@@ -11,7 +11,7 @@ namespace wings {
     struct Func {
         WObj* (*fptr)(WObj** args, int argc, void* userdata);
         void* userdata;
-        const WObj* captures;
+        const WObj** captures;
         int captureCount;
     };
 
@@ -34,6 +34,7 @@ namespace wings {
     struct Config {
         int maxAlloc;
         int maxRecursion;
+        int maxCollectionSize;
         LogFn log;
     };
 
@@ -90,12 +91,13 @@ namespace wings {
         WDLL_EXPORT int WObjLen(const WObj* obj);
         WDLL_EXPORT WObj* WObjCall(const WObj* func, WObj** args, int argc);
 
-        WDLL_EXPORT WObj* WObjListGet(WObj* list);
-        WDLL_EXPORT void WObjListSet(WObj* list, WObj* value);
+        WDLL_EXPORT WObj* WObjListGet(const WObj* list, int index);
+        WDLL_EXPORT void WObjListSet(WObj* list, int index, WObj* value);
         WDLL_EXPORT void WObjListPush(WObj* list, WObj* value);
         WDLL_EXPORT void WObjListPop(WObj* list);
         WDLL_EXPORT void WObjListInsert(WObj* list, int index, WObj* value);
         WDLL_EXPORT void WObjListRemoveAt(WObj* list, int index);
+        WDLL_EXPORT WObj* WObjMapGet(WObj* map, const WObj* key);
         WDLL_EXPORT void WObjMapSet(WObj* map, const WObj* key, WObj* value);
         WDLL_EXPORT void WObjMapRemove(WObj* map, const WObj* key);
 

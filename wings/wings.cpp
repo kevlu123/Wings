@@ -24,6 +24,7 @@ namespace wings {
             } else {
                 context->config.maxAlloc = 100'000;
                 context->config.maxRecursion = 100;
+                context->config.maxCollectionSize = 1'000'000'000;
                 context->config.log = [](const char* message) { std::cout << message << '\n'; };
             }
         }

@@ -10,7 +10,7 @@
 
 namespace std {
     template <> struct hash<wings::WObj> {
-        size_t operator()(const wings::WObj& obj);
+        size_t operator()(const wings::WObj& obj) const;
     };
 }
 

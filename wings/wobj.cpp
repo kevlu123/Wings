@@ -26,6 +26,14 @@ namespace wings {
         return !(lhs == rhs);
     }
 
+    static bool IsImmutable(const WObj* obj) {
+        return obj->type == WObj::Type::Null
+            || obj->type == WObj::Type::Bool
+            || obj->type == WObj::Type::Int
+            || obj->type == WObj::Type::Float
+            || obj->type == WObj::Type::String;
+    }
+
 	extern "C" {
 
         WObj* WObjCreateNull(WContext* context) {
@@ -199,13 +207,9 @@ namespace wings {
                     [value](const WObj* obj) { return WObjEquals(obj, value); }
                 );
             case WObj::Type::Map:
-                return std::any_of(
-                    container->m.begin(),
-                    container->m.end(),
-                    [value](const std::pair<const WObj, WObj*>& pair) { return WObjEquals(&pair.first, value); }
-                );
+                return container->m.find(*value) != container->m.end();
             default:
-                return false;
+                WUNREACHABLE();
             }
         }
 
@@ -224,12 +228,12 @@ namespace wings {
             default: WUNREACHABLE();
             }
         }
-
+        
         bool WObjEquals(const WObj* lhs, const WObj* rhs) {
             WASSERT(lhs && rhs);
             return *lhs == *rhs;
         }
-
+        
         int WObjLen(const WObj* obj) {
             WASSERT(obj);
             switch (obj->type) {
@@ -239,10 +243,61 @@ namespace wings {
             default: WUNREACHABLE();
             }
         }
-
+        
         WObj* WObjCall(const WObj* func, WObj** args, int argc) {
-            WASSERT(func && args && argc >= 0);
+            WASSERT(func && args && argc >= 0 && WObjIsFunc(func));
+            for (int i = 0; i < argc; i++)
+                WASSERT(args[i]);
             return func->fn.fptr(args, argc, func->fn.userdata);
+        }
+        
+        WObj* WObjListGet(const WObj* list, int index) {
+            WASSERT(list && WObjIsList(list) && index >= 0 && (size_t)index < list->v.size());
+            return list->v[index];
+        }
+        
+        void WObjListSet(WObj* list, int index, WObj* value) {
+            WASSERT(list && WObjIsList(list) && index >= 0 && (size_t)index < list->v.size());
+            list->v[index] = value;
+        }
+        
+        void WObjListPush(WObj* list, WObj* value) {
+            WASSERT(list && value && WObjIsList(list));
+            WObjListInsert(list, (int)list->v.size(), value);
+        }
+        
+        void WObjListPop(WObj* list) {
+            WASSERT(list && WObjIsList(list));
+            WObjListRemoveAt(list, (int)list->v.size() - 1);
+        }
+        
+        void WObjListInsert(WObj* list, int index, WObj* value) {
+            WASSERT(list && WObjIsList(list) && index >= 0 && (size_t)index <= list->v.size() && value);
+            list->v.insert(list->v.begin() + index, value);
+        }
+        
+        void WObjListRemoveAt(WObj* list, int index) {
+            WASSERT(list && WObjIsList(list) && index >= 0 && (size_t)index < list->v.size());
+            list->v.erase(list->v.begin() + index);
+        }
+        
+        WObj* WObjMapGet(WObj* map, const WObj* key) {
+            WASSERT(map && key && WObjIsMap(map) && IsImmutable(key));
+            auto it = map->m.find(*key);
+            WASSERT(it != map->m.end());
+            return it->second;
+        }
+
+        void WObjMapSet(WObj* map, const WObj* key, WObj* value) {
+            WASSERT(map && key && value && WObjIsMap(map) && IsImmutable(key));
+            map->m[*key] = value;
+        }
+
+        void WObjMapRemove(WObj* map, const WObj* key) {
+            WASSERT(map && key && WObjIsMap(map) && IsImmutable(key));
+            auto it = map->m.find(*key);
+            WASSERT(it != map->m.end());
+            map->m.erase(it);
         }
 
 	} // extern "C"
@@ -250,7 +305,7 @@ namespace wings {
 } // namespace wings
 
 namespace std {
-    size_t hash<wings::WObj>::operator()(const wings::WObj& obj) {
+    size_t hash<wings::WObj>::operator()(const wings::WObj& obj) const {
         auto doHash = []<typename T>(const T & val) { return std::hash<T>()(val); };
 
         switch (obj.type) {
