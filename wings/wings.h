@@ -11,7 +11,8 @@ namespace wings {
     struct Func {
         WObj* (*fptr)(WObj** args, int argc, void* userdata);
         void* userdata;
-        std::vector<const WObj*> captures;
+        const WObj* captures;
+        int captureCount;
     };
 
     struct Finalizer {
@@ -86,8 +87,8 @@ namespace wings {
         WDLL_EXPORT bool WObjIn(const WObj* container, const WObj* value);
         WDLL_EXPORT bool WObjTruthy(const WObj* obj);
         WDLL_EXPORT bool WObjEquals(const WObj* lhs, const WObj* rhs);
-        WDLL_EXPORT WObj* WObjCall(const WObj* func, WObj** args, int argc);
         WDLL_EXPORT int WObjLen(const WObj* obj);
+        WDLL_EXPORT WObj* WObjCall(const WObj* func, WObj** args, int argc);
 
         WDLL_EXPORT WObj* WObjListGet(WObj* list);
         WDLL_EXPORT void WObjListSet(WObj* list, WObj* value);

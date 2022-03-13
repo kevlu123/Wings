@@ -28,6 +28,75 @@ namespace wings {
 
 	extern "C" {
 
+        WObj* WObjCreateNull(WContext* context) {
+            WASSERT(context);
+            auto obj = Alloc(context);
+            obj->type = WObj::Type::Null;
+            return obj;
+        }
+
+        WObj* WObjCreateBool(WContext* context, bool value) {
+            WASSERT(context);
+            auto obj = Alloc(context);
+            obj->type = WObj::Type::Bool;
+            obj->b = value;
+            return obj;
+        }
+
+        WObj* WObjCreateInt(WContext* context, int value) {
+            WASSERT(context);
+            auto obj = Alloc(context);
+            obj->type = WObj::Type::Int;
+            obj->i = value;
+            return obj;
+        }
+
+        WObj* WObjCreateFloat(WContext* context, wfloat value) {
+            WASSERT(context);
+            auto obj = Alloc(context);
+            obj->type = WObj::Type::Float;
+            obj->f = value;
+            return obj;
+        }
+
+        WObj* WObjCreateString(WContext* context, const char* value) {
+            WASSERT(context && value);
+            auto obj = Alloc(context);
+            obj->type = WObj::Type::String;
+            obj->s = value;
+            return obj;
+        }
+
+        WObj* WObjCreateList(WContext* context) {
+            WASSERT(context);
+            auto obj = Alloc(context);
+            obj->type = WObj::Type::List;
+            return obj;
+        }
+
+        WObj* WObjCreateMap(WContext* context) {
+            WASSERT(context);
+            auto obj = Alloc(context);
+            obj->type = WObj::Type::Map;
+            return obj;
+        }
+
+        WObj* WObjCreateFunc(WContext* context, const Func* value) {
+            WASSERT(context && value && value->fptr);
+            auto obj = Alloc(context);
+            obj->type = WObj::Type::Func;
+            obj->fn = *value;
+            return obj;
+        }
+
+        WObj* WObjCreateUserdata(WContext* context, void* value) {
+            WASSERT(context);
+            auto obj = Alloc(context);
+            obj->type = WObj::Type::Userdata;
+            obj->u = value;
+            return obj;
+        }
+
         bool WObjIsNull(const WObj* obj) {
             WASSERT(obj);
             return obj->type == WObj::Type::Null;
@@ -169,6 +238,11 @@ namespace wings {
             case WObj::Type::Map: return (int)obj->s.size();
             default: WUNREACHABLE();
             }
+        }
+
+        WObj* WObjCall(const WObj* func, WObj** args, int argc) {
+            WASSERT(func && args && argc >= 0);
+            return func->fn.fptr(args, argc, func->fn.userdata);
         }
 
 	} // extern "C"

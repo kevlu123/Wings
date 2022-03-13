@@ -39,11 +39,11 @@ namespace wings {
             int i;
             wfloat f;
             void* u;
+            Func fn;
         };
         std::string s;
         std::vector<WObj*> v;
         std::unordered_map<WObj, WObj*> m;
-        Func fn;
         Finalizer finalizer{};
     };
 

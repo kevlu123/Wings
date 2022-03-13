@@ -39,8 +39,8 @@ namespace wings {
                     case WObj::Type::Func:
                         inUse.insert(
                             inUse.end(),
-                            obj->fn.captures.begin(),
-                            obj->fn.captures.end()
+                            obj->fn.captures,
+                            obj->fn.captures + obj->fn.captureCount
                         );
                         break;
                     }
