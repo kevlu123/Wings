@@ -3,6 +3,6 @@
 
 namespace wings {
 
-	WObj* Alloc();
+	WObj* Alloc(WContext* context);
 
 }

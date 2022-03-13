@@ -1,3 +1,4 @@
+#pragma once
 #include "wings.h"
 #include <string>
 #include <vector>
@@ -38,11 +39,11 @@ namespace wings {
             int i;
             wfloat f;
             void* u;
-            Func fn;
         };
         std::string s;
         std::vector<WObj*> v;
         std::unordered_map<WObj, WObj*> m;
+        Func fn;
         Finalizer finalizer{};
     };
 
@@ -55,4 +56,4 @@ namespace wings {
 } // namespace wings
 
 #define WASSERT(assertion) do { if (!(assertion)) std::abort(); } while (0)
-#define WUNREACHABLE() WASSERT(false)
+#define WUNREACHABLE() std::abort()

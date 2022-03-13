@@ -1,5 +1,6 @@
 #pragma once
 #include <stdint.h>
+#include <vector>
 
 namespace wings {
 
@@ -10,6 +11,7 @@ namespace wings {
     struct Func {
         WObj* (*fptr)(WObj** args, int argc, void* userdata);
         void* userdata;
+        std::vector<const WObj*> captures;
     };
 
     struct Finalizer {
@@ -45,7 +47,7 @@ namespace wings {
         WDLL_EXPORT Error WErrorGet();
         WDLL_EXPORT WContext* WContextCreate(const Config* config = nullptr);
         WDLL_EXPORT void WContextDestroy(WContext* context);
-        WDLL_EXPORT void WContextCompile(WContext* context, const char* code, Func* compiled);
+        WDLL_EXPORT WObj* WContextCompile(WContext* context, const char* code);
         WDLL_EXPORT void WContextGetConfig(const WContext* context, Config* config);
         WDLL_EXPORT void WContextSetConfig(WContext* context, const Config* config);
         WDLL_EXPORT void WContextLog(const WContext* context, const char* message);
