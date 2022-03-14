@@ -35,6 +35,7 @@ namespace wings {
         int maxAlloc;
         int maxRecursion;
         int maxCollectionSize;
+        float gcRunFactor;
         LogFn log;
     };
 

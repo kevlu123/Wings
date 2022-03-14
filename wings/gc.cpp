@@ -5,6 +5,12 @@
 namespace wings {
 
     WObj* Alloc(WContext* context) {
+        // Check if GC should run
+        if (context->mem.size() >= (size_t)(context->config.gcRunFactor * context->lastObjectCountAfterGC)) {
+            WGCCollect(context);
+        }
+
+        // Allocate new object
         auto obj = std::make_unique<WObj>();
         auto p = obj.get();
         context->mem.push_back(std::move(obj));
@@ -61,6 +67,8 @@ namespace wings {
             }
             // Free the memory
             context->mem.erase(context->mem.begin(), unusedBegin);
+
+            context->lastObjectCountAfterGC = context->mem.size();
         }
 
         void WGCProtect(WContext* context, const WObj* obj) {

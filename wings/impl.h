@@ -49,6 +49,8 @@ namespace wings {
 
     struct WContext {
         Config config{};
+
+        size_t lastObjectCountAfterGC = 0;
         std::deque<std::unique_ptr<WObj>> mem;
         std::unordered_multiset<const WObj*> protectedObjects;
     };
