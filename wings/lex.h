@@ -12,10 +12,11 @@ namespace wings {
 
 	struct Token {
 		enum class Type {
+			Null,
 			Bool,
 			Int,
 			Float,
-			Str,
+			String,
 			Symbol,
 			Word,
 		} type;
@@ -26,7 +27,7 @@ namespace wings {
 		struct {
 			union {
 				bool b;
-				int i = 0;
+				int i;
 				wfloat f;
 			};
 			std::string s;
@@ -38,14 +39,18 @@ namespace wings {
 		std::vector<LexTree> children;
 	};
 
+	struct LexError {
+		bool good{};
+		SourcePosition srcPos{};
+		std::string message;
+		operator bool() const { return !good; }
+		static LexError Good() { return LexError{ true }; }
+	};
+
 	struct LexResult {
 		std::vector<std::string> rawCode;
-		bool success{};
 		LexTree lexTree;
-		struct {
-			SourcePosition srcPos{};
-			std::string message;
-		} error;
+		LexError error;
 	};
 
 	LexResult Lex(std::string code);

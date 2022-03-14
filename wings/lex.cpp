@@ -32,7 +32,11 @@ namespace wings {
 	}
 
 	static bool IsWhitespace(const std::string& s) {
-		return s.find_first_not_of(' ') == std::string::npos;
+		return s.find_first_not_of(" \t") == std::string::npos;
+	}
+
+	static bool IsWhitespaceChar(char c) {
+		return c == ' ' || c == '\t';
 	}
 
 	static void StripComments(std::string& s) {
@@ -44,6 +48,10 @@ namespace wings {
 
 	static bool IsPossibleSymbol(const std::string& s) {
 		return std::any_of(SYMBOLS.begin(), SYMBOLS.end(), [&](const auto& x) {return x.starts_with(s); });
+	}
+
+	static bool IsPossibleSymbol(char c) {
+		return IsPossibleSymbol(std::string(1, c));
 	}
 
 	static std::vector<std::string> SplitLines(const std::string& s) {
@@ -99,5 +107,162 @@ namespace wings {
 				return 0;
 			}
 		}
+	}
+
+	static void RemoveEmptyLines(std::vector<std::string>& lines) {
+		for (auto& line : lines)
+			StripComments(line);
+
+		lines.erase(
+			std::remove_if(
+				lines.begin(),
+				lines.end(),
+				IsWhitespace
+			),
+			lines.end()
+		);
+	}
+
+	using StringIter = const char*;
+
+	static Token ConsumeWord(StringIter& p) {
+		Token t{};
+		for (; *p && IsAlphaNum(*p); ++p) {
+			t.text += *p;
+		}
+		t.type = Token::Type::Word;
+		if (t.text == "None") {
+			t.type = Token::Type::Null;
+		} else if (t.text == "True" || t.text == "False") {
+			t.type = Token::Type::Bool;
+			t.literal.b = t.text[0] == 'T';
+		}
+		return t;
+	}
+
+	static LexError ConsumeNumber(StringIter& p, Token& out) {
+		// TODO
+		return LexError::Good();
+	}
+
+	static LexError ConsumeString(StringIter& p, Token& out) {
+		char quote = *p;
+		++p;
+
+		Token t{};
+		for (; *p && *p != quote; ++p) {
+			t.text += *p;
+
+			// Escape sequences TODO
+			//if (*p == '\\') {
+			//	++p;
+			//	switch (*p) {
+			//
+			//	}
+			//}
+		}
+
+		if (*p == '\0') {
+			LexError err{};
+			err.good = false;
+			err.message = "Missing closing quote";
+			return err;
+		}
+
+		t.text = quote + t.text + quote;
+		t.type = Token::Type::String;
+		out = std::move(t);
+		return LexError::Good();
+	}
+
+	static void ConsumeWhitespace(StringIter& p) {
+		while (*p && IsWhitespaceChar(*p))
+			++p;
+	}
+
+	static Token ConsumeSymbol(StringIter& p) {
+		Token t{};
+		for (; *p && IsPossibleSymbol(t.text + *p); ++p) {
+			t.text += *p;
+		}
+		t.type = Token::Type::Symbol;
+		return t;
+	}
+
+	static LexError TokenizeLine(const std::string& line, std::vector<Token>& out) {
+		std::vector<Token> tokens;
+		LexError error = LexError::Good();
+
+		StringIter p = line.data();
+		while (*p) {
+			size_t srcColumn = p - line.data();
+			bool wasWhitespace = false;
+
+			if (IsAlpha(*p)) {
+				tokens.push_back(ConsumeWord(p));
+			} else if (IsDigit(*p)) {
+				Token t{};
+				if (!(error = ConsumeNumber(p, t))) {
+					tokens.push_back(std::move(t));
+				}
+			} else if (*p == '\'' || *p == '"') {
+				Token t{};
+				if (!(error = ConsumeString(p, t))) {
+					tokens.push_back(std::move(t));
+				}
+			} else if (IsPossibleSymbol(*p)) {
+				tokens.push_back(ConsumeSymbol(p));
+			} else if (IsWhitespaceChar(*p)) {
+				ConsumeWhitespace(p);
+				wasWhitespace = true;
+			} else {
+				error.good = false;
+				error.srcPos.column = srcColumn;
+				error.message = std::string("Unrecognised character ") + *p;
+			}
+
+			if (error) {
+				out.clear();
+				error.srcPos.column = srcColumn;
+				return error;
+			}
+
+			if (!wasWhitespace) {
+				tokens.back().srcPos.column = srcColumn;
+			}
+		}
+
+		out = std::move(tokens);
+		return LexError::Good();
+	}
+
+	// Returns [no. of open brackets] minus [no. close brackets]
+	static int BracketBalance(std::vector<Token>& tokens) {
+		int balance = 0;
+		for (const auto& t : tokens) {
+			if (t.text.size() == 1) {
+				switch (t.text[0]) {
+				case '(': case '[': case '{': balance++; break;
+				case ')': case ']': case '}': balance--; break;
+				}
+			}
+		}
+		return balance;
+	}
+
+	LexResult Lex(std::string code) {
+		code = NormalizeLineEndings(code);
+		auto rawCode = SplitLines(code);
+		
+		// Clean out comments and empty lines
+		decltype(rawCode) lines = rawCode; // Using decltype to suppress copy warning
+		RemoveEmptyLines(lines);
+
+		// TODO
+
+		LexResult result{};
+		result.error.good = true;
+		result.rawCode = std::move(rawCode);
+		return result;
 	}
 }
