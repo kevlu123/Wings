@@ -1,7 +1,0 @@
-#include <iostream>
-#include "wings.h"
-
-int main() {
-
-	return 0;
-}
