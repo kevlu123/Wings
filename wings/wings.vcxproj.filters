@@ -27,6 +27,9 @@
     <ClCompile Include="gc.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="lex.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="wings.h">
@@ -36,6 +39,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="gc.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="lex.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

@@ -144,6 +144,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="gc.cpp" />
+    <ClCompile Include="lex.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="wings.cpp" />
     <ClCompile Include="wobj.cpp" />
@@ -151,6 +152,7 @@
   <ItemGroup>
     <ClInclude Include="gc.h" />
     <ClInclude Include="impl.h" />
+    <ClInclude Include="lex.h" />
     <ClInclude Include="wings.h" />
   </ItemGroup>
   <ItemGroup>
