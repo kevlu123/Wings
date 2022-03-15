@@ -1,4 +1,5 @@
 #include "lex.h"
+#include "impl.h"
 #include <regex>
 #include <optional>
 
@@ -23,8 +24,33 @@ namespace wings {
 		return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || c == '_';
 	}
 
-	static bool IsDigit(char c) {
-		return c >= '0' && c <= '9';
+	static bool IsDigit(char c, int base = 10) {
+		switch (base) {
+		case 2: return c >= '0' && c <= '1';
+		case 8: return c >= '0' && c <= '7';
+		case 10: return c >= '0' && c <= '9';
+		case 16: return (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F');
+		default: WUNREACHABLE();
+		}
+	}
+
+	static int DigitValueOf(char c, int base) {
+		switch (base) {
+		case 2:
+		case 8:
+		case 10:
+			return c - '0';
+		case 16:
+			if (c >= '0' && c <= '9') {
+				return c - '0';
+			} else if (c >= 'a' && c <= 'f') {
+				return c - 'a' + 10;
+			} else {
+				return c - 'A' + 10;
+			}
+		default:
+			WUNREACHABLE();
+		}
 	}
 
 	static bool IsAlphaNum(char c) {
@@ -141,7 +167,48 @@ namespace wings {
 	}
 
 	static LexError ConsumeNumber(StringIter& p, Token& out) {
-		// TODO
+		Token t{};
+		int base = 10;
+		if (*p == '0') {
+			switch (p[1]) {
+			case 'b': case 'B': base = 2; break;
+			case 'x': case 'X': base = 8; break;
+			case '.': break;
+			default: base = 8; break;
+			}
+		}
+
+		if (base != 10 && base != 8) {
+			t.text += p[0];
+			t.text += p[1];
+			p += 2;
+		}
+
+		uint16_t value = 0;
+		for (; *p && IsDigit(base); ++p) {
+			value = (base * value) + DigitValueOf(*p, base);
+		}
+
+		wfloat fvalue = 0;
+		if (*p == '.') {
+			// Is a float
+			fvalue = (wfloat)value;
+			for (int i = 1; *p && IsDigit(base); ++p, ++i) {
+				fvalue += DigitValueOf(*p, base) * std::pow((wfloat)base, (wfloat)-i);
+			}
+			t.literal.f = fvalue;
+			t.type = Token::Type::Float;
+		} else {
+			// Is an int
+			if (value > std::numeric_limits<unsigned int>::max()) {
+				return LexError::Bad("Integer literal is too large");
+			}
+			unsigned int u = (unsigned int)value;
+			std::memcpy(&t.literal.i, &u, sizeof(u));
+			t.type = Token::Type::Int;
+		}
+
+		out = std::move(t);
 		return LexError::Good();
 	}
 
@@ -153,7 +220,7 @@ namespace wings {
 		for (; *p && *p != quote; ++p) {
 			t.text += *p;
 
-			// Escape sequences TODO
+			// Escape sequences
 			if (*p == '\\') {
 				++p;
 				if (*p == '\0') {
@@ -267,7 +334,7 @@ namespace wings {
 		return balance;
 	}
 
-	static LexResult Lex(std::string code) {
+	LexResult Lex(std::string code) {
 		code = NormalizeLineEndings(code);
 		auto rawCode = SplitLines(code);
 		
