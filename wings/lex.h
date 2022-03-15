@@ -45,6 +45,13 @@ namespace wings {
 		std::string message;
 		operator bool() const { return !good; }
 		static LexError Good() { return LexError{ true }; }
+		static LexError Bad(std::string message) {
+			return LexError{
+				.good = false,
+				.srcPos = {},
+				.message = message
+			};
+		}
 	};
 
 	struct LexResult {

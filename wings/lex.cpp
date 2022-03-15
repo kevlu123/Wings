@@ -154,19 +154,36 @@ namespace wings {
 			t.text += *p;
 
 			// Escape sequences TODO
-			//if (*p == '\\') {
-			//	++p;
-			//	switch (*p) {
-			//
-			//	}
-			//}
+			if (*p == '\\') {
+				++p;
+				if (*p == '\0') {
+					return LexError::Bad("Missing closing quote");
+				}
+
+				char esc = 0;
+				switch (*p) {
+				case '0': esc = '\0'; break;
+				case 'n': esc = '\n'; break;
+				case 'r': esc = '\r'; break;
+				case 't': esc = '\t'; break;
+				case 'v': esc = '\v'; break;
+				case 'b': esc = '\b'; break;
+				case 'f': esc = '\f'; break;
+				case '"': esc = '"'; break;
+				case '\'': esc = '\''; break;
+				case '\\': esc = '\\'; break;
+				default: return LexError::Bad("Invalid escape sequence");
+				}
+
+				t.text += *p;
+				t.literal.s += esc;
+			} else {
+				t.literal.s += *p;
+			}
 		}
 
 		if (*p == '\0') {
-			LexError err{};
-			err.good = false;
-			err.message = "Missing closing quote";
-			return err;
+			return LexError::Bad("Missing closing quote");
 		}
 
 		t.text = quote + t.text + quote;
@@ -250,7 +267,7 @@ namespace wings {
 		return balance;
 	}
 
-	LexResult Lex(std::string code) {
+	static LexResult Lex(std::string code) {
 		code = NormalizeLineEndings(code);
 		auto rawCode = SplitLines(code);
 		
