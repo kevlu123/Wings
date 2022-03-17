@@ -167,33 +167,44 @@ namespace wings {
 	}
 
 	static LexError ConsumeNumber(StringIter& p, Token& out) {
+		StringIter start = p;
+
 		Token t{};
 		int base = 10;
 		if (*p == '0') {
 			switch (p[1]) {
 			case 'b': case 'B': base = 2; break;
-			case 'x': case 'X': base = 8; break;
+			case 'x': case 'X': base = 16; break;
 			case '.': break;
 			default: base = 8; break;
 			}
 		}
 
-		if (base != 10 && base != 8) {
+		if (base == 2 || base == 16) {
 			t.text += p[0];
 			t.text += p[1];
 			p += 2;
+
+			if (!IsDigit(*p, base) && *p != '.') {
+				if (base == 2) {
+					return LexError::Bad("Invalid binary literal");
+				} else {
+					return LexError::Bad("Invalid hexadecimal literal");
+				}
+			}
 		}
 
 		uint16_t value = 0;
-		for (; *p && IsDigit(base); ++p) {
+		for (; *p && IsDigit(*p, base); ++p) {
 			value = (base * value) + DigitValueOf(*p, base);
 		}
 
 		wfloat fvalue = 0;
 		if (*p == '.') {
 			// Is a float
+			++p;
 			fvalue = (wfloat)value;
-			for (int i = 1; *p && IsDigit(base); ++p, ++i) {
+			for (int i = 1; *p && IsDigit(*p, base); ++p, ++i) {
 				fvalue += DigitValueOf(*p, base) * std::pow((wfloat)base, (wfloat)-i);
 			}
 			t.literal.f = fvalue;
@@ -208,6 +219,11 @@ namespace wings {
 			t.type = Token::Type::Int;
 		}
 
+		if (IsAlphaNum(*p)) {
+			return LexError::Bad("Invalid numerical literal");
+		}
+
+		t.text = std::string(start, p);
 		out = std::move(t);
 		return LexError::Good();
 	}
