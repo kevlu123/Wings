@@ -5,6 +5,47 @@
 
 namespace wings {
 
+	std::string Token::ToString() const {
+		std::vector<std::pair<std::string, std::string>> props;
+
+		props.push_back({ "text", '"' + text + '"' });
+		props.push_back({ "srcPos", '(' + std::to_string(srcPos.column) + ',' + std::to_string(srcPos.line) + ')' });
+		switch (type) {
+		case wings::Token::Type::Null:
+			props.push_back({ "type", "null" });
+			break;
+		case wings::Token::Type::Bool:
+			props.push_back({ "type", "bool" });
+			props.push_back({ "value", literal.b ? "True" : "False" });
+			break;
+		case wings::Token::Type::Int:
+			props.push_back({ "type", "int" });
+			props.push_back({ "value", std::to_string(literal.i) });
+			break;
+		case wings::Token::Type::Float:
+			props.push_back({ "type", "float" });
+			props.push_back({ "value", std::to_string(literal.f) });
+			break;
+		case wings::Token::Type::String:
+			props.push_back({ "type", "string" });
+			props.push_back({ "value", literal.s });
+			break;
+		case wings::Token::Type::Symbol:
+			props.push_back({ "type", "symbol" });
+			break;
+		case wings::Token::Type::Word:
+			props.push_back({ "type", "word" });
+			break;
+		default:
+			WUNREACHABLE();
+		}
+
+		std::string s = "{ ";
+		for (const auto& p : props)
+			s += p.first + ": " + p.second + ", ";
+		return s + "}";
+	}
+
 	static const std::vector<std::string> SYMBOLS = {
 		"(", ")", "[", "]", "{", "}", ":", ".", ",",
 		"+", "-", "*", "**", "/", "//", "%",

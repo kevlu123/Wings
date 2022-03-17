@@ -32,6 +32,8 @@ namespace wings {
 			};
 			std::string s;
 		} literal;
+
+		std::string ToString() const;
 	};
 
 	struct LexTree {
