@@ -2,6 +2,7 @@
 #include "impl.h"
 #include <regex>
 #include <optional>
+#include <stack>
 
 namespace wings {
 
@@ -9,7 +10,8 @@ namespace wings {
 		std::vector<std::pair<std::string, std::string>> props;
 
 		props.push_back({ "text", '"' + text + '"' });
-		props.push_back({ "srcPos", '(' + std::to_string(srcPos.column) + ',' + std::to_string(srcPos.line) + ')' });
+		props.push_back({ "srcPos", '(' + std::to_string(srcPos.column + 1)
+								  + ',' + std::to_string(srcPos.line + 1) + ')' });
 		switch (type) {
 		case wings::Token::Type::Null:
 			props.push_back({ "type", "null" });
@@ -44,6 +46,32 @@ namespace wings {
 		for (const auto& p : props)
 			s += p.first + ": " + p.second + ", ";
 		return s + "}";
+	}
+
+	std::string LexError::ToString() const {
+		if (good) {
+			return "Success";
+		} else {
+			return '(' + std::to_string(srcPos.column + 1) + ','
+				+ std::to_string(srcPos.line + 1) + ") "
+				+ message;
+		}
+	}
+
+	LexError::operator bool() const {
+		return !good;
+	}
+
+	LexError LexError::Good() {
+		return LexError{ true };
+	}
+
+	LexError LexError::Bad(std::string message) {
+		return LexError{
+			.good = false,
+			.srcPos = {},
+			.message = message
+		};
 	}
 
 	static const std::vector<std::string> SYMBOLS = {
@@ -176,20 +204,6 @@ namespace wings {
 		}
 	}
 
-	static void RemoveEmptyLines(std::vector<std::string>& lines) {
-		for (auto& line : lines)
-			StripComments(line);
-
-		lines.erase(
-			std::remove_if(
-				lines.begin(),
-				lines.end(),
-				IsWhitespace
-			),
-			lines.end()
-		);
-	}
-
 	using StringIter = const char*;
 
 	static Token ConsumeWord(StringIter& p) {
@@ -310,6 +324,9 @@ namespace wings {
 			return LexError::Bad("Missing closing quote");
 		}
 
+		// Skip closing quote
+		++p;
+
 		t.text = quote + t.text + quote;
 		t.type = Token::Type::String;
 		out = std::move(t);
@@ -395,14 +412,69 @@ namespace wings {
 		code = NormalizeLineEndings(code);
 		auto rawCode = SplitLines(code);
 		
-		// Clean out comments and empty lines
-		decltype(rawCode) lines = rawCode; // Using decltype to suppress copy warning
-		RemoveEmptyLines(lines);
+		// Clean out comments
+		std::vector<std::string> lines = rawCode;
+		for (auto& line : lines)
+			StripComments(line);
 
-		// TODO
+		LexError error = LexError::Good();
+		std::optional<std::string> indentString;
+		int bracketBalance = 0;
+
+		LexTree rootTree;
+		std::stack<LexTree*> parents;
+		parents.push(&rootTree);
+
+		for (size_t i = 0; i < lines.size(); i++) {
+			if (IsWhitespace(lines[i]))
+				continue;
+
+			std::vector<Token> tokens;
+			if (error = TokenizeLine(lines[i], tokens)) {
+				// Line had tokenizing errors
+				error.srcPos.line = i;
+				break;
+			}
+
+			bool continuePrevLine = bracketBalance > 0;
+			bracketBalance = std::max(0, bracketBalance + BracketBalance(tokens));
+			if (continuePrevLine) {
+				// Ignore indenting and continue as previous line
+				auto& prevLineTokens = parents.top()->children.back().tokens;
+				prevLineTokens.insert(prevLineTokens.end(), tokens.begin(), tokens.end());
+				continue;
+			}
+
+			// Get indentation level
+			size_t parentIndent = parents.size() - 1;
+			size_t currentIndent = 0;
+			if (IndentOf(lines[i], indentString, currentIndent)) {
+				error = LexError::Bad("Invalid indentation");
+				error.srcPos.line = i;
+				break;
+			}
+
+			if (currentIndent > parentIndent + 1) {
+				// Indented too much
+				error = LexError::Bad("Indentation level increased by more than 1");
+				error.srcPos.line = i;
+				break;
+			} else if (currentIndent == parentIndent + 1) {
+				// Indented
+				// Make the last child the new parent
+				parents.push(&parents.top()->children.back());
+			} else if (currentIndent < parentIndent) {
+				// De-indented
+				for (size_t j = 0; j < parentIndent - currentIndent; j++)
+					parents.pop();
+			}
+
+			parents.top()->children.push_back(LexTree{ std::move(tokens) });
+		}
 
 		LexResult result{};
-		result.error.good = true;
+		result.error = std::move(error);
+		result.lexTree = std::move(rootTree);
 		result.rawCode = std::move(rawCode);
 		return result;
 	}

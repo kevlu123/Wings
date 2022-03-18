@@ -45,20 +45,16 @@ namespace wings {
 		bool good{};
 		SourcePosition srcPos{};
 		std::string message;
-		operator bool() const { return !good; }
-		static LexError Good() { return LexError{ true }; }
-		static LexError Bad(std::string message) {
-			return LexError{
-				.good = false,
-				.srcPos = {},
-				.message = message
-			};
-		}
+
+		operator bool() const;
+		std::string ToString() const;
+		static LexError Good();
+		static LexError Bad(std::string message);
 	};
 
 	struct LexResult {
 		std::vector<std::string> rawCode;
-		LexTree lexTree;
+		LexTree lexTree; // Root tree contains no tokens
 		LexError error;
 	};
 
