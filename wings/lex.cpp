@@ -10,8 +10,8 @@ namespace wings {
 		std::vector<std::pair<std::string, std::string>> props;
 
 		props.push_back({ "text", '"' + text + '"' });
-		props.push_back({ "srcPos", '(' + std::to_string(srcPos.column + 1)
-								  + ',' + std::to_string(srcPos.line + 1) + ')' });
+		props.push_back({ "srcPos", '(' + std::to_string(srcPos.line + 1)
+								  + ',' + std::to_string(srcPos.column + 1) + ')' });
 		switch (type) {
 		case wings::Token::Type::Null:
 			props.push_back({ "type", "null" });
@@ -46,32 +46,6 @@ namespace wings {
 		for (const auto& p : props)
 			s += p.first + ": " + p.second + ", ";
 		return s + "}";
-	}
-
-	std::string LexError::ToString() const {
-		if (good) {
-			return "Success";
-		} else {
-			return '(' + std::to_string(srcPos.column + 1) + ','
-				+ std::to_string(srcPos.line + 1) + ") "
-				+ message;
-		}
-	}
-
-	LexError::operator bool() const {
-		return !good;
-	}
-
-	LexError LexError::Good() {
-		return LexError{ true };
-	}
-
-	LexError LexError::Bad(std::string message) {
-		return LexError{
-			.good = false,
-			.srcPos = {},
-			.message = message
-		};
 	}
 
 	static const std::vector<std::string> SYMBOLS = {
@@ -221,7 +195,7 @@ namespace wings {
 		return t;
 	}
 
-	static LexError ConsumeNumber(StringIter& p, Token& out) {
+	static CodeError ConsumeNumber(StringIter& p, Token& out) {
 		StringIter start = p;
 
 		Token t{};
@@ -242,9 +216,9 @@ namespace wings {
 
 			if (!IsDigit(*p, base) && *p != '.') {
 				if (base == 2) {
-					return LexError::Bad("Invalid binary literal");
+					return CodeError::Bad("Invalid binary literal");
 				} else {
-					return LexError::Bad("Invalid hexadecimal literal");
+					return CodeError::Bad("Invalid hexadecimal literal");
 				}
 			}
 		}
@@ -267,7 +241,7 @@ namespace wings {
 		} else {
 			// Is an int
 			if (value > std::numeric_limits<unsigned int>::max()) {
-				return LexError::Bad("Integer literal is too large");
+				return CodeError::Bad("Integer literal is too large");
 			}
 			unsigned int u = (unsigned int)value;
 			std::memcpy(&t.literal.i, &u, sizeof(u));
@@ -275,15 +249,15 @@ namespace wings {
 		}
 
 		if (IsAlphaNum(*p)) {
-			return LexError::Bad("Invalid numerical literal");
+			return CodeError::Bad("Invalid numerical literal");
 		}
 
 		t.text = std::string(start, p);
 		out = std::move(t);
-		return LexError::Good();
+		return CodeError::Good();
 	}
 
-	static LexError ConsumeString(StringIter& p, Token& out) {
+	static CodeError ConsumeString(StringIter& p, Token& out) {
 		char quote = *p;
 		++p;
 
@@ -295,7 +269,7 @@ namespace wings {
 			if (*p == '\\') {
 				++p;
 				if (*p == '\0') {
-					return LexError::Bad("Missing closing quote");
+					return CodeError::Bad("Missing closing quote");
 				}
 
 				char esc = 0;
@@ -310,7 +284,7 @@ namespace wings {
 				case '"': esc = '"'; break;
 				case '\'': esc = '\''; break;
 				case '\\': esc = '\\'; break;
-				default: return LexError::Bad("Invalid escape sequence");
+				default: return CodeError::Bad("Invalid escape sequence");
 				}
 
 				t.text += *p;
@@ -321,7 +295,7 @@ namespace wings {
 		}
 
 		if (*p == '\0') {
-			return LexError::Bad("Missing closing quote");
+			return CodeError::Bad("Missing closing quote");
 		}
 
 		// Skip closing quote
@@ -330,7 +304,7 @@ namespace wings {
 		t.text = quote + t.text + quote;
 		t.type = Token::Type::String;
 		out = std::move(t);
-		return LexError::Good();
+		return CodeError::Good();
 	}
 
 	static void ConsumeWhitespace(StringIter& p) {
@@ -347,9 +321,9 @@ namespace wings {
 		return t;
 	}
 
-	static LexError TokenizeLine(const std::string& line, std::vector<Token>& out) {
+	static CodeError TokenizeLine(const std::string& line, std::vector<Token>& out) {
 		std::vector<Token> tokens;
-		LexError error = LexError::Good();
+		CodeError error = CodeError::Good();
 
 		StringIter p = line.data();
 		while (*p) {
@@ -391,7 +365,7 @@ namespace wings {
 		}
 
 		out = std::move(tokens);
-		return LexError::Good();
+		return CodeError::Good();
 	}
 
 	// Returns [no. of open brackets] minus [no. close brackets]
@@ -417,7 +391,7 @@ namespace wings {
 		for (auto& line : lines)
 			StripComments(line);
 
-		LexError error = LexError::Good();
+		CodeError error = CodeError::Good();
 		std::optional<std::string> indentString;
 		int bracketBalance = 0;
 
@@ -449,15 +423,13 @@ namespace wings {
 			size_t parentIndent = parents.size() - 1;
 			size_t currentIndent = 0;
 			if (IndentOf(lines[i], indentString, currentIndent)) {
-				error = LexError::Bad("Invalid indentation");
-				error.srcPos.line = i;
+				error = CodeError::Bad("Invalid indentation", { i, 0 });
 				break;
 			}
 
 			if (currentIndent > parentIndent + 1) {
 				// Indented too much
-				error = LexError::Bad("Indentation level increased by more than 1");
-				error.srcPos.line = i;
+				error = CodeError::Bad("Indentation level increased by more than 1", { i, 0 });
 				break;
 			} else if (currentIndent == parentIndent + 1) {
 				// Indented
