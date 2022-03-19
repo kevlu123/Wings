@@ -144,6 +144,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="error.cpp" />
+    <ClCompile Include="exprparse.cpp" />
     <ClCompile Include="gc.cpp" />
     <ClCompile Include="lex.cpp" />
     <ClCompile Include="main.cpp" />
@@ -153,6 +154,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="error.h" />
+    <ClInclude Include="exprparse.h" />
     <ClInclude Include="gc.h" />
     <ClInclude Include="impl.h" />
     <ClInclude Include="lex.h" />
