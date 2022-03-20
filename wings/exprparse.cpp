@@ -2,10 +2,11 @@
 #include "impl.h"
 #include <unordered_map>
 #include <unordered_set>
+#include <optional>
 
 namespace wings {
 
-	static CodeError ParseExpression(TokenIter& p, Expression& out, size_t minPrecedence);
+	static CodeError ParseExpression(TokenIter& p, Expression& out, size_t minPrecedence, std::optional<Expression> preParsedArg = std::nullopt);
 
 	TokenIter::TokenIter(const std::vector<Token>& tokens) :
 		tokens(tokens),
@@ -42,7 +43,7 @@ namespace wings {
 		"or", "and", "not", "global", "nonlocal",
 	};
 
-	const std::unordered_map<std::string, Operation> OP_STRINGS = {
+	const std::unordered_map<std::string, Operation> BINARY_OP_STRINGS = {
 		{ "+",  Operation::Add },
 		{ "-",  Operation::Sub },
 		{ "*",  Operation::Mul },
@@ -64,6 +65,7 @@ namespace wings {
 		{ "<<", Operation::ShiftL },
 		{ ">>", Operation::ShiftR },
 		{ "in", Operation::In },
+		{ "not", Operation::NotIn },
 
 		{ "=",  Operation::Assign },
 		{ "+=", Operation::AddAssign },
@@ -78,13 +80,13 @@ namespace wings {
 		{ "|=", Operation::OrAssign },
 		{ "&=", Operation::AndAssign },
 		{ "^=", Operation::XorAssign },
+	};
 
+	const std::unordered_map<std::string, Operation> PREFIX_UNARY_OP_STRINGS = {
 		{ "+", Operation::Pos },
 		{ "-", Operation::Neg },
-		{ "not", Operation::Not },
 		{ "~", Operation::BitNot },
-		{ "++", Operation::Incr },
-		{ "--", Operation::Decr },
+		{ "not", Operation::Not },
 	};
 
 	const std::unordered_set<Operation> BINARY_OPS = {
@@ -247,49 +249,6 @@ namespace wings {
 		return CodeError::Good();
 	}
 
-	static CodeError ParseValue(TokenIter& p, Expression& out) {
-		Expression value{};
-
-		// Parse standalone values
-		if (p->text == "(") {
-			return ParseBracket(p, out);
-		} else if (p->text == "[") {
-			return ParseListLiteral(p, out);
-		} else if (p->text == "{") {
-			return ParseMapLiteral(p, out);
-		} else {
-			switch (p->type) {
-			case Token::Type::Null:
-			case Token::Type::Bool:
-			case Token::Type::Int:
-			case Token::Type::Float:
-			case Token::Type::String:
-				value.operation = Operation::Literal;
-				break;
-			case Token::Type::Word:
-				value.operation = Operation::Variable;
-			default:
-				return CodeError::Bad("Unexpected expression token", p->srcPos);
-			}
-			value.literal = *p;
-			++p;
-		}
-
-		// Apply any postfix operators
-		Expression postfix{};
-		bool parsed = true;
-		while (parsed && !p.EndReached()) {
-			if (auto error = ParsePostfix(p, value, postfix, parsed)) {
-				return error;
-			}
-			value = std::move(postfix);
-			postfix = {};
-		}
-
-		out = std::move(value);
-		return CodeError::Good();
-	}
-
 	static CodeError ParseBracket(TokenIter& p, Expression& out) {
 		++p;
 
@@ -366,11 +325,107 @@ namespace wings {
 		}
 	}
 
-	static CodeError ParseExpression(TokenIter& p, Expression& out, size_t minPrecedence) {
+	static CodeError ParseValue(TokenIter& p, Expression& out) {
+		Expression value{};
 
-		// TODO
+		// Parse standalone values
+		if (p->text == "(") {
+			return ParseBracket(p, out);
+		} else if (p->text == "[") {
+			return ParseListLiteral(p, out);
+		} else if (p->text == "{") {
+			return ParseMapLiteral(p, out);
+		} else {
+			switch (p->type) {
+			case Token::Type::Null:
+			case Token::Type::Bool:
+			case Token::Type::Int:
+			case Token::Type::Float:
+			case Token::Type::String:
+				value.operation = Operation::Literal;
+				break;
+			case Token::Type::Word:
+				value.operation = Operation::Variable;
+			default:
+				return CodeError::Bad("Unexpected expression token", p->srcPos);
+			}
+			value.literal = *p;
+			++p;
+		}
 
+		// Apply any postfix operators
+		Expression postfix{};
+		bool parsed = true;
+		while (parsed && !p.EndReached()) {
+			if (auto error = ParsePostfix(p, value, postfix, parsed)) {
+				return error;
+			}
+			value = std::move(postfix);
+			postfix = {};
+		}
+
+		out = std::move(value);
 		return CodeError::Good();
+	}
+
+	static CodeError ParsePrefix(TokenIter& p, Expression& out) {
+		if (PREFIX_UNARY_OP_STRINGS.contains(p->text)) {
+			Operation op = PREFIX_UNARY_OP_STRINGS.at(p->text);
+			++p;
+			if (p.EndReached()) {
+				return CodeError::Bad("Expected an expression", (--p)->srcPos);
+			}
+			out.operation = op;
+			out.children.emplace_back();
+			return ParsePrefix(p, out.children[0]);
+		} else {
+			return ParseValue(p, out);
+		}
+	}
+
+	static CodeError ParseExpression(TokenIter& p, Expression& out, size_t minPrecedence, std::optional<Expression> preParsedArg) {
+		Expression lhs{};
+		if (preParsedArg.has_value()) {
+			lhs = std::move(preParsedArg.value());
+		} else {
+			if (auto error = ParsePrefix(p, lhs)) {
+				return error;
+			}
+		}
+
+		if (p.EndReached() || !BINARY_OP_STRINGS.contains(p->text)) {
+			out = std::move(lhs);
+			return CodeError::Good();
+		}
+		Operation op = BINARY_OP_STRINGS.at(p->text);
+		size_t precedence = PrecedenceOf(op);
+		if (precedence < minPrecedence) {
+			out = std::move(lhs);
+			return CodeError::Good();
+		}
+		++p;
+
+		if (p.EndReached()) {
+			return CodeError::Bad("Expected an expression", (--p)->srcPos);
+		}
+		if (BINARY_RIGHT_ASSOCIATIVE_OPS.contains(op)) {
+			Expression rhs{};
+			if (auto error = ParseExpression(p, rhs)) {
+				return error;
+			}
+			out.operation = op;
+			out.children = { std::move(lhs), std::move(rhs) };
+			return CodeError::Good();
+		} else {
+			Expression rhs{};
+			if (auto error = ParseExpression(p, rhs, precedence + 1)) {
+				return error;
+			}
+			out.operation = op;
+			out.children = { std::move(lhs), std::move(rhs) };
+			lhs = std::move(out);
+			return ParseExpression(p, out, 0, std::move(lhs));
+		}
 	}
 
 	CodeError ParseExpression(TokenIter& p, Expression& out) {
