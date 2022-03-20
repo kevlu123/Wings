@@ -1,5 +1,5 @@
 #pragma once
-#include "parse.h"
+#include "lex.h"
 #include <vector>
 
 namespace wings {
@@ -9,9 +9,11 @@ namespace wings {
 		ListLiteral, MapLiteral,
 		ListComprehension,
 		Index, Call,
+		Pos, Neg,
 		Add, Sub, Mul, Div, IDiv, Mod, Pow,
 		Eq, Ne, Lt, Le, Gt, Ge,
 		And, Or, Not,
+		In, NotIn,
 		BitAnd, BitOr, BitNot, BitXor,
 		ShiftL, ShiftR,
 		Assign, AddAssign, SubAssign, MulAssign,
@@ -24,6 +26,7 @@ namespace wings {
 	struct Expression {
 		Operation operation;
 		std::vector<Expression> children;
+		Token literal;
 	};
 
 	CodeError ParseExpression(const std::vector<Token>& tokens, Expression& out);
