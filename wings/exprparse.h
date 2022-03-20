@@ -29,6 +29,18 @@ namespace wings {
 		Token literal;
 	};
 
-	CodeError ParseExpression(const std::vector<Token>& tokens, Expression& out);
+	struct TokenIter {
+		TokenIter(const std::vector<Token>& tokens);
+		TokenIter& operator++();
+		TokenIter& operator--();
+		const Token& operator*() const;
+		const Token* operator->() const;
+		bool EndReached() const;
+	private:
+		size_t index;
+		const std::vector<Token>& tokens;
+	};
+
+	CodeError ParseExpression(TokenIter& p, Expression& out);
 
 }

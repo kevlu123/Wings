@@ -1,40 +1,45 @@
 #include "exprparse.h"
+#include "impl.h"
 #include <unordered_map>
 #include <unordered_set>
 
 namespace wings {
 
-	struct TokenIter {
+	static CodeError ParseExpression(TokenIter& p, Expression& out, size_t minPrecedence);
 
-		TokenIter(const std::vector<Token>& tokens) :
-			tokens(tokens),
-			index(0)
-		{
-		}
+	TokenIter::TokenIter(const std::vector<Token>& tokens) :
+		tokens(tokens),
+		index(0)
+	{
+	}
 
-		TokenIter& operator++() {
-			index++;
-			return *this;
-		}
+	TokenIter& TokenIter::operator++() {
+		index++;
+		return *this;
+	}
 
-		const Token& operator*() const {
-			return tokens[index];
-		}
+	TokenIter& TokenIter::operator--() {
+		index--;
+		return *this;
+	}
 
-		bool EndReached() const {
-			return index >= tokens.size();
-		}
+	const Token& TokenIter::operator*() const {
+		return tokens[index];
+	}
 
-	private:
-		size_t index;
-		const std::vector<Token>& tokens;
-	};
-	
+	const Token* TokenIter::operator->() const {
+		return &tokens[index];
+	}
+
+	bool TokenIter::EndReached() const {
+		return index >= tokens.size();
+	}
+
 	const std::vector<std::string> RESERVED = {
-			"def", "if", "while", "for", "in", "return",
-			"True", "False", "None",
-			"break", "continue", "pass", "else", "elif",
-			"or", "and", "not", "global", "nonlocal",
+		"def", "if", "while", "for", "in", "return",
+		"True", "False", "None",
+		"break", "continue", "pass", "else", "elif",
+		"or", "and", "not", "global", "nonlocal",
 	};
 
 	const std::unordered_map<std::string, Operation> OP_STRINGS = {
@@ -121,6 +126,22 @@ namespace wings {
 		Operation::XorAssign,
 	};
 
+	const std::unordered_set<Operation> BINARY_RIGHT_ASSOCIATIVE_OPS = {
+		Operation::Assign,
+		Operation::AddAssign,
+		Operation::SubAssign,
+		Operation::MulAssign,
+		Operation::PowAssign,
+		Operation::DivAssign,
+		Operation::IDivAssign,
+		Operation::ModAssign,
+		Operation::ShiftLAssign,
+		Operation::ShiftRAssign,
+		Operation::OrAssign,
+		Operation::AndAssign,
+		Operation::XorAssign,
+	};
+
 	const std::unordered_set<Operation> PREFIX_UNARY_OPS = {
 		Operation::Pos,
 		Operation::Neg,
@@ -162,5 +183,132 @@ namespace wings {
 			[=](const auto& group) { return std::find(group.begin(), group.end(), op) != group.end(); }
 		);
 		return std::distance(it, PRECEDENCE.end());
+	}
+
+	static CodeError ParseExpressionList(TokenIter& p, const std::string& terminate, std::vector<Expression>& out) {
+		bool mustTerminate = false;
+		while (true) {
+			// Check for terminating token
+			if (p.EndReached()) {
+				return CodeError::Bad("Expected a closing bracket", (--p)->srcPos);
+			} else if (p->text == terminate) {
+				return CodeError::Good();
+			} else if (mustTerminate) {
+				return CodeError::Bad("Expected a closing bracket", p->srcPos);
+			}
+
+			// Get expression
+			Expression expr{};
+			if (auto error = ParseExpression(p, expr)) {
+				return error;
+			}
+			out.push_back(std::move(expr));
+
+			// Check for comma
+			if (!p.EndReached() && p->text == ",") {
+				++p;
+			} else {
+				mustTerminate = true;
+			}
+		}
+	}
+
+	static CodeError ParsePostfix(TokenIter& p, Expression arg, Expression& out, bool& parsed) {
+		if (p.EndReached()) {
+			out = std::move(arg);
+			parsed = false;
+		} else if (p->text == "++" || p->text == "--") {
+			out.operation = p->text == "++" ? Operation::Incr : Operation::Decr;
+			out.children = { std::move(arg) };
+			++p;
+			parsed = true;
+		} else if (p->text == "(" || p->text == "[") {
+			// Consume opening bracket
+			out.operation = p->text == "(" ? Operation::Call : Operation::Index;
+			auto endBracket = p->text == "(" ? ")" : "]";
+			++p;
+
+			// Consume expression list
+			out.children = { std::move(arg) };
+			if (p.EndReached()) {
+				return CodeError::Bad("Expected an expression", (--p)->srcPos);
+			} else if (auto error = ParseExpressionList(p, endBracket, out.children)) {
+				return error;
+			}
+
+			// Consume closing bracket
+			++p;
+
+			parsed = true;
+		} else {
+			out = std::move(arg);
+			parsed = false;
+		}
+		return CodeError::Good();
+	}
+
+	static CodeError ParseValue(TokenIter& p, Expression& out) {
+		Expression value{};
+		switch (p->type) {
+		case Token::Type::Null:
+		case Token::Type::Bool:
+		case Token::Type::Int:
+		case Token::Type::Float:
+		case Token::Type::String:
+			value.operation = Operation::Literal;
+			value.literal = *p;
+			break;
+		case Token::Type::Word:
+			value.operation = Operation::Variable;
+			value.literal = *p;
+		default:
+			return CodeError::Bad("Unexpected expression token", p->srcPos);
+		}
+		++p;
+
+		Expression postfix{};
+		bool parsed = true;
+		while (parsed && !p.EndReached()) {
+			if (auto error = ParsePostfix(p, value, postfix, parsed)) {
+				return error;
+			}
+			value = std::move(postfix);
+			postfix = {};
+		}
+
+		out = std::move(value);
+		return CodeError::Good();
+	}
+
+	static CodeError ParseBracket(TokenIter& p, Expression& out) {
+		++p;
+
+		if (auto error = ParseExpression(p, out)) {
+			return error;
+		}
+
+		if (p.EndReached()) {
+			return CodeError::Bad("Expected a ')'", (--p)->srcPos);
+		} else if (p->text != ")") {
+			return CodeError::Bad("Expected a ')'", p->srcPos);
+		}
+		++p;
+
+		return CodeError::Good();
+	}
+
+	static CodeError ParseExpression(TokenIter& p, Expression& out, size_t minPrecedence) {
+
+		// TODO
+
+		return CodeError::Good();
+	}
+
+	CodeError ParseExpression(TokenIter& p, Expression& out) {
+		if (p.EndReached()) {
+			return CodeError::Bad("Expected an expression", (--p)->srcPos);
+		} else {
+			return ParseExpression(p, out, 0);
+		}
 	}
 }
