@@ -297,9 +297,76 @@ namespace wings {
 		return CodeError::Good();
 	}
 
+	static CodeError ParseListLiteral(TokenIter& p, Expression& out) {
+		++p;
+
+		out.operation = Operation::ListLiteral;
+		if (p.EndReached()) {
+			return CodeError::Bad("Expected an expression", (--p)->srcPos);
+		} else if (auto error = ParseExpressionList(p, "]", out.children)) {
+			return error;
+		}
+
+		return CodeError::Good();
+	}
+
+	static CodeError ParseMapLiteral(TokenIter& p, Expression& out) {
+		out.operation = Operation::MapLiteral;
+
+		bool mustTerminate = false;
+		while (true) {
+			// Check for terminating token
+			if (p.EndReached()) {
+				return CodeError::Bad("Expected a closing bracket", (--p)->srcPos);
+			} else if (p->text == "}") {
+				++p;
+				return CodeError::Good();
+			} else if (mustTerminate) {
+				return CodeError::Bad("Expected a closing bracket", p->srcPos);
+			}
+
+			// Get key
+			Expression key{};
+			if (auto error = ParseExpression(p, key)) {
+				return error;
+			}
+			out.children.push_back(std::move(key));
+
+			// Check for colon
+			if (p.EndReached()) {
+				return CodeError::Bad("Expected a ':'", (--p)->srcPos);
+			} else if (p->text != ":") {
+				return CodeError::Bad("Expected a ':'", p->srcPos);
+			}
+			++p;
+
+			// Get value
+			Expression value{};
+			if (auto error = ParseExpression(p, value)) {
+				return error;
+			}
+			out.children.push_back(std::move(value));
+
+			// Check for comma
+			if (!p.EndReached() && p->text == ",") {
+				++p;
+			} else {
+				mustTerminate = true;
+			}
+		}
+	}
+
 	static CodeError ParseExpression(TokenIter& p, Expression& out, size_t minPrecedence) {
 
-		// TODO
+		if (p->text == "(") {
+			return ParseBracket(p, out);
+		} else if (p->text == "[") {
+			return ParseListLiteral(p, out);
+		} else if (p->text == "{") {
+			return ParseMapLiteral(p, out);
+		} else {
+			// TODO
+		}
 
 		return CodeError::Good();
 	}
