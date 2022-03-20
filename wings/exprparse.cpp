@@ -249,23 +249,33 @@ namespace wings {
 
 	static CodeError ParseValue(TokenIter& p, Expression& out) {
 		Expression value{};
-		switch (p->type) {
-		case Token::Type::Null:
-		case Token::Type::Bool:
-		case Token::Type::Int:
-		case Token::Type::Float:
-		case Token::Type::String:
-			value.operation = Operation::Literal;
-			value.literal = *p;
-			break;
-		case Token::Type::Word:
-			value.operation = Operation::Variable;
-			value.literal = *p;
-		default:
-			return CodeError::Bad("Unexpected expression token", p->srcPos);
-		}
-		++p;
 
+		// Parse standalone values
+		if (p->text == "(") {
+			return ParseBracket(p, out);
+		} else if (p->text == "[") {
+			return ParseListLiteral(p, out);
+		} else if (p->text == "{") {
+			return ParseMapLiteral(p, out);
+		} else {
+			switch (p->type) {
+			case Token::Type::Null:
+			case Token::Type::Bool:
+			case Token::Type::Int:
+			case Token::Type::Float:
+			case Token::Type::String:
+				value.operation = Operation::Literal;
+				break;
+			case Token::Type::Word:
+				value.operation = Operation::Variable;
+			default:
+				return CodeError::Bad("Unexpected expression token", p->srcPos);
+			}
+			value.literal = *p;
+			++p;
+		}
+
+		// Apply any postfix operators
 		Expression postfix{};
 		bool parsed = true;
 		while (parsed && !p.EndReached()) {
@@ -311,8 +321,8 @@ namespace wings {
 	}
 
 	static CodeError ParseMapLiteral(TokenIter& p, Expression& out) {
+		++p;
 		out.operation = Operation::MapLiteral;
-
 		bool mustTerminate = false;
 		while (true) {
 			// Check for terminating token
@@ -358,15 +368,7 @@ namespace wings {
 
 	static CodeError ParseExpression(TokenIter& p, Expression& out, size_t minPrecedence) {
 
-		if (p->text == "(") {
-			return ParseBracket(p, out);
-		} else if (p->text == "[") {
-			return ParseListLiteral(p, out);
-		} else if (p->text == "{") {
-			return ParseMapLiteral(p, out);
-		} else {
-			// TODO
-		}
+		// TODO
 
 		return CodeError::Good();
 	}
