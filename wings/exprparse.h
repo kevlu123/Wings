@@ -35,10 +35,12 @@ namespace wings {
 		TokenIter& operator--();
 		const Token& operator*() const;
 		const Token* operator->() const;
+		bool operator==(const TokenIter& rhs) const;
+		bool operator!=(const TokenIter& rhs) const;
 		bool EndReached() const;
 	private:
 		size_t index;
-		const std::vector<Token>& tokens;
+		const std::vector<Token>* tokens;
 	};
 
 	CodeError ParseExpression(TokenIter& p, Expression& out);

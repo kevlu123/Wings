@@ -9,7 +9,7 @@ namespace wings {
 	static CodeError ParseExpression(TokenIter& p, Expression& out, size_t minPrecedence, std::optional<Expression> preParsedArg = std::nullopt);
 
 	TokenIter::TokenIter(const std::vector<Token>& tokens) :
-		tokens(tokens),
+		tokens(&tokens),
 		index(0)
 	{
 	}
@@ -25,15 +25,23 @@ namespace wings {
 	}
 
 	const Token& TokenIter::operator*() const {
-		return tokens[index];
+		return (*tokens)[index];
 	}
 
 	const Token* TokenIter::operator->() const {
-		return &tokens[index];
+		return &(*tokens)[index];
+	}
+
+	bool TokenIter::operator==(const TokenIter& rhs) const {
+		return index == rhs.index && tokens == rhs.tokens;
+	}
+
+	bool TokenIter::operator!=(const TokenIter& rhs) const {
+		return !(*this == rhs);
 	}
 
 	bool TokenIter::EndReached() const {
-		return index >= tokens.size();
+		return index >= tokens->size();
 	}
 
 	const std::vector<std::string> RESERVED = {
@@ -224,23 +232,43 @@ namespace wings {
 			out.children = { std::move(arg) };
 			++p;
 			parsed = true;
-		} else if (p->text == "(" || p->text == "[") {
+		} else if (p->text == "(") {
 			// Consume opening bracket
-			out.operation = p->text == "(" ? Operation::Call : Operation::Index;
-			auto endBracket = p->text == "(" ? ")" : "]";
+			out.operation = Operation::Call;
 			++p;
 
 			// Consume expression list
 			out.children = { std::move(arg) };
 			if (p.EndReached()) {
 				return CodeError::Bad("Expected an expression", (--p)->srcPos);
-			} else if (auto error = ParseExpressionList(p, endBracket, out.children)) {
+			} else if (auto error = ParseExpressionList(p, ")", out.children)) {
 				return error;
 			}
 
 			// Consume closing bracket
 			++p;
+			parsed = true;
+		} else if (p->text == "[") {
+			// Consume opening bracket
+			out.operation = Operation::Index;
+			++p;
 
+			// Consume expression
+			Expression index{};
+			if (p.EndReached()) {
+				return CodeError::Bad("Expected an expression", (--p)->srcPos);
+			} else if (auto error = ParseExpression(p, index)) {
+				return error;
+			}
+			out.children = { std::move(arg), std::move(index) };
+
+			// Consume closing bracket
+			if (p.EndReached()) {
+				return CodeError::Bad("Expected a ']'", (--p)->srcPos);
+			} else if (p->text != "]") {
+				return CodeError::Bad("Expected a ']'", p->srcPos);
+			}
+			++p;
 			parsed = true;
 		} else {
 			out = std::move(arg);
@@ -275,6 +303,8 @@ namespace wings {
 		} else if (auto error = ParseExpressionList(p, "]", out.children)) {
 			return error;
 		}
+
+		++p;
 
 		return CodeError::Good();
 	}
@@ -330,11 +360,17 @@ namespace wings {
 
 		// Parse standalone values
 		if (p->text == "(") {
-			return ParseBracket(p, out);
+			if (auto error = ParseBracket(p, value)) {
+				return error;
+			}
 		} else if (p->text == "[") {
-			return ParseListLiteral(p, out);
+			if (auto error = ParseListLiteral(p, value)) {
+				return error;
+			}
 		} else if (p->text == "{") {
-			return ParseMapLiteral(p, out);
+			if (auto error = ParseMapLiteral(p, value)) {
+				return error;
+			}
 		} else {
 			switch (p->type) {
 			case Token::Type::Null:
@@ -346,8 +382,9 @@ namespace wings {
 				break;
 			case Token::Type::Word:
 				value.operation = Operation::Variable;
+				break;
 			default:
-				return CodeError::Bad("Unexpected expression token", p->srcPos);
+				return CodeError::Bad("Unexpected expression", p->srcPos);
 			}
 			value.literal = *p;
 			++p;
@@ -423,8 +460,17 @@ namespace wings {
 			}
 			out.operation = op;
 			out.children = { std::move(lhs), std::move(rhs) };
-			lhs = std::move(out);
-			return ParseExpression(p, out, 0, std::move(lhs));
+
+			TokenIter oldP = p;
+			do {
+				lhs = std::move(out);
+				out = {};
+				oldP = p;
+				if (auto error = ParseExpression(p, out, minPrecedence + 1, std::move(lhs))) {
+					return error;
+				}
+			} while (oldP != p);
+			return CodeError::Good();
 		}
 	}
 
