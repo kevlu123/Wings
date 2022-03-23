@@ -432,6 +432,14 @@ namespace wings {
 		if (precedence < minPrecedence) {
 			out = std::move(lhs);
 			return CodeError::Good();
+		} else if (op == Operation::NotIn) {
+			// 'not in' is a special case since it contains 2 tokens
+			++p;
+			if (p.EndReached()) {
+				return CodeError::Bad("Expected a 'in'", (--p)->srcPos);
+			} else if (p->text != "in") {
+				return CodeError::Bad("Expected a 'in'", p->srcPos);
+			}
 		}
 		++p;
 
