@@ -33,6 +33,9 @@ namespace wings {
 			Expression variables;
 		} forLoop;
 		struct {
+			std::string name;
+		} capture;
+		struct {
 			std::vector<Parameter> parameters;
 			std::vector<Capture> captures;
 			std::vector<std::string> variables;

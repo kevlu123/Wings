@@ -3,6 +3,14 @@
 
 namespace wings {
 
+	static CodeError CheckTrailingTokens(const TokenIter& iter) {
+		if (!iter.EndReached()) {
+			return CodeError::Bad("Unexpected trailing tokens", iter->srcPos);
+		} else {
+			return CodeError::Good();
+		}
+	}
+
 	using ParseFn = CodeError(*)(const LexTree& node, Statement& out);
 
 	static CodeError ParseIf(const LexTree& node, Statement& out);
@@ -15,9 +23,42 @@ namespace wings {
 	static CodeError ParseDef(const LexTree& node, Statement& out);
 	static CodeError ParseReturn(const LexTree& node, Statement& out);
 	static CodeError ParsePass(const LexTree& node, Statement& out);
-	static CodeError ParseNonlocal(const LexTree& node, Statement& out);
-	static CodeError ParseGlobal(const LexTree& node, Statement& out);
-	static CodeError ParseExpressionStatement(const LexTree& node, Statement& out);
+
+	static CodeError ParseNonlocal(const LexTree& node, Statement& out) {
+		TokenIter p(node.tokens);
+		++p;
+
+		if (p.EndReached()) {
+			return CodeError::Bad("Expected a variable name", (--p)->srcPos);
+		} else if (p->type != Token::Type::Word) {
+			return CodeError::Bad("Expected a variable name", p->srcPos);
+		}
+
+		out.type = Statement::Type::Nonlocal;
+		out.capture.name = p->text;
+		++p;
+		return CheckTrailingTokens(p);
+	}
+
+	static CodeError ParseGlobal(const LexTree& node, Statement& out) {
+		// Almost exactly tthe same as ParseNonLocal()
+		if (auto error = ParseNonlocal(node, out)) {
+			return error;
+		} else {
+			out.type = Statement::Type::Global;
+			return CodeError::Good();
+		}
+	}
+
+	static CodeError ParseExpressionStatement(const LexTree& node, Statement& out) {
+		TokenIter p(node.tokens);
+		out.type = Statement::Type::Expr;
+		if (auto error = ParseExpression(p, out.expr)) {
+			return error;
+		} else {
+			return CheckTrailingTokens(p);
+		}
+	}
 
 	static const std::unordered_map<std::string, ParseFn> STATEMENT_STARTINGS = {
 		{ "if", ParseIf },
@@ -40,14 +81,6 @@ namespace wings {
 			return STATEMENT_STARTINGS.at(firstToken)(node, out);
 		} else {
 			return ParseExpressionStatement(node, out);
-		}
-	}
-
-	static CodeError CheckTrailingTokens(const TokenIter& iter) {
-		if (!iter.EndReached()) {
-			return CodeError::Bad("Unexpected trailing tokens", iter->srcPos);
-		} else {
-			return CodeError::Good();
 		}
 	}
 
