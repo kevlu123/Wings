@@ -18,13 +18,29 @@ namespace wings {
 	static CodeError ParseElse(const LexTree& node, Statement& out);
 	static CodeError ParseWhile(const LexTree& node, Statement& out);
 	static CodeError ParseFor(const LexTree& node, Statement& out);
-	static CodeError ParseBreak(const LexTree& node, Statement& out);
-	static CodeError ParseContinue(const LexTree& node, Statement& out);
 	static CodeError ParseDef(const LexTree& node, Statement& out);
 	static CodeError ParseReturn(const LexTree& node, Statement& out);
-	static CodeError ParsePass(const LexTree& node, Statement& out);
 
-	static CodeError ParseNonlocal(const LexTree& node, Statement& out) {
+	static CodeError ParseSingleToken(const LexTree& node, Statement& out, Statement::Type type) {
+		TokenIter p(node.tokens);
+		++p;
+		out.type = type;
+		return CheckTrailingTokens(p);
+	}
+
+	static CodeError ParseBreak(const LexTree& node, Statement& out) {
+		return ParseSingleToken(node, out, Statement::Type::Break);
+	}
+
+	static CodeError ParseContinue(const LexTree& node, Statement& out) {
+		return ParseSingleToken(node, out, Statement::Type::Continue);
+	}
+
+	static CodeError ParsePass(const LexTree& node, Statement& out) {
+		return ParseSingleToken(node, out, Statement::Type::Pass);
+	}
+
+	static CodeError ParseCapture(const LexTree& node, Statement& out, Statement::Type type) {
 		TokenIter p(node.tokens);
 		++p;
 
@@ -34,20 +50,18 @@ namespace wings {
 			return CodeError::Bad("Expected a variable name", p->srcPos);
 		}
 
-		out.type = Statement::Type::Nonlocal;
+		out.type = type;
 		out.capture.name = p->text;
 		++p;
 		return CheckTrailingTokens(p);
 	}
 
+	static CodeError ParseNonlocal(const LexTree& node, Statement& out) {
+		return ParseCapture(node, out, Statement::Type::Nonlocal);
+	}
+
 	static CodeError ParseGlobal(const LexTree& node, Statement& out) {
-		// Almost exactly tthe same as ParseNonLocal()
-		if (auto error = ParseNonlocal(node, out)) {
-			return error;
-		} else {
-			out.type = Statement::Type::Global;
-			return CodeError::Good();
-		}
+		return ParseCapture(node, out, Statement::Type::Global);
 	}
 
 	// Get a set of variables referenced by an expression
@@ -57,9 +71,10 @@ namespace wings {
 			variables.insert(expr.literal.text);
 		} else {
 			for (const auto& child : expr.children) {
-				variables.merge(GetWriteVariables(child));
+				variables.merge(GetReferencedVariables(child));
 			}
 		}
+		return variables;
 	}
 
 	// Get a set of variables directly written to by the '=' operator. This excludes compound assignment.
@@ -72,6 +87,7 @@ namespace wings {
 				variables.merge(GetWriteVariables(child));
 			}
 		}
+		return variables;
 	}
 
 	static CodeError ParseExpressionStatement(const LexTree& node, Statement& out) {
