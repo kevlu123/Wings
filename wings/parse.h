@@ -17,6 +17,7 @@ namespace wings {
 		enum class Type {
 			Pass,
 			Expr,
+			Nonlocal, Global,
 			Def, Return,
 			If, Elif, Else,
 			While, For,
