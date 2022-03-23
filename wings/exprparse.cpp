@@ -223,15 +223,13 @@ namespace wings {
 		}
 	}
 
-	static CodeError ParsePostfix(TokenIter& p, Expression arg, Expression& out, bool& parsed) {
+	static CodeError ParsePostfix(TokenIter& p, Expression arg, Expression& out) {
 		if (p.EndReached()) {
 			out = std::move(arg);
-			parsed = false;
 		} else if (p->text == "++" || p->text == "--") {
 			out.operation = p->text == "++" ? Operation::Incr : Operation::Decr;
 			out.children = { std::move(arg) };
 			++p;
-			parsed = true;
 		} else if (p->text == "(") {
 			// Consume opening bracket
 			out.operation = Operation::Call;
@@ -247,7 +245,6 @@ namespace wings {
 
 			// Consume closing bracket
 			++p;
-			parsed = true;
 		} else if (p->text == "[") {
 			// Consume opening bracket
 			out.operation = Operation::Index;
@@ -269,10 +266,8 @@ namespace wings {
 				return CodeError::Bad("Expected a ']'", p->srcPos);
 			}
 			++p;
-			parsed = true;
 		} else {
 			out = std::move(arg);
-			parsed = false;
 		}
 		return CodeError::Good();
 	}
@@ -356,19 +351,18 @@ namespace wings {
 	}
 
 	static CodeError ParseValue(TokenIter& p, Expression& out) {
-		Expression value{};
-
 		// Parse standalone values
+		out = {};
 		if (p->text == "(") {
-			if (auto error = ParseBracket(p, value)) {
+			if (auto error = ParseBracket(p, out)) {
 				return error;
 			}
 		} else if (p->text == "[") {
-			if (auto error = ParseListLiteral(p, value)) {
+			if (auto error = ParseListLiteral(p, out)) {
 				return error;
 			}
 		} else if (p->text == "{") {
-			if (auto error = ParseMapLiteral(p, value)) {
+			if (auto error = ParseMapLiteral(p, out)) {
 				return error;
 			}
 		} else {
@@ -378,30 +372,29 @@ namespace wings {
 			case Token::Type::Int:
 			case Token::Type::Float:
 			case Token::Type::String:
-				value.operation = Operation::Literal;
+				out.operation = Operation::Literal;
 				break;
 			case Token::Type::Word:
-				value.operation = Operation::Variable;
+				out.operation = Operation::Variable;
 				break;
 			default:
 				return CodeError::Bad("Unexpected expression", p->srcPos);
 			}
-			value.literal = *p;
+			out.literal = *p;
 			++p;
 		}
 
 		// Apply any postfix operators
-		Expression postfix{};
-		bool parsed = true;
-		while (parsed && !p.EndReached()) {
-			if (auto error = ParsePostfix(p, value, postfix, parsed)) {
+		TokenIter oldP = p;
+		do {
+			Expression operand = std::move(out);
+			out = {};
+			oldP = p;
+			if (auto error = ParsePostfix(p, operand, out)) {
 				return error;
 			}
-			value = std::move(postfix);
-			postfix = {};
-		}
+		} while (oldP != p);
 
-		out = std::move(value);
 		return CodeError::Good();
 	}
 
