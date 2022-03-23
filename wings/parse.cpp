@@ -50,6 +50,30 @@ namespace wings {
 		}
 	}
 
+	// Get a set of variables referenced by an expression
+	static std::unordered_set<std::string> GetReferencedVariables(const Expression& expr) {
+		std::unordered_set<std::string> variables;
+		if (expr.operation == Operation::Variable) {
+			variables.insert(expr.literal.text);
+		} else {
+			for (const auto& child : expr.children) {
+				variables.merge(GetWriteVariables(child));
+			}
+		}
+	}
+
+	// Get a set of variables directly written to by the '=' operator. This excludes compound assignment.
+	static std::unordered_set<std::string> GetWriteVariables(const Expression& expr) {
+		std::unordered_set<std::string> variables;
+		if (expr.operation == Operation::Assign && expr.children[0].operation == Operation::Variable) {
+			variables.insert(expr.children[0].literal.text);
+		} else {
+			for (const auto& child : expr.children) {
+				variables.merge(GetWriteVariables(child));
+			}
+		}
+	}
+
 	static CodeError ParseExpressionStatement(const LexTree& node, Statement& out) {
 		TokenIter p(node.tokens);
 		out.type = Statement::Type::Expr;
@@ -99,6 +123,7 @@ namespace wings {
 
 	ParseResult Parse(const LexTree& lexTree) {
 		ParseResult result{};
+		result.parseTree.type = Statement::Type::Def;
 		result.error = ParseBody(lexTree, result.parseTree.body);
 		return result;
 	}

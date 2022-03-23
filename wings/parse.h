@@ -1,6 +1,7 @@
 #pragma once
 #include "exprparse.h"
 #include <optional>
+#include <unordered_set>
 
 namespace wings {
 
@@ -37,8 +38,8 @@ namespace wings {
 		} capture;
 		struct {
 			std::vector<Parameter> parameters;
-			std::vector<Capture> captures;
-			std::vector<std::string> variables;
+			std::unordered_set<Capture> captures;
+			std::unordered_set<std::string> variables;
 		} def;
 	};
 
