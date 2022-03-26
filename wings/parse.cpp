@@ -1,7 +1,14 @@
 #include "parse.h"
 #include <unordered_map>
+#include <functional>
+#include <algorithm>
+#include <iterator>
 
 namespace wings {
+
+	thread_local std::vector<Statement::Type> statementHierarchy;
+
+	static CodeError ParseBody(const LexTree& node, std::vector<Statement>& out);
 
 	static CodeError CheckTrailingTokens(const TokenIter& iter) {
 		if (!iter.EndReached()) {
@@ -11,15 +18,302 @@ namespace wings {
 		}
 	}
 
-	using ParseFn = CodeError(*)(const LexTree& node, Statement& out);
+	static CodeError ExpectColonEnding(TokenIter& p) {
+		if (p.EndReached()) {
+			return CodeError::Bad("Expected a ':'", (--p)->srcPos);
+		} else if (p->text != ":") {
+			return CodeError::Bad("Expected a ':'", p->srcPos);
+		}
+		++p;
 
-	static CodeError ParseIf(const LexTree& node, Statement& out);
-	static CodeError ParseElif(const LexTree& node, Statement& out);
-	static CodeError ParseElse(const LexTree& node, Statement& out);
-	static CodeError ParseWhile(const LexTree& node, Statement& out);
-	static CodeError ParseFor(const LexTree& node, Statement& out);
-	static CodeError ParseDef(const LexTree& node, Statement& out);
-	static CodeError ParseReturn(const LexTree& node, Statement& out);
+		return CheckTrailingTokens(p);
+	}
+
+	static CodeError ParseConditionalBlock(const LexTree& node, Statement& out, Statement::Type type) {
+		TokenIter p(node.tokens);
+		++p;
+
+		if (auto error = ParseExpression(p, out.expr)) {
+			return error;
+		}
+
+		if (auto error = ExpectColonEnding(p)) {
+			return error;
+		}
+
+		out.type = type;
+		return ParseBody(node, out.body);
+	}
+
+	static CodeError ParseIf(const LexTree& node, Statement& out) {
+		return ParseConditionalBlock(node, out, Statement::Type::If);
+	}
+
+	static CodeError ParseElif(const LexTree& node, Statement& out) {
+		return ParseConditionalBlock(node, out, Statement::Type::Elif);
+	}
+
+	static CodeError ParseElse(const LexTree& node, Statement& out) {
+		TokenIter p(node.tokens);
+		++p;
+
+		out.type = Statement::Type::Else;
+		if (auto error = ExpectColonEnding(p)) {
+			return error;
+		}
+
+		return ParseBody(node, out.body);
+	}
+
+	static CodeError ParseWhile(const LexTree& node, Statement& out) {
+		return ParseConditionalBlock(node, out, Statement::Type::While);
+	}
+
+	static CodeError ParseVariableList(TokenIter& p, std::vector<std::string>& out) {
+		out.clear();
+		if (p.EndReached()) {
+			return CodeError::Bad("Expected a variable name", (--p)->srcPos);
+		} else if (p->type != Token::Type::Word) {
+			return CodeError::Bad("Expected a variable name", p->srcPos);
+		}
+
+		while (true) {
+			out.push_back(p->text);
+			++p;
+
+			if (p.EndReached()) {
+				return CodeError::Good();
+			} else if (p->text != ",") {
+				return CodeError::Good();
+			} 
+			++p;
+
+			if (p.EndReached()) {
+				return CodeError::Good();
+			} else if (p->type != Token::Type::Word) {
+				return CodeError::Good();
+			}
+		}
+	}
+
+	static CodeError ParseFor(const LexTree& node, Statement& out) {
+		TokenIter p(node.tokens);
+		++p;
+		out.type = Statement::Type::For;
+
+		if (auto error = ParseVariableList(p, out.forLoop.variables)) {
+			return error;
+		}
+
+		if (p.EndReached()) {
+			return CodeError::Bad("Expected a 'in'");
+		}
+		++p;
+
+		if (auto error = ParseExpression(p, out.expr)) {
+			return error;
+		}
+
+		if (auto error = ExpectColonEnding(p)) {
+			return error;
+		}
+
+		return ParseBody(node, out.body);
+	}
+
+	static CodeError ParseParameterList(TokenIter& p, std::vector<Parameter>& out) {
+		out.clear();
+		while (true) {
+			if (p.EndReached()) {
+				return CodeError::Good();
+			} else if (p->type != Token::Type::Word) {
+				return CodeError::Good();
+			}
+
+			std::string parameterName = p->text;
+			std::optional<Expression> defaultValue;
+			++p;
+
+			if (p.EndReached()) {
+				out.push_back(Parameter{ parameterName });
+				return CodeError::Good();
+			} else if (p->text == "=") {
+				// Default value
+				++p;
+				Expression expr{};
+				if (auto error = ParseExpression(p, expr)) {
+					return error;
+				}
+				defaultValue = std::move(expr);
+			} else if (!out.empty() && out.back().defaultValue) {
+				// If last parameter has a default value,
+				// this parameter must also have a default value
+				return CodeError::Bad(
+					"Parameters with default values must appear at the end of the parameter list",
+					(--p)->srcPos
+				);
+			}
+
+			// Check for duplicate parameters
+			if (std::find_if(out.begin(), out.end(), [&](const Parameter& p) {
+				return p.name == parameterName;
+				}) != out.end()) {
+				return CodeError::Bad("Duplicate parameter name", p->srcPos);
+			}
+
+			out.push_back(Parameter{ std::move(parameterName), std::move(defaultValue) });
+
+			if (p.EndReached()) {
+				return CodeError::Good();
+			} else if (p->text != ",") {
+				return CodeError::Good();
+			}
+			++p;
+		}
+	}
+
+	// Get a set of variables referenced by an expression
+	static std::unordered_set<std::string> GetReferencedVariables(const Expression& expr) {
+		std::unordered_set<std::string> variables;
+		if (expr.operation == Operation::Variable) {
+			variables.insert(expr.literal.text);
+		} else {
+			for (const auto& child : expr.children) {
+				variables.merge(GetReferencedVariables(child));
+			}
+		}
+		return variables;
+	}
+
+	// Get a set of variables directly written to by the '=' operator. This excludes compound assignment.
+	static std::unordered_set<std::string> GetWriteVariables(const Expression& expr) {
+		std::unordered_set<std::string> variables;
+		if (expr.operation == Operation::Assign && expr.children[0].operation == Operation::Variable) {
+			variables.insert(expr.children[0].literal.text);
+		} else {
+			for (const auto& child : expr.children) {
+				variables.merge(GetWriteVariables(child));
+			}
+		}
+		return variables;
+	}
+
+	template <typename T, typename... Args>
+	std::unordered_set<T> SetDifference(const std::unordered_set<T>& set, const std::unordered_set<T>& subtract, const Args&... args) {
+		if constexpr (sizeof...(args) == 0) {
+			std::unordered_set<T> diff = set;
+			for (const auto& sub : subtract)
+				diff.erase(sub);
+			return diff;
+		} else {
+			return SetDifference(SetDifference(set, subtract), args...);
+		}
+	}
+
+	static void ResolveCaptures(Statement& defNode) {
+		std::unordered_set<std::string> writeVars;
+		std::unordered_set<std::string> allVars;
+
+		std::function<void(const Statement&)> scanNode = [&](const Statement& node) {
+			for (const auto& child : node.body) {
+				switch (child.type) {
+				case Statement::Type::Expr:
+				case Statement::Type::If:
+				case Statement::Type::Elif:
+				case Statement::Type::While:
+				case Statement::Type::For:
+				case Statement::Type::Return:
+					writeVars.merge(GetWriteVariables(child.expr));
+					allVars.merge(GetReferencedVariables(child.expr));
+					break;
+				case Statement::Type::Def:
+					writeVars.insert(child.def.name);
+					allVars.insert(child.def.name);
+
+					for (const auto& parameter : child.def.parameters) {
+						if (parameter.defaultValue) {
+							writeVars.merge(GetWriteVariables(parameter.defaultValue.value()));
+							allVars.merge(GetReferencedVariables(parameter.defaultValue.value()));
+						}
+					}
+
+					allVars.insert(child.def.localCaptures.begin(), child.def.localCaptures.end());
+					break;
+				case Statement::Type::Global:
+					defNode.def.globalCaptures.insert(child.capture.name);
+					break;
+				case Statement::Type::Nonlocal:
+					defNode.def.localCaptures.insert(child.capture.name);
+					break;
+				}
+
+				if (child.type != Statement::Type::Def) {
+					scanNode(child);
+				}
+			}
+		};
+
+		scanNode(defNode);
+
+		defNode.def.localCaptures.merge(SetDifference(allVars, writeVars));
+		defNode.def.variables = SetDifference(writeVars, defNode.def.globalCaptures, defNode.def.localCaptures);
+	}
+
+	static CodeError ParseDef(const LexTree& node, Statement& out) {
+		TokenIter p(node.tokens);
+		++p;
+		out.type = Statement::Type::Def;
+
+		if (p.EndReached()) {
+			return CodeError::Bad("Expected a function name", (--p)->srcPos);
+		} else if (p->type != Token::Type::Word) {
+			return CodeError::Bad("Expected a function name", p->srcPos);
+		}
+		out.def.name = p->text;
+		++p;
+
+		if (p.EndReached()) {
+			return CodeError::Bad("Expected a '('", (--p)->srcPos);
+		} else if (p->text != "(") {
+			return CodeError::Bad("Expected a '('", p->srcPos);
+		}
+		++p;
+
+		if (auto error = ParseParameterList(p, out.def.parameters)) {
+			return error;
+		}
+
+		if (p.EndReached()) {
+			return CodeError::Bad("Expected a ')'", (--p)->srcPos);
+		} else if (p->text != ")") {
+			return CodeError::Bad("Expected a ')'", p->srcPos);
+		}
+		++p;
+
+		if (auto error = ExpectColonEnding(p)) {
+			return error;
+		}
+
+		if (auto error = ParseBody(node, out.body)) {
+			return error;
+		}
+
+		ResolveCaptures(out);
+
+		return CodeError::Good();
+	}
+
+	static CodeError ParseReturn(const LexTree& node, Statement& out) {
+		TokenIter p(node.tokens);
+		++p;
+
+		if (auto error = ParseExpression(p, out.expr)) {
+			return error;
+		} else {
+			out.type = Statement::Type::Return;
+			return CheckTrailingTokens(p);
+		}
+	}
 
 	static CodeError ParseSingleToken(const LexTree& node, Statement& out, Statement::Type type) {
 		TokenIter p(node.tokens);
@@ -64,32 +358,6 @@ namespace wings {
 		return ParseCapture(node, out, Statement::Type::Global);
 	}
 
-	// Get a set of variables referenced by an expression
-	static std::unordered_set<std::string> GetReferencedVariables(const Expression& expr) {
-		std::unordered_set<std::string> variables;
-		if (expr.operation == Operation::Variable) {
-			variables.insert(expr.literal.text);
-		} else {
-			for (const auto& child : expr.children) {
-				variables.merge(GetReferencedVariables(child));
-			}
-		}
-		return variables;
-	}
-
-	// Get a set of variables directly written to by the '=' operator. This excludes compound assignment.
-	static std::unordered_set<std::string> GetWriteVariables(const Expression& expr) {
-		std::unordered_set<std::string> variables;
-		if (expr.operation == Operation::Assign && expr.children[0].operation == Operation::Variable) {
-			variables.insert(expr.children[0].literal.text);
-		} else {
-			for (const auto& child : expr.children) {
-				variables.merge(GetWriteVariables(child));
-			}
-		}
-		return variables;
-	}
-
 	static CodeError ParseExpressionStatement(const LexTree& node, Statement& out) {
 		TokenIter p(node.tokens);
 		out.type = Statement::Type::Expr;
@@ -99,6 +367,8 @@ namespace wings {
 			return CheckTrailingTokens(p);
 		}
 	}
+
+	using ParseFn = CodeError(*)(const LexTree& node, Statement& out);
 
 	static const std::unordered_map<std::string, ParseFn> STATEMENT_STARTINGS = {
 		{ "if", ParseIf },
@@ -139,8 +409,13 @@ namespace wings {
 
 	ParseResult Parse(const LexTree& lexTree) {
 		ParseResult result{};
-		result.parseTree.type = Statement::Type::Def;
+		result.parseTree.type = Statement::Type::Root;
+
+		statementHierarchy.clear();
 		result.error = ParseBody(lexTree, result.parseTree.body);
+		statementHierarchy.clear();
+		ResolveCaptures(result.parseTree);
+
 		return result;
 	}
 }

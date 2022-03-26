@@ -6,16 +6,13 @@
 namespace wings {
 
 	struct Parameter {
-		std::optional<Expression> defaultValue;
-	};
-
-	struct Capture {
 		std::string name;
-		bool global;
+		std::optional<Expression> defaultValue;
 	};
 
 	struct Statement {
 		enum class Type {
+			Root,
 			Pass,
 			Expr,
 			Nonlocal, Global,
@@ -31,14 +28,16 @@ namespace wings {
 		std::vector<Statement> body;
 
 		struct {
-			Expression variables;
+			std::vector<std::string> variables;
 		} forLoop;
 		struct {
 			std::string name;
 		} capture;
 		struct {
+			std::string name;
 			std::vector<Parameter> parameters;
-			std::unordered_set<Capture> captures;
+			std::unordered_set<std::string> globalCaptures;
+			std::unordered_set<std::string> localCaptures;
 			std::unordered_set<std::string> variables;
 		} def;
 	};
