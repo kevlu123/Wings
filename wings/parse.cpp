@@ -132,6 +132,13 @@ namespace wings {
 
 			std::string parameterName = p->text;
 			std::optional<Expression> defaultValue;
+
+			// Check for duplicate parameters
+			if (std::find_if(out.begin(), out.end(), [&](const Parameter& p) {
+				return p.name == parameterName;
+				}) != out.end()) {
+				return CodeError::Bad("Duplicate parameter name", p->srcPos);
+			}
 			++p;
 
 			if (p.EndReached()) {
@@ -145,20 +152,13 @@ namespace wings {
 					return error;
 				}
 				defaultValue = std::move(expr);
-			} else if (!out.empty() && out.back().defaultValue) {
+			} if (!out.empty() && out.back().defaultValue) {
 				// If last parameter has a default value,
 				// this parameter must also have a default value
 				return CodeError::Bad(
 					"Parameters with default values must appear at the end of the parameter list",
 					(--p)->srcPos
 				);
-			}
-
-			// Check for duplicate parameters
-			if (std::find_if(out.begin(), out.end(), [&](const Parameter& p) {
-				return p.name == parameterName;
-				}) != out.end()) {
-				return CodeError::Bad("Duplicate parameter name", p->srcPos);
 			}
 
 			out.push_back(Parameter{ std::move(parameterName), std::move(defaultValue) });
