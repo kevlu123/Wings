@@ -8,7 +8,7 @@ namespace wings {
 
 	thread_local std::vector<Statement::Type> statementHierarchy;
 
-	static CodeError ParseBody(const LexTree& node, std::vector<Statement>& out);
+	static CodeError ParseBody(const LexTree& node, Statement::Type statType, std::vector<Statement>& out);
 
 	static CodeError CheckTrailingTokens(const TokenIter& iter) {
 		if (!iter.EndReached()) {
@@ -42,7 +42,7 @@ namespace wings {
 		}
 
 		out.type = type;
-		return ParseBody(node, out.body);
+		return ParseBody(node, type, out.body);
 	}
 
 	static CodeError ParseIf(const LexTree& node, Statement& out) {
@@ -62,7 +62,7 @@ namespace wings {
 			return error;
 		}
 
-		return ParseBody(node, out.body);
+		return ParseBody(node, Statement::Type::Else, out.body);
 	}
 
 	static CodeError ParseWhile(const LexTree& node, Statement& out) {
@@ -118,7 +118,7 @@ namespace wings {
 			return error;
 		}
 
-		return ParseBody(node, out.body);
+		return ParseBody(node, Statement::Type::For, out.body);
 	}
 
 	static CodeError ParseParameterList(TokenIter& p, std::vector<Parameter>& out) {
@@ -198,8 +198,8 @@ namespace wings {
 		return variables;
 	}
 
-	template <typename T, typename... Args>
-	std::unordered_set<T> SetDifference(const std::unordered_set<T>& set, const std::unordered_set<T>& subtract, const Args&... args) {
+	template <typename T, typename Subtract, typename... Args>
+	std::unordered_set<T> SetDifference(const std::unordered_set<T>& set, const Subtract& subtract, const Args&... args) {
 		if constexpr (sizeof...(args) == 0) {
 			std::unordered_set<T> diff = set;
 			for (const auto& sub : subtract)
@@ -221,11 +221,19 @@ namespace wings {
 				case Statement::Type::If:
 				case Statement::Type::Elif:
 				case Statement::Type::While:
-				case Statement::Type::For:
 				case Statement::Type::Return:
 					writeVars.merge(GetWriteVariables(child.expr));
 					allVars.merge(GetReferencedVariables(child.expr));
 					break;
+				case Statement::Type::For: {
+					writeVars.merge(GetWriteVariables(child.expr));
+					allVars.merge(GetReferencedVariables(child.expr));
+
+					const auto& loopVars = child.forLoop.variables;
+					writeVars.insert(loopVars.begin(), loopVars.end());
+					allVars.insert(loopVars.begin(), loopVars.end());
+					break;
+				}
 				case Statement::Type::Def:
 					writeVars.insert(child.def.name);
 					allVars.insert(child.def.name);
@@ -255,7 +263,10 @@ namespace wings {
 
 		scanNode(defNode);
 
-		defNode.def.localCaptures.merge(SetDifference(allVars, writeVars));
+		std::vector<std::string> parameterVars;
+		for (const auto& param : defNode.def.parameters)
+			parameterVars.push_back(param.name);
+		defNode.def.localCaptures.merge(SetDifference(allVars, writeVars, parameterVars));
 		defNode.def.variables = SetDifference(writeVars, defNode.def.globalCaptures, defNode.def.localCaptures);
 	}
 
@@ -294,7 +305,7 @@ namespace wings {
 			return error;
 		}
 
-		if (auto error = ParseBody(node, out.body)) {
+		if (auto error = ParseBody(node, Statement::Type::Def, out.body)) {
 			return error;
 		}
 
@@ -322,11 +333,29 @@ namespace wings {
 		return CheckTrailingTokens(p);
 	}
 
+	static CodeError CheckBreakable(const LexTree& node) {
+		auto it = statementHierarchy.rbegin();
+		while (true) {
+			if (*it == Statement::Type::Def || *it == Statement::Type::Root) {
+				return CodeError::Bad("'break' or 'continue' outside of loop", node.tokens[0].srcPos);
+			} else if (*it == Statement::Type::For || *it == Statement::Type::While) {
+				return CodeError::Good();
+			}
+			++it;
+		}
+	}
+
 	static CodeError ParseBreak(const LexTree& node, Statement& out) {
+		if (auto error = CheckBreakable(node)) {
+			return error;
+		}
 		return ParseSingleToken(node, out, Statement::Type::Break);
 	}
 
 	static CodeError ParseContinue(const LexTree& node, Statement& out) {
+		if (auto error = CheckBreakable(node)) {
+			return error;
+		}
 		return ParseSingleToken(node, out, Statement::Type::Continue);
 	}
 
@@ -337,6 +366,10 @@ namespace wings {
 	static CodeError ParseCapture(const LexTree& node, Statement& out, Statement::Type type) {
 		TokenIter p(node.tokens);
 		++p;
+
+		if (statementHierarchy.back() == Statement::Type::Root) {
+			return CodeError::Bad("Cannot capture at top level", (--p)->srcPos);
+		}
 
 		if (p.EndReached()) {
 			return CodeError::Bad("Expected a variable name", (--p)->srcPos);
@@ -394,8 +427,9 @@ namespace wings {
 		}
 	}
 
-	static CodeError ParseBody(const LexTree& node, std::vector<Statement>& out) {
+	static CodeError ParseBody(const LexTree& node, Statement::Type statType, std::vector<Statement>& out) {
 		out.clear();
+		statementHierarchy.push_back(statType);
 		for (auto& node : node.children) {
 			Statement statement;
 			if (auto error = ParseStatement(node, statement)) {
@@ -404,6 +438,7 @@ namespace wings {
 			}
 			out.push_back(std::move(statement));
 		}
+		statementHierarchy.pop_back();
 		return CodeError::Good();
 	}
 
@@ -412,9 +447,12 @@ namespace wings {
 		result.parseTree.type = Statement::Type::Root;
 
 		statementHierarchy.clear();
-		result.error = ParseBody(lexTree, result.parseTree.body);
+		result.error = ParseBody(lexTree, Statement::Type::Root, result.parseTree.body);
 		statementHierarchy.clear();
+
 		ResolveCaptures(result.parseTree);
+		result.parseTree.def.variables.merge(result.parseTree.def.localCaptures);
+		result.parseTree.def.localCaptures.clear();
 
 		return result;
 	}
