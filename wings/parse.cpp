@@ -318,10 +318,13 @@ namespace wings {
 		TokenIter p(node.tokens);
 		++p;
 
-		if (auto error = ParseExpression(p, out.expr)) {
+		out.type = Statement::Type::Return;
+		if (p.EndReached()) {
+			out.expr.operation = Operation::Literal;
+			out.expr.literal.type = Token::Type::Null;
+		} else if (auto error = ParseExpression(p, out.expr)) {
 			return error;
 		} else {
-			out.type = Statement::Type::Return;
 			return CheckTrailingTokens(p);
 		}
 	}
