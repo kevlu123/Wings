@@ -408,6 +408,11 @@ namespace wings {
 				// Line had tokenizing errors
 				error.srcPos.line = i;
 				break;
+			} else {
+				// Assign line numbers
+				for (auto& token : tokens) {
+					token.srcPos.line = i;
+				}
 			}
 
 			bool continuePrevLine = bracketBalance > 0;
