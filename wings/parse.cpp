@@ -429,6 +429,11 @@ namespace wings {
 
 	static CodeError ParseBody(const LexTree& node, Statement::Type statType, std::vector<Statement>& out) {
 		out.clear();
+
+		if (node.children.empty()) {
+			return CodeError::Bad("Expected a statement", node.tokens.back().srcPos);
+		}
+
 		statementHierarchy.push_back(statType);
 		for (auto& node : node.children) {
 			Statement statement;
