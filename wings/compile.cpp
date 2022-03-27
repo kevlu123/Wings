@@ -30,7 +30,18 @@ namespace wings {
 		return *this;
 	}
 
-	static void CompileExpression(const Expression& expression, std::vector<Instruction>& instructions) {}
+	static void CompileExpression(const Expression& expression, std::vector<Instruction>& instructions) {
+		for (const auto& child : expression.children) {
+			CompileExpression(child, instructions);
+		}
+
+		Instruction instr;
+		instr.type = Instruction::Type::Operation;
+		instr.data.operation = new OperationInstructionInfo;
+		instr.data.operation->op = expression.operation;
+		instr.data.operation->token = expression.literal;
+		instructions.push_back(std::move(instr));
+	}
 
 	static void CompileExpressionStatement(const Statement& node, std::vector<Instruction>& instructions) {
 		CompileExpression(node.expr, instructions);
