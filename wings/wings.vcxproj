@@ -143,6 +143,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="compile.cpp" />
     <ClCompile Include="error.cpp" />
     <ClCompile Include="exprparse.cpp" />
     <ClCompile Include="gc.cpp" />
@@ -153,6 +154,7 @@
     <ClCompile Include="wobj.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="compile.h" />
     <ClInclude Include="error.h" />
     <ClInclude Include="exprparse.h" />
     <ClInclude Include="gc.h" />

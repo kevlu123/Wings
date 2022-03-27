@@ -39,6 +39,9 @@
     <ClCompile Include="exprparse.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="compile.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="wings.h">
@@ -60,6 +63,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="exprparse.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="compile.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
