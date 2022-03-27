@@ -199,7 +199,7 @@ namespace wings {
 	}
 
 	template <typename T, typename Subtract, typename... Args>
-	std::unordered_set<T> SetDifference(const std::unordered_set<T>& set, const Subtract& subtract, const Args&... args) {
+	static std::unordered_set<T> SetDifference(const std::unordered_set<T>& set, const Subtract& subtract, const Args&... args) {
 		if constexpr (sizeof...(args) == 0) {
 			std::unordered_set<T> diff = set;
 			for (const auto& sub : subtract)
@@ -322,6 +322,7 @@ namespace wings {
 		if (p.EndReached()) {
 			out.expr.operation = Operation::Literal;
 			out.expr.literal.type = Token::Type::Null;
+			return CodeError::Good();
 		} else if (auto error = ParseExpression(p, out.expr)) {
 			return error;
 		} else {
