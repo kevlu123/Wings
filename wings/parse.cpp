@@ -524,10 +524,33 @@ namespace wings {
 		// Expand composite statements
 		for (size_t i = 0; i < out.size(); i++) {
 			if (out[i].type == Statement::Type::Composite) {
-				for (auto& child : out[i].body) {
-					out.insert(out.begin() + i + 1, std::move(child));
+				for (size_t j = 0; j < out[i].body.size(); j++) {
+					auto& child = out[i].body[j];
+					out.insert(out.begin() + i + j + 1, std::move(child));
 				}
 				out.erase(out.begin() + i);
+			}
+		}
+
+		// Validate elif and else
+		for (size_t i = 0; i < out.size(); i++) {
+			auto& stat = out[i];
+			Statement::Type lastType = i ? out[i - 1].type : Statement::Type::Pass;
+
+			if (stat.type == Statement::Type::Elif) {
+				if (lastType != Statement::Type::If && lastType != Statement::Type::Elif) {
+					return CodeError::Bad(
+						"An 'elif' clause may only appear after an 'if' or 'elif' clause",
+						stat.token.srcPos
+					);
+				}
+			} else if (stat.type == Statement::Type::Else) {
+				if (lastType != Statement::Type::If && lastType != Statement::Type::While) {
+					return CodeError::Bad(
+						"An 'else' clause may only appear after an 'if', 'elif', 'while', or 'for' clause",
+						stat.token.srcPos
+					);
+				}
 			}
 		}
 
@@ -538,13 +561,6 @@ namespace wings {
 
 			std::optional<Statement> elseClause;
 			if (stat.type == Statement::Type::Elif) {
-				if (lastType != Statement::Type::If && lastType != Statement::Type::Elif) {
-					return CodeError::Bad(
-						"An 'elif' clause may only appear after an 'if' or 'elif' clause",
-						stat.token.srcPos
-					);
-				}
-
 				// Transform elif into an else and if statement
 				stat.type = Statement::Type::If;
 				elseClause = Statement{};
@@ -554,16 +570,6 @@ namespace wings {
 				i--;
 
 			} else if (stat.type == Statement::Type::Else) {
-				if (lastType != Statement::Type::If
-					&& lastType != Statement::Type::Elif
-					&& lastType != Statement::Type::While)
-				{
-					return CodeError::Bad(
-						"An 'else' clause may only appear after an 'if', 'elif', 'while', or 'for' clause",
-						stat.token.srcPos
-					);
-				}
-
 				elseClause = std::move(stat);
 				out.erase(out.begin() + i);
 				i--;
