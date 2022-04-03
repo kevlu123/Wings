@@ -48,7 +48,6 @@ namespace wings {
 	}
 
 	static void CompileIf(const Statement& node, std::vector<Instruction>& instructions) {}
-	static void CompileElif(const Statement& node, std::vector<Instruction>& instructions) {}
 	static void CompileElse(const Statement& node, std::vector<Instruction>& instructions) {}
 	static void CompileWhile(const Statement& node, std::vector<Instruction>& instructions) {}
 	static void CompileFor(const Statement& node, std::vector<Instruction>& instructions) {}
@@ -70,7 +69,6 @@ namespace wings {
 	static const std::unordered_map<Statement::Type, CompileFn> COMPILE_FUNCTIONS = {
 		{ Statement::Type::Expr, CompileExpressionStatement },
 		{ Statement::Type::If, CompileIf },
-		{ Statement::Type::Elif, CompileElif },
 		{ Statement::Type::Else, CompileElse },
 		{ Statement::Type::While, CompileWhile },
 		{ Statement::Type::For, CompileFor },

@@ -438,6 +438,8 @@ namespace wings {
 			return CodeError::Bad("Expected a statement", node.tokens.back().srcPos);
 		}
 
+		std::optional<Statement::Type> lastType;
+
 		statementHierarchy.push_back(statType);
 		for (auto& node : node.children) {
 			Statement statement;
@@ -445,7 +447,39 @@ namespace wings {
 				out.clear();
 				return error;
 			}
-			out.push_back(std::move(statement));
+
+			auto statType = statement.type;
+			if (statType == Statement::Type::Elif) {
+				if (!lastType || (lastType.value() != Statement::Type::If && lastType.value() != Statement::Type::Elif)) {
+					return CodeError::Bad("An 'elif' clause may only appear after an 'if' or 'elif' clause");
+				}
+				// Transform elif into an else and if statement
+				Statement elseClause{};
+				elseClause.type = Statement::Type::Else;
+				statement.type = Statement::Type::If;
+				elseClause.body.push_back(std::move(statement));
+				out.back().elseClause = std::make_unique<Statement>(std::move(elseClause));
+			} else if (statType == Statement::Type::Else) {
+				if (!lastType || (lastType.value() != Statement::Type::If
+					&& lastType.value() != Statement::Type::Elif
+					&& lastType.value() != Statement::Type::While
+					&& lastType.value() != Statement::Type::For)) {
+					return CodeError::Bad("An 'else' clause may only appear after an 'if', 'elif', 'while', or 'for' clause");
+				}
+				
+				if (lastType.value() == Statement::Type::Elif) {
+					auto parent = out.back().elseClause.get();
+					while (parent->elseClause) {
+						parent = parent->elseClause.get();
+					}
+					parent->elseClause = std::make_unique<Statement>(std::move(statement));
+				} else {
+					out.back().elseClause = std::make_unique<Statement>(std::move(statement));
+				}
+			} else {
+				out.push_back(std::move(statement));
+			}
+			lastType = statType;
 		}
 		statementHierarchy.pop_back();
 		return CodeError::Good();

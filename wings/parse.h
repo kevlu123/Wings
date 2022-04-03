@@ -2,6 +2,7 @@
 #include "exprparse.h"
 #include <optional>
 #include <unordered_set>
+#include <memory>
 
 namespace wings {
 
@@ -26,6 +27,7 @@ namespace wings {
 		Expression expr;
 
 		std::vector<Statement> body;
+		std::unique_ptr<Statement> elseClause;
 
 		struct {
 			std::vector<std::string> variables;
