@@ -56,8 +56,31 @@ namespace wings {
 		instructions.push_back(std::move(instr));
 	}
 
-	static void CompileIf(const Statement& node, std::vector<Instruction>& instructions) {}
-	static void CompileElse(const Statement& node, std::vector<Instruction>& instructions) {}
+	static void CompileIf(const Statement& node, std::vector<Instruction>& instructions) {
+		CompileExpression(node.expr, instructions);
+
+		size_t falseJumpInstrIndex = instructions.size();
+		Instruction falseJump{};
+		falseJump.type = Instruction::Type::JumpIfFalse;
+		instructions.push_back(std::move(falseJump));
+
+		CompileBody(node, instructions);
+
+		if (node.elseClause) {
+			size_t trueJumpInstrIndex = instructions.size();
+			Instruction trueJump{};
+			trueJump.type = Instruction::Type::Jump;
+			instructions.push_back(std::move(trueJump));
+
+			instructions[falseJumpInstrIndex].data.jump.location = instructions.size();
+
+			CompileBody(*node.elseClause, instructions);
+
+			instructions[trueJumpInstrIndex].data.jump.location = instructions.size();
+		} else {
+			instructions[falseJumpInstrIndex].data.jump.location = instructions.size();
+		}
+	}
 
 	static void CompileWhile(const Statement& node, std::vector<Instruction>& instructions) {
 		size_t conditionLocation = instructions.size();
@@ -122,7 +145,6 @@ namespace wings {
 	static const std::unordered_map<Statement::Type, CompileFn> COMPILE_FUNCTIONS = {
 		{ Statement::Type::Expr, CompileExpressionStatement },
 		{ Statement::Type::If, CompileIf },
-		{ Statement::Type::Else, CompileElse },
 		{ Statement::Type::While, CompileWhile },
 		{ Statement::Type::Break, CompileBreak },
 		{ Statement::Type::Continue, CompileContinue },

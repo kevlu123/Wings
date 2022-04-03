@@ -23,7 +23,6 @@ namespace wings {
 			Push,
 			Pop,
 			Jump,
-			JumpIfTrue,
 			JumpIfFalse,
 			Def,
 			Return,
