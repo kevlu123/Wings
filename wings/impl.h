@@ -55,6 +55,8 @@ namespace wings {
         std::unordered_multiset<const WObj*> protectedObjects;
     };
 
+    size_t Guid();
+
 } // namespace wings
 
 #define WASSERT(assertion) do { if (!(assertion)) std::abort(); } while (0)

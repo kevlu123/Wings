@@ -21,16 +21,16 @@ namespace wings {
 			If, Elif, Else,
 			While, For,
 			Break, Continue,
+			Composite,
 		} type;
 
-		// Main expression argument
+		Token token;
 		Expression expr;
-
 		std::vector<Statement> body;
 		std::unique_ptr<Statement> elseClause;
 
 		struct {
-			std::vector<std::string> variables;
+			Expression variable;
 		} forLoop;
 		struct {
 			std::string name;

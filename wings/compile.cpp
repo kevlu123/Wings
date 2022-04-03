@@ -60,7 +60,7 @@ namespace wings {
 	static void CompileElse(const Statement& node, std::vector<Instruction>& instructions) {}
 
 	static void CompileWhile(const Statement& node, std::vector<Instruction>& instructions) {
-		size_t conditionLocation = instructions.size() - 1;
+		size_t conditionLocation = instructions.size();
 		CompileExpression(node.expr, instructions);
 		
 		size_t terminateJumpInstrIndex = instructions.size();
@@ -75,14 +75,14 @@ namespace wings {
 		loopJump.data.jump.location = conditionLocation;
 		instructions.push_back(std::move(loopJump));
 
-		instructions[terminateJumpInstrIndex].data.jump.location = instructions.size() - 1;
+		instructions[terminateJumpInstrIndex].data.jump.location = instructions.size();
 
 		if (node.elseClause) {
 			CompileBody(*node.elseClause, instructions);
 		}
 
 		for (size_t index : breakInstructions) {
-			instructions[index].data.jump.location = instructions.size() - 1;
+			instructions[index].data.jump.location = instructions.size();
 		}
 		for (size_t index : continueInstructions) {
 			instructions[index].data.jump.location = conditionLocation;
@@ -90,8 +90,6 @@ namespace wings {
 		breakInstructions.clear();
 		continueInstructions.clear();
 	}
-
-	static void CompileFor(const Statement& node, std::vector<Instruction>& instructions) {}
 
 	static void CompileBreak(const Statement& node, std::vector<Instruction>& instructions) {
 		breakInstructions.push_back(instructions.size());
@@ -126,7 +124,6 @@ namespace wings {
 		{ Statement::Type::If, CompileIf },
 		{ Statement::Type::Else, CompileElse },
 		{ Statement::Type::While, CompileWhile },
-		{ Statement::Type::For, CompileFor },
 		{ Statement::Type::Break, CompileBreak },
 		{ Statement::Type::Continue, CompileContinue },
 		{ Statement::Type::Return, CompileReturn },

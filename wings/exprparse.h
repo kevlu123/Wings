@@ -43,6 +43,6 @@ namespace wings {
 		const std::vector<Token>* tokens;
 	};
 
-	CodeError ParseExpression(TokenIter& p, Expression& out);
+	CodeError ParseExpression(TokenIter& p, Expression& out, bool disableInOp = false);
 
 }

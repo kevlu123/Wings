@@ -5,6 +5,11 @@ namespace wings {
 
     static thread_local Error werror;
 
+    size_t Guid() {
+        static size_t i = 0;
+        return ++i;
+    }
+
     extern "C" {
 
         Error WErrorGet() {

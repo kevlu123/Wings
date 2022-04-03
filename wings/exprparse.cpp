@@ -6,6 +6,8 @@
 
 namespace wings {
 
+	static thread_local bool disableInOperator;
+
 	static CodeError ParseExpression(TokenIter& p, Expression& out, size_t minPrecedence, std::optional<Expression> preParsedArg = std::nullopt);
 
 	TokenIter::TokenIter(const std::vector<Token>& tokens) :
@@ -440,6 +442,9 @@ namespace wings {
 			} else if (p->text != "in") {
 				return CodeError::Bad("Expected a 'in'", p->srcPos);
 			}
+		} else if (disableInOperator && op == Operation::In) {
+			out = std::move(lhs);
+			return CodeError::Good();
 		}
 		++p;
 
@@ -475,11 +480,12 @@ namespace wings {
 		}
 	}
 
-	CodeError ParseExpression(TokenIter& p, Expression& out) {
+	CodeError ParseExpression(TokenIter& p, Expression& out, bool disableInOp) {
+		disableInOperator = disableInOp;
 		if (p.EndReached()) {
 			return CodeError::Bad("Expected an expression", (--p)->srcPos);
 		} else {
-			return ParseExpression(p, out, 0);
+			return ParseExpression(p, out, (size_t)0);
 		}
 	}
 }

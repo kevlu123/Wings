@@ -1,4 +1,5 @@
 #include "parse.h"
+#include "impl.h"
 #include <unordered_map>
 #include <functional>
 #include <algorithm>
@@ -96,12 +97,80 @@ namespace wings {
 		}
 	}
 
+	static Statement TransformForToWhile(Statement forLoop) {
+		// __VarXXX = expression
+		std::string rangeVarName = "__For" + std::to_string(Guid());
+		Expression rangeVar{};
+		rangeVar.operation = Operation::Variable;
+		rangeVar.literal.type = Token::Type::Word;
+		rangeVar.literal.literal.s = rangeVarName;
+		rangeVar.literal.text = rangeVarName;
+
+		Statement rangeEval{};
+		rangeEval.type = Statement::Type::Expr;
+		rangeEval.expr.operation = Operation::Assign;
+		rangeEval.expr.children.push_back(rangeVar);
+		rangeEval.expr.children.push_back(std::move(forLoop.expr));
+
+		// while not iterend(__VarXXX):
+		Expression loadEndCheck{};
+		loadEndCheck.operation = Operation::Variable;
+		loadEndCheck.literal.type = Token::Type::Word;
+		loadEndCheck.literal.literal.s = "iterend";
+		loadEndCheck.literal.text = "iterend";
+
+		Expression callEndCheck{};
+		callEndCheck.operation = Operation::Call;
+		callEndCheck.children.push_back(std::move(loadEndCheck));
+		callEndCheck.children.push_back(rangeVar);
+
+		Expression condition{};
+		condition.operation = Operation::Not;
+		condition.children.push_back(std::move(callEndCheck));
+
+		Statement wh{};
+		wh.type = Statement::Type::While;
+		wh.expr = std::move(condition);
+
+		// vars = iternext(__VarXXX)
+		Expression loadNext{};
+		loadNext.operation = Operation::Variable;
+		loadNext.literal.type = Token::Type::Word;
+		loadNext.literal.literal.s = "iternext";
+		loadNext.literal.text = "iternext";
+
+		Expression callNext{};
+		callNext.operation = Operation::Call;
+		callNext.children.push_back(std::move(loadNext));
+		callNext.children.push_back(std::move(rangeVar));
+
+		Expression iterAssign{};
+		iterAssign.operation = Operation::Assign;
+		iterAssign.children.push_back(std::move(forLoop.forLoop.variable));
+		iterAssign.children.push_back(std::move(callNext));
+
+		Statement iterAssignStat{};
+		iterAssignStat.type = Statement::Type::Expr;
+		iterAssignStat.expr = std::move(iterAssign);
+		wh.body.push_back(std::move(iterAssignStat));
+
+		// Transfer body over
+		for (auto& child : forLoop.body)
+			wh.body.push_back(std::move(child));
+
+		Statement out{};
+		out.type = Statement::Type::Composite;
+		out.body.push_back(std::move(rangeEval));
+		out.body.push_back(std::move(wh));
+		return out;
+	}
+
 	static CodeError ParseFor(const LexTree& node, Statement& out) {
 		TokenIter p(node.tokens);
 		++p;
 		out.type = Statement::Type::For;
 
-		if (auto error = ParseVariableList(p, out.forLoop.variables)) {
+		if (auto error = ParseExpression(p, out.forLoop.variable, true)) {
 			return error;
 		}
 
@@ -118,7 +187,12 @@ namespace wings {
 			return error;
 		}
 
-		return ParseBody(node, Statement::Type::For, out.body);
+		if (auto error = ParseBody(node, Statement::Type::For, out.body)) {
+			return error;
+		}
+
+		out = TransformForToWhile(std::move(out));
+		return CodeError::Good();
 	}
 
 	static CodeError ParseParameterList(TokenIter& p, std::vector<Parameter>& out) {
@@ -225,15 +299,6 @@ namespace wings {
 					writeVars.merge(GetWriteVariables(child.expr));
 					allVars.merge(GetReferencedVariables(child.expr));
 					break;
-				case Statement::Type::For: {
-					writeVars.merge(GetWriteVariables(child.expr));
-					allVars.merge(GetReferencedVariables(child.expr));
-
-					const auto& loopVars = child.forLoop.variables;
-					writeVars.insert(loopVars.begin(), loopVars.end());
-					allVars.insert(loopVars.begin(), loopVars.end());
-					break;
-				}
 				case Statement::Type::Def:
 					writeVars.insert(child.def.name);
 					allVars.insert(child.def.name);
@@ -423,12 +488,19 @@ namespace wings {
 	};
 
 	static CodeError ParseStatement(const LexTree& node, Statement& out) {
-		const auto& firstToken = node.tokens.at(0).text;
+		const auto& firstToken = node.tokens[0].text;
 		if (STATEMENT_STARTINGS.contains(firstToken)) {
-			return STATEMENT_STARTINGS.at(firstToken)(node, out);
+			if (auto error = STATEMENT_STARTINGS.at(firstToken)(node, out)) {
+				return error;
+			}
 		} else {
-			return ParseExpressionStatement(node, out);
+			if (auto error = ParseExpressionStatement(node, out)) {
+				return error;
+			}
 		}
+
+		out.token = node.tokens[0];
+		return CodeError::Good();
 	}
 
 	static CodeError ParseBody(const LexTree& node, Statement::Type statType, std::vector<Statement>& out) {
@@ -438,8 +510,6 @@ namespace wings {
 			return CodeError::Bad("Expected a statement", node.tokens.back().srcPos);
 		}
 
-		std::optional<Statement::Type> lastType;
-
 		statementHierarchy.push_back(statType);
 		for (auto& node : node.children) {
 			Statement statement;
@@ -447,41 +517,67 @@ namespace wings {
 				out.clear();
 				return error;
 			}
-
-			auto statType = statement.type;
-			if (statType == Statement::Type::Elif) {
-				if (!lastType || (lastType.value() != Statement::Type::If && lastType.value() != Statement::Type::Elif)) {
-					return CodeError::Bad("An 'elif' clause may only appear after an 'if' or 'elif' clause");
-				}
-				// Transform elif into an else and if statement
-				Statement elseClause{};
-				elseClause.type = Statement::Type::Else;
-				statement.type = Statement::Type::If;
-				elseClause.body.push_back(std::move(statement));
-				out.back().elseClause = std::make_unique<Statement>(std::move(elseClause));
-			} else if (statType == Statement::Type::Else) {
-				if (!lastType || (lastType.value() != Statement::Type::If
-					&& lastType.value() != Statement::Type::Elif
-					&& lastType.value() != Statement::Type::While
-					&& lastType.value() != Statement::Type::For)) {
-					return CodeError::Bad("An 'else' clause may only appear after an 'if', 'elif', 'while', or 'for' clause");
-				}
-				
-				if (lastType.value() == Statement::Type::Elif) {
-					auto parent = out.back().elseClause.get();
-					while (parent->elseClause) {
-						parent = parent->elseClause.get();
-					}
-					parent->elseClause = std::make_unique<Statement>(std::move(statement));
-				} else {
-					out.back().elseClause = std::make_unique<Statement>(std::move(statement));
-				}
-			} else {
-				out.push_back(std::move(statement));
-			}
-			lastType = statType;
+			out.push_back(std::move(statement));
 		}
 		statementHierarchy.pop_back();
+
+		// Expand composite statements
+		for (size_t i = 0; i < out.size(); i++) {
+			if (out[i].type == Statement::Type::Composite) {
+				for (auto& child : out[i].body) {
+					out.insert(out.begin() + i + 1, std::move(child));
+				}
+				out.erase(out.begin() + i);
+			}
+		}
+
+		// Rearrange elif and else nodes
+		for (size_t i = 0; i < out.size(); i++) {
+			auto& stat = out[i];
+			Statement::Type lastType = i ? out[i - 1].type : Statement::Type::Pass;
+
+			std::optional<Statement> elseClause;
+			if (stat.type == Statement::Type::Elif) {
+				if (lastType != Statement::Type::If && lastType != Statement::Type::Elif) {
+					return CodeError::Bad(
+						"An 'elif' clause may only appear after an 'if' or 'elif' clause",
+						stat.token.srcPos
+					);
+				}
+
+				// Transform elif into an else and if statement
+				stat.type = Statement::Type::If;
+				elseClause = Statement{};
+				elseClause.value().type = Statement::Type::Else;
+				elseClause.value().body.push_back(std::move(stat));
+				out.erase(out.begin() + i);
+				i--;
+
+			} else if (stat.type == Statement::Type::Else) {
+				if (lastType != Statement::Type::If
+					&& lastType != Statement::Type::Elif
+					&& lastType != Statement::Type::While)
+				{
+					return CodeError::Bad(
+						"An 'else' clause may only appear after an 'if', 'elif', 'while', or 'for' clause",
+						stat.token.srcPos
+					);
+				}
+
+				elseClause = std::move(stat);
+				out.erase(out.begin() + i);
+				i--;
+			}
+
+			if (elseClause) {
+				Statement* parent = &out[i];
+				while (parent->elseClause) {
+					parent = &parent->elseClause->body.back();
+				}
+				parent->elseClause = std::make_unique<Statement>(std::move(elseClause.value()));
+			}
+		}
+
 		return CodeError::Good();
 	}
 

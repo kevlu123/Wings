@@ -20,6 +20,7 @@ namespace wings {
 	struct Instruction {
 		enum class Type {
 			Operation,
+			Push,
 			Pop,
 			Jump,
 			JumpIfTrue,
@@ -32,9 +33,13 @@ namespace wings {
 			OperationInstructionInfo* operation = nullptr;
 			DefInstructionInfo* def;
 			struct {
-				// 1 less than the location to execute next
+				// Location to execute next
 				size_t location;
 			} jump;
+			struct {
+				// Distance from the next unused index on the stack
+				size_t offset;
+			} push;
 		} data;
 
 		Instruction() = default;
