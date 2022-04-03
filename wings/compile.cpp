@@ -92,8 +92,22 @@ namespace wings {
 	}
 
 	static void CompileFor(const Statement& node, std::vector<Instruction>& instructions) {}
-	static void CompileBreak(const Statement& node, std::vector<Instruction>& instructions) {}
-	static void CompileContinue(const Statement& node, std::vector<Instruction>& instructions) {}
+
+	static void CompileBreak(const Statement& node, std::vector<Instruction>& instructions) {
+		breakInstructions.push_back(instructions.size());
+
+		Instruction jump{};
+		jump.type = Instruction::Type::Jump;
+		instructions.push_back(std::move(jump));
+	}
+
+	static void CompileContinue(const Statement& node, std::vector<Instruction>& instructions) {
+		continueInstructions.push_back(instructions.size());
+
+		Instruction jump{};
+		jump.type = Instruction::Type::Jump;
+		instructions.push_back(std::move(jump));
+	}
 
 	static void CompileReturn(const Statement& node, std::vector<Instruction>& instructions) {
 		CompileExpression(node.expr, instructions);
