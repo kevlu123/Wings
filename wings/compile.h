@@ -20,8 +20,10 @@ namespace wings {
 	struct Instruction {
 		enum class Type {
 			Operation,
+			Pop,
 			Jump,
 			JumpIfTrue,
+			JumpIfFalse,
 			Def,
 			Return,
 		} type{};
