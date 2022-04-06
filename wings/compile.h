@@ -20,7 +20,6 @@ namespace wings {
 	struct Instruction {
 		enum class Type {
 			Operation,
-			Push,
 			Pop,
 			Jump,
 			JumpIfFalse,

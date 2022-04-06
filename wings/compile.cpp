@@ -133,12 +133,44 @@ namespace wings {
 	static void CompileReturn(const Statement& node, std::vector<Instruction>& instructions) {
 		CompileExpression(node.expr, instructions);
 
-		Instruction in;
+		Instruction in{};
 		in.type = Instruction::Type::Return;
 		instructions.push_back(std::move(in));
 	}
 
-	static void CompileDef(const Statement& node, std::vector<Instruction>& instructions) {}
+	static void CompileDef(const Statement& node, std::vector<Instruction>& instructions) {
+		Instruction defName{};
+		defName.type = Instruction::Type::Operation;
+		defName.data.operation = new OperationInstructionInfo();
+		defName.data.operation->op = Operation::Variable;
+		defName.data.operation->token.literal.s = node.def.name;
+		defName.data.operation->token.text = node.def.name;
+		instructions.push_back(std::move(defName));
+
+		Instruction def{};
+		def.type = Instruction::Type::Def;
+		def.data.def = new DefInstructionInfo();
+		def.data.def->variables = std::vector<std::string>(
+			node.def.variables.begin(),
+			node.def.variables.end()
+			);
+		def.data.def->localCaptures = std::vector<std::string>(
+			node.def.localCaptures.begin(),
+			node.def.localCaptures.end()
+			);
+		def.data.def->globalCaptures = std::vector<std::string>(
+			node.def.globalCaptures.begin(),
+			node.def.globalCaptures.end()
+			);
+		def.data.def->parameters = node.def.parameters;
+		instructions.push_back(std::move(def));
+
+		Instruction assign{};
+		assign.type = Instruction::Type::Operation;
+		assign.data.operation = new OperationInstructionInfo();
+		assign.data.operation->op = Operation::Assign;
+		instructions.push_back(std::move(assign));
+	}
 
 	using CompileFn = void(*)(const Statement&, std::vector<Instruction>&);
 
