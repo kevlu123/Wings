@@ -27,6 +27,8 @@ namespace wings {
         MaxAlloc,
         // Max recursion reached
         MaxRecursion,
+        // Error while compiling code
+        CompileFailed,
     };
 
     using LogFn = void (*)(const char* message);
@@ -48,6 +50,7 @@ namespace wings {
 #endif
 
         WDLL_EXPORT Error WErrorGet();
+        WDLL_EXPORT const char* WErrorMessageGet();
         WDLL_EXPORT WContext* WContextCreate(const Config* config = nullptr);
         WDLL_EXPORT void WContextDestroy(WContext* context);
         WDLL_EXPORT WObj* WContextCompile(WContext* context, const char* code);

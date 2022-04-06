@@ -16,7 +16,8 @@ namespace std {
 
 namespace wings {
 
-    extern thread_local Error werror;
+    inline thread_local Error werror;
+    inline thread_local std::string werrorMessage;
 
     bool operator==(const WObj& lhs, const WObj& rhs);
     bool operator!=(const WObj& lhs, const WObj& rhs);

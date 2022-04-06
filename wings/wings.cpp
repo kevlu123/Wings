@@ -1,9 +1,11 @@
 #include "impl.h"
+#include "executor.h"
+#include "compile.h"
 #include <iostream>
+#include <memory>
+#include <sstream>
 
 namespace wings {
-
-    static thread_local Error werror;
 
     size_t Guid() {
         static size_t i = 0;
@@ -14,6 +16,15 @@ namespace wings {
 
         Error WErrorGet() {
             return werror;
+        }
+
+        const char* WErrorMessageGet() {
+            switch (werror) {
+            case Error::Ok: return "Ok";
+            case Error::MaxAlloc: return "Exceeded maximum number of objects allocated at a time";
+            case Error::MaxRecursion: return "Exceeded maximum recursion limit";
+            default: return werrorMessage.c_str();
+            }
         }
 
         void WContextGetConfig(const WContext* context, Config* config) {
@@ -54,6 +65,51 @@ namespace wings {
             WASSERT(context && message);
             if (context->config.log)
                 context->config.log(message);
+        }
+
+        WObj* WContextCompile(WContext* context, const char* code) {
+
+            auto formatError = [](const auto& err, const auto& rawCode) {
+                std::stringstream ss;
+                ss << "Error on line " << (err.srcPos.line + 1) << '\n';
+                ss << rawCode[err.srcPos.line] << '\n';
+                ss << std::string(err.srcPos.column, ' ') << "^\n";
+                ss << err.message;
+                return ss.str();
+            };
+
+            auto lexResult = Lex(code);
+            if (lexResult.error) {
+                werror = Error::CompileFailed;
+                werrorMessage = formatError(lexResult.error, lexResult.rawCode);
+                return nullptr;
+            }
+
+            auto parseResult = Parse(lexResult.lexTree);
+            if (parseResult.error) {
+                werror = Error::CompileFailed;
+                werrorMessage = formatError(lexResult.error, lexResult.rawCode);
+                return nullptr;
+            }
+
+            Executor* executor = new Executor();
+            executor->instructions = Compile(parseResult.parseTree);
+
+            Func func{};
+            func.fptr = &Executor::Run;
+            func.userdata = executor;
+            WObj* obj = WObjCreateFunc(context, &func);
+            if (obj == nullptr) {
+                delete (Executor*)executor;
+                return nullptr;
+            }
+
+            Finalizer finalizer{};
+            finalizer.fptr = [](WObj* obj, void* userdata) { delete (Executor*)userdata; };
+            finalizer.userdata = executor;
+            WObjSetFinalizer(obj, &finalizer);
+
+            return obj;
         }
 
     } // extern "C"
