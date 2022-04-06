@@ -245,7 +245,9 @@ namespace wings {
         }
         
         WObj* WObjCall(const WObj* func, WObj** args, int argc) {
-            WASSERT(func && args && argc >= 0 && WObjIsFunc(func));
+            WASSERT(func && argc >= 0 && WObjIsFunc(func));
+            if (argc)
+                WASSERT(args);
             for (int i = 0; i < argc; i++)
                 WASSERT(args[i]);
             return func->fn.fptr(args, argc, func->fn.userdata);
