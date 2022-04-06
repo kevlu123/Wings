@@ -66,7 +66,7 @@ namespace wings {
                     obj->finalizer.fptr(obj.get(), obj->finalizer.userdata);
             }
             // Free the memory
-            context->mem.erase(context->mem.begin(), unusedBegin);
+            context->mem.erase(unusedBegin, context->mem.end());
 
             context->lastObjectCountAfterGC = context->mem.size();
         }
