@@ -74,6 +74,9 @@
     <ClInclude Include="executor.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="rcptr.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="cpp.hint" />

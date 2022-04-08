@@ -147,6 +147,18 @@ namespace wings {
 		defName.data.operation->token.text = node.def.name;
 		instructions.push_back(std::move(defName));
 
+		const auto& parameters = node.def.parameters;
+		size_t defaultParamCount = 0;
+		for (size_t i = parameters.size(); i--> 0; ) {
+			const auto& param = parameters[i];
+			if (param.defaultValue.has_value()) {
+				CompileExpression(param.defaultValue.value(), instructions);
+				defaultParamCount = parameters.size() - i;
+			} else {
+				break;
+			}
+		}
+
 		Instruction def{};
 		def.type = Instruction::Type::Def;
 		def.data.def = new DefInstructionInfo();
@@ -162,7 +174,10 @@ namespace wings {
 			node.def.globalCaptures.begin(),
 			node.def.globalCaptures.end()
 			);
+		def.data.def->defaultParameterCount = defaultParamCount;
 		def.data.def->parameters = node.def.parameters;
+		def.data.def->instructions = MakeRcPtr<std::vector<Instruction>>();
+		CompileBody(node, *def.data.def->instructions);
 		instructions.push_back(std::move(def));
 
 		Instruction assign{};

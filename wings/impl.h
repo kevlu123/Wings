@@ -1,4 +1,5 @@
 #pragma once
+#include "rcptr.h"
 #include "wings.h"
 #include <string>
 #include <vector>
@@ -57,6 +58,8 @@ struct WContext {
     size_t lastObjectCountAfterGC = 0;
     std::deque<std::unique_ptr<WObj>> mem;
     std::unordered_multiset<const WObj*> protectedObjects;
+
+    std::unordered_map<std::string, wings::RcPtr<WObj*>> globals;
 };
 
 #define WASSERT(assertion) do { if (!(assertion)) std::abort(); } while (0)

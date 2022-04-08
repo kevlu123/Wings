@@ -1,6 +1,9 @@
 #pragma once
 #include "compile.h"
+#include "rcptr.h"
 #include <vector>
+#include <string>
+#include <unordered_map>
 
 namespace wings {
 
@@ -11,9 +14,12 @@ namespace wings {
 		void PushStack(WObj* obj);
 		WObj* PopStack();
 
-		std::vector<Instruction> instructions;
+		RcPtr<std::vector<Instruction>> instructions;
 		WContext* context{};
 		std::vector<WObj*> stack;
+		std::unordered_map<std::string, RcPtr<WObj*>> variables;
+		std::vector<std::string> parameterNames;
+		std::vector<WObj*> defaultParameterValues;
 	};
 
 }

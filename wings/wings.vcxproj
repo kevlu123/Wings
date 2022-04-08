@@ -163,6 +163,7 @@
     <ClInclude Include="impl.h" />
     <ClInclude Include="lex.h" />
     <ClInclude Include="parse.h" />
+    <ClInclude Include="rcptr.h" />
     <ClInclude Include="wings.h" />
   </ItemGroup>
   <ItemGroup>

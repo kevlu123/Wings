@@ -7,7 +7,7 @@ namespace wings {
     WObj* Alloc(WContext* context) {
         // Check if GC should run
         if (context->mem.size() >= (size_t)(context->config.gcRunFactor * context->lastObjectCountAfterGC)) {
-            WGCCollect(context);
+            WGcCollect(context);
         }
 
         // Allocate new object
@@ -19,11 +19,15 @@ namespace wings {
 
     extern "C" {
 
-        void WGCCollect(WContext* context) {
+        void WGcCollect(WContext* context) {
             WASSERT(context);
 
-            // Recursively find objects in use
             std::deque<const WObj*> inUse(context->protectedObjects.begin(), context->protectedObjects.end());
+            for (auto& var : context->globals) {
+                inUse.push_back(*var.second);
+            }
+
+            // Recursively find objects in use
             std::unordered_set<const WObj*> traversed;
             while (inUse.size()) {
                 auto obj = inUse.back();
@@ -71,12 +75,12 @@ namespace wings {
             context->lastObjectCountAfterGC = context->mem.size();
         }
 
-        void WGCProtect(WContext* context, const WObj* obj) {
+        void WGcProtect(WContext* context, const WObj* obj) {
             WASSERT(context && obj);
             context->protectedObjects.insert(obj);
         }
 
-        void WGCUnprotect(WContext* context, const WObj* obj) {
+        void WGcUnprotect(WContext* context, const WObj* obj) {
             WASSERT(context && obj);
             auto it = context->protectedObjects.find(obj);
             WASSERT(it != context->protectedObjects.end());

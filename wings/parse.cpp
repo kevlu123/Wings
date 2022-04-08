@@ -332,7 +332,7 @@ namespace wings {
 		for (const auto& param : defNode.def.parameters)
 			parameterVars.push_back(param.name);
 		defNode.def.localCaptures.merge(SetDifference(allVars, writeVars, parameterVars));
-		defNode.def.variables = SetDifference(writeVars, defNode.def.globalCaptures, defNode.def.localCaptures);
+		defNode.def.variables = SetDifference(writeVars, defNode.def.globalCaptures, defNode.def.localCaptures, parameterVars);
 	}
 
 	static CodeError ParseDef(const LexTree& node, Statement& out) {

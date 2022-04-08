@@ -86,9 +86,9 @@ extern "C" {
             werrorMessage = formatError(parseResult.error, lexResult.rawCode);
             return nullptr;
         }
-
         Executor* executor = new Executor();
-        executor->instructions = Compile(parseResult.parseTree);
+        auto instructions = Compile(parseResult.parseTree);
+        executor->instructions = MakeRcPtr<std::vector<Instruction>>(std::move(instructions));
 
         WFunc func{};
         func.fptr = &Executor::Run;
@@ -105,6 +105,23 @@ extern "C" {
         WObjSetFinalizer(obj, &finalizer);
 
         return obj;
+    }
+
+    WObj* WContextGetGlobal(WContext* context, const char* name) {
+        auto it = context->globals.find(std::string(name));
+        if (it == context->globals.end()) {
+            return nullptr;
+        } else {
+            return *it->second;
+        }
+    }
+
+    void WContextSetGlobal(WContext* context, const char* name, WObj* value) {
+        if (context->globals.contains(std::string(name))) {
+            *context->globals.at(std::string(name)) = value;
+        } else {
+            context->globals.insert({ std::string(name), MakeRcPtr<WObj*>(value) });
+        }
     }
 
 } // extern "C"

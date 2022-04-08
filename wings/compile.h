@@ -1,6 +1,7 @@
 #pragma once
 #include "parse.h"
 #include "wings.h"
+#include "rcptr.h"
 #include <vector>
 
 namespace wings {
@@ -10,11 +11,15 @@ namespace wings {
 		Token token; // Holds literal, variable, and/or source location of operation
 	};
 
+	struct Instruction;
+
 	struct DefInstructionInfo {
+		size_t defaultParameterCount;
 		std::vector<Parameter> parameters;
 		std::vector<std::string> globalCaptures;
 		std::vector<std::string> localCaptures;
 		std::vector<std::string> variables;
+		RcPtr<std::vector<Instruction>> instructions;
 	};
 
 	struct Instruction {

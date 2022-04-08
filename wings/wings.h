@@ -64,6 +64,7 @@ extern "C" {
 
 WDLL_EXPORT WError WErrorGet();
 WDLL_EXPORT const char* WErrorMessageGet();
+
 WDLL_EXPORT WContext* WContextCreate(const WConfig* config WDEFAULT_ARG(nullptr));
 WDLL_EXPORT void WContextDestroy(WContext* context);
 WDLL_EXPORT WObj* WContextCompile(WContext* context, const char* code);
@@ -71,9 +72,12 @@ WDLL_EXPORT void WContextGetConfig(const WContext* context, WConfig* config);
 WDLL_EXPORT void WContextSetConfig(WContext* context, const WConfig* config);
 WDLL_EXPORT void WContextLog(const WContext* context, const char* message);
 
-WDLL_EXPORT void WGCProtect(WContext* context, const WObj* obj);
-WDLL_EXPORT void WGCUnprotect(WContext* context, const WObj* obj);
-WDLL_EXPORT void WGCCollect(WContext* context);
+WDLL_EXPORT void WGcProtect(WContext* context, const WObj* obj);
+WDLL_EXPORT void WGcUnprotect(WContext* context, const WObj* obj);
+WDLL_EXPORT void WGcCollect(WContext* context);
+
+WDLL_EXPORT WObj* WContextGetGlobal(WContext* context, const char* name);
+WDLL_EXPORT void WContextSetGlobal(WContext* context, const char* name, WObj* value);
 
 WDLL_EXPORT WObj* WObjCreateNull(WContext* context);
 WDLL_EXPORT WObj* WObjCreateBool(WContext* context, bool value WDEFAULT_ARG(false));
