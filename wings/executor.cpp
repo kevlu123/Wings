@@ -15,11 +15,33 @@ namespace wings {
 		return obj;
 	}
 
+	bool Executor::InitializeParams(WObj** args, int argc) {
+		if (argc > (int)parameterNames.size()) {
+			// TODO: error message
+			return false;
+		} else {
+			for (size_t i = 0; i < parameterNames.size(); i++) {
+				size_t defaultParameterIndex = i + defaultParameterValues.size() - parameterNames.size();
+				WObj* value = ((int)i < argc) ? args[i] : defaultParameterValues[defaultParameterIndex];
+				SetLocal(parameterNames[i], value);
+			}
+			return true;
+		}
+	}
+
+	void Executor::SetLocal(const std::string& name, WObj* value) {
+		*variables.at(name) = value;
+	}
+
 	WObj* Executor::Run(WObj** args, int argc, void* userdata) {
 		return ((Executor*)userdata)->Run(args, argc);
 	}
 
 	WObj* Executor::Run(WObj** args, int argc) {
+
+		if (!InitializeParams(args, argc)) {
+			return nullptr;
+		}
 
 		for (size_t pc = 0; pc < instructions->size(); pc++) {
 			const auto& instr = (*instructions)[pc];
