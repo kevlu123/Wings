@@ -250,7 +250,11 @@ extern "C" {
             WASSERT(args);
         for (int i = 0; i < argc; i++)
             WASSERT(args[i]);
-        return func->fn.fptr(args, argc, func->fn.userdata);
+
+        WGcProtect(func->context, func);
+        auto ret = func->fn.fptr(args, argc, func->fn.userdata);
+        WGcUnprotect(func->context, func);
+        return ret;
     }
         
     WObj* WObjListGet(const WObj* list, int index) {

@@ -9,6 +9,7 @@ namespace wings {
 	struct OperationInstructionInfo {
 		Operation op;
 		Token token; // Holds literal, variable, and/or source location of operation
+		size_t argc;
 	};
 
 	struct Instruction;
@@ -30,6 +31,7 @@ namespace wings {
 			JumpIfFalse,
 			Def,
 			Return,
+			Assign,
 		} type{};
 
 		union {

@@ -87,6 +87,7 @@ extern "C" {
             return nullptr;
         }
         Executor* executor = new Executor();
+        executor->context = context;
         auto instructions = Compile(parseResult.parseTree);
         executor->instructions = MakeRcPtr<std::vector<Instruction>>(std::move(instructions));
 

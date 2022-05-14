@@ -1,4 +1,5 @@
 #include "compile.h"
+#include "impl.h"
 #include <unordered_map>
 
 namespace wings {
@@ -36,15 +37,45 @@ namespace wings {
 	static void CompileBody(const Statement& node, std::vector<Instruction>& instructions);
 
 	static void CompileExpression(const Expression& expression, std::vector<Instruction>& instructions) {
-		for (const auto& child : expression.children) {
-			CompileExpression(child, instructions);
+		for (size_t i = 0; i < expression.children.size(); i++) {
+			if (expression.assignType != AssignType::Direct || i > 0)
+				CompileExpression(expression.children[i], instructions);
 		}
 
 		Instruction instr{};
 		instr.type = Instruction::Type::Operation;
 		instr.data.operation = new OperationInstructionInfo;
 		instr.data.operation->op = expression.operation;
-		instr.data.operation->token = expression.literal;
+
+		switch (expression.assignType) {
+		case AssignType::None:
+			instr.data.operation->token = expression.literal;
+
+			switch (expression.operation) {
+			case Operation::ListLiteral:
+				instr.data.operation->argc = expression.children.size();
+				break;
+			case Operation::MapLiteral:
+				instr.data.operation->argc = expression.children.size() / 2;
+				break;
+			case Operation::Call:
+				instr.data.operation->argc = expression.children.size() - 1;
+				break;
+			}
+
+			break;
+		case AssignType::Direct:
+			instr.type = Instruction::Type::Assign;
+			instr.data.operation->token = expression.children[0].literal;
+			break;
+		case AssignType::Index:
+			instr.type = Instruction::Type::Assign;
+			instr.data.operation->op = expression.operation;
+			break;
+		default:
+			WUNREACHABLE();
+		}
+
 		instructions.push_back(std::move(instr));
 	}
 

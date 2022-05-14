@@ -26,6 +26,8 @@ namespace wings {
 bool operator==(const WObj& lhs, const WObj& rhs);
 bool operator!=(const WObj& lhs, const WObj& rhs);
 
+struct WContext;
+
 struct WObj {
     enum class Type {
         Null,
@@ -50,6 +52,8 @@ struct WObj {
     std::vector<WObj*> v;
     std::unordered_map<WObj, WObj*> m;
     WFinalizer finalizer{};
+    std::vector<WObj*> references;
+    WContext* context;
 };
 
 struct WContext {

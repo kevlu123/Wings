@@ -23,8 +23,17 @@ namespace wings {
 		Incr, Decr,
 	};
 
+	enum class AssignType {
+		None,
+		// var = value
+		Direct,
+		// var[index] = value
+		Index,
+	};
+
 	struct Expression {
 		Operation operation;
+		AssignType assignType = AssignType::None;
 		std::vector<Expression> children;
 		Token literal;
 	};

@@ -229,6 +229,16 @@ namespace wings {
 		if (p.EndReached()) {
 			out = std::move(arg);
 		} else if (p->text == "++" || p->text == "--") {
+			switch (arg.operation) {
+			case Operation::Variable:
+				out.assignType = AssignType::Direct;
+				break;
+			case Operation::Index:
+				out.assignType = AssignType::Index;
+				break;
+			default:
+				return CodeError::Bad("Expression is not assignable", (--p)->srcPos);
+			}
 			out.operation = p->text == "++" ? Operation::Incr : Operation::Decr;
 			out.children = { std::move(arg) };
 			++p;
@@ -452,6 +462,18 @@ namespace wings {
 			return CodeError::Bad("Expected an expression", (--p)->srcPos);
 		}
 		if (BINARY_RIGHT_ASSOCIATIVE_OPS.contains(op)) {
+			// Binary operation is an assignment operation if and only if it is right associative
+			switch (lhs.operation) {
+			case Operation::Variable:
+				out.assignType = AssignType::Direct;
+				break;
+			case Operation::Index:
+				out.assignType = AssignType::Index;
+				break;
+			default:
+				return CodeError::Bad("Expression is not assignable", (----p)->srcPos);
+			}
+
 			Expression rhs{};
 			if (auto error = ParseExpression(p, rhs)) {
 				return error;

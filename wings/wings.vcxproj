@@ -149,6 +149,7 @@
     <ClCompile Include="exprparse.cpp" />
     <ClCompile Include="gc.cpp" />
     <ClCompile Include="lex.cpp" />
+    <ClCompile Include="lib.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="parse.cpp" />
     <ClCompile Include="wings.cpp" />
