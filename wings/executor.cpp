@@ -3,6 +3,45 @@
 
 namespace wings {
 
+	WObj* DefObject::Run(WObj** args, int argc, void* userdata) {
+		DefObject* def = (DefObject*)userdata;
+
+		Executor executor{};
+		executor.def = def;
+		executor.context = def->context;
+
+		// Create local variables
+		for (const auto& localVar : def->localVariables) {
+			WObj* null = WObjCreateNull(def->context);
+			if (null == nullptr)
+				return nullptr;
+			executor.variables.insert({ localVar, MakeRcPtr<WObj*>(null) });
+		}
+
+		// Initialize parameters
+		if (argc > (int)def->parameterNames.size()) {
+			std::string msg = "function takes " +
+				std::to_string(def->parameterNames.size()) +
+				" argument(s) but " +
+				std::to_string(argc) +
+				(argc == 1 ? " was given" : " were given");
+			WErrorSetRuntimeError(msg.c_str());
+			return nullptr;
+		}
+		for (size_t i = 0; i < def->parameterNames.size(); i++) {
+			size_t defaultParameterIndex = i + def->defaultParameterValues.size() - def->parameterNames.size();
+			WObj* value = ((int)i < argc) ? args[i] : def->defaultParameterValues[defaultParameterIndex];
+			executor.variables.insert({ def->parameterNames[i], MakeRcPtr<WObj*>(value) });
+		}
+
+		return executor.Run(args, argc);
+	}
+
+	DefObject::~DefObject() {
+		for (WObj* val : defaultParameterValues)
+			WGcUnprotect(context, val);
+	}
+
 	void  Executor::PushStack(WObj* obj) {
 		WGcProtect(context, obj);
 		stack.push_back(obj);
@@ -19,20 +58,6 @@ namespace wings {
 	WObj* Executor::PeekStack() {
 		WASSERT(!stack.empty());
 		return stack.back();
-	}
-
-	bool Executor::InitializeParams(WObj** args, int argc) {
-		if (argc > (int)parameterNames.size()) {
-			// TODO: error message
-			return false;
-		} else {
-			for (size_t i = 0; i < parameterNames.size(); i++) {
-				size_t defaultParameterIndex = i + defaultParameterValues.size() - parameterNames.size();
-				WObj* value = ((int)i < argc) ? args[i] : defaultParameterValues[defaultParameterIndex];
-				SetVariable(parameterNames[i], value);
-			}
-			return true;
-		}
 	}
 
 	WObj* Executor::GetVariable(const std::string& name) {
@@ -53,22 +78,12 @@ namespace wings {
 		}
 	}
 
-	WObj* Executor::Run(WObj** args, int argc, void* userdata) {
-		return ((Executor*)userdata)->Run(args, argc);
-	}
-
 	WObj* Executor::Run(WObj** args, int argc) {
-
-		if (!InitializeParams(args, argc)) {
-			return nullptr;
-		}
-
-		for (pc = 0; pc < instructions->size(); pc++) {
-			DoInstruction((*instructions)[pc]);
+		for (pc = 0; pc < def->instructions->size(); pc++) {
+			DoInstruction((*def->instructions)[pc]);
 			if (returnValue.has_value())
 				return returnValue.value();
 		}
-
 		return WObjCreateNull(context);
 	}
 
@@ -95,35 +110,39 @@ namespace wings {
 		}
 		case Instruction::Type::Def: {
 
-			Executor* executor = new Executor();
-			executor->context = context;
-			executor->instructions = instr.data.def->instructions;
+			DefObject* def = new DefObject();
+			def->context = context;
+			def->instructions = instr.data.def->instructions;
 
-			for (const auto& capture : instr.data.def->localCaptures) {
-				executor->variables.insert({ capture, variables[capture] });
-			}
-			for (const auto& capture : instr.data.def->globalCaptures) {
-				executor->variables.insert({ capture, context->globals.at(capture) });
-			}
-
+			for (const auto& param : instr.data.def->parameters)
+				def->parameterNames.push_back(param.name);
 			for (size_t i = 0; i < instr.data.def->defaultParameterCount; i++) {
 				WObj* value = PopStack();
-				executor->defaultParameterValues.push_back(value);
+				WGcProtect(context, value);
+				def->defaultParameterValues.push_back(value);
 			}
 
+			for (const auto& capture : instr.data.def->localCaptures) {
+				def->captures.insert({ capture, variables[capture] });
+			}
+			for (const auto& capture : instr.data.def->globalCaptures) {
+				def->captures.insert({ capture, context->globals.at(capture) });
+			}
+			def->localVariables = instr.data.def->variables;
+
 			WFunc func{};
-			func.fptr = &Executor::Run;
-			func.userdata = executor;
+			func.fptr = &DefObject::Run;
+			func.userdata = def;
 			WObj* obj = WObjCreateFunc(context, &func);
 			if (obj == nullptr) {
-				delete (Executor*)executor;
+				delete def;
 				returnValue = nullptr;
 				return;
 			}
 
 			WFinalizer finalizer{};
-			finalizer.fptr = [](WObj* obj, void* userdata) { delete (Executor*)userdata; };
-			finalizer.userdata = executor;
+			finalizer.fptr = [](WObj* obj, void* userdata) { delete (DefObject*)userdata; };
+			finalizer.userdata = def;
 			WObjSetFinalizer(obj, &finalizer);
 
 			PushStack(obj);
@@ -184,9 +203,16 @@ namespace wings {
 		case Operation::Literal:
 			DoLiteral(op.token);
 			break;
-		case Operation::Variable:
-			PushStack(GetVariable(op.token.text));
+		case Operation::Variable: {
+			WObj* var = GetVariable(op.token.text);
+			if (var == nullptr) {
+				WErrorSetRuntimeError(("name '" + op.token.text + "' is not defined").c_str());
+				returnValue = nullptr;
+				return;
+			}
+			PushStack(var);
 			break;
+		}
 		case Operation::ListLiteral: {
 			WObj* li = WObjCreateList(context);
 			for (int i = 0; i < op.argc; i++)
@@ -206,11 +232,14 @@ namespace wings {
 		}
 		case Operation::Call: {
 			WObj* fn = stack[stack.size() - op.argc - 1];
-			WObj** args = &stack[stack.size() - op.argc];
-			WObj* ret = WObjCall(fn, args, (int)op.argc);
-			for (size_t i = 0; i < op.argc + 1; i++)
-				PopStack();
-			PushStack(ret);
+			WObj** args = stack.data() + stack.size() - op.argc;
+			if (WObj* ret = WObjCall(fn, args, (int)op.argc)) {
+				for (size_t i = 0; i < op.argc + 1; i++)
+					PopStack();
+				PushStack(ret);
+			} else {
+				returnValue = nullptr;
+			}
 			break;
 		}
 		default:

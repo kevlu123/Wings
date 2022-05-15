@@ -170,14 +170,6 @@ namespace wings {
 	}
 
 	static void CompileDef(const Statement& node, std::vector<Instruction>& instructions) {
-		Instruction defName{};
-		defName.type = Instruction::Type::Operation;
-		defName.data.operation = new OperationInstructionInfo();
-		defName.data.operation->op = Operation::Variable;
-		defName.data.operation->token.literal.s = node.def.name;
-		defName.data.operation->token.text = node.def.name;
-		instructions.push_back(std::move(defName));
-
 		const auto& parameters = node.def.parameters;
 		size_t defaultParamCount = 0;
 		for (size_t i = parameters.size(); i--> 0; ) {
@@ -212,9 +204,10 @@ namespace wings {
 		instructions.push_back(std::move(def));
 
 		Instruction assign{};
-		assign.type = Instruction::Type::Operation;
+		assign.type = Instruction::Type::Assign;
 		assign.data.operation = new OperationInstructionInfo();
 		assign.data.operation->op = Operation::Assign;
+		assign.data.operation->token.text = node.def.name;
 		instructions.push_back(std::move(assign));
 	}
 

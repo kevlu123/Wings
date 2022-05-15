@@ -26,12 +26,14 @@ enum WError {
 #endif
     // No error
     WERROR_OK,
-    // Max wobj allocations reached
+    // Max WObj allocations reached
     WERROR_MAX_ALLOC,
     // Max recursion reached
     WERROR_MAX_RECURSION,
     // Error while compiling code
     WERROR_COMPILE_FAILED,
+    // Error while executing user code
+    WERROR_RUNTIME_ERROR,
 };
 
 typedef void (*WLogFn)(const char* message);
@@ -62,6 +64,7 @@ extern "C" {
 
 WDLL_EXPORT WError WErrorGet();
 WDLL_EXPORT const char* WErrorMessageGet();
+WDLL_EXPORT void WErrorSetRuntimeError(const char* message);
 
 WDLL_EXPORT WContext* WContextCreate(const WConfig* config WDEFAULT_ARG(nullptr));
 WDLL_EXPORT void WContextDestroy(WContext* context);

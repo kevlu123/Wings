@@ -8,8 +8,18 @@
 
 namespace wings {
 
-	struct Executor {
+	struct DefObject {
+		~DefObject();
 		static WObj* Run(WObj** args, int argc, void* userdata);
+		WContext* context{};
+		RcPtr<std::vector<Instruction>> instructions;
+		std::vector<std::string> localVariables;
+		std::vector<std::string> parameterNames;
+		std::vector<WObj*> defaultParameterValues;
+		std::unordered_map<std::string, RcPtr<WObj*>> captures;
+	};
+
+	struct Executor {
 		WObj* Run(WObj** args, int argc);
 
 		void PushStack(WObj* obj);
@@ -21,17 +31,14 @@ namespace wings {
 		void DoAssignment(const OperationInstructionInfo& op);
 		void DoLiteral(const Token& t);
 
-		bool InitializeParams(WObj** args, int argc);
 		WObj* GetVariable(const std::string& name);
 		void SetVariable(const std::string& name, WObj* value);
 
-		RcPtr<std::vector<Instruction>> instructions;
-		WContext* context{};
-		size_t pc;
+		DefObject* def;
+		WContext* context;
+		size_t pc{};
 		std::vector<WObj*> stack;
 		std::unordered_map<std::string, RcPtr<WObj*>> variables;
-		std::vector<std::string> parameterNames;
-		std::vector<WObj*> defaultParameterValues;
 		std::optional<WObj*> returnValue;
 	};
 

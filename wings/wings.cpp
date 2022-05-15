@@ -1,4 +1,4 @@
-#include "impl.h"
+ #include "impl.h"
 #include "executor.h"
 #include "compile.h"
 #include <iostream>
@@ -20,6 +20,11 @@ extern "C" {
         case WError::WERROR_MAX_RECURSION: return "Exceeded maximum recursion limit";
         default: return werrorMessage.c_str();
         }
+    }
+
+    void WErrorSetRuntimeError(const char* message) {
+        werror = WError::WERROR_RUNTIME_ERROR;
+        werrorMessage = message;
     }
 
     void WContextGetConfig(const WContext* context, WConfig* config) {
@@ -86,23 +91,25 @@ extern "C" {
             werrorMessage = formatError(parseResult.error, lexResult.rawCode);
             return nullptr;
         }
-        Executor* executor = new Executor();
-        executor->context = context;
+
+
+        DefObject* def = new DefObject();
+        def->context = context;
         auto instructions = Compile(parseResult.parseTree);
-        executor->instructions = MakeRcPtr<std::vector<Instruction>>(std::move(instructions));
+        def->instructions = MakeRcPtr<std::vector<Instruction>>(std::move(instructions));
 
         WFunc func{};
-        func.fptr = &Executor::Run;
-        func.userdata = executor;
+        func.fptr = &DefObject::Run;
+        func.userdata = def;
         WObj* obj = WObjCreateFunc(context, &func);
         if (obj == nullptr) {
-            delete (Executor*)executor;
+            delete def;
             return nullptr;
         }
 
         WFinalizer finalizer{};
-        finalizer.fptr = [](WObj* obj, void* userdata) { delete (Executor*)userdata; };
-        finalizer.userdata = executor;
+        finalizer.fptr = [](WObj* obj, void* userdata) { delete (DefObject*)userdata; };
+        finalizer.userdata = def;
         WObjSetFinalizer(obj, &finalizer);
 
         return obj;

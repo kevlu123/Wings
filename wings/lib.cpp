@@ -3,8 +3,6 @@
 #include <sstream>
 #include <unordered_set>
 
-using namespace wings;
-
 namespace wings {
 	static std::string PtrToString(const void* p) {
 		std::stringstream ss;
@@ -74,14 +72,18 @@ namespace wings {
 		return WObjToString(val, seen);
 	}
 
-} // namespace wings
+	static void SetInvalidArgumentCountError(int expected, int given) {
+		std::string msg = "function takes " +
+			std::to_string(expected) +
+			" argument(s) but " +
+			std::to_string(given) +
+			(given == 1 ? " was given" : " were given");
+		WErrorSetRuntimeError(msg.c_str());
+	}
 
-extern "C" {
+	namespace lib {
 
-	void WContextInitLibrary(WContext* context) {
-		WFunc print{};
-		print.userdata = context;
-		print.fptr = [](WObj** argv, int argc, void* userdata) {
+		WObj* print(WObj** argv, int argc, WContext* userdata) {
 			std::string text;
 			for (int i = 0; i < argc; i++) {
 				text += WObjToString(argv[i]);
@@ -90,19 +92,37 @@ extern "C" {
 			}
 			text += '\n';
 			std::cout << text;
-			return WObjCreateNull((WContext*)userdata);
-		};
-		WContextSetGlobal(context, "print", WObjCreateFunc(context, &print));
+			return WObjCreateNull(userdata);
+		}
 
-		WFunc str{};
-		str.userdata = context;
-		str.fptr = [](WObj** argv, int argc, void* userdata) {
-			if (argc != 1)
-				return (WObj*)nullptr; // TODO: error message
+		WObj* str(WObj** argv, int argc, WContext* userdata) {
+			if (argc != 1) {
+				SetInvalidArgumentCountError(1, argc);
+				return nullptr;
+			}
+			return WObjCreateString(userdata, WObjToString(argv[0]).c_str());
+		}
 
-			return WObjCreateString((WContext*)userdata, WObjToString(argv[0]).c_str());
-		};
-		WContextSetGlobal(context, "str", WObjCreateFunc(context, &str));
+	} // namespace lib
+
+} // namespace wings
+
+extern "C" {
+
+	using namespace wings;
+
+	void WContextInitLibrary(WContext* context) {
+
+		WFunc wfn{};
+
+#define REGISTER_STATELESS_FUNCTION(name) \
+		wfn = {}; \
+		wfn.userdata = context; \
+		wfn.fptr = [](WObj** argv, int argc, void* userdata) { return lib::name(argv, argc, (WContext*)userdata); }; \
+		WContextSetGlobal(context, #name, WObjCreateFunc(context, &wfn))
+
+		REGISTER_STATELESS_FUNCTION(print);
+		REGISTER_STATELESS_FUNCTION(str);
 	}
 
 } // extern "C"
