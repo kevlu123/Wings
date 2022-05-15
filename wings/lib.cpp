@@ -83,7 +83,7 @@ namespace wings {
 
 	namespace lib {
 
-		WObj* print(WObj** argv, int argc, WContext* userdata) {
+		WObj* print(WObj** argv, int argc, WContext* context) {
 			std::string text;
 			for (int i = 0; i < argc; i++) {
 				text += WObjToString(argv[i]);
@@ -92,15 +92,15 @@ namespace wings {
 			}
 			text += '\n';
 			std::cout << text;
-			return WObjCreateNull(userdata);
+			return WObjCreateNull(context);
 		}
 
-		WObj* str(WObj** argv, int argc, WContext* userdata) {
+		WObj* str(WObj** argv, int argc, WContext* context) {
 			if (argc != 1) {
 				SetInvalidArgumentCountError(1, argc);
 				return nullptr;
 			}
-			return WObjCreateString(userdata, WObjToString(argv[0]).c_str());
+			return WObjCreateString(context, WObjToString(argv[0]).c_str());
 		}
 
 	} // namespace lib

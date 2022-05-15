@@ -51,6 +51,8 @@ struct WObj {
     std::string s;
     std::vector<WObj*> v;
     std::unordered_map<WObj, WObj*> m;
+
+    std::unordered_map<WObj, WObj*> attributes;
     WFinalizer finalizer{};
     std::vector<WObj*> references;
     WContext* context;

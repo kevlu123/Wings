@@ -242,6 +242,9 @@ namespace wings {
 			}
 			break;
 		}
+		case Operation::Not:
+			PushStack(WObjCreateBool(context, !WObjTruthy(PopStack())));
+			break;
 		default:
 			WUNREACHABLE();
 		}

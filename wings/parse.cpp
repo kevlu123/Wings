@@ -109,6 +109,7 @@ namespace wings {
 		Statement rangeEval{};
 		rangeEval.type = Statement::Type::Expr;
 		rangeEval.expr.operation = Operation::Assign;
+		rangeEval.expr.assignType = AssignType::Direct;
 		rangeEval.expr.children.push_back(rangeVar);
 		rangeEval.expr.children.push_back(std::move(forLoop.expr));
 
