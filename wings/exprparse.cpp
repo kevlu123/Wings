@@ -90,6 +90,7 @@ namespace wings {
 		{ "|=", Operation::OrAssign },
 		{ "&=", Operation::AndAssign },
 		{ "^=", Operation::XorAssign },
+		{ ".", Operation::Dot },
 	};
 
 	const std::unordered_map<std::string, Operation> PREFIX_UNARY_OP_STRINGS = {
@@ -122,6 +123,7 @@ namespace wings {
 		Operation::ShiftR,
 		Operation::In,
 		Operation::NotIn,
+		Operation::Dot,
 
 		Operation::Assign,
 		Operation::AddAssign,
@@ -164,7 +166,7 @@ namespace wings {
 	};
 
 	const std::vector<std::vector<Operation>> PRECEDENCE = {
-		{ Operation::Call, Operation::Index, Operation::Incr, Operation::Decr },
+		{ Operation::Call, Operation::Index, Operation::Incr, Operation::Decr, Operation::Dot },
 		{ Operation::Pow },
 		{ Operation::Pos, Operation::Neg, Operation::BitNot },
 		{ Operation::Mul, Operation::Div, Operation::IDiv, Operation::Mod },
@@ -236,6 +238,9 @@ namespace wings {
 			case Operation::Index:
 				out.assignType = AssignType::Index;
 				break;
+			case Operation::Dot:
+				out.assignType = AssignType::Member;
+				break;
 			default:
 				return CodeError::Bad("Expression is not assignable", (--p)->srcPos);
 			}
@@ -277,6 +282,20 @@ namespace wings {
 			} else if (p->text != "]") {
 				return CodeError::Bad("Expected a ']'", p->srcPos);
 			}
+			++p;
+		} else if (p->text == ".") {
+			// Consume dot
+			out.operation = Operation::Dot;
+			++p;
+
+			// Consume attribute name
+			if (p.EndReached()) {
+				return CodeError::Bad("Expected an attribute name", (--p)->srcPos);
+			} else if (p->type != Token::Type::Word) {
+				return CodeError::Bad("Expected an attribute name", p->srcPos);
+			}
+			out.children = { std::move(arg) };
+			out.literal = *p;
 			++p;
 		} else {
 			out = std::move(arg);
@@ -469,6 +488,9 @@ namespace wings {
 				break;
 			case Operation::Index:
 				out.assignType = AssignType::Index;
+				break;
+			case Operation::Dot:
+				out.assignType = AssignType::Member;
 				break;
 			default:
 				return CodeError::Bad("Expression is not assignable", (----p)->srcPos);

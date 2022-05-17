@@ -242,9 +242,14 @@ namespace wings {
 			}
 			break;
 		}
-		case Operation::Not:
-			PushStack(WObjCreateBool(context, !WObjTruthy(PopStack())));
+		case Operation::Dot: {
+			WObj* self = PopStack();
+			WObj* attr = WObjGetAttribute(self, op.token.text.c_str());
+			if (WObjIsFunc(attr))
+				attr->self = self;
+			PushStack(attr);
 			break;
+		}
 		default:
 			WUNREACHABLE();
 		}

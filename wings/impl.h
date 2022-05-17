@@ -1,12 +1,14 @@
 #pragma once
 #include "rcptr.h"
 #include "wings.h"
+#include "attributetable.h"
 #include <string>
 #include <vector>
 #include <deque>
 #include <unordered_set>
 #include <unordered_map>
 #include <memory>
+#include <optional>
 #include <cstdlib> // std::abort
 
 namespace std {
@@ -19,6 +21,8 @@ namespace wings {
 
     inline thread_local WError werror;
     inline thread_local std::string werrorMessage;
+
+    inline WObj* listClass;
 
     size_t Guid();
 }
@@ -37,6 +41,7 @@ struct WObj {
         String,
         List,
         Map,
+        Object,
         Func,
         Userdata,
     } type = Type::Null;
@@ -46,13 +51,16 @@ struct WObj {
         int i;
         wfloat f;
         void* u;
-        WFunc fn;
+        struct {
+            WObj* self;
+            WFunc fn;
+        };
     };
     std::string s;
     std::vector<WObj*> v;
     std::unordered_map<WObj, WObj*> m;
 
-    std::unordered_map<WObj, WObj*> attributes;
+    wings::AttributeTable attributes;
     WFinalizer finalizer{};
     std::vector<WObj*> references;
     WContext* context;

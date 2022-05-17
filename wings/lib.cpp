@@ -81,6 +81,22 @@ namespace wings {
 		WErrorSetRuntimeError(msg.c_str());
 	}
 
+	namespace attrlib {
+
+		WObj* list_append(WObj** argv, int argc, WContext* context) {
+			if (argc != 2) {
+				SetInvalidArgumentCountError(2, argc);
+				return nullptr;
+			} else if (!WObjIsList(argv[0])) {
+				WErrorSetRuntimeError("function list.append() Argument 1 must be a list");
+				return nullptr;
+			}
+			WObjListPush(argv[0], argv[1]);
+			return WObjCreateNull(context);
+		}
+
+	}
+
 	namespace lib {
 
 		WObj* print(WObj** argv, int argc, WContext* context) {
@@ -103,6 +119,14 @@ namespace wings {
 			return WObjCreateString(context, WObjToString(argv[0]).c_str());
 		}
 
+		//WObj* range(WObj** argv, int argc, WContext* context) {
+		//
+		//}
+
+		WObj* list(WObj** argv, int argc, WContext* context) {
+			return WObjCreateList(context);
+		}
+
 	} // namespace lib
 
 } // namespace wings
@@ -111,18 +135,35 @@ extern "C" {
 
 	using namespace wings;
 
-	void WContextInitLibrary(WContext* context) {
+	bool WContextInitLibrary(WContext* context) {
 
 		WFunc wfn{};
+		WObj* obj{};
 
 #define REGISTER_STATELESS_FUNCTION(name) \
 		wfn = {}; \
 		wfn.userdata = context; \
 		wfn.fptr = [](WObj** argv, int argc, void* userdata) { return lib::name(argv, argc, (WContext*)userdata); }; \
-		WContextSetGlobal(context, #name, WObjCreateFunc(context, &wfn))
+		wfn.isMethod = false; \
+		wfn.prettyName = #name; \
+		WContextSetGlobal(context, #name, obj = WObjCreateFunc(context, &wfn))
+
+#define REGISTER_STATELESS_METHOD(_class, name) \
+		wfn = {}; \
+		wfn.userdata = context; \
+		wfn.fptr = [](WObj** argv, int argc, void* userdata) { return attrlib::_class ## _ ## name(argv, argc, (WContext*)userdata); }; \
+		wfn.isMethod = true; \
+		wfn.prettyName = #_class "." #name; \
+		WObjSetAttribute(obj, #name, WObjCreateFunc(context, &wfn))
 
 		REGISTER_STATELESS_FUNCTION(print);
 		REGISTER_STATELESS_FUNCTION(str);
+
+		REGISTER_STATELESS_FUNCTION(list);
+		listClass = obj;
+		REGISTER_STATELESS_METHOD(list, append);
+
+		return true;
 	}
 
 } // extern "C"

@@ -79,6 +79,7 @@ extern "C" {
         WASSERT(context);
         auto obj = Alloc(context);
         obj->type = WObj::Type::List;
+        obj->attributes = listClass->attributes.Copy();
         return obj;
     }
 
@@ -86,6 +87,13 @@ extern "C" {
         WASSERT(context);
         auto obj = Alloc(context);
         obj->type = WObj::Type::Map;
+        return obj;
+    }
+
+    WObj* WObjCreateObject(WContext* context) {
+        WASSERT(context);
+        auto obj = Alloc(context);
+        obj->type = WObj::Type::Object;
         return obj;
     }
 
@@ -138,6 +146,11 @@ extern "C" {
     bool WObjIsMap(const WObj* obj) {
         WASSERT(obj);
         return obj->type == WObj::Type::Map;
+    }
+
+    bool WObjIsObject(const WObj* obj) {
+        WASSERT(obj);
+        return obj->type == WObj::Type::Object;
     }
 
     bool WObjIsFunc(const WObj* obj) {
@@ -251,8 +264,15 @@ extern "C" {
         for (int i = 0; i < argc; i++)
             WASSERT(args[i]);
 
+        WObj* ret;
         WGcProtect(func->context, func);
-        auto ret = func->fn.fptr(args, argc, func->fn.userdata);
+        if (func->self) {
+            std::vector<WObj*> argsWithSelf = { func->self };
+            argsWithSelf.insert(argsWithSelf.end(), args, args + argc);
+            ret = func->fn.fptr(argsWithSelf.data(), argc + 1, func->fn.userdata);
+        } else {
+            ret = func->fn.fptr(args, argc, func->fn.userdata);
+        }
         WGcUnprotect(func->context, func);
         return ret;
     }
@@ -304,6 +324,16 @@ extern "C" {
         auto it = map->m.find(*key);
         WASSERT(it != map->m.end());
         map->m.erase(it);
+    }
+
+    WObj* WObjGetAttribute(WObj* obj, const char* member) {
+        WASSERT(obj && member);
+        return obj->attributes.Get(member);
+    }
+
+    void WObjSetAttribute(WObj* obj, const char* member, WObj* value) {
+        WASSERT(obj && member && value);
+        obj->attributes.Set(member, value);
     }
 
 } // extern "C"

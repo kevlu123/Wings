@@ -21,6 +21,7 @@ namespace wings {
 		AndAssign, OrAssign, XorAssign,
 		ShiftLAssign, ShiftRAssign,
 		Incr, Decr,
+		Dot,
 	};
 
 	enum class AssignType {
@@ -29,6 +30,8 @@ namespace wings {
 		Direct,
 		// var[index] = value
 		Index,
+		// var.member = value
+		Member,
 	};
 
 	struct Expression {

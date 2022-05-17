@@ -72,6 +72,11 @@ namespace wings {
 			instr.type = Instruction::Type::Assign;
 			instr.data.operation->op = expression.operation;
 			break;
+		case AssignType::Member:
+			instr.type = Instruction::Type::Assign;
+			instr.data.operation->op = expression.operation;
+			instr.data.operation->token = expression.literal;
+			break;
 		default:
 			WUNREACHABLE();
 		}

@@ -37,6 +37,7 @@ extern "C" {
             inUse.pop_back();
             if (!traversed.contains(obj)) {
                 traversed.insert(obj);
+
                 switch (obj->type) {
                 case WObj::Type::List:
                     inUse.insert(
@@ -50,6 +51,14 @@ extern "C" {
                         inUse.push_back(value);
                     }
                     break;
+                case WObj::Type::Func:
+                    if (obj->self)
+                        inUse.push_back(obj->self);
+                    break;
+                }
+                
+                for (auto& [_, val] : obj->attributes) {
+                    inUse.push_back(val);
                 }
             }
         }

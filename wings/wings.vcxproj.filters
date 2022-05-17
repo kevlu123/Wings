@@ -48,6 +48,9 @@
     <ClCompile Include="lib.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="attributetable.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="wings.h">
@@ -78,6 +81,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="rcptr.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="attributetable.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
