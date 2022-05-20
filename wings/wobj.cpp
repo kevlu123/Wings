@@ -274,7 +274,7 @@ extern "C" {
             WASSERT(args[i]);
 
         WObj* ret;
-        WGcProtect(func->context, func);
+        WGcProtect(func);
         if (func->self) {
             std::vector<WObj*> argsWithSelf = { func->self };
             argsWithSelf.insert(argsWithSelf.end(), args, args + argc);
@@ -282,7 +282,7 @@ extern "C" {
         } else {
             ret = func->fn.fptr(args, argc, func->fn.userdata);
         }
-        WGcUnprotect(func->context, func);
+        WGcUnprotect(func);
         return ret;
     }
         

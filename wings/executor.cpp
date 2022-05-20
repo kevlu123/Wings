@@ -39,11 +39,11 @@ namespace wings {
 
 	DefObject::~DefObject() {
 		for (WObj* val : defaultParameterValues)
-			WGcUnprotect(context, val);
+			WGcUnprotect(val);
 	}
 
 	void  Executor::PushStack(WObj* obj) {
-		WGcProtect(context, obj);
+		WGcProtect(obj);
 		stack.push_back(obj);
 	}
 
@@ -51,7 +51,7 @@ namespace wings {
 		WASSERT(!stack.empty());
 		auto obj = stack.back();
 		stack.pop_back();
-		WGcUnprotect(context, obj);
+		WGcUnprotect(obj);
 		return obj;
 	}
 
@@ -118,7 +118,7 @@ namespace wings {
 				def->parameterNames.push_back(param.name);
 			for (size_t i = 0; i < instr.data.def->defaultParameterCount; i++) {
 				WObj* value = PopStack();
-				WGcProtect(context, value);
+				WGcProtect(value);
 				def->defaultParameterValues.push_back(value);
 			}
 

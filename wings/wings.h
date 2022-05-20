@@ -76,8 +76,8 @@ WDLL_EXPORT void WContextSetConfig(WContext* context, const WConfig* config);
 WDLL_EXPORT void WContextLog(const WContext* context, const char* message);
 
 WDLL_EXPORT void WGcCollect(WContext* context);
-WDLL_EXPORT void WGcProtect(WContext* context, const WObj* obj);
-WDLL_EXPORT void WGcUnprotect(WContext* context, const WObj* obj);
+WDLL_EXPORT void WGcProtect(const WObj* obj);
+WDLL_EXPORT void WGcUnprotect(const WObj* obj);
 WDLL_EXPORT void WGcCreateReference(WObj* parent, WObj* child);
 WDLL_EXPORT void WGcRemoveReference(WObj* parent, WObj* child);
 

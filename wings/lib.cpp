@@ -231,7 +231,7 @@ namespace wings {
 			}
 
 			WObj* rangeObj = WObjCreateObject(context);
-			WGcProtect(context, rangeObj);
+			WGcProtect(rangeObj);
 			switch (argc) {
 			case 1:
 				WObjSetAttribute(rangeObj, "_cur", WObjCreateInt(context, 0));
@@ -273,7 +273,7 @@ namespace wings {
 			};
 			RegisterStatelessMethod<next>(context, rangeObj->attributes, "__iternext__");
 
-			WGcUnprotect(context, rangeObj);
+			WGcUnprotect(rangeObj);
 			return rangeObj;
 		}
 

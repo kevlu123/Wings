@@ -101,16 +101,16 @@ extern "C" {
         context->lastObjectCountAfterGC = context->mem.size();
     }
 
-    void WGcProtect(WContext* context, const WObj* obj) {
-        WASSERT(context && obj);
-        context->protectedObjects.insert(obj);
+    void WGcProtect(const WObj* obj) {
+        WASSERT(obj);
+        obj->context->protectedObjects.insert(obj);
     }
 
-    void WGcUnprotect(WContext* context, const WObj* obj) {
-        WASSERT(context && obj);
-        auto it = context->protectedObjects.find(obj);
-        WASSERT(it != context->protectedObjects.end());
-        context->protectedObjects.erase(it);
+    void WGcUnprotect(const WObj* obj) {
+        WASSERT(obj);
+        auto it = obj->context->protectedObjects.find(obj);
+        WASSERT(it != obj->context->protectedObjects.end());
+        obj->context->protectedObjects.erase(it);
     }
 
     void WGcCreateReference(WObj* parent, WObj* child) {
