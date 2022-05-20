@@ -25,6 +25,7 @@ namespace wings {
     inline WObj* listClass;
 
     size_t Guid();
+    bool InitLibrary(WContext* context);
 }
 
 bool operator==(const WObj& lhs, const WObj& rhs);
@@ -74,6 +75,19 @@ struct WContext {
     std::unordered_multiset<const WObj*> protectedObjects;
 
     std::unordered_map<std::string, wings::RcPtr<WObj*>> globals;
+
+    struct {
+        wings::AttributeTable null;
+        wings::AttributeTable _bool;
+        wings::AttributeTable _int;
+        wings::AttributeTable _float;
+        wings::AttributeTable str;
+        wings::AttributeTable list;
+        wings::AttributeTable map;
+        wings::AttributeTable object;
+        wings::AttributeTable func;
+        wings::AttributeTable userdata;
+    } attributeTables;
 };
 
 #define WASSERT(assertion) do { if (!(assertion)) std::abort(); } while (0)

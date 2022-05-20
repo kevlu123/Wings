@@ -95,7 +95,7 @@ namespace wings {
 		}
 		case Instruction::Type::JumpIfFalse: {
 			auto arg = PopStack();
-			if (WObjTruthy(arg)) {
+			if (!WObjTruthy(arg)) {
 				pc = instr.data.jump.location - 1;
 			}
 			break;
@@ -199,6 +199,23 @@ namespace wings {
 	}
 
 	void Executor::DoOperation(const OperationInstructionInfo& op) {
+
+		auto callMethod = [&]<size_t argc>(const char* member) {
+			static_assert(argc > 0);
+			WObj* args[argc]{};
+			for (size_t i = argc; i --> 0; )
+				args[i] = PopStack();
+
+			WObj* self = args[0];
+			WObj* attr = WObjGetAttribute(self, member);
+			if (WObjIsFunc(attr)) {
+				attr->self = self;
+				PushStack(WObjCall(attr, args + 1, argc - 1));
+			} else {
+				returnValue = nullptr;
+			}
+		};
+
 		switch (op.op) {
 		case Operation::Literal:
 			DoLiteral(op.token);
@@ -248,6 +265,22 @@ namespace wings {
 			if (WObjIsFunc(attr))
 				attr->self = self;
 			PushStack(attr);
+			break;
+		}
+		case Operation::Not: {
+			callMethod.operator()<1>("__not__");
+			break;
+		}
+		case Operation::Mod: {
+			callMethod.operator()<2>("__mod__");
+			break;
+		}
+		case Operation::And: {
+			callMethod.operator()<2>("__and__");
+			break;
+		}
+		case Operation::Eq: {
+			callMethod.operator()<2>("__eq__");
 			break;
 		}
 		default:

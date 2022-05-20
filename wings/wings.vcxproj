@@ -167,10 +167,14 @@
     <ClInclude Include="lex.h" />
     <ClInclude Include="parse.h" />
     <ClInclude Include="rcptr.h" />
+    <ClInclude Include="resource.h" />
     <ClInclude Include="wings.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="cpp.hint" />
+  </ItemGroup>
+  <ItemGroup>
+    <ResourceCompile Include="wings.rc" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

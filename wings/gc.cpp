@@ -2,6 +2,8 @@
 #include <deque>
 #include <unordered_set>
 
+using namespace wings;
+
 namespace wings {
 
     WObj* Alloc(WContext* context) {
@@ -28,6 +30,24 @@ extern "C" {
         std::deque<const WObj*> inUse(context->protectedObjects.begin(), context->protectedObjects.end());
         for (auto& var : context->globals) {
             inUse.push_back(*var.second);
+        }
+
+        auto attributeTables = {
+            context->attributeTables.object,
+            context->attributeTables.null,
+            context->attributeTables._bool,
+            context->attributeTables._int,
+            context->attributeTables._float,
+            context->attributeTables.str,
+            context->attributeTables.list,
+            context->attributeTables.map,
+            context->attributeTables.func,
+            context->attributeTables.userdata,
+        };
+        for (auto& table : attributeTables) {
+            table.ForEach([&](auto& entry) {
+                inUse.push_back(entry.second);
+                });
         }
 
         // Recursively find objects in use
@@ -57,9 +77,9 @@ extern "C" {
                     break;
                 }
                 
-                for (auto& [_, val] : obj->attributes) {
-                    inUse.push_back(val);
-                }
+                obj->attributes.ForEach([&](auto& entry) {
+                    inUse.push_back(entry.second);
+                    });
             }
         }
 

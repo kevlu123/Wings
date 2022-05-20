@@ -70,7 +70,6 @@ WDLL_EXPORT void WErrorSetRuntimeError(const char* message);
 
 WDLL_EXPORT WContext* WContextCreate(const WConfig* config WDEFAULT_ARG(nullptr));
 WDLL_EXPORT void WContextDestroy(WContext* context);
-WDLL_EXPORT bool WContextInitLibrary(WContext* context);
 WDLL_EXPORT WObj* WContextCompile(WContext* context, const char* code);
 WDLL_EXPORT void WContextGetConfig(const WContext* context, WConfig* config);
 WDLL_EXPORT void WContextSetConfig(WContext* context, const WConfig* config);

@@ -7,17 +7,32 @@
 struct WObj;
 
 namespace wings {
+
 	struct AttributeTable {
-		using Buffer = std::unordered_map<std::string, WObj*>;
-		AttributeTable(Buffer&& attributes = {});
+		AttributeTable();
 		WObj* Get(const std::string& name) const;
-		void Set(const std::string& name, WObj* value);
+		void Set(const std::string& name, WObj* value, bool validate = true);
+		void SetSuper(AttributeTable& super, bool validate = true);
 		AttributeTable Copy();
-		Buffer::const_iterator begin() const;
-		Buffer::const_iterator end() const;
+		template <class Fn> void ForEach(Fn fn) const;
 	private:
-		RcPtr<Buffer> attributes;
+		struct Table {
+			std::unordered_map<std::string, WObj*> entries;
+			RcPtr<Table> super;
+		};
+
+		RcPtr<Table> attributes;
 		bool owned;
 		bool referenced;
 	};
+
+	template <class Fn>
+	void AttributeTable::ForEach(Fn fn) const {
+		for (auto* table = &attributes; *table; table = &(*table)->super) {
+			for (const auto& entry : (*table)->entries) {
+				fn(entry);
+			}
+		}
+	}
 }
+

@@ -52,6 +52,10 @@ extern "C" {
     WContext* WContextCreate(const WConfig* config) {
         WContext* context = new WContext();
         WContextSetConfig(context, config);
+        if (!InitLibrary(context)) {
+            WContextDestroy(context);
+            return nullptr;
+        }
         return context;
     }
 

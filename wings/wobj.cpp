@@ -40,6 +40,7 @@ extern "C" {
         WASSERT(context);
         auto obj = Alloc(context);
         obj->type = WObj::Type::Null;
+        obj->attributes = context->attributeTables.null.Copy();
         return obj;
     }
 
@@ -48,6 +49,7 @@ extern "C" {
         auto obj = Alloc(context);
         obj->type = WObj::Type::Bool;
         obj->b = value;
+        obj->attributes = context->attributeTables._bool.Copy();
         return obj;
     }
 
@@ -56,6 +58,7 @@ extern "C" {
         auto obj = Alloc(context);
         obj->type = WObj::Type::Int;
         obj->i = value;
+        obj->attributes = context->attributeTables._int.Copy();
         return obj;
     }
 
@@ -64,6 +67,7 @@ extern "C" {
         auto obj = Alloc(context);
         obj->type = WObj::Type::Float;
         obj->f = value;
+        obj->attributes = context->attributeTables._float.Copy();
         return obj;
     }
 
@@ -72,6 +76,7 @@ extern "C" {
         auto obj = Alloc(context);
         obj->type = WObj::Type::String;
         obj->s = value;
+        obj->attributes = context->attributeTables.str.Copy();
         return obj;
     }
 
@@ -79,7 +84,7 @@ extern "C" {
         WASSERT(context);
         auto obj = Alloc(context);
         obj->type = WObj::Type::List;
-        obj->attributes = listClass->attributes.Copy();
+        obj->attributes = context->attributeTables.list.Copy();
         return obj;
     }
 
@@ -87,6 +92,7 @@ extern "C" {
         WASSERT(context);
         auto obj = Alloc(context);
         obj->type = WObj::Type::Map;
+        obj->attributes = context->attributeTables.map.Copy();
         return obj;
     }
 
@@ -94,6 +100,7 @@ extern "C" {
         WASSERT(context);
         auto obj = Alloc(context);
         obj->type = WObj::Type::Object;
+        obj->attributes = context->attributeTables.object.Copy();
         return obj;
     }
 
@@ -102,6 +109,7 @@ extern "C" {
         auto obj = Alloc(context);
         obj->type = WObj::Type::Func;
         obj->fn = *value;
+        obj->attributes = context->attributeTables.func.Copy();
         return obj;
     }
 
@@ -110,6 +118,7 @@ extern "C" {
         auto obj = Alloc(context);
         obj->type = WObj::Type::Userdata;
         obj->u = value;
+        obj->attributes = context->attributeTables.userdata.Copy();
         return obj;
     }
 

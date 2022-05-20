@@ -2,30 +2,48 @@
 
 namespace wings {
 
-	AttributeTable::AttributeTable(Buffer&& attributes) :
-		attributes(MakeRcPtr<Buffer>(std::move(attributes))),
+	AttributeTable::AttributeTable() :
+		attributes(MakeRcPtr<Table>()),
 		owned(true),
 		referenced(false) {
 	}
 
 	WObj* AttributeTable::Get(const std::string& name) const {
-		auto it = attributes->find(name);
-		if (it == attributes->end()) {
-			return nullptr;
-		} else {
-			return it->second;
+		for (auto* table = &attributes; *table; table = &(*table)->super) {
+			auto it = (*table)->entries.find(name);
+			if (it != (*table)->entries.end()) {
+				return it->second;
+			}
 		}
+		return nullptr;
 	}
 
-	void AttributeTable::Set(const std::string& name, WObj* value) {
-		if (referenced) {
+	void AttributeTable::Set(const std::string& name, WObj* value, bool validate) {
+		if (validate && referenced) {
 			std::abort();
 		}
+
 		if (!owned) {
-			attributes = MakeRcPtr<Buffer>(*attributes);
+			attributes = MakeRcPtr<Table>(*attributes);
 			owned = true;
 		}
-		attributes->insert({ name, value });
+
+		for (auto* table = &attributes; *table; table = &(*table)->super) {
+			if ((*table)->entries.contains(name)) {
+				(*table)->entries[name] = value;
+				return;
+			}
+		}
+		attributes->entries.insert({ name, value });
+	}
+
+	void AttributeTable::SetSuper(AttributeTable& super, bool validate) {
+		if (validate && referenced) {
+			std::abort();
+		}
+
+		attributes->super = super.attributes;
+		super.referenced = true;
 	}
 
 	AttributeTable AttributeTable::Copy() {
@@ -34,13 +52,5 @@ namespace wings {
 		copy.owned = false;
 		referenced = true;
 		return copy;
-	}
-
-	AttributeTable::Buffer::const_iterator AttributeTable::begin() const {
-		return attributes->begin();
-	}
-
-	AttributeTable::Buffer::const_iterator AttributeTable::end() const {
-		return attributes->end();
 	}
 }

@@ -113,17 +113,17 @@ namespace wings {
 		rangeEval.expr.children.push_back(rangeVar);
 		rangeEval.expr.children.push_back(std::move(forLoop.expr));
 
-		// while not iterend(__VarXXX):
+		// while not __VarXXX.__iterend__():
 		Expression loadEndCheck{};
-		loadEndCheck.operation = Operation::Variable;
+		loadEndCheck.operation = Operation::Dot;
 		loadEndCheck.literal.type = Token::Type::Word;
-		loadEndCheck.literal.literal.s = "iterend";
-		loadEndCheck.literal.text = "iterend";
+		loadEndCheck.literal.literal.s = "__iterend__";
+		loadEndCheck.literal.text = "__iterend__";
+		loadEndCheck.children.push_back(rangeVar);
 
 		Expression callEndCheck{};
 		callEndCheck.operation = Operation::Call;
 		callEndCheck.children.push_back(std::move(loadEndCheck));
-		callEndCheck.children.push_back(rangeVar);
 
 		Expression condition{};
 		condition.operation = Operation::Not;
@@ -133,21 +133,22 @@ namespace wings {
 		wh.type = Statement::Type::While;
 		wh.expr = std::move(condition);
 
-		// vars = iternext(__VarXXX)
+		// vars = __VarXXX.__iternext__()
 		Expression loadNext{};
-		loadNext.operation = Operation::Variable;
+		loadNext.operation = Operation::Dot;
 		loadNext.literal.type = Token::Type::Word;
-		loadNext.literal.literal.s = "iternext";
-		loadNext.literal.text = "iternext";
+		loadNext.literal.literal.s = "__iternext__";
+		loadNext.literal.text = "__iternext__";
+		loadNext.children.push_back(rangeVar);
 
 		Expression callNext{};
 		callNext.operation = Operation::Call;
 		callNext.children.push_back(std::move(loadNext));
-		callNext.children.push_back(std::move(rangeVar));
 
-		Expression iterAssign{};
+		Expression iterAssign{}; //
 		iterAssign.operation = Operation::Assign;
-		iterAssign.children.push_back(std::move(forLoop.forLoop.variable));
+		iterAssign.assignType = AssignType::Direct;
+		iterAssign.children.push_back(forLoop.forLoop.variable);
 		iterAssign.children.push_back(std::move(callNext));
 
 		Statement iterAssignStat{};
@@ -546,7 +547,7 @@ namespace wings {
 					);
 				}
 			} else if (stat.type == Statement::Type::Else) {
-				if (lastType != Statement::Type::If && lastType != Statement::Type::While) {
+				if (lastType != Statement::Type::If && lastType != Statement::Type::Elif && lastType != Statement::Type::While) {
 					return CodeError::Bad(
 						"An 'else' clause may only appear after an 'if', 'elif', 'while', or 'for' clause",
 						stat.token.srcPos
