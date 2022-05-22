@@ -18,12 +18,6 @@ namespace std {
 }
 
 namespace wings {
-
-    inline thread_local WError werror;
-    inline thread_local std::string werrorMessage;
-
-    inline WObj* listClass;
-
     size_t Guid();
     bool InitLibrary(WContext* context);
 }
@@ -42,8 +36,9 @@ struct WObj {
         String,
         List,
         Map,
-        Object,
         Func,
+        Object,
+        Class,
         Userdata,
     } type = Type::Null;
 
@@ -60,6 +55,7 @@ struct WObj {
     std::string s;
     std::vector<WObj*> v;
     std::unordered_map<WObj, WObj*> m;
+    wings::AttributeTable c;
 
     wings::AttributeTable attributes;
     WFinalizer finalizer{};
@@ -67,9 +63,16 @@ struct WObj {
     WContext* context;
 };
 
+struct TraceFrame {
+    size_t line;
+    std::string module;
+    std::string func;
+};
+
 struct WContext {
     WConfig config{};
 
+    bool lockGc = false;
     size_t lastObjectCountAfterGC = 0;
     std::deque<std::unique_ptr<WObj>> mem;
     std::unordered_multiset<const WObj*> protectedObjects;
@@ -77,17 +80,25 @@ struct WContext {
     std::unordered_map<std::string, wings::RcPtr<WObj*>> globals;
 
     struct {
-        wings::AttributeTable null;
-        wings::AttributeTable _bool;
-        wings::AttributeTable _int;
-        wings::AttributeTable _float;
-        wings::AttributeTable str;
-        wings::AttributeTable list;
-        wings::AttributeTable map;
-        wings::AttributeTable object;
-        wings::AttributeTable func;
-        wings::AttributeTable userdata;
-    } attributeTables;
+        WError code;
+        std::string message;
+        std::vector<TraceFrame> trace;
+        std::string traceMessage;
+    } err;
+
+    struct {
+        WObj* null;
+        WObj* _bool;
+        WObj* _int;
+        WObj* _float;
+        WObj* str;
+        WObj* list;
+        WObj* map;
+        WObj* object;
+        WObj* func;
+        WObj* userdata;
+    } builtinClasses;
+    WObj* nullSingleton;
 };
 
 #define WASSERT(assertion) do { if (!(assertion)) std::abort(); } while (0)

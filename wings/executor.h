@@ -13,6 +13,7 @@ namespace wings {
 		static WObj* Run(WObj** args, int argc, void* userdata);
 		WContext* context{};
 		RcPtr<std::vector<Instruction>> instructions;
+		std::string module;
 		std::vector<std::string> localVariables;
 		std::vector<std::string> parameterNames;
 		std::vector<WObj*> defaultParameterValues;

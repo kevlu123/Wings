@@ -34,92 +34,113 @@ static bool IsImmutable(const WObj* obj) {
         || obj->type == WObj::Type::String;
 }
 
+static void AppendTraceback(const WObj* func) {
+    TraceFrame frame{};
+    frame.func = func->fn.prettyName ? func->fn.prettyName : "";
+    func->context->err.trace.push_back(std::move(frame));
+}
+
 extern "C" {
 
     WObj* WObjCreateNull(WContext* context) {
         WASSERT(context);
-        auto obj = Alloc(context);
-        obj->type = WObj::Type::Null;
-        obj->attributes = context->attributeTables.null.Copy();
-        return obj;
+        return context->nullSingleton;
     }
 
     WObj* WObjCreateBool(WContext* context, bool value) {
         WASSERT(context);
-        auto obj = Alloc(context);
-        obj->type = WObj::Type::Bool;
-        obj->b = value;
-        obj->attributes = context->attributeTables._bool.Copy();
-        return obj;
+        WObj* _class = context->builtinClasses._bool;
+        WObj* instance = _class->fn.fptr(nullptr, 0, _class->fn.userdata);
+        if (instance) {
+            instance->attributes = _class->attributes.Copy();
+            instance->b = value;
+        }
+        return instance;
     }
 
     WObj* WObjCreateInt(WContext* context, int value) {
         WASSERT(context);
-        auto obj = Alloc(context);
-        obj->type = WObj::Type::Int;
-        obj->i = value;
-        obj->attributes = context->attributeTables._int.Copy();
-        return obj;
+        WObj* _class = context->builtinClasses._int;
+        WObj* instance = _class->fn.fptr(nullptr, 0, _class->fn.userdata);
+        if (instance) {
+            instance->attributes = _class->attributes.Copy();
+            instance->i = value;
+        }
+        return instance;
     }
 
     WObj* WObjCreateFloat(WContext* context, wfloat value) {
         WASSERT(context);
-        auto obj = Alloc(context);
-        obj->type = WObj::Type::Float;
-        obj->f = value;
-        obj->attributes = context->attributeTables._float.Copy();
-        return obj;
+        WObj* _class = context->builtinClasses._float;
+        WObj* instance = _class->fn.fptr(nullptr, 0, _class->fn.userdata);
+        if (instance) {
+            instance->attributes = _class->attributes.Copy();
+            instance->f = value;
+        }
+        return instance;
     }
 
     WObj* WObjCreateString(WContext* context, const char* value) {
         WASSERT(context && value);
-        auto obj = Alloc(context);
-        obj->type = WObj::Type::String;
-        obj->s = value;
-        obj->attributes = context->attributeTables.str.Copy();
-        return obj;
+        WObj* _class = context->builtinClasses.str;
+        WObj* instance = _class->fn.fptr(nullptr, 0, _class->fn.userdata);
+        if (instance) {
+            instance->attributes = _class->attributes.Copy();
+            instance->s = value;
+        }
+        return instance;
     }
 
     WObj* WObjCreateList(WContext* context) {
         WASSERT(context);
-        auto obj = Alloc(context);
-        obj->type = WObj::Type::List;
-        obj->attributes = context->attributeTables.list.Copy();
-        return obj;
+        WObj* _class = context->builtinClasses.list;
+        WObj* instance = _class->fn.fptr(nullptr, 0, _class->fn.userdata);
+        if (instance) {
+            instance->attributes = _class->attributes.Copy();
+        }
+        return instance;
     }
 
     WObj* WObjCreateMap(WContext* context) {
         WASSERT(context);
-        auto obj = Alloc(context);
-        obj->type = WObj::Type::Map;
-        obj->attributes = context->attributeTables.map.Copy();
-        return obj;
+        WObj* _class = context->builtinClasses.map;
+        WObj* instance = _class->fn.fptr(nullptr, 0, _class->fn.userdata);
+        if (instance) {
+            instance->attributes = _class->attributes.Copy();
+        }
+        return instance;
     }
 
     WObj* WObjCreateObject(WContext* context) {
         WASSERT(context);
-        auto obj = Alloc(context);
-        obj->type = WObj::Type::Object;
-        obj->attributes = context->attributeTables.object.Copy();
-        return obj;
+        WObj* _class = context->builtinClasses.object;
+        WObj* instance = _class->fn.fptr(nullptr, 0, _class->fn.userdata);
+        if (instance) {
+            instance->attributes = _class->attributes.Copy();
+        }
+        return instance;
     }
 
     WObj* WObjCreateFunc(WContext* context, const WFunc* value) {
         WASSERT(context && value && value->fptr);
-        auto obj = Alloc(context);
-        obj->type = WObj::Type::Func;
-        obj->fn = *value;
-        obj->attributes = context->attributeTables.func.Copy();
-        return obj;
+        WObj* _class = context->builtinClasses.func;
+        WObj* instance = _class->fn.fptr(nullptr, 0, _class->fn.userdata);
+        if (instance) {
+            instance->attributes = _class->attributes.Copy();
+            instance->fn = *value;
+        }
+        return instance;
     }
 
     WObj* WObjCreateUserdata(WContext* context, void* value) {
         WASSERT(context);
-        auto obj = Alloc(context);
-        obj->type = WObj::Type::Userdata;
-        obj->u = value;
-        obj->attributes = context->attributeTables.userdata.Copy();
-        return obj;
+        WObj* _class = context->builtinClasses.userdata;
+        WObj* instance = _class->fn.fptr(nullptr, 0, _class->fn.userdata);
+        if (instance) {
+            instance->attributes = _class->attributes.Copy();
+            instance->u = value;
+        }
+        return instance;
     }
 
     bool WObjIsNull(const WObj* obj) {
@@ -160,6 +181,11 @@ extern "C" {
     bool WObjIsObject(const WObj* obj) {
         WASSERT(obj);
         return obj->type == WObj::Type::Object;
+    }
+
+    bool WObjIsClass(const WObj* obj) {
+        WASSERT(obj);
+        return obj->type == WObj::Type::Class;
     }
 
     bool WObjIsFunc(const WObj* obj) {
@@ -267,7 +293,7 @@ extern "C" {
     }
         
     WObj* WObjCall(const WObj* func, WObj** args, int argc) {
-        WASSERT(func && argc >= 0 && WObjIsFunc(func));
+        WASSERT(func && argc >= 0 && (WObjIsFunc(func) || WObjIsClass(func)));
         if (argc)
             WASSERT(args);
         for (int i = 0; i < argc; i++)
@@ -283,6 +309,11 @@ extern "C" {
             ret = func->fn.fptr(args, argc, func->fn.userdata);
         }
         WGcUnprotect(func);
+
+        if (ret == nullptr) {
+            AppendTraceback(func);
+        }
+
         return ret;
     }
         
@@ -337,7 +368,11 @@ extern "C" {
 
     WObj* WObjGetAttribute(WObj* obj, const char* member) {
         WASSERT(obj && member);
-        return obj->attributes.Get(member);
+        WObj* mem = obj->attributes.Get(member);
+        if (mem && WObjIsFunc(mem) && mem->fn.isMethod) {
+            mem->self = obj;
+        }
+        return mem;
     }
 
     void WObjSetAttribute(WObj* obj, const char* member, WObj* value) {

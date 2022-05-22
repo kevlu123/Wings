@@ -47,6 +47,10 @@ namespace wings {
 			} push;
 		} data;
 
+		struct {
+			size_t line;
+		} trace;
+
 		Instruction() = default;
 		Instruction(const Instruction&) = delete;
 		Instruction(Instruction&&) noexcept;

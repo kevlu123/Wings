@@ -5,10 +5,11 @@ namespace wings {
 
 	WObj* DefObject::Run(WObj** args, int argc, void* userdata) {
 		DefObject* def = (DefObject*)userdata;
+		WContext* context = def->context;
 
 		Executor executor{};
 		executor.def = def;
-		executor.context = def->context;
+		executor.context = context;
 
 		// Create local variables
 		for (const auto& localVar : def->localVariables) {
@@ -25,7 +26,7 @@ namespace wings {
 				" argument(s) but " +
 				std::to_string(argc) +
 				(argc == 1 ? " was given" : " were given");
-			WErrorSetRuntimeError(msg.c_str());
+			WErrorSetRuntimeError(context, msg.c_str());
 			return nullptr;
 		}
 		for (size_t i = 0; i < def->parameterNames.size(); i++) {
@@ -80,9 +81,15 @@ namespace wings {
 
 	WObj* Executor::Run(WObj** args, int argc) {
 		for (pc = 0; pc < def->instructions->size(); pc++) {
-			DoInstruction((*def->instructions)[pc]);
-			if (returnValue.has_value())
+			const auto& instr = (*def->instructions)[pc];
+			DoInstruction(instr);
+			if (returnValue.has_value()) {
+				if (returnValue.value() == nullptr) {
+					context->err.trace.back().line = instr.trace.line;
+					context->err.trace.back().module = def->module;
+				}
 				return returnValue.value();
+			}
 		}
 		return WObjCreateNull(context);
 	}
@@ -112,6 +119,7 @@ namespace wings {
 
 			DefObject* def = new DefObject();
 			def->context = context;
+			def->module = this->def->module;
 			def->instructions = instr.data.def->instructions;
 
 			for (const auto& param : instr.data.def->parameters)
@@ -209,8 +217,12 @@ namespace wings {
 			WObj* self = args[0];
 			WObj* attr = WObjGetAttribute(self, member);
 			if (WObjIsFunc(attr)) {
-				attr->self = self;
-				PushStack(WObjCall(attr, args + 1, argc - 1));
+				if (WObj* ret = WObjCall(attr, args + 1, argc - 1)) {
+					PushStack(ret);
+					return;
+				} else {
+					returnValue = nullptr;
+				}
 			} else {
 				returnValue = nullptr;
 			}
@@ -223,7 +235,7 @@ namespace wings {
 		case Operation::Variable: {
 			WObj* var = GetVariable(op.token.text);
 			if (var == nullptr) {
-				WErrorSetRuntimeError(("name '" + op.token.text + "' is not defined").c_str());
+				WErrorSetRuntimeError(context, ("name '" + op.token.text + "' is not defined").c_str());
 				returnValue = nullptr;
 				return;
 			}
@@ -262,8 +274,6 @@ namespace wings {
 		case Operation::Dot: {
 			WObj* self = PopStack();
 			WObj* attr = WObjGetAttribute(self, op.token.text.c_str());
-			if (WObjIsFunc(attr))
-				attr->self = self;
 			PushStack(attr);
 			break;
 		}

@@ -64,13 +64,13 @@ struct WConfig {
 extern "C" {
 #endif
 
-WDLL_EXPORT WError WErrorGet();
-WDLL_EXPORT const char* WErrorMessageGet();
-WDLL_EXPORT void WErrorSetRuntimeError(const char* message);
+WDLL_EXPORT WError WErrorGet(WContext* context);
+WDLL_EXPORT const char* WErrorMessageGet(WContext* context);
+WDLL_EXPORT void WErrorSetRuntimeError(WContext* context, const char* message);
 
 WDLL_EXPORT WContext* WContextCreate(const WConfig* config WDEFAULT_ARG(nullptr));
 WDLL_EXPORT void WContextDestroy(WContext* context);
-WDLL_EXPORT WObj* WContextCompile(WContext* context, const char* code);
+WDLL_EXPORT WObj* WContextCompile(WContext* context, const char* code, const char* moduleName WDEFAULT_ARG(""));
 WDLL_EXPORT void WContextGetConfig(const WContext* context, WConfig* config);
 WDLL_EXPORT void WContextSetConfig(WContext* context, const WConfig* config);
 WDLL_EXPORT void WContextLog(const WContext* context, const char* message);
@@ -91,8 +91,8 @@ WDLL_EXPORT WObj* WObjCreateFloat(WContext* context, wfloat value WDEFAULT_ARG(0
 WDLL_EXPORT WObj* WObjCreateString(WContext* context, const char* value WDEFAULT_ARG(""));
 WDLL_EXPORT WObj* WObjCreateList(WContext* context);
 WDLL_EXPORT WObj* WObjCreateMap(WContext* context);
-WDLL_EXPORT WObj* WObjCreateObject(WContext* context);
 WDLL_EXPORT WObj* WObjCreateFunc(WContext* context, const WFunc* value);
+WDLL_EXPORT WObj* WObjCreateObject(WContext* context);
 WDLL_EXPORT WObj* WObjCreateUserdata(WContext* context, void* value);
 
 WDLL_EXPORT bool WObjIsNull(const WObj* obj);
@@ -102,8 +102,9 @@ WDLL_EXPORT bool WObjIsIntOrFloat(const WObj* obj);
 WDLL_EXPORT bool WObjIsString(const WObj* obj);
 WDLL_EXPORT bool WObjIsList(const WObj* obj);
 WDLL_EXPORT bool WObjIsMap(const WObj* obj);
-WDLL_EXPORT bool WObjIsObject(const WObj* obj);
 WDLL_EXPORT bool WObjIsFunc(const WObj* obj);
+WDLL_EXPORT bool WObjIsObject(const WObj* obj);
+WDLL_EXPORT bool WObjIsClass(const WObj* obj);
 WDLL_EXPORT bool WObjIsUserdata(const WObj* obj);
 
 WDLL_EXPORT bool WObjGetBool(const WObj* obj);
@@ -134,6 +135,8 @@ WDLL_EXPORT void WObjSetAttribute(WObj* obj, const char* member, WObj* value);
 
 WDLL_EXPORT void WObjGetFinalizer(const WObj* obj, WFinalizer* finalizer);
 WDLL_EXPORT void WObjSetFinalizer(WObj* obj, const WFinalizer* finalizer);
+
+WDLL_EXPORT WObj* WOpCall(WObj* callable, WObj** argv, int argc);
 
 #undef WDEFAULT_ARG
 #undef WDLL_EXPORT

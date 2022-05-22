@@ -8,7 +8,8 @@ namespace wings {
 
     WObj* Alloc(WContext* context) {
         // Check if GC should run
-        if (context->mem.size() >= (size_t)(context->config.gcRunFactor * context->lastObjectCountAfterGC)) {
+        size_t threshold = (size_t)(context->config.gcRunFactor * context->lastObjectCountAfterGC);
+        if (context->mem.size() >= threshold) {
             WGcCollect(context);
         }
 
@@ -27,27 +28,31 @@ extern "C" {
     void WGcCollect(WContext* context) {
         WASSERT(context);
 
+        if (context->lockGc) {
+            return;
+        }
+
         std::deque<const WObj*> inUse(context->protectedObjects.begin(), context->protectedObjects.end());
         for (auto& var : context->globals) {
             inUse.push_back(*var.second);
         }
 
-        auto attributeTables = {
-            context->attributeTables.object,
-            context->attributeTables.null,
-            context->attributeTables._bool,
-            context->attributeTables._int,
-            context->attributeTables._float,
-            context->attributeTables.str,
-            context->attributeTables.list,
-            context->attributeTables.map,
-            context->attributeTables.func,
-            context->attributeTables.userdata,
+        auto builtinClasses = {
+            context->builtinClasses.object,
+            context->builtinClasses.null,
+            context->builtinClasses._bool,
+            context->builtinClasses._int,
+            context->builtinClasses._float,
+            context->builtinClasses.str,
+            context->builtinClasses.list,
+            context->builtinClasses.map,
+            context->builtinClasses.func,
+            context->builtinClasses.userdata,
         };
-        for (auto& table : attributeTables) {
-            table.ForEach([&](auto& entry) {
-                inUse.push_back(entry.second);
-                });
+        for (auto& _class : builtinClasses) {
+            if (_class) {
+                inUse.push_back(_class);
+            }
         }
 
         // Recursively find objects in use
@@ -74,6 +79,11 @@ extern "C" {
                 case WObj::Type::Func:
                     if (obj->self)
                         inUse.push_back(obj->self);
+                    break;
+                case WObj::Type::Class:
+                    obj->c.ForEach([&](auto& entry) {
+                        inUse.push_back(entry.second);
+                        });
                     break;
                 }
                 

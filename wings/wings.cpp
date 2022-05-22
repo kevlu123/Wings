@@ -7,24 +7,52 @@
 
 using namespace wings;
 
+static std::string CreateTracebackMessage(WContext* context) {
+    std::string s = "Traceback (most recent call last):\n";
+    for (const auto& frame : context->err.trace) {
+        s += "  Module \"";
+        s += frame.module;
+        s += "\", line " + std::to_string(frame.line);
+        if (!frame.func.empty()) {
+            s += ", in ";
+            s += frame.func;
+        } else {
+            s += ", in <no name>";
+        }
+        s += "\n";
+    }
+    s += context->err.message + "\n";
+    return s;
+}
+
+static void SetCompileError(WContext* context, const std::string& message) {
+    context->err.code = WError::WERROR_COMPILE_FAILED;
+    context->err.message = message;
+}
+
 extern "C" {
 
-    WError WErrorGet() {
-        return werror;
+    WError WErrorGet(WContext* context) {
+        WASSERT(context);
+        return context->err.code;
     }
 
-    const char* WErrorMessageGet() {
-        switch (werror) {
+    const char* WErrorMessageGet(WContext* context) {
+        WASSERT(context);
+        switch (context->err.code) {
         case WError::WERROR_OK: return "Ok";
         case WError::WERROR_MAX_ALLOC: return "Exceeded maximum number of objects allocated at a time";
         case WError::WERROR_MAX_RECURSION: return "Exceeded maximum recursion limit";
-        default: return werrorMessage.c_str();
+        case WError::WERROR_COMPILE_FAILED: return context->err.message.c_str();
+        case WError::WERROR_RUNTIME_ERROR: return (context->err.traceMessage = CreateTracebackMessage(context)).c_str();
+        default: WUNREACHABLE();
         }
     }
 
-    void WErrorSetRuntimeError(const char* message) {
-        werror = WError::WERROR_RUNTIME_ERROR;
-        werrorMessage = message;
+    void WErrorSetRuntimeError(WContext* context, const char* message) {
+        WASSERT(context && message);
+        context->err.code = WError::WERROR_RUNTIME_ERROR;
+        context->err.message = message;
     }
 
     void WContextGetConfig(const WContext* context, WConfig* config) {
@@ -71,7 +99,8 @@ extern "C" {
             context->config.log(message);
     }
 
-    WObj* WContextCompile(WContext* context, const char* code) {
+    WObj* WContextCompile(WContext* context, const char* code, const char* moduleName) {
+        WASSERT(context && code && moduleName);
 
         auto formatError = [](const auto& err, const auto& rawCode) {
             std::stringstream ss;
@@ -84,27 +113,26 @@ extern "C" {
 
         auto lexResult = Lex(code);
         if (lexResult.error) {
-            werror = WError::WERROR_COMPILE_FAILED;
-            werrorMessage = formatError(lexResult.error, lexResult.rawCode);
+            SetCompileError(context, formatError(lexResult.error, lexResult.rawCode));
             return nullptr;
         }
 
         auto parseResult = Parse(lexResult.lexTree);
         if (parseResult.error) {
-            werror = WError::WERROR_COMPILE_FAILED;
-            werrorMessage = formatError(parseResult.error, lexResult.rawCode);
+            SetCompileError(context, formatError(parseResult.error, lexResult.rawCode));
             return nullptr;
         }
 
-
         DefObject* def = new DefObject();
         def->context = context;
+        def->module = moduleName;
         auto instructions = Compile(parseResult.parseTree);
         def->instructions = MakeRcPtr<std::vector<Instruction>>(std::move(instructions));
 
         WFunc func{};
         func.fptr = &DefObject::Run;
         func.userdata = def;
+        func.prettyName = "__root__";
         WObj* obj = WObjCreateFunc(context, &func);
         if (obj == nullptr) {
             delete def;
