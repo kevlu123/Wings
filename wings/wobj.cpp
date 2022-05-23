@@ -52,7 +52,7 @@ extern "C" {
         WObj* _class = context->builtinClasses._bool;
         WObj* instance = _class->fn.fptr(nullptr, 0, _class->fn.userdata);
         if (instance) {
-            instance->attributes = _class->attributes.Copy();
+            instance->attributes = _class->c.Copy();
             instance->b = value;
         }
         return instance;
@@ -63,7 +63,7 @@ extern "C" {
         WObj* _class = context->builtinClasses._int;
         WObj* instance = _class->fn.fptr(nullptr, 0, _class->fn.userdata);
         if (instance) {
-            instance->attributes = _class->attributes.Copy();
+            instance->attributes = _class->c.Copy();
             instance->i = value;
         }
         return instance;
@@ -74,7 +74,7 @@ extern "C" {
         WObj* _class = context->builtinClasses._float;
         WObj* instance = _class->fn.fptr(nullptr, 0, _class->fn.userdata);
         if (instance) {
-            instance->attributes = _class->attributes.Copy();
+            instance->attributes = _class->c.Copy();
             instance->f = value;
         }
         return instance;
@@ -85,7 +85,7 @@ extern "C" {
         WObj* _class = context->builtinClasses.str;
         WObj* instance = _class->fn.fptr(nullptr, 0, _class->fn.userdata);
         if (instance) {
-            instance->attributes = _class->attributes.Copy();
+            instance->attributes = _class->c.Copy();
             instance->s = value;
         }
         return instance;
@@ -96,7 +96,7 @@ extern "C" {
         WObj* _class = context->builtinClasses.list;
         WObj* instance = _class->fn.fptr(nullptr, 0, _class->fn.userdata);
         if (instance) {
-            instance->attributes = _class->attributes.Copy();
+            instance->attributes = _class->c.Copy();
         }
         return instance;
     }
@@ -106,7 +106,7 @@ extern "C" {
         WObj* _class = context->builtinClasses.map;
         WObj* instance = _class->fn.fptr(nullptr, 0, _class->fn.userdata);
         if (instance) {
-            instance->attributes = _class->attributes.Copy();
+            instance->attributes = _class->c.Copy();
         }
         return instance;
     }
@@ -116,7 +116,7 @@ extern "C" {
         WObj* _class = context->builtinClasses.object;
         WObj* instance = _class->fn.fptr(nullptr, 0, _class->fn.userdata);
         if (instance) {
-            instance->attributes = _class->attributes.Copy();
+            instance->attributes = _class->c.Copy();
         }
         return instance;
     }
@@ -126,7 +126,7 @@ extern "C" {
         WObj* _class = context->builtinClasses.func;
         WObj* instance = _class->fn.fptr(nullptr, 0, _class->fn.userdata);
         if (instance) {
-            instance->attributes = _class->attributes.Copy();
+            instance->attributes = _class->c.Copy();
             instance->fn = *value;
         }
         return instance;
@@ -137,7 +137,7 @@ extern "C" {
         WObj* _class = context->builtinClasses.userdata;
         WObj* instance = _class->fn.fptr(nullptr, 0, _class->fn.userdata);
         if (instance) {
-            instance->attributes = _class->attributes.Copy();
+            instance->attributes = _class->c.Copy();
             instance->u = value;
         }
         return instance;

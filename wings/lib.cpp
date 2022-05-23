@@ -7,73 +7,73 @@
 
 using namespace wings;
 
-//static std::string PtrToString(const void* p) {
-//	std::stringstream ss;
-//	ss << p;
-//	return ss.str();
-//}
-//
-//static std::string WObjToString(const WObj* val, std::unordered_set<const WObj*>& seen) {
-//	switch (val->type) {
-//	case WObj::Type::Null:
-//		return "None";
-//	case WObj::Type::Bool:
-//		return val->b ? "True" : "False";
-//	case WObj::Type::Int:
-//		return std::to_string(val->i);
-//	case WObj::Type::Float: {
-//		std::string s = std::to_string(val->f);
-//		s.erase(s.find_last_not_of('0') + 1, std::string::npos);
-//		if (s.ends_with('.'))
-//			s.push_back('0');
-//		return s;
-//	}
-//	case WObj::Type::String:
-//		return val->s;
-//	case WObj::Type::Func:
-//		return "<function at " + PtrToString(val) + ">";
-//	case WObj::Type::Userdata:
-//		return "<userdata at " + PtrToString(val) + ">";
-//	case WObj::Type::List:
-//		if (seen.contains(val)) {
-//			return "[...]";
-//		} else {
-//			seen.insert(val);
-//			std::string s = "[";
-//			for (WObj* child : val->v) {;
-//				s += WObjToString(child, seen) + ", ";
-//			}
-//			if (!val->v.empty()) {
-//				s.pop_back();
-//				s.pop_back();
-//			}
-//			return s + "]";
-//		}
-//	case WObj::Type::Map:
-//		if (seen.contains(val)) {
-//			return "{...}";
-//		} else {
-//			seen.insert(val);
-//			std::string s = "{";
-//			for (const auto& [key, val] : val->m) {
-//				s += WObjToString(&key, seen) + ": ";
-//				s += WObjToString(val, seen) + ", ";
-//			}
-//			if (!val->m.empty()) {
-//				s.pop_back();
-//				s.pop_back();
-//			}
-//			return s + "}";
-//		}
-//	default:
-//		WUNREACHABLE();
-//	}
-//}
-//
-//static std::string WObjToString(const WObj* val) {
-//	std::unordered_set<const WObj*> seen;
-//	return WObjToString(val, seen);
-//}
+static std::string PtrToString(const void* p) {
+	std::stringstream ss;
+	ss << p;
+	return ss.str();
+}
+
+static std::string WObjToString(const WObj* val, std::unordered_set<const WObj*>& seen) {
+	switch (val->type) {
+	case WObj::Type::Null:
+		return "None";
+	case WObj::Type::Bool:
+		return val->b ? "True" : "False";
+	case WObj::Type::Int:
+		return std::to_string(val->i);
+	case WObj::Type::Float: {
+		std::string s = std::to_string(val->f);
+		s.erase(s.find_last_not_of('0') + 1, std::string::npos);
+		if (s.ends_with('.'))
+			s.push_back('0');
+		return s;
+	}
+	case WObj::Type::String:
+		return val->s;
+	case WObj::Type::Func:
+		return "<function at " + PtrToString(val) + ">";
+	case WObj::Type::Userdata:
+		return "<userdata at " + PtrToString(val) + ">";
+	case WObj::Type::List:
+		if (seen.contains(val)) {
+			return "[...]";
+		} else {
+			seen.insert(val);
+			std::string s = "[";
+			for (WObj* child : val->v) {;
+				s += WObjToString(child, seen) + ", ";
+			}
+			if (!val->v.empty()) {
+				s.pop_back();
+				s.pop_back();
+			}
+			return s + "]";
+		}
+	case WObj::Type::Map:
+		if (seen.contains(val)) {
+			return "{...}";
+		} else {
+			seen.insert(val);
+			std::string s = "{";
+			for (const auto& [key, val] : val->m) {
+				s += WObjToString(&key, seen) + ": ";
+				s += WObjToString(val, seen) + ", ";
+			}
+			if (!val->m.empty()) {
+				s.pop_back();
+				s.pop_back();
+			}
+			return s + "}";
+		}
+	default:
+		WUNREACHABLE();
+	}
+}
+
+static std::string WObjToString(const WObj* val) {
+	std::unordered_set<const WObj*> seen;
+	return WObjToString(val, seen);
+}
 
 static std::string WObjTypeToString(WObj::Type t) {
 	switch (t) {
@@ -375,15 +375,12 @@ namespace wings {
 			return WObjCreateBool(context, WObjEquals(argv[0], argv[1]));
 		}
 
-		static WObj* int_str_(WObj** argv, int argc, WContext* context) {
+		static WObj* object_str_(WObj** argv, int argc, WContext* context) {
 			if (argc != 1) {
-				SetInvalidArgumentCountError(context, "int.__str__", argc, 1);
-				return nullptr;
-			} else if (!WObjIsInt(argv[0])) {
-				SetInvalidTypeError(context, "int.__str__", 1, "int", argv[0]);
+				SetInvalidArgumentCountError(context, "object.__str__", argc, 1);
 				return nullptr;
 			}
-			return WObjCreateString(context, std::to_string(WObjGetInt(argv[0])).c_str());
+			return WObjCreateString(context, WObjToString(argv[0]).c_str());
 		}
 
 		static WObj* int_mod_(WObj** argv, int argc, WContext* context) {
@@ -522,11 +519,8 @@ namespace wings {
 		// Returns from function if operation resulted in nullptr
 #define CheckOperation(op) do { if ((op) == nullptr) return false; } while (0)
 
-		// Create null (None) class
-		CheckOperation(context->builtinClasses.null = CreateClass<classlib::null>(context));
-		CheckOperation(context->nullSingleton = WObjCall(context->builtinClasses.null, nullptr, 0));
-
 		// Create builtin classes
+		CheckOperation(context->builtinClasses.null = CreateClass<classlib::null>(context));
 		CheckOperation(context->builtinClasses._bool = CreateClass<classlib::_bool>(context, "bool"));
 		CheckOperation(context->builtinClasses._int = CreateClass<classlib::_int>(context, "int"));
 		CheckOperation(context->builtinClasses._float = CreateClass<classlib::_float>(context, "float"));
@@ -539,20 +533,24 @@ namespace wings {
 
 		// Subclass the object class
 		AttributeTable& objectAttributes = context->builtinClasses.object->attributes;
-		context->builtinClasses.null->attributes.SetSuper(objectAttributes);
-		context->builtinClasses._bool->attributes.SetSuper(objectAttributes);
-		context->builtinClasses._int->attributes.SetSuper(objectAttributes);
-		context->builtinClasses._float->attributes.SetSuper(objectAttributes);
-		context->builtinClasses.str->attributes.SetSuper(objectAttributes);
-		context->builtinClasses.list->attributes.SetSuper(objectAttributes);
-		context->builtinClasses.map->attributes.SetSuper(objectAttributes);
-		context->builtinClasses.func->attributes.SetSuper(objectAttributes);
-		context->builtinClasses.userdata->attributes.SetSuper(objectAttributes);
+		context->builtinClasses.null->c.SetSuper(objectAttributes);
+		context->builtinClasses._bool->c.SetSuper(objectAttributes);
+		context->builtinClasses._int->c.SetSuper(objectAttributes);
+		context->builtinClasses._float->c.SetSuper(objectAttributes);
+		context->builtinClasses.str->c.SetSuper(objectAttributes);
+		context->builtinClasses.list->c.SetSuper(objectAttributes);
+		context->builtinClasses.map->c.SetSuper(objectAttributes);
+		context->builtinClasses.func->c.SetSuper(objectAttributes);
+		context->builtinClasses.userdata->c.SetSuper(objectAttributes);
+
+		// Create null (None) singleton
+		CheckOperation(context->nullSingleton = WObjCall(context->builtinClasses.null, nullptr, 0));
 
 		// Register methods of builtin classes
 		CheckOperation(RegisterStatelessMethod<attrlib::object_not_>(context, objectAttributes, "__not__"));
 		CheckOperation(RegisterStatelessMethod<attrlib::object_and_>(context, objectAttributes, "__and__"));
 		CheckOperation(RegisterStatelessMethod<attrlib::object_eq_>(context, objectAttributes, "__eq__"));
+		CheckOperation(RegisterStatelessMethod<attrlib::object_str_>(context, objectAttributes, "__str__"));
 
 		CheckOperation(RegisterStatelessMethod<attrlib::int_mod_>(context, context->builtinClasses._int->attributes, "__mod__"));
 

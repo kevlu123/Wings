@@ -48,6 +48,7 @@ extern "C" {
             context->builtinClasses.map,
             context->builtinClasses.func,
             context->builtinClasses.userdata,
+            context->nullSingleton,
         };
         for (auto& _class : builtinClasses) {
             if (_class) {
