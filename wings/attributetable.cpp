@@ -53,4 +53,8 @@ namespace wings {
 		referenced = true;
 		return copy;
 	}
+
+	bool AttributeTable::Empty() const {
+		return attributes->entries.empty();
+	}
 }

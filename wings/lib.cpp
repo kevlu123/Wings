@@ -75,22 +75,6 @@ static std::string WObjToString(const WObj* val) {
 	return WObjToString(val, seen);
 }
 
-static std::string WObjTypeToString(WObj::Type t) {
-	switch (t) {
-	case WObj::Type::Null: return "NoneType";
-	case WObj::Type::Bool: return "bool";
-	case WObj::Type::Int: return "int";
-	case WObj::Type::Float: return "float";
-	case WObj::Type::String: return "str";
-	case WObj::Type::List: return "list";
-	case WObj::Type::Map: return "map";
-	case WObj::Type::Object: return "object";
-	case WObj::Type::Func: return "function";
-	case WObj::Type::Userdata: return "userdata";
-	default: WUNREACHABLE();
-	}
-}
-
 static void SetInvalidArgumentCountError(WContext* context, const std::string& fnName, int given, int expected = -1) {
 	std::string msg;
 	if (expected != -1) {
@@ -180,7 +164,8 @@ static WObj* CreateClass(WContext* context, const char* name = nullptr) {
 		WObj* instance = Constructor(argv, argc, _class->context);
 		if (instance == nullptr)
 			return (WObj*)nullptr;
-		instance->attributes = _class->c.Copy();
+		if (instance->attributes.Empty())
+			instance->attributes = _class->c.Copy();
 		return instance;
 	};
 
@@ -210,86 +195,98 @@ namespace wings {
 		}
 
 		static WObj* _bool(WObj** argv, int argc, WContext* context) {
-			bool b{};
 			switch (argc) {
 			case 0:
-				b = false;
-				break;
+				if (WObj* obj = Alloc(context)) {
+					obj->type = WObj::Type::Bool;
+					obj->b = false;
+					return obj;
+				} else {
+					return nullptr;
+				}
 			case 1:
-				b = WObjTruthy(argv[0]);
-				break;
+				if (WObj* res = WOpTruthy(argv[0])) {
+					if (WObjIsBool(res)) {
+						return res;
+					} else {
+						WErrorSetRuntimeError(context, "function bool() argument 1 __nonzero__() method returned a non bool type.");
+					}
+				}
+				return nullptr;
 			default:
 				SetInvalidArgumentCountError(context, "bool", argc);
 				return nullptr;
 			}
-
-			WObj* obj = Alloc(context);
-			if (obj == nullptr)
-				return nullptr;
-			obj->type = WObj::Type::Bool;
-			obj->b = b;
-			return obj;
 		}
 
 		static WObj* _int(WObj** argv, int argc, WContext* context) {
-			int i{};
 			switch (argc) {
 			case 0:
-				i = 0;
-				break;
-			//case 1:
-			//	break;
+				if (WObj* obj = Alloc(context)) {
+					obj->type = WObj::Type::Int;
+					obj->i = 0;
+					return obj;
+				} else {
+					return nullptr;
+				}
+			case 1:
+				if (WObj* res = WOpTruthy(argv[0])) {
+					if (WObjIsBool(res)) {
+						return res;
+					} else {
+						WErrorSetRuntimeError(context, "function int() argument 1 __int__() method returned a non int type.");
+					}
+				}
+				return nullptr;
 			default:
 				SetInvalidArgumentCountError(context, "int", argc);
 				return nullptr;
 			}
-
-			WObj* obj = Alloc(context);
-			if (obj == nullptr)
-				return nullptr;
-			obj->type = WObj::Type::Int;
-			obj->i = i;
-			return obj;
 		}
 
 		static WObj* _float(WObj** argv, int argc, WContext* context) {
-			wfloat f{};
 			switch (argc) {
 			case 0:
-				f = 0;
-				break;
-				// TODO
-				//case 1:
-				//	break;
+				if (WObj* obj = Alloc(context)) {
+					obj->type = WObj::Type::Float;
+					obj->f = 0;
+					return obj;
+				} else {
+					return nullptr;
+				}
+			case 1:
+				if (WObj* res = WOpTruthy(argv[0])) {
+					if (WObjIsBool(res)) {
+						return res;
+					} else {
+						WErrorSetRuntimeError(context, "function float() argument 1 __float__() method returned a non float type.");
+					}
+				}
+				return nullptr;
 			default:
 				SetInvalidArgumentCountError(context, "float", argc);
 				return nullptr;
 			}
-
-			WObj* obj = Alloc(context);
-			if (obj == nullptr)
-				return nullptr;
-			obj->type = WObj::Type::Float;
-			obj->f = f;
-			return obj;
 		}
 
 		static WObj* str(WObj** argv, int argc, WContext* context) {
 			switch (argc) {
-			case 0: {
-				WObj* obj = Alloc(context);
-				if (obj == nullptr)
-					return nullptr;
-				obj->type = WObj::Type::String;
-				return obj;
-			}
-			case 1:
-				if (WObj* method = WObjGetAttribute(argv[0], "__str__")) {
-					return WObjCall(method, nullptr, 0);
+			case 0:
+				if (WObj* obj = Alloc(context)) {
+					obj->type = WObj::Type::String;
+					return obj;
 				} else {
-					SetMissingAttributeError(context, "str", 1, "__str__", argv[0]);
 					return nullptr;
 				}
+			case 1:
+				if (WObj* res = WOpTruthy(argv[0])) {
+					if (WObjIsBool(res)) {
+						return res;
+					} else {
+						WErrorSetRuntimeError(context, "function str() argument 1 __str__() method returned a non str type.");
+					}
+				}
+				return nullptr;
 			default:
 				SetInvalidArgumentCountError(context, "str", argc);
 				return nullptr;
@@ -356,7 +353,11 @@ namespace wings {
 				SetInvalidArgumentCountError(context, "object.__not__", 1, argc);
 				return nullptr;
 			}
-			return WObjCreateBool(context, !WObjTruthy(argv[0]));
+			if (WObj* b = WOpTruthy(argv[0])) {
+				return WObjCreateBool(context, !WObjGetBool(b));
+			} else {
+				return nullptr;
+			}
 		}
 
 		static WObj* object_and_(WObj** argv, int argc, WContext* context) {
@@ -364,7 +365,20 @@ namespace wings {
 				SetInvalidArgumentCountError(context, "object.__and__", 1, argc);
 				return nullptr;
 			}
-			return WObjCreateBool(context, WObjTruthy(argv[0]) && WObjTruthy(argv[1]));
+
+			WObj* lhs = WOpTruthy(argv[0]);
+			if (!WObjIsBool(lhs)) {
+				
+				return nullptr;
+			}
+
+			WObj* rhs = WOpTruthy(argv[1]);
+			if (!WObjIsBool(rhs)) {
+
+				return nullptr;
+			}
+
+			return WObjCreateBool(context, lhs->b && rhs->b);
 		}
 
 		static WObj* object_eq_(WObj** argv, int argc, WContext* context) {
@@ -372,7 +386,7 @@ namespace wings {
 				SetInvalidArgumentCountError(context, "object.__eq__", 1, argc);
 				return nullptr;
 			}
-			return WObjCreateBool(context, WObjEquals(argv[0], argv[1]));
+			return WOpEquals(argv[0], argv[1]);
 		}
 
 		static WObj* object_str_(WObj** argv, int argc, WContext* context) {
@@ -422,8 +436,8 @@ namespace wings {
 				return nullptr;
 			}
 
-			WObjListPush(argv[0], argv[1]);
-			return WObjCreateNull(context);
+			argv[0]->v.push_back(argv[1]);
+			return argv[0];
 		}
 
 	} // namespace attrlib
@@ -434,7 +448,7 @@ namespace wings {
 			std::string text;
 			for (int i = 0; i < argc; i++) {
 				if (WObj* method = WObjGetAttribute(argv[i], "__str__")) {
-					WObj* s = WObjCall(method, nullptr, 0);
+					WObj* s = WOpCall(method, nullptr, 0);
 					if (s == nullptr) {
 						return nullptr;
 					} else if (!WObjIsString(s)) {
@@ -532,7 +546,7 @@ namespace wings {
 		CheckOperation(context->builtinClasses.userdata = CreateClass<classlib::userdata>(context));
 
 		// Subclass the object class
-		AttributeTable& objectAttributes = context->builtinClasses.object->attributes;
+		AttributeTable& objectAttributes = context->builtinClasses.object->c;
 		context->builtinClasses.null->c.SetSuper(objectAttributes);
 		context->builtinClasses._bool->c.SetSuper(objectAttributes);
 		context->builtinClasses._int->c.SetSuper(objectAttributes);
@@ -544,7 +558,7 @@ namespace wings {
 		context->builtinClasses.userdata->c.SetSuper(objectAttributes);
 
 		// Create null (None) singleton
-		CheckOperation(context->nullSingleton = WObjCall(context->builtinClasses.null, nullptr, 0));
+		CheckOperation(context->nullSingleton = WOpCall(context->builtinClasses.null, nullptr, 0));
 
 		// Register methods of builtin classes
 		CheckOperation(RegisterStatelessMethod<attrlib::object_not_>(context, objectAttributes, "__not__"));
@@ -552,9 +566,9 @@ namespace wings {
 		CheckOperation(RegisterStatelessMethod<attrlib::object_eq_>(context, objectAttributes, "__eq__"));
 		CheckOperation(RegisterStatelessMethod<attrlib::object_str_>(context, objectAttributes, "__str__"));
 
-		CheckOperation(RegisterStatelessMethod<attrlib::int_mod_>(context, context->builtinClasses._int->attributes, "__mod__"));
+		CheckOperation(RegisterStatelessMethod<attrlib::int_mod_>(context, context->builtinClasses._int->c, "__mod__"));
 
-		CheckOperation(RegisterStatelessMethod<attrlib::list_append>(context, context->builtinClasses.list->attributes, "append"));
+		CheckOperation(RegisterStatelessMethod<attrlib::list_append>(context, context->builtinClasses.list->c, "append"));
 
 		// Register builtin functions
 		CheckOperation(RegisterStatelessFunction<lib::print>(context, "print"));

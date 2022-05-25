@@ -93,6 +93,7 @@ WDLL_EXPORT WObj* WObjCreateList(WContext* context);
 WDLL_EXPORT WObj* WObjCreateMap(WContext* context);
 WDLL_EXPORT WObj* WObjCreateFunc(WContext* context, const WFunc* value);
 WDLL_EXPORT WObj* WObjCreateObject(WContext* context);
+WDLL_EXPORT WObj* WObjCreateClass(WContext* context, WObj* );
 WDLL_EXPORT WObj* WObjCreateUserdata(WContext* context, void* value);
 
 WDLL_EXPORT bool WObjIsNull(const WObj* obj);
@@ -114,29 +115,54 @@ WDLL_EXPORT const char* WObjGetString(const WObj* obj);
 WDLL_EXPORT void WObjGetFunc(const WObj* obj, WFunc* fn);
 WDLL_EXPORT void* WObjGetUserdata(const WObj* obj);
 
-WDLL_EXPORT bool WObjIn(const WObj* container, const WObj* value);
-WDLL_EXPORT bool WObjTruthy(const WObj* obj);
-WDLL_EXPORT bool WObjEquals(const WObj* lhs, const WObj* rhs);
-WDLL_EXPORT int WObjLen(const WObj* obj);
-WDLL_EXPORT WObj* WObjCall(const WObj* func, WObj** args, int argc);
+WDLL_EXPORT void WObjGetFinalizer(const WObj* obj, WFinalizer* finalizer);
+WDLL_EXPORT void WObjSetFinalizer(WObj* obj, const WFinalizer* finalizer);
 
-WDLL_EXPORT WObj* WObjListGet(const WObj* list, int index);
-WDLL_EXPORT void WObjListSet(WObj* list, int index, WObj* value);
-WDLL_EXPORT void WObjListPush(WObj* list, WObj* value);
-WDLL_EXPORT void WObjListPop(WObj* list);
-WDLL_EXPORT void WObjListInsert(WObj* list, int index, WObj* value);
-WDLL_EXPORT void WObjListRemoveAt(WObj* list, int index);
-WDLL_EXPORT WObj* WObjMapGet(WObj* map, const WObj* key);
-WDLL_EXPORT void WObjMapSet(WObj* map, const WObj* key, WObj* value);
-WDLL_EXPORT void WObjMapRemove(WObj* map, const WObj* key);
+//WDLL_EXPORT bool WObjIn(const WObj* container, const WObj* value);
+//WDLL_EXPORT bool WObjTruthy(const WObj* obj);
+//WDLL_EXPORT bool WObjEquals(const WObj* lhs, const WObj* rhs);
+//WDLL_EXPORT int WObjLen(const WObj* obj);
+//WDLL_EXPORT WObj* WObjCall(const WObj* func, WObj** args, int argc);
+//
+//WDLL_EXPORT WObj* WObjListGet(const WObj* list, int index);
+//WDLL_EXPORT void WObjListSet(WObj* list, int index, WObj* value);
+//WDLL_EXPORT void WObjListPush(WObj* list, WObj* value);
+//WDLL_EXPORT void WObjListPop(WObj* list);
+//WDLL_EXPORT void WObjListInsert(WObj* list, int index, WObj* value);
+//WDLL_EXPORT void WObjListRemoveAt(WObj* list, int index);
+//WDLL_EXPORT WObj* WObjMapGet(WObj* map, const WObj* key);
+//WDLL_EXPORT void WObjMapSet(WObj* map, const WObj* key, WObj* value);
+//WDLL_EXPORT void WObjMapRemove(WObj* map, const WObj* key);
 
 WDLL_EXPORT WObj* WObjGetAttribute(WObj* obj, const char* member);
 WDLL_EXPORT void WObjSetAttribute(WObj* obj, const char* member, WObj* value);
 
-WDLL_EXPORT void WObjGetFinalizer(const WObj* obj, WFinalizer* finalizer);
-WDLL_EXPORT void WObjSetFinalizer(WObj* obj, const WFinalizer* finalizer);
-
+WDLL_EXPORT WObj* WOpTruthy(WObj* arg);
 WDLL_EXPORT WObj* WOpCall(WObj* callable, WObj** argv, int argc);
+WDLL_EXPORT WObj* WOpCallMethod(WObj* obj, const char* member, WObj** argv, int argc);
+WDLL_EXPORT WObj* WOpPositive(WObj* arg);
+WDLL_EXPORT WObj* WOpNegative(WObj* arg);
+WDLL_EXPORT WObj* WOpAdd(WObj* lhs, WObj* rhs);
+WDLL_EXPORT WObj* WOpSubtract(WObj* lhs, WObj* rhs);
+WDLL_EXPORT WObj* WOpMultiply(WObj* lhs, WObj* rhs);
+WDLL_EXPORT WObj* WOpDivide(WObj* lhs, WObj* rhs);
+WDLL_EXPORT WObj* WOpFloorDivide(WObj* lhs, WObj* rhs);
+WDLL_EXPORT WObj* WOpModulo(WObj* lhs, WObj* rhs);
+WDLL_EXPORT WObj* WOpPower(WObj* lhs, WObj* rhs);
+WDLL_EXPORT WObj* WOpEquals(WObj* lhs, WObj* rhs);
+WDLL_EXPORT WObj* WOpNotEquals(WObj* lhs, WObj* rhs);
+WDLL_EXPORT WObj* WOpLessThan(WObj* lhs, WObj* rhs);
+WDLL_EXPORT WObj* WOpLessThanOrEqual(WObj* lhs, WObj* rhs);
+WDLL_EXPORT WObj* WOpGreaterThan(WObj* lhs, WObj* rhs);
+WDLL_EXPORT WObj* WOpGreaterThanOrEqual(WObj* lhs, WObj* rhs);
+WDLL_EXPORT WObj* WOpIn(WObj* lhs, WObj* rhs);
+WDLL_EXPORT WObj* WOpNotIn(WObj* lhs, WObj* rhs);
+WDLL_EXPORT WObj* WOpBitAnd(WObj* lhs, WObj* rhs);
+WDLL_EXPORT WObj* WOpBitOr(WObj* lhs, WObj* rhs);
+WDLL_EXPORT WObj* WOpBitNot(WObj* arg);
+WDLL_EXPORT WObj* WOpBitXor(WObj* lhs, WObj* rhs);
+WDLL_EXPORT WObj* WOpShiftLeft(WObj* lhs, WObj* rhs);
+WDLL_EXPORT WObj* WOpShiftRight(WObj* lhs, WObj* rhs);
 
 #undef WDEFAULT_ARG
 #undef WDLL_EXPORT

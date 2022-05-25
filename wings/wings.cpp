@@ -167,8 +167,26 @@ extern "C" {
 } // extern "C"
 
 namespace wings {
+
     size_t Guid() {
         static size_t i = 0;
         return ++i;
     }
-}
+
+    std::string WObjTypeToString(WObj::Type t) {
+        switch (t) {
+        case WObj::Type::Null: return "NoneType";
+        case WObj::Type::Bool: return "bool";
+        case WObj::Type::Int: return "int";
+        case WObj::Type::Float: return "float";
+        case WObj::Type::String: return "str";
+        case WObj::Type::List: return "list";
+        case WObj::Type::Map: return "map";
+        case WObj::Type::Object: return "object";
+        case WObj::Type::Func: return "function";
+        case WObj::Type::Userdata: return "userdata";
+        default: WUNREACHABLE();
+        }
+    }
+
+} // namespace wings

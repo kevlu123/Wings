@@ -102,9 +102,13 @@ namespace wings {
 		}
 		case Instruction::Type::JumpIfFalse: {
 			auto arg = PopStack();
-			if (!WObjTruthy(arg)) {
-				pc = instr.data.jump.location - 1;
+			if (WObj* truthy = WOpTruthy(arg)) {
+				if (!WObjGetBool(truthy)) {
+					pc = instr.data.jump.location - 1;
+					break;
+				}
 			}
+			returnValue = nullptr;
 			break;
 		}
 		case Instruction::Type::Pop: {
@@ -207,27 +211,6 @@ namespace wings {
 	}
 
 	void Executor::DoOperation(const OperationInstructionInfo& op) {
-
-		auto callMethod = [&]<size_t argc>(const char* member) {
-			static_assert(argc > 0);
-			WObj* args[argc]{};
-			for (size_t i = argc; i --> 0; )
-				args[i] = PopStack();
-
-			WObj* self = args[0];
-			WObj* attr = WObjGetAttribute(self, member);
-			if (WObjIsFunc(attr)) {
-				if (WObj* ret = WObjCall(attr, args + 1, argc - 1)) {
-					PushStack(ret);
-					return;
-				} else {
-					returnValue = nullptr;
-				}
-			} else {
-				returnValue = nullptr;
-			}
-		};
-
 		switch (op.op) {
 		case Operation::Literal:
 			DoLiteral(op.token);
@@ -245,7 +228,7 @@ namespace wings {
 		case Operation::ListLiteral: {
 			WObj* li = WObjCreateList(context);
 			for (int i = 0; i < op.argc; i++)
-				WObjListInsert(li, 0, PopStack());
+				li->v.insert(li->v.begin(), PopStack());
 			PushStack(li);
 			break;
 		}
@@ -254,7 +237,7 @@ namespace wings {
 			for (int i = 0; i < op.argc; i++) {
 				WObj* val = PopStack();
 				WObj* key = PopStack();
-				WObjMapSet(li, key, val);
+				li->m.insert({ *key, val });
 			}
 			PushStack(li);
 			break;
@@ -262,7 +245,7 @@ namespace wings {
 		case Operation::Call: {
 			WObj* fn = stack[stack.size() - op.argc - 1];
 			WObj** args = stack.data() + stack.size() - op.argc;
-			if (WObj* ret = WObjCall(fn, args, (int)op.argc)) {
+			if (WObj* ret = WOpCall(fn, args, (int)op.argc)) {
 				for (size_t i = 0; i < op.argc + 1; i++)
 					PopStack();
 				PushStack(ret);
@@ -277,22 +260,51 @@ namespace wings {
 			PushStack(attr);
 			break;
 		}
-		case Operation::Not: {
-			callMethod.operator()<1>("__not__");
-			break;
-		}
-		case Operation::Mod: {
-			callMethod.operator()<2>("__mod__");
-			break;
-		}
-		case Operation::And: {
-			callMethod.operator()<2>("__and__");
-			break;
-		}
-		case Operation::Eq: {
-			callMethod.operator()<2>("__eq__");
-			break;
-		}
+
+
+#define DEFINE_UNARY_OPERATION(enumVal, fn)				\
+		case enumVal:									\
+			if (WObj* res = fn(PopStack())) {			\
+				PushStack(res);						    \
+			} else {								    \
+				returnValue = nullptr;				    \
+			}										    \
+			break
+#define DEFINE_BINARY_OPERATION(enumVal, fn)			\
+		case enumVal: {									\
+			WObj* arg2 = PopStack();					\
+			if (WObj* res = fn(PopStack(), arg2)) {		\
+				PushStack(res);						    \
+			} else {								    \
+				returnValue = nullptr;				    \
+			}										    \
+			break;										\
+			}
+
+			DEFINE_UNARY_OPERATION(Operation::Pos, WOpPositive);
+			DEFINE_UNARY_OPERATION(Operation::Neg, WOpNegative);
+			DEFINE_UNARY_OPERATION(Operation::BitNot, WOpBitNot);
+			DEFINE_BINARY_OPERATION(Operation::Add, WOpAdd);
+			DEFINE_BINARY_OPERATION(Operation::Sub, WOpSubtract);
+			DEFINE_BINARY_OPERATION(Operation::Mul, WOpMultiply);
+			DEFINE_BINARY_OPERATION(Operation::Div, WOpDivide);
+			DEFINE_BINARY_OPERATION(Operation::IDiv, WOpFloorDivide);
+			DEFINE_BINARY_OPERATION(Operation::Mod, WOpModulo);
+			DEFINE_BINARY_OPERATION(Operation::Pow, WOpPower);
+			DEFINE_BINARY_OPERATION(Operation::Eq, WOpEquals);
+			DEFINE_BINARY_OPERATION(Operation::Ne, WOpNotEquals);
+			DEFINE_BINARY_OPERATION(Operation::Lt, WOpLessThan);
+			DEFINE_BINARY_OPERATION(Operation::Le, WOpLessThanOrEqual);
+			DEFINE_BINARY_OPERATION(Operation::Gt, WOpGreaterThan);
+			DEFINE_BINARY_OPERATION(Operation::Ge, WOpGreaterThanOrEqual);
+			DEFINE_BINARY_OPERATION(Operation::In, WOpIn);
+			DEFINE_BINARY_OPERATION(Operation::NotIn, WOpNotIn);
+			DEFINE_BINARY_OPERATION(Operation::BitAnd, WOpBitAnd);
+			DEFINE_BINARY_OPERATION(Operation::BitOr, WOpBitOr);
+			DEFINE_BINARY_OPERATION(Operation::BitXor, WOpBitXor);
+			DEFINE_BINARY_OPERATION(Operation::ShiftL, WOpShiftLeft);
+			DEFINE_BINARY_OPERATION(Operation::ShiftR, WOpShiftRight);
+
 		default:
 			WUNREACHABLE();
 		}

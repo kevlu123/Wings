@@ -14,6 +14,7 @@ namespace wings {
 		void Set(const std::string& name, WObj* value, bool validate = true);
 		void SetSuper(AttributeTable& super, bool validate = true);
 		AttributeTable Copy();
+		bool Empty() const;
 		template <class Fn> void ForEach(Fn fn) const;
 	private:
 		struct Table {

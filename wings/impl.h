@@ -17,11 +17,6 @@ namespace std {
     };
 }
 
-namespace wings {
-    size_t Guid();
-    bool InitLibrary(WContext* context);
-}
-
 bool operator==(const WObj& lhs, const WObj& rhs);
 bool operator!=(const WObj& lhs, const WObj& rhs);
 
@@ -100,6 +95,12 @@ struct WContext {
     } builtinClasses;
     WObj* nullSingleton;
 };
+
+namespace wings {
+    size_t Guid();
+    bool InitLibrary(WContext* context);
+    std::string WObjTypeToString(WObj::Type t);
+}
 
 #define WASSERT(assertion) do { if (!(assertion)) std::abort(); } while (0)
 #define WUNREACHABLE() std::abort()
