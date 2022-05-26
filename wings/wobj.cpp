@@ -58,7 +58,7 @@ extern "C" {
         return instance;
     }
 
-    WObj* WObjCreateInt(WContext* context, int value) {
+    WObj* WObjCreateInt(WContext* context, wint value) {
         WASSERT(context);
         WObj* _class = context->builtinClasses._int;
         WObj* instance = _class->fn.fptr(nullptr, 0, _class->fn.userdata);
@@ -203,7 +203,7 @@ extern "C" {
         return obj->b;
     }
 
-    int WObjGetInt(const WObj* obj) {
+    wint WObjGetInt(const WObj* obj) {
         WASSERT(obj && WObjIsInt(obj));
         return obj->i;
     }
@@ -381,12 +381,44 @@ extern "C" {
     }
 
     WObj* WOpTruthy(WObj* arg) {
-        WASSERT(arg);
         if (WObj* res = WOpCallMethod(arg, "__nonzero__", nullptr, 0)) {
             if (WObjIsBool(res)) {
                 return res;
             } else {
                 WErrorSetRuntimeError(arg->context, "__nonzero__() returned a non bool type");
+            }
+        }
+        return nullptr;
+    }
+
+    WObj* WOpCastToInt(WObj* arg) {
+        if (WObj* res = WOpCallMethod(arg, "__int__", nullptr, 0)) {
+            if (WObjIsInt(res)) {
+                return res;
+            } else {
+                WErrorSetRuntimeError(arg->context, "__int__() returned a non int type");
+            }
+        }
+        return nullptr;
+    }
+
+    WObj* WOpCastToFloat(WObj* arg) {
+        if (WObj* res = WOpCallMethod(arg, "__float__", nullptr, 0)) {
+            if (WObjIsIntOrFloat(res)) {
+                return res;
+            } else {
+                WErrorSetRuntimeError(arg->context, "__float__() returned a non float type");
+            }
+        }
+        return nullptr;
+    }
+
+    WObj* WOpCastToString(WObj* arg) {
+        if (WObj* res = WOpCallMethod(arg, "__str__", nullptr, 0)) {
+            if (WObjIsString(res)) {
+                return res;
+            } else {
+                WErrorSetRuntimeError(arg->context, "__str__() returned a non str type");
             }
         }
         return nullptr;

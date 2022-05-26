@@ -39,7 +39,7 @@ struct WObj {
 
     union {
         bool b;
-        int i;
+        wint i;
         wfloat f;
         void* u;
         struct {

@@ -593,6 +593,10 @@ namespace wings {
 		ParseResult result{};
 		result.parseTree.type = Statement::Type::Root;
 
+		if (lexTree.children.empty()) {
+			return result;
+		}
+
 		statementHierarchy.clear();
 		result.error = ParseBody(lexTree, Statement::Type::Root, result.parseTree.body);
 		statementHierarchy.clear();

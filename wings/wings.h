@@ -7,6 +7,8 @@
 
 struct WContext;
 struct WObj;
+typedef int32_t wint;
+typedef uint32_t wuint;
 typedef float wfloat;
 
 struct WFunc {
@@ -70,7 +72,7 @@ WDLL_EXPORT void WErrorSetRuntimeError(WContext* context, const char* message);
 
 WDLL_EXPORT WContext* WContextCreate(const WConfig* config WDEFAULT_ARG(nullptr));
 WDLL_EXPORT void WContextDestroy(WContext* context);
-WDLL_EXPORT WObj* WContextCompile(WContext* context, const char* code, const char* moduleName WDEFAULT_ARG(""));
+WDLL_EXPORT WObj* WContextCompile(WContext* context, const char* code, const char* moduleName WDEFAULT_ARG(nullptr));
 WDLL_EXPORT void WContextGetConfig(const WContext* context, WConfig* config);
 WDLL_EXPORT void WContextSetConfig(WContext* context, const WConfig* config);
 WDLL_EXPORT void WContextLog(const WContext* context, const char* message);
@@ -86,7 +88,7 @@ WDLL_EXPORT void WContextSetGlobal(WContext* context, const char* name, WObj* va
 
 WDLL_EXPORT WObj* WObjCreateNull(WContext* context);
 WDLL_EXPORT WObj* WObjCreateBool(WContext* context, bool value WDEFAULT_ARG(false));
-WDLL_EXPORT WObj* WObjCreateInt(WContext* context, int value WDEFAULT_ARG(0));
+WDLL_EXPORT WObj* WObjCreateInt(WContext* context, wint value WDEFAULT_ARG(0));
 WDLL_EXPORT WObj* WObjCreateFloat(WContext* context, wfloat value WDEFAULT_ARG(0));
 WDLL_EXPORT WObj* WObjCreateString(WContext* context, const char* value WDEFAULT_ARG(""));
 WDLL_EXPORT WObj* WObjCreateList(WContext* context);
@@ -109,7 +111,7 @@ WDLL_EXPORT bool WObjIsClass(const WObj* obj);
 WDLL_EXPORT bool WObjIsUserdata(const WObj* obj);
 
 WDLL_EXPORT bool WObjGetBool(const WObj* obj);
-WDLL_EXPORT int WObjGetInt(const WObj* obj);
+WDLL_EXPORT wint WObjGetInt(const WObj* obj);
 WDLL_EXPORT wfloat WObjGetFloat(const WObj* obj);
 WDLL_EXPORT const char* WObjGetString(const WObj* obj);
 WDLL_EXPORT void WObjGetFunc(const WObj* obj, WFunc* fn);
@@ -138,6 +140,9 @@ WDLL_EXPORT WObj* WObjGetAttribute(WObj* obj, const char* member);
 WDLL_EXPORT void WObjSetAttribute(WObj* obj, const char* member, WObj* value);
 
 WDLL_EXPORT WObj* WOpTruthy(WObj* arg);
+WDLL_EXPORT WObj* WOpCastToInt(WObj* arg);
+WDLL_EXPORT WObj* WOpCastToFloat(WObj* arg);
+WDLL_EXPORT WObj* WOpCastToString(WObj* arg);
 WDLL_EXPORT WObj* WOpCall(WObj* callable, WObj** argv, int argc);
 WDLL_EXPORT WObj* WOpCallMethod(WObj* obj, const char* member, WObj** argv, int argc);
 WDLL_EXPORT WObj* WOpPositive(WObj* arg);

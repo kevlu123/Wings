@@ -223,16 +223,15 @@ namespace wings {
 			}
 		}
 
-		uint16_t value = 0;
+		uintmax_t value = 0;
 		for (; *p && IsDigit(*p, base); ++p) {
 			value = (base * value) + DigitValueOf(*p, base);
 		}
 
-		wfloat fvalue = 0;
 		if (*p == '.') {
 			// Is a float
 			++p;
-			fvalue = (wfloat)value;
+			wfloat fvalue = (wfloat)value;
 			for (int i = 1; *p && IsDigit(*p, base); ++p, ++i) {
 				fvalue += DigitValueOf(*p, base) * std::pow((wfloat)base, (wfloat)-i);
 			}
@@ -240,10 +239,11 @@ namespace wings {
 			t.type = Token::Type::Float;
 		} else {
 			// Is an int
-			if (value > std::numeric_limits<unsigned int>::max()) {
+			if (value > std::numeric_limits<wuint>::max()) {
 				return CodeError::Bad("Integer literal is too large");
 			}
-			unsigned int u = (unsigned int)value;
+			wuint u = (wuint)value;
+			static_assert(sizeof(t.literal.i) == sizeof(u));
 			std::memcpy(&t.literal.i, &u, sizeof(u));
 			t.type = Token::Type::Int;
 		}

@@ -23,7 +23,7 @@ namespace wings {
 		struct {
 			union {
 				bool b;
-				int i;
+				wint i;
 				wfloat f;
 			};
 			std::string s;
