@@ -145,6 +145,8 @@ WDLL_EXPORT WObj* WOpCastToFloat(WObj* arg);
 WDLL_EXPORT WObj* WOpCastToString(WObj* arg);
 WDLL_EXPORT WObj* WOpCall(WObj* callable, WObj** argv, int argc);
 WDLL_EXPORT WObj* WOpCallMethod(WObj* obj, const char* member, WObj** argv, int argc);
+WDLL_EXPORT WObj* WOpGetIndex(WObj* obj, WObj* index);
+WDLL_EXPORT WObj* WOpSetIndex(WObj* obj, WObj* index, WObj* value);
 WDLL_EXPORT WObj* WOpPositive(WObj* arg);
 WDLL_EXPORT WObj* WOpNegative(WObj* arg);
 WDLL_EXPORT WObj* WOpAdd(WObj* lhs, WObj* rhs);

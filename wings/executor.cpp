@@ -304,6 +304,7 @@ namespace wings {
 			DEFINE_BINARY_OPERATION(Operation::BitXor, WOpBitXor);
 			DEFINE_BINARY_OPERATION(Operation::ShiftL, WOpShiftLeft);
 			DEFINE_BINARY_OPERATION(Operation::ShiftR, WOpShiftRight);
+			DEFINE_BINARY_OPERATION(Operation::Index, WOpGetIndex);
 
 		default:
 			WUNREACHABLE();

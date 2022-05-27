@@ -473,6 +473,15 @@ extern "C" {
         }
     }
 
+    WObj* WOpGetIndex(WObj* obj, WObj* index) {
+        return WOpCallMethod(obj, "__getitem__", &index, 1);
+    }
+
+    WObj* WOpSetIndex(WObj* obj, WObj* index, WObj* value) {
+        WObj* argv[2] = { index, value };
+        return WOpCallMethod(obj, "__setitem__", argv, 2);
+    }
+
     WObj* WOpPositive(WObj* arg) {
         return WOpCallMethod(arg, "__pos__", nullptr, 0);
     }
