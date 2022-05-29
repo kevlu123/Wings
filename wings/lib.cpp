@@ -83,58 +83,73 @@ static size_t ConvertNegativeIndex(wint index, size_t size) {
 	}
 }
 
-static void SetInvalidArgumentCountError(WContext* context, const std::string& fnName, int given, int expected = -1) {
+static void SetInvalidArgumentCountError(WContext* context, int given, int expected = -1) {
 	std::string msg;
 	if (expected != -1) {
-		msg = "function " +
-			fnName +
-			"() takes " +
+		msg = "function takes " +
 			std::to_string(expected) +
 			" argument(s) but " +
 			std::to_string(given) +
 			(given == 1 ? " was given" : " were given");
 	} else {
-		msg = "function " +
-			fnName +
-			"() does not take " +
+		msg = "function does not take " +
 			std::to_string(given) +
 			" argument(s)";
 	}
 	WErrorSetRuntimeError(context, msg.c_str());
 }
 
-static void SetInvalidTypeError(WContext* context, const std::string& fnName, int paramNumber, const std::string& expectedType, WObj* given) {
-	std::string msg = "function " +
-		fnName +
-		"() expected type " +
-		expectedType +
-		" on argument " +
-		std::to_string(paramNumber) +
-		" but got " +
-		WObjTypeToString(given->type);
+static void SetArgumentError(WContext* context, size_t paramIndex, const std::string& message) {
+	std::string msg = "argument " + std::to_string(paramIndex) + " " + message;
 	WErrorSetRuntimeError(context, msg.c_str());
 }
 
-static void SetMissingAttributeError(WContext* context, const std::string& fnName, int paramNumber, const std::string& attribute, WObj* given) {
-	std::string msg = "function " +
-		fnName +
-		"() argument " +
-		std::to_string(paramNumber) +
-		" (of type " +
-		WObjTypeToString(given->type) +
-		") has no attribute " +
-		attribute;
-	WErrorSetRuntimeError(context, msg.c_str());
+static void SetInvalidTypeError(WContext* context, WObj**argv, size_t paramIndex, const std::string& expectedType) {
+	SetArgumentError(
+		context,
+		paramIndex,
+		"expected type " + expectedType +
+		" but got " + WObjTypeToString(argv[paramIndex]->type)
+	);
 }
 
-static void SetIndexOutOfRangeError(WContext* context, const std::string& fnName, int paramNumber) {
-	std::string msg = "function " +
-		fnName +
-		"() argument" +
-		std::to_string(paramNumber) +
-		" index out of range";
-	WErrorSetRuntimeError(context, msg.c_str());
+static void SetMissingAttributeError(WContext* context, WObj** argv, size_t paramIndex, const std::string& attribute) {
+	SetArgumentError(
+		context,
+		paramIndex,
+		" of type " + WObjTypeToString(argv[paramIndex]->type) +
+		" has no attribute " + attribute
+	);
 }
+
+static void SetIndexOutOfRangeError(WContext* context, WObj** argv, size_t paramIndex) {
+	WASSERT(WObjIsInt(argv[paramIndex]));
+	SetArgumentError(
+		context,
+		paramIndex,
+		"index out of range with value " + std::to_string(WObjGetInt(argv[paramIndex]))
+	);
+}
+
+static void SetDivisionByZeroError(WContext* context) {
+	WErrorSetRuntimeError(context, "division by zero");
+}
+
+#define EXPECT_ARG_COUNT(n) do if (argc != n) { SetInvalidArgumentCountError(context, argc, n); return nullptr; } while (0)
+#define EXPECT_ARG_TYPE(index, check, expect) do if (!check(argv[index])) { SetInvalidTypeError(context, argv, index, expect); return nullptr; } while (0)
+#define EXPECT_ARG_TYPE_NULL(index) EXPECT_ARG_TYPE(index, WObjIsNull, "NoneType");
+#define EXPECT_ARG_TYPE_BOOL(index) EXPECT_ARG_TYPE(index, WObjIsBool, "bool");
+#define EXPECT_ARG_TYPE_INT(index) EXPECT_ARG_TYPE(index, WObjIsInt, "int");
+#define EXPECT_ARG_TYPE_INT_OR_FLOAT(index) EXPECT_ARG_TYPE(index, WObjIsIntOrFloat, "int or float");
+#define EXPECT_ARG_TYPE_STRING(index) EXPECT_ARG_TYPE(index, WObjIsString, "str");
+#define EXPECT_ARG_TYPE_LIST(index) EXPECT_ARG_TYPE(index, WObjIsList, "list");
+#define GET_LIST_INDEX(list, index)														\
+size_t listIndex = ConvertNegativeIndex(WObjGetInt(argv[index]), argv[list]->v.size()); \
+if (listIndex >= argv[list]->v.size()) {												\
+	SetIndexOutOfRangeError(context, argv, index);										\
+	return nullptr;																		\
+}
+
 
 using WFuncSignature = WObj * (*)(WObj**, int, WContext*);
 
@@ -152,15 +167,15 @@ static WObj* RegisterStatelessFunction(WContext* context, const char* name) {
 }
 
 template <WFuncSignature fn>
-static WObj* RegisterStatelessMethod(WContext* context, AttributeTable& attributeTable, const char* name) {
+static WObj* RegisterStatelessMethod(WContext* context, AttributeTable& attributeTable, const char* attribute, const char* prettyName) {
 	WFunc wfn{};
 	wfn.userdata = context;
 	wfn.fptr = [](WObj** argv, int argc, void* userdata) { return fn(argv, argc, (WContext*)userdata); };
 	wfn.isMethod = true;
-	wfn.prettyName = name;
+	wfn.prettyName = prettyName;
 
 	WObj* obj = WObjCreateFunc(context, &wfn);
-	attributeTable.Set(name, obj, false);
+	attributeTable.Set(attribute, obj, false);
 	return obj;
 }
 
@@ -226,12 +241,12 @@ namespace wings {
 					if (WObjIsBool(res)) {
 						return res;
 					} else {
-						WErrorSetRuntimeError(context, "function bool() argument 1 __nonzero__() method returned a non bool type.");
+						SetArgumentError(context, 1, "__nonzero__() method returned a non bool type");
 					}
 				}
 				return nullptr;
 			default:
-				SetInvalidArgumentCountError(context, "bool", argc);
+				SetInvalidArgumentCountError(context, argc);
 				return nullptr;
 			}
 		}
@@ -249,7 +264,7 @@ namespace wings {
 			case 1:
 				return WOpCastToInt(argv[0]);
 			default:
-				SetInvalidArgumentCountError(context, "int", argc);
+				SetInvalidArgumentCountError(context, argc);
 				return nullptr;
 			}
 		}
@@ -267,7 +282,7 @@ namespace wings {
 			case 1:
 				return WOpCastToFloat(argv[0]);
 			default:
-				SetInvalidArgumentCountError(context, "float", argc);
+				SetInvalidArgumentCountError(context, argc);
 				return nullptr;
 			}
 		}
@@ -284,7 +299,7 @@ namespace wings {
 			case 1:
 				return WOpCastToString(argv[0]);
 			default:
-				SetInvalidArgumentCountError(context, "str", argc);
+				SetInvalidArgumentCountError(context, argc);
 				return nullptr;
 			}
 		}
@@ -319,11 +334,7 @@ namespace wings {
 		}
 
 		static WObj* Object(WObj** argv, int argc, WContext* context) {
-			if (argc != 0) {
-				SetInvalidArgumentCountError(context, "object", argc, 0);
-				return nullptr;
-			}
-
+			EXPECT_ARG_COUNT(0);
 			WObj* obj = Alloc(context);
 			if (obj == nullptr)
 				return nullptr;
@@ -345,201 +356,112 @@ namespace wings {
 	namespace attrlib {
 
 		static WObj* Object_Pos(WObj** argv, int argc, WContext* context) {
-			if (argc != 1) {
-				SetInvalidArgumentCountError(context, "object.__pos__", argc, 1);
-				return nullptr;
-			}
+			EXPECT_ARG_COUNT(1);
 			return argv[0];
 		}
 
 		static WObj* Object_Str(WObj** argv, int argc, WContext* context) {
-			if (argc != 1) {
-				SetInvalidArgumentCountError(context, "object.__str__", argc, 1);
-				return nullptr;
-			}
-
+			EXPECT_ARG_COUNT(1);
 			std::string s = WObjToString(argv[0]);
 			return WObjCreateString(context, s.c_str());
 		}
 
 		static WObj* Object_Eq(WObj** argv, int argc, WContext* context) {
-			if (argc != 2) {
-				SetInvalidArgumentCountError(context, "object.__eq__", argc, 2);
-				return nullptr;
-			}
-
+			EXPECT_ARG_COUNT(2);
 			return WObjCreateBool(context, argv[0] == argv[1]);
 		}
 
 		static WObj* Null_Bool(WObj** argv, int argc, WContext* context) {
-			if (argc != 1) {
-				SetInvalidArgumentCountError(context, "NoneType.__nonzero__", argc, 1);
-				return nullptr;
-			} else if (!WObjIsNull(argv[0])) {
-				SetInvalidTypeError(context, "NoneType.__nonzero__", 1, "NoneType", argv[0]);
-				return nullptr;
-			}
-
+			EXPECT_ARG_COUNT(1);
+			EXPECT_ARG_TYPE_NULL(0);
 			return WObjCreateNull(context);
 		}
 
 		static WObj* Null_Eq(WObj** argv, int argc, WContext* context) {
-			if (argc != 2) {
-				SetInvalidArgumentCountError(context, "NoneType.__eq__", argc, 2);
-				return nullptr;
-			}
-
+			EXPECT_ARG_COUNT(2);
+			EXPECT_ARG_TYPE_NULL(0);
 			return WObjCreateBool(context, WObjIsNull(argv[1]));
 		}
 
 		static WObj* Bool_Bool(WObj** argv, int argc, WContext* context) {
-			if (argc != 1) {
-				SetInvalidArgumentCountError(context, "bool.__nonzero__", argc, 1);
-				return nullptr;
-			} else if (!WObjIsBool(argv[0])) {
-				SetInvalidTypeError(context, "bool.__nonzero__", 1, "bool", argv[0]);
-				return nullptr;
-			}
-
+			EXPECT_ARG_COUNT(1);
+			EXPECT_ARG_TYPE_BOOL(0);
 			return argv[0];
 		}
 
 		static WObj* Bool_Int(WObj** argv, int argc, WContext* context) {
-			if (argc != 1) {
-				SetInvalidArgumentCountError(context, "bool.__int__", argc, 1);
-				return nullptr;
-			} else if (!WObjIsBool(argv[0])) {
-				SetInvalidTypeError(context, "bool.__int__", 1, "bool", argv[0]);
-				return nullptr;
-			}
-
+			EXPECT_ARG_COUNT(1);
+			EXPECT_ARG_TYPE_BOOL(0);
 			return WObjCreateInt(context, WObjGetBool(argv[0]) ? 1 : 0);
 		}
 
 		static WObj* Bool_Float(WObj** argv, int argc, WContext* context) {
-			if (argc != 1) {
-				SetInvalidArgumentCountError(context, "bool.__float__", argc, 1);
-				return nullptr;
-			} else if (!WObjIsBool(argv[0])) {
-				SetInvalidTypeError(context, "bool.__float__", 1, "bool", argv[0]);
-				return nullptr;
-			}
-
+			EXPECT_ARG_COUNT(1);
+			EXPECT_ARG_TYPE_BOOL(0);
 			return WObjCreateFloat(context, WObjGetBool(argv[0]) ? (wfloat)1 : (wfloat)0);
 		}
 
 		static WObj* Bool_Eq(WObj** argv, int argc, WContext* context) {
-			if (argc != 2) {
-				SetInvalidArgumentCountError(context, "bool.__eq__", argc, 2);
-				return nullptr;
-			}
-
+			EXPECT_ARG_COUNT(2);
+			EXPECT_ARG_TYPE_BOOL(0);
 			return WObjCreateBool(context, WObjIsBool(argv[1]) && WObjGetBool(argv[0]) == WObjGetBool(argv[1]));
 		}
 
 		static WObj* Int_Bool(WObj** argv, int argc, WContext* context) {
-			if (argc != 1) {
-				SetInvalidArgumentCountError(context, "int.__nonzero__", argc, 1);
-				return nullptr;
-			} else if (!WObjIsInt(argv[0])) {
-				SetInvalidTypeError(context, "int.__nonzero__", 1, "int", argv[0]);
-				return nullptr;
-			}
-
+			EXPECT_ARG_COUNT(1);
+			EXPECT_ARG_TYPE_INT(0);
 			return WObjCreateBool(context, WObjGetInt(argv[0]) != 0);
 		}
 
 		static WObj* Int_Int(WObj** argv, int argc, WContext* context) {
-			if (argc != 1) {
-				SetInvalidArgumentCountError(context, "int.__int__", argc, 1);
-				return nullptr;
-			} else if (!WObjIsInt(argv[0])) {
-				SetInvalidTypeError(context, "int.__int__", 1, "int", argv[0]);
-				return nullptr;
-			}
-
+			EXPECT_ARG_COUNT(1);
+			EXPECT_ARG_TYPE_INT(0);
 			return argv[0];
 		}
 
 		static WObj* Int_Float(WObj** argv, int argc, WContext* context) {
-			if (argc != 1) {
-				SetInvalidArgumentCountError(context, "int.__float__", argc, 1);
-				return nullptr;
-			} else if (!WObjIsInt(argv[0])) {
-				SetInvalidTypeError(context, "int.__float__", 1, "int", argv[0]);
-				return nullptr;
-			}
-
+			EXPECT_ARG_COUNT(1);
+			EXPECT_ARG_TYPE_INT(0);
 			return WObjCreateFloat(context, WObjGetFloat(argv[0]));
 		}
 
 		static WObj* Int_Eq(WObj** argv, int argc, WContext* context) {
-			if (argc != 2) {
-				SetInvalidArgumentCountError(context, "int.__eq__", argc, 2);
-				return nullptr;
-			}
-
+			EXPECT_ARG_COUNT(2);
+			EXPECT_ARG_TYPE_INT(0);
 			return WObjCreateBool(context, WObjIsInt(argv[1]) && WObjGetInt(argv[0]) == WObjGetInt(argv[1]));
 		}
 
 		static WObj* Int_Neg(WObj** argv, int argc, WContext* context) {
-			if (argc != 1) {
-				SetInvalidArgumentCountError(context, "int.__neg__", argc, 1);
-				return nullptr;
-			} else if (!WObjIsInt(argv[0])) {
-				SetInvalidTypeError(context, "int.__neg__", 1, "int", argv[0]);
-				return nullptr;
-			}
-
+			EXPECT_ARG_COUNT(1);
+			EXPECT_ARG_TYPE_INT(0);
 			return WObjCreateInt(context, -WObjGetInt(argv[0]));
 		}
 
 		static WObj* Int_Add(WObj** argv, int argc, WContext* context) {
-			if (argc != 2) {
-				SetInvalidArgumentCountError(context, "int.__add__", argc, 1);
-				return nullptr;
-			} else if (!WObjIsInt(argv[0])) {
-				SetInvalidTypeError(context, "int.__add__", 1, "int", argv[0]);
-				return nullptr;
-			}
-
+			EXPECT_ARG_COUNT(2);
+			EXPECT_ARG_TYPE_INT(0);
+			EXPECT_ARG_TYPE_INT_OR_FLOAT(1);
 			if (WObjIsInt(argv[1])) {
 				return WObjCreateInt(context, WObjGetInt(argv[0]) + WObjGetInt(argv[1]));
-			} else if (WObjIsIntOrFloat(argv[1])) {
-				return WObjCreateFloat(context, WObjGetFloat(argv[0]) + WObjGetFloat(argv[1]));
 			} else {
-				SetInvalidTypeError(context, "int.__add__", 2, "int or float", argv[1]);
-				return nullptr;
+				return WObjCreateFloat(context, WObjGetFloat(argv[0]) + WObjGetFloat(argv[1]));
 			}
 		}
 
 		static WObj* Int_Sub(WObj** argv, int argc, WContext* context) {
-			if (argc != 2) {
-				SetInvalidArgumentCountError(context, "int.__sub__", argc, 1);
-				return nullptr;
-			} else if (!WObjIsInt(argv[0])) {
-				SetInvalidTypeError(context, "int.__sub__", 1, "int", argv[0]);
-				return nullptr;
-			}
-
+			EXPECT_ARG_COUNT(2);
+			EXPECT_ARG_TYPE_INT(0);
+			EXPECT_ARG_TYPE_INT_OR_FLOAT(1);
 			if (WObjIsInt(argv[1])) {
 				return WObjCreateInt(context, WObjGetInt(argv[0]) - WObjGetInt(argv[1]));
-			} else if (WObjIsIntOrFloat(argv[1])) {
-				return WObjCreateFloat(context, WObjGetFloat(argv[0]) - WObjGetFloat(argv[1]));
 			} else {
-				SetInvalidTypeError(context, "int.__sub__", 2, "int or float", argv[1]);
-				return nullptr;
+				return WObjCreateFloat(context, WObjGetFloat(argv[0]) - WObjGetFloat(argv[1]));
 			}
 		}
 
 		static WObj* Int_Mul(WObj** argv, int argc, WContext* context) {
-			if (argc != 2) {
-				SetInvalidArgumentCountError(context, "int.__mul__", argc, 1);
-				return nullptr;
-			} else if (!WObjIsInt(argv[0])) {
-				SetInvalidTypeError(context, "int.__mul__", 1, "int", argv[0]);
-				return nullptr;
-			}
+			EXPECT_ARG_COUNT(2);
+			EXPECT_ARG_TYPE_INT(0);
 
 			if (WObjIsString(argv[1])) {
 				wint multiplier = WObjGetInt(argv[0]);
@@ -552,52 +474,47 @@ namespace wings {
 			} else if (WObjIsIntOrFloat(argv[1])) {
 				return WObjCreateFloat(context, WObjGetFloat(argv[0]) * WObjGetFloat(argv[1]));
 			} else {
-				SetInvalidTypeError(context, "int.__mul__", 2, "int or float", argv[1]);
+				EXPECT_ARG_TYPE_INT_OR_FLOAT(1);
 				return nullptr;
 			}
 		}
 
 		static WObj* Int_Div(WObj** argv, int argc, WContext* context) {
-			if (argc != 2) {
-				SetInvalidArgumentCountError(context, "int.__div__", argc, 1);
-				return nullptr;
-			} else if (!WObjIsInt(argv[0])) {
-				SetInvalidTypeError(context, "int.__div__", 1, "int", argv[0]);
-				return nullptr;
-			}
+			EXPECT_ARG_COUNT(2);
+			EXPECT_ARG_TYPE_INT(0);
+			EXPECT_ARG_TYPE_INT_OR_FLOAT(0);
 
-			if (WObjIsIntOrFloat(argv[1])) {
-				return WObjCreateFloat(context, WObjGetFloat(argv[0]) / WObjGetFloat(argv[1]));
-			} else {
-				SetInvalidTypeError(context, "int.__div__", 2, "int or float", argv[1]);
+			if (WObjGetFloat(argv[1]) == 0) {
+				SetDivisionByZeroError(context);
 				return nullptr;
 			}
+			return WObjCreateFloat(context, WObjGetFloat(argv[0]) / WObjGetFloat(argv[1]));
 		}
 
 		static WObj* Int_FloorDiv(WObj** argv, int argc, WContext* context) {
-			if (argc != 2) {
-				SetInvalidArgumentCountError(context, "int.__floordiv__", argc, 1);
-				return nullptr;
-			} else if (!WObjIsInt(argv[0])) {
-				SetInvalidTypeError(context, "int.__floordiv__", 1, "int", argv[0]);
-				return nullptr;
-			} else if (!WObjIsInt(argv[1])) {
-				SetInvalidTypeError(context, "int.__floordiv__", 2, "int", argv[1]);
+			EXPECT_ARG_COUNT(2);
+			EXPECT_ARG_TYPE_INT(0);
+			EXPECT_ARG_TYPE_INT_OR_FLOAT(1);
+
+			if (WObjGetFloat(argv[1]) == 0) {
+				SetDivisionByZeroError(context);
 				return nullptr;
 			}
 
-			return WObjCreateInt(context, (wint)std::floor(WObjGetFloat(argv[0]) / WObjGetFloat(argv[1])));
+			if (WObjIsInt(argv[1])) {
+				return WObjCreateInt(context, (wint)std::floor(WObjGetFloat(argv[0]) / WObjGetFloat(argv[1])));
+			} else {
+				return WObjCreateFloat(context, std::floor(WObjGetFloat(argv[0]) / WObjGetFloat(argv[1])));
+			}
 		}
 
 		static WObj* Int_Mod(WObj** argv, int argc, WContext* context) {
-			if (argc != 2) {
-				SetInvalidArgumentCountError(context, "int.__mod__", argc, 1);
-				return nullptr;
-			} else if (!WObjIsInt(argv[0])) {
-				SetInvalidTypeError(context, "int.__mod__", 1, "int", argv[0]);
-				return nullptr;
-			} else if (!WObjIsIntOrFloat(argv[1])) {
-				SetInvalidTypeError(context, "int.__mod__", 2, "int or float", argv[1]);
+			EXPECT_ARG_COUNT(2);
+			EXPECT_ARG_TYPE_INT(0);
+			EXPECT_ARG_TYPE_INT_OR_FLOAT(1);
+
+			if (WObjGetFloat(argv[1]) == 0) {
+				SetDivisionByZeroError(context);
 				return nullptr;
 			}
 
@@ -613,92 +530,47 @@ namespace wings {
 		}
 
 		static WObj* Int_Pow(WObj** argv, int argc, WContext* context) {
-			if (argc != 2) {
-				SetInvalidArgumentCountError(context, "int.__pow__", argc, 1);
-				return nullptr;
-			} else if (!WObjIsInt(argv[0])) {
-				SetInvalidTypeError(context, "int.__pow__", 1, "int", argv[0]);
-				return nullptr;
-			} else if (!WObjIsIntOrFloat(argv[1])) {
-				SetInvalidTypeError(context, "int.__pow__", 2, "int or float", argv[1]);
-				return nullptr;
-			}
-
+			EXPECT_ARG_COUNT(2);
+			EXPECT_ARG_TYPE_INT(0);
+			EXPECT_ARG_TYPE_INT_OR_FLOAT(1);
 			return WObjCreateFloat(context, std::pow(WObjGetFloat(argv[0]), WObjGetFloat(argv[1])));
 		}
 
 		static WObj* Int_BitAnd(WObj** argv, int argc, WContext* context) {
-			if (argc != 2) {
-				SetInvalidArgumentCountError(context, "int.__and__", argc, 1);
-				return nullptr;
-			} else if (!WObjIsInt(argv[0])) {
-				SetInvalidTypeError(context, "int.__and__", 1, "int", argv[0]);
-				return nullptr;
-			} else if (!WObjIsInt(argv[1])) {
-				SetInvalidTypeError(context, "int.__and__", 2, "int", argv[1]);
-				return nullptr;
-			}
-
+			EXPECT_ARG_COUNT(2);
+			EXPECT_ARG_TYPE_INT(0);
+			EXPECT_ARG_TYPE_INT(1);
 			return WObjCreateInt(context, WObjGetInt(argv[0]) & WObjGetInt(argv[1]));
 		}
 
 		static WObj* Int_BitOr(WObj** argv, int argc, WContext* context) {
-			if (argc != 2) {
-				SetInvalidArgumentCountError(context, "int.__or__", argc, 1);
-				return nullptr;
-			} else if (!WObjIsInt(argv[0])) {
-				SetInvalidTypeError(context, "int.__or__", 1, "int", argv[0]);
-				return nullptr;
-			} else if (!WObjIsInt(argv[1])) {
-				SetInvalidTypeError(context, "int.__or__", 2, "int", argv[1]);
-				return nullptr;
-			}
-
+			EXPECT_ARG_COUNT(2);
+			EXPECT_ARG_TYPE_INT(0);
+			EXPECT_ARG_TYPE_INT(1);
 			return WObjCreateInt(context, WObjGetInt(argv[0]) | WObjGetInt(argv[1]));
 		}
 
 		static WObj* Int_BitXor(WObj** argv, int argc, WContext* context) {
-			if (argc != 2) {
-				SetInvalidArgumentCountError(context, "int.__xor__", argc, 1);
-				return nullptr;
-			} else if (!WObjIsInt(argv[0])) {
-				SetInvalidTypeError(context, "int.__xor__", 1, "int", argv[0]);
-				return nullptr;
-			} else if (!WObjIsInt(argv[1])) {
-				SetInvalidTypeError(context, "int.__xor__", 2, "int", argv[1]);
-				return nullptr;
-			}
-
+			EXPECT_ARG_COUNT(2);
+			EXPECT_ARG_TYPE_INT(0);
+			EXPECT_ARG_TYPE_INT(1);
 			return WObjCreateInt(context, WObjGetInt(argv[0]) ^ WObjGetInt(argv[1]));
 		}
 
 		static WObj* Int_BitNot(WObj** argv, int argc, WContext* context) {
-			if (argc != 1) {
-				SetInvalidArgumentCountError(context, "int.__invert__", argc, 1);
-				return nullptr;
-			} else if (!WObjIsInt(argv[0])) {
-				SetInvalidTypeError(context, "int.__invert__", 1, "int", argv[0]);
-				return nullptr;
-			}
-
+			EXPECT_ARG_COUNT(1);
+			EXPECT_ARG_TYPE_INT(0);
 			return WObjCreateInt(context, ~WObjGetInt(argv[0]));
 		}
 
 		static WObj* Int_ShiftLeft(WObj** argv, int argc, WContext* context) {
-			if (argc != 2) {
-				SetInvalidArgumentCountError(context, "int.__lshift__", argc, 1);
-				return nullptr;
-			} else if (!WObjIsInt(argv[0])) {
-				SetInvalidTypeError(context, "int.__lshift__", 1, "int", argv[0]);
-				return nullptr;
-			} else if (!WObjIsInt(argv[1])) {
-				SetInvalidTypeError(context, "int.__lshift__", 2, "int", argv[1]);
-				return nullptr;
-			}
+			EXPECT_ARG_COUNT(2);
+			EXPECT_ARG_TYPE_INT(0);
+			EXPECT_ARG_TYPE_INT(1);
 
 			wint shift = WObjGetInt(argv[1]);
 			if (shift < 0) {
-				WErrorSetRuntimeError(context, "function int.__lshift__() shift was negative");
+				WErrorSetRuntimeError(context, "shift cannot be negative");
 				return nullptr;
 			}
 			shift = std::min(shift, (wint)sizeof(wint) * 8);
@@ -706,20 +578,13 @@ namespace wings {
 		}
 
 		static WObj* Int_ShiftRight(WObj** argv, int argc, WContext* context) {
-			if (argc != 2) {
-				SetInvalidArgumentCountError(context, "int.__rshift__", argc, 1);
-				return nullptr;
-			} else if (!WObjIsInt(argv[0])) {
-				SetInvalidTypeError(context, "int.__rshift__", 1, "int", argv[0]);
-				return nullptr;
-			} else if (!WObjIsInt(argv[1])) {
-				SetInvalidTypeError(context, "int.__rshift__", 2, "int", argv[1]);
-				return nullptr;
-			}
+			EXPECT_ARG_COUNT(2);
+			EXPECT_ARG_TYPE_INT(0);
+			EXPECT_ARG_TYPE_INT(1);
 
 			wint shift = WObjGetInt(argv[1]);
 			if (shift < 0) {
-				WErrorSetRuntimeError(context, "function int.__rshift__() shift was negative");
+				WErrorSetRuntimeError(context, "shift cannot be negative");
 				return nullptr;
 			}
 			shift = std::min(shift, (wint)sizeof(wint) * 8);
@@ -727,188 +592,94 @@ namespace wings {
 		}
 
 		static WObj* Float_Bool(WObj** argv, int argc, WContext* context) {
-			if (argc != 1) {
-				SetInvalidArgumentCountError(context, "float.__nonzero__", argc, 1);
-				return nullptr;
-			} else if (!WObjIsIntOrFloat(argv[0])) {
-				SetInvalidTypeError(context, "float.__nonzero__", 1, "float", argv[0]);
-				return nullptr;
-			}
-
+			EXPECT_ARG_COUNT(1);
+			EXPECT_ARG_TYPE_INT_OR_FLOAT(0);
 			return WObjCreateBool(context, WObjGetFloat(argv[0]) != 0);
 		}
 
 		static WObj* Float_Int(WObj** argv, int argc, WContext* context) {
-			if (argc != 1) {
-				SetInvalidArgumentCountError(context, "float.__int__", argc, 1);
-				return nullptr;
-			} else if (!WObjIsIntOrFloat(argv[0])) {
-				SetInvalidTypeError(context, "float.__int__", 1, "float", argv[0]);
-				return nullptr;
-			}
-
+			EXPECT_ARG_COUNT(1);
+			EXPECT_ARG_TYPE_INT_OR_FLOAT(0);
 			return WObjCreateInt(context, (wint)WObjGetFloat(argv[0]));
 		}
 
 		static WObj* Float_Float(WObj** argv, int argc, WContext* context) {
-			if (argc != 1) {
-				SetInvalidArgumentCountError(context, "float.__float__", argc, 1);
-				return nullptr;
-			} else if (!WObjIsIntOrFloat(argv[0])) {
-				SetInvalidTypeError(context, "float.__float__", 1, "float", argv[0]);
-				return nullptr;
-			}
-
+			EXPECT_ARG_COUNT(1);
+			EXPECT_ARG_TYPE_INT_OR_FLOAT(0);
 			return argv[0];
 		}
 
 		static WObj* Float_Eq(WObj** argv, int argc, WContext* context) {
-			if (argc != 2) {
-				SetInvalidArgumentCountError(context, "float.__eq__", argc, 2);
-				return nullptr;
-			}
-
+			EXPECT_ARG_COUNT(2);
+			EXPECT_ARG_TYPE_INT_OR_FLOAT(0);
 			return WObjCreateBool(context, WObjIsIntOrFloat(argv[1]) && WObjGetFloat(argv[0]) == WObjGetFloat(argv[1]));
 		}
 
 		static WObj* Float_Neg(WObj** argv, int argc, WContext* context) {
-			if (argc != 1) {
-				SetInvalidArgumentCountError(context, "float.__neg__", argc, 1);
-				return nullptr;
-			} else if (!WObjIsIntOrFloat(argv[0])) {
-				SetInvalidTypeError(context, "float.__neg__", 1, "float", argv[0]);
-				return nullptr;
-			}
-
+			EXPECT_ARG_COUNT(1);
+			EXPECT_ARG_TYPE_INT_OR_FLOAT(0);
 			return WObjCreateFloat(context, -WObjGetFloat(argv[0]));
 		}
 
 		static WObj* Float_Add(WObj** argv, int argc, WContext* context) {
-			if (argc != 2) {
-				SetInvalidArgumentCountError(context, "float.__add__", argc, 1);
-				return nullptr;
-			} else if (!WObjIsIntOrFloat(argv[0])) {
-				SetInvalidTypeError(context, "float.__add__", 1, "float", argv[0]);
-				return nullptr;
-			} else if (!WObjIsIntOrFloat(argv[1])) {
-				SetInvalidTypeError(context, "float.__add__", 2, "float", argv[1]);
-				return nullptr;
-			}
-
+			EXPECT_ARG_COUNT(2);
+			EXPECT_ARG_TYPE_INT_OR_FLOAT(0);
+			EXPECT_ARG_TYPE_INT_OR_FLOAT(1);
 			return WObjCreateFloat(context, WObjGetFloat(argv[0]) + WObjGetFloat(argv[1]));
 		}
 
 		static WObj* Float_Sub(WObj** argv, int argc, WContext* context) {
-			if (argc != 2) {
-				SetInvalidArgumentCountError(context, "float.__sub__", argc, 1);
-				return nullptr;
-			} else if (!WObjIsIntOrFloat(argv[0])) {
-				SetInvalidTypeError(context, "float.__sub__", 1, "float", argv[0]);
-				return nullptr;
-			} else if (!WObjIsIntOrFloat(argv[1])) {
-				SetInvalidTypeError(context, "float.__sub__", 2, "float", argv[1]);
-				return nullptr;
-			}
-
+			EXPECT_ARG_COUNT(2);
+			EXPECT_ARG_TYPE_INT_OR_FLOAT(0);
+			EXPECT_ARG_TYPE_INT_OR_FLOAT(1);
 			return WObjCreateFloat(context, WObjGetFloat(argv[0]) - WObjGetFloat(argv[1]));
 		}
 
 		static WObj* Float_Mul(WObj** argv, int argc, WContext* context) {
-			if (argc != 2) {
-				SetInvalidArgumentCountError(context, "float.__mul__", argc, 1);
-				return nullptr;
-			} else if (!WObjIsIntOrFloat(argv[0])) {
-				SetInvalidTypeError(context, "float.__mul__", 1, "float", argv[0]);
-				return nullptr;
-			} else if (!WObjIsIntOrFloat(argv[1])) {
-				SetInvalidTypeError(context, "float.__mul__", 2, "float", argv[1]);
-				return nullptr;
-			}
-
+			EXPECT_ARG_COUNT(2);
+			EXPECT_ARG_TYPE_INT_OR_FLOAT(0);
+			EXPECT_ARG_TYPE_INT_OR_FLOAT(1);
 			return WObjCreateFloat(context, WObjGetFloat(argv[0]) * WObjGetFloat(argv[1]));
 		}
 
 		static WObj* Float_Div(WObj** argv, int argc, WContext* context) {
-			if (argc != 2) {
-				SetInvalidArgumentCountError(context, "float.__div__", argc, 1);
-				return nullptr;
-			} else if (!WObjIsIntOrFloat(argv[0])) {
-				SetInvalidTypeError(context, "float.__div__", 1, "float", argv[0]);
-				return nullptr;
-			} else if (!WObjIsIntOrFloat(argv[1])) {
-				SetInvalidTypeError(context, "float.__div__", 2, "float", argv[1]);
-				return nullptr;
-			}
-
+			EXPECT_ARG_COUNT(2);
+			EXPECT_ARG_TYPE_INT_OR_FLOAT(0);
+			EXPECT_ARG_TYPE_INT_OR_FLOAT(1);
 			return WObjCreateFloat(context, WObjGetFloat(argv[0]) / WObjGetFloat(argv[1]));
 		}
 
 		static WObj* Float_FloorDiv(WObj** argv, int argc, WContext* context) {
-			if (argc != 2) {
-				SetInvalidArgumentCountError(context, "float.__floordiv__", argc, 1);
-				return nullptr;
-			} else if (!WObjIsIntOrFloat(argv[0])) {
-				SetInvalidTypeError(context, "float.__floordiv__", 1, "float", argv[0]);
-				return nullptr;
-			} else if (!WObjIsIntOrFloat(argv[1])) {
-				SetInvalidTypeError(context, "float.__floordiv__", 2, "float", argv[1]);
-				return nullptr;
-			}
-
+			EXPECT_ARG_COUNT(2);
+			EXPECT_ARG_TYPE_INT_OR_FLOAT(0);
+			EXPECT_ARG_TYPE_INT_OR_FLOAT(1);
 			return WObjCreateFloat(context, std::floor(WObjGetFloat(argv[0]) / WObjGetFloat(argv[1])));
 		}
 
 		static WObj* Float_Mod(WObj** argv, int argc, WContext* context) {
-			if (argc != 2) {
-				SetInvalidArgumentCountError(context, "int.__mod__", argc, 1);
-				return nullptr;
-			} else if (!WObjIsIntOrFloat(argv[0])) {
-				SetInvalidTypeError(context, "float.__mod__", 1, "float", argv[0]);
-				return nullptr;
-			} else if (!WObjIsIntOrFloat(argv[1])) {
-				SetInvalidTypeError(context, "float.__mod__", 2, "int or float", argv[1]);
-				return nullptr;
-			}
-
+			EXPECT_ARG_COUNT(2);
+			EXPECT_ARG_TYPE_INT_OR_FLOAT(0);
+			EXPECT_ARG_TYPE_INT_OR_FLOAT(1);
 			return WObjCreateFloat(context, std::fmod(WObjGetFloat(argv[0]), WObjGetFloat(argv[1])));
 		}
 
 		static WObj* Float_Pow(WObj** argv, int argc, WContext* context) {
-			if (argc != 2) {
-				SetInvalidArgumentCountError(context, "int.__pow__", argc, 1);
-				return nullptr;
-			} else if (!WObjIsIntOrFloat(argv[0])) {
-				SetInvalidTypeError(context, "float.__pow__", 1, "float", argv[0]);
-				return nullptr;
-			} else if (!WObjIsIntOrFloat(argv[1])) {
-				SetInvalidTypeError(context, "float.__pow__", 2, "int or float", argv[1]);
-				return nullptr;
-			}
-
+			EXPECT_ARG_COUNT(2);
+			EXPECT_ARG_TYPE_INT_OR_FLOAT(0);
+			EXPECT_ARG_TYPE_INT_OR_FLOAT(1);
 			return WObjCreateFloat(context, std::pow(WObjGetFloat(argv[0]), WObjGetFloat(argv[1])));
 		}
 
 		static WObj* Str_Bool(WObj** argv, int argc, WContext* context) {
-			if (argc != 1) {
-				SetInvalidArgumentCountError(context, "str.__nonzero__", argc, 1);
-				return nullptr;
-			} else if (!WObjIsString(argv[0])) {
-				SetInvalidTypeError(context, "str.__nonzero__", 1, "str", argv[0]);
-				return nullptr;
-			}
-
+			EXPECT_ARG_COUNT(1);
+			EXPECT_ARG_TYPE_STRING(0);
 			std::string s = WObjGetString(argv[0]);
 			return WObjCreateBool(context, !s.empty());
 		}
 
 		static WObj* Str_Int(WObj** argv, int argc, WContext* context) {
-			if (argc != 1) {
-				SetInvalidArgumentCountError(context, "str.__int__", argc, 1);
-				return nullptr;
-			} else if (!WObjIsString(argv[0])) {
-				SetInvalidTypeError(context, "str.__int__", 1, "str", argv[0]);
-				return nullptr;
-			}
+			EXPECT_ARG_COUNT(1);
+			EXPECT_ARG_TYPE_STRING(0);
 
 			auto isDigit = [](char c, int base = 10) {
 				switch (base) {
@@ -956,9 +727,9 @@ namespace wings {
 
 				if (!isDigit(*p, base)) {
 					if (base == 2) {
-						WErrorSetRuntimeError(context, "function str.__int__() invalid binary string");
+						WErrorSetRuntimeError(context, "invalid binary string");
 					} else {
-						WErrorSetRuntimeError(context, "function str.__int__() invalid hexadecimal string");
+						WErrorSetRuntimeError(context, "invalid hexadecimal string");
 					}
 					return nullptr;
 				}
@@ -970,12 +741,12 @@ namespace wings {
 			}
 
 			if (value > std::numeric_limits<wuint>::max()) {
-				WErrorSetRuntimeError(context, "function str.__int__() Integer string is too large");
+				WErrorSetRuntimeError(context, "integer string is too large");
 				return nullptr;
 			}
 
 			if (*p) {
-				WErrorSetRuntimeError(context, "function str.__int__() invalid numerical string");
+				WErrorSetRuntimeError(context, "invalid integer string");
 				return nullptr;
 			}
 
@@ -983,13 +754,8 @@ namespace wings {
 		}
 
 		static WObj* Str_Float(WObj** argv, int argc, WContext* context) {
-			if (argc != 1) {
-				SetInvalidArgumentCountError(context, "str.__float__", argc, 1);
-				return nullptr;
-			} else if (!WObjIsString(argv[0])) {
-				SetInvalidTypeError(context, "str.__float__", 1, "str", argv[0]);
-				return nullptr;
-			}
+			EXPECT_ARG_COUNT(1);
+			EXPECT_ARG_TYPE_STRING(0);
 
 			auto isDigit = [](char c, int base = 10) {
 				switch (base) {
@@ -1038,9 +804,9 @@ namespace wings {
 
 				if (!isDigit(*p, base) && *p != '.') {
 					if (base == 2) {
-						WErrorSetRuntimeError(context, "function str.__float__() invalid binary string");
+						WErrorSetRuntimeError(context, "invalid binary string");
 					} else {
-						WErrorSetRuntimeError(context, "function str.__float__() invalid hexadecimal string");
+						WErrorSetRuntimeError(context, "invalid hexadecimal string");
 					}
 					return nullptr;
 				}
@@ -1060,7 +826,7 @@ namespace wings {
 			}
 
 			if (*p) {
-				WErrorSetRuntimeError(context, "function str.__float__() invalid numerical string");
+				WErrorSetRuntimeError(context, "invalid float string");
 				return nullptr;
 			}
 
@@ -1068,26 +834,15 @@ namespace wings {
 		}
 
 		static WObj* Str_Eq(WObj** argv, int argc, WContext* context) {
-			if (argc != 2) {
-				SetInvalidArgumentCountError(context, "str.__eq__", argc, 2);
-				return nullptr;
-			}
-
+			EXPECT_ARG_COUNT(2);
+			EXPECT_ARG_TYPE_STRING(0);
 			return WObjCreateBool(context, WObjIsString(argv[1]) && std::strcmp(WObjGetString(argv[0]), WObjGetString(argv[1])) == 0);
 		}
 
 		static WObj* Str_Mul(WObj** argv, int argc, WContext* context) {
-			if (argc != 2) {
-				SetInvalidArgumentCountError(context, "str.__mul__", argc, 1);
-				return nullptr;
-			} else if (!WObjIsString(argv[0])) {
-				SetInvalidTypeError(context, "str.__mul__", 1, "str", argv[0]);
-				return nullptr;
-			} else if (!WObjIsInt(argv[1])) {
-				SetInvalidTypeError(context, "str.__mul__", 2, "int", argv[1]);
-				return nullptr;
-			}
-
+			EXPECT_ARG_COUNT(2);
+			EXPECT_ARG_TYPE_STRING(0);
+			EXPECT_ARG_TYPE_INT(1);
 			wint multiplier = WObjGetInt(argv[1]);
 			std::string s;
 			for (wint i = 0; i < multiplier; i++)
@@ -1096,137 +851,75 @@ namespace wings {
 		}
 
 		static WObj* Str_Contains(WObj** argv, int argc, WContext* context) {
-			if (argc != 2) {
-				SetInvalidArgumentCountError(context, "str.__contains__", argc, 1);
-				return nullptr;
-			} else if (!WObjIsString(argv[0])) {
-				SetInvalidTypeError(context, "str.__contains__", 1, "str", argv[0]);
-				return nullptr;
-			} else if (!WObjIsString(argv[1])) {
-				SetInvalidTypeError(context, "str.__contains__", 2, "str", argv[1]);
-				return nullptr;
-			}
-
+			EXPECT_ARG_COUNT(2);
+			EXPECT_ARG_TYPE_STRING(0);
+			EXPECT_ARG_TYPE_STRING(1);
 			return WObjCreateBool(context, std::strstr(WObjGetString(argv[0]), WObjGetString(argv[1])));
 		}
 
 		static WObj* List_GetItem(WObj** argv, int argc, WContext* context) {
-			if (argc != 2) {
-				SetInvalidArgumentCountError(context, "list.__getitem__", argc, 2);
-				return nullptr;
-			} else if (!WObjIsList(argv[0])) {
-				SetInvalidTypeError(context, "list.__getitem__", 1, "list", argv[0]);
-				return nullptr;
-			} else if (!WObjIsInt(argv[1])) {
-				SetInvalidTypeError(context, "list.__getitem__", 2, "int", argv[1]);
-				return nullptr;
-			}
+			EXPECT_ARG_COUNT(2);
+			EXPECT_ARG_TYPE_LIST(0);
+			EXPECT_ARG_TYPE_INT(1);
 
-			size_t rawIndex = ConvertNegativeIndex(WObjGetInt(argv[1]), argv[0]->v.size());
-			if (rawIndex >= argv[0]->v.size()) {
-				SetIndexOutOfRangeError(context, "list.__getitem__", 2);
-				return nullptr;
-			}
-
-			return argv[0]->v[rawIndex];
+			GET_LIST_INDEX(0, 1);
+			return argv[0]->v[listIndex];
 		}
 
 		static WObj* List_SetItem(WObj** argv, int argc, WContext* context) {
-			if (argc != 3) {
-				SetInvalidArgumentCountError(context, "list.__setitem__", argc, 3);
-				return nullptr;
-			} else if (!WObjIsList(argv[0])) {
-				SetInvalidTypeError(context, "list.__setitem__", 1, "list", argv[0]);
-				return nullptr;
-			} else if (!WObjIsInt(argv[1])) {
-				SetInvalidTypeError(context, "list.__setitem__", 2, "int", argv[1]);
-				return nullptr;
-			}
+			EXPECT_ARG_COUNT(3);
+			EXPECT_ARG_TYPE_LIST(0);
+			EXPECT_ARG_TYPE_INT(1);
 
-			size_t rawIndex = ConvertNegativeIndex(WObjGetInt(argv[1]), argv[0]->v.size());
-			if (rawIndex >= argv[0]->v.size()) {
-				SetIndexOutOfRangeError(context, "list.__setitem__", 2);
-				return nullptr;
-			}
-
-			argv[0]->v[rawIndex] = argv[2];
+			GET_LIST_INDEX(0, 1);
+			argv[0]->v[listIndex] = argv[2];
 			return argv[0];
 		}
 
 		static WObj* List_Append(WObj** argv, int argc, WContext* context) {
-			if (argc != 2) {
-				SetInvalidArgumentCountError(context, "list.append", argc, 2);
-				return nullptr;
-			} else if (!WObjIsList(argv[0])) {
-				SetInvalidTypeError(context, "list.append", 1, "list", argv[0]);
-				return nullptr;
-			}
-
+			EXPECT_ARG_COUNT(2);
+			EXPECT_ARG_TYPE_LIST(0);
 			argv[0]->v.push_back(argv[1]);
 			return argv[0];
 		}
 
 		static WObj* List_Insert(WObj** argv, int argc, WContext* context) {
-			if (argc != 3) {
-				SetInvalidArgumentCountError(context, "list.insert", argc, 3);
-				return nullptr;
-			} else if (!WObjIsList(argv[0])) {
-				SetInvalidTypeError(context, "list.insert", 1, "list", argv[0]);
-				return nullptr;
-			} else if (!WObjIsInt(argv[1])) {
-				SetInvalidTypeError(context, "list.insert", 2, "int", argv[1]);
-				return nullptr;
-			}
+			EXPECT_ARG_COUNT(3);
+			EXPECT_ARG_TYPE_LIST(0);
+			EXPECT_ARG_TYPE_INT(1);
 
-			wint index = WObjGetInt(argv[1]);
-			size_t rawIndex = ConvertNegativeIndex(index, argv[0]->v.size());
-			if (rawIndex >= argv[0]->v.size()) {
-				SetIndexOutOfRangeError(context, "list.insert", 2);
-				return nullptr;
-			}
-
-			argv[0]->v.insert(argv[0]->v.begin() + rawIndex, argv[2]);
+			GET_LIST_INDEX(0, 1);
+			argv[0]->v.insert(argv[0]->v.begin() + listIndex, argv[2]);
 			return argv[0];
 		}
 
 		static WObj* List_Pop(WObj** argv, int argc, WContext* context) {
 			if (argc >= 2) {
-				SetInvalidArgumentCountError(context, "list.pop", argc, 2);
-				return nullptr;
-			} else if (!WObjIsList(argv[0])) {
-				SetInvalidTypeError(context, "list.pop", 1, "list", argv[0]);
+				SetInvalidArgumentCountError(context, argc, 2);
 				return nullptr;
 			}
+			EXPECT_ARG_TYPE_LIST(0);
 
-			int index = -1;
+			int negIndex = -1;
 			if (argc == 1) {
-				if (!WObjIsInt(argv[1])) {
-					SetInvalidTypeError(context, "list.pop", 2, "int", argv[1]);
-					return nullptr;
-				} else {
-					index = WObjGetInt(argv[1]);
-				}
+				EXPECT_ARG_TYPE_INT(1);
+				negIndex = WObjGetInt(argv[1]);
 			}
 
-			size_t rawIndex = ConvertNegativeIndex(index, argv[0]->v.size());
-			if (rawIndex >= argv[0]->v.size()) {
-				SetIndexOutOfRangeError(context, "list.pop", 2);
+			size_t listIndex = ConvertNegativeIndex(negIndex, argv[0]->v.size());
+			if (listIndex >= argv[0]->v.size()) {
+				SetIndexOutOfRangeError(context, argv, 1);
 				return nullptr;
 			}
 
-			WObj* popped = argv[0]->v[rawIndex];
-			argv[0]->v.erase(argv[0]->v.begin() + rawIndex);
+			WObj* popped = argv[0]->v[listIndex];
+			argv[0]->v.erase(argv[0]->v.begin() + listIndex);
 			return popped;
 		}
 
 		static WObj* List_Remove(WObj** argv, int argc, WContext* context) {
-			if (argc != 2) {
-				SetInvalidArgumentCountError(context, "list.remove", argc, 2);
-				return nullptr;
-			} else if (!WObjIsList(argv[0])) {
-				SetInvalidTypeError(context, "list.remove", 1, "list", argv[0]);
-				return nullptr;
-			}
+			EXPECT_ARG_COUNT(2);
+			EXPECT_ARG_TYPE_LIST(0);
 
 			auto& v = argv[0]->v;
 			for (size_t i = 0; i < v.size(); i++) {
@@ -1241,7 +934,7 @@ namespace wings {
 				}
 
 				if (i >= v.size()) {
-					WErrorSetRuntimeError(context, "function list.remove() list modified while iterating over it");
+					WErrorSetRuntimeError(context, "list modified while iterating");
 					return nullptr;
 				}
 				
@@ -1249,7 +942,7 @@ namespace wings {
 				return argv[0];
 			}
 
-			WErrorSetRuntimeError(context, "function list.remove() ");
+			WErrorSetRuntimeError(context, "value not found in list");
 			return nullptr;
 		}
 
@@ -1277,10 +970,10 @@ namespace wings {
 
 		static WObj* range(WObj** argv, int argc, WContext* context) {
 			if (argc < 1) {
-				SetInvalidArgumentCountError(context, "range", 1, argc);
+				SetInvalidArgumentCountError(context, argc, 1);
 				return nullptr;
 			} else if (argc > 3) {
-				SetInvalidArgumentCountError(context, "range", 3, argc);
+				SetInvalidArgumentCountError(context, argc, 3);
 				return nullptr;
 			}
 
@@ -1314,7 +1007,7 @@ namespace wings {
 					return WObjCreateBool(context, WObjGetInt(cur) <= WObjGetInt(end));
 				}
 			};
-			RegisterStatelessMethod<iterend>(context, rangeObj->attributes, "__iterend__");
+			RegisterStatelessMethod<iterend>(context, rangeObj->attributes, "__iterend__", "range.__iterend__");
 
 			auto next = [](WObj** argv, int argc, WContext* context) {
 				WObj* cur = WObjGetAttribute(argv[0], "_cur");
@@ -1325,7 +1018,7 @@ namespace wings {
 				WObjSetAttribute(argv[0], "_cur", WObjCreateInt(context, nextVal));
 				return cur;
 			};
-			RegisterStatelessMethod<next>(context, rangeObj->attributes, "__iternext__");
+			RegisterStatelessMethod<next>(context, rangeObj->attributes, "__iternext__", "range.__iternext__");
 
 			WGcUnprotect(rangeObj);
 			return rangeObj;
@@ -1366,65 +1059,65 @@ namespace wings {
 		CheckOperation(context->nullSingleton = WOpCall(context->builtinClasses.null, nullptr, 0));
 
 		// Register methods of builtin classes
-		CheckOperation(RegisterStatelessMethod<attrlib::Object_Pos>(context, context->builtinClasses.object->c, "__pos__"));
-		CheckOperation(RegisterStatelessMethod<attrlib::Object_Str>(context, context->builtinClasses.object->c, "__str__"));
-		CheckOperation(RegisterStatelessMethod<attrlib::Object_Eq>(context, context->builtinClasses.object->c, "__eq__"));
+		CheckOperation(RegisterStatelessMethod<attrlib::Object_Pos>(context, context->builtinClasses.object->c, "__pos__", "object.__pos__"));
+		CheckOperation(RegisterStatelessMethod<attrlib::Object_Str>(context, context->builtinClasses.object->c, "__str__", "object.__str__"));
+		CheckOperation(RegisterStatelessMethod<attrlib::Object_Eq>(context, context->builtinClasses.object->c, "__eq__", "object.__eq__"));
 
-		CheckOperation(RegisterStatelessMethod<attrlib::Null_Bool>(context, context->builtinClasses.null->c, "__bool__"));
-		CheckOperation(RegisterStatelessMethod<attrlib::Null_Eq>(context, context->builtinClasses.null->c, "__eq__"));
+		CheckOperation(RegisterStatelessMethod<attrlib::Null_Bool>(context, context->builtinClasses.null->c, "__nonzero__", "NoneType.__nonzero__"));
+		CheckOperation(RegisterStatelessMethod<attrlib::Null_Eq>(context, context->builtinClasses.null->c, "__eq__", "NoneType.__eq__"));
 
-		CheckOperation(RegisterStatelessMethod<attrlib::Bool_Bool>(context, context->builtinClasses._bool->c, "__bool__"));
-		CheckOperation(RegisterStatelessMethod<attrlib::Bool_Int>(context, context->builtinClasses._bool->c, "__int__"));
-		CheckOperation(RegisterStatelessMethod<attrlib::Bool_Float>(context, context->builtinClasses._bool->c, "__float__"));
-		CheckOperation(RegisterStatelessMethod<attrlib::Bool_Eq>(context, context->builtinClasses._bool->c, "__eq__"));
+		CheckOperation(RegisterStatelessMethod<attrlib::Bool_Bool>(context, context->builtinClasses._bool->c, "__nonzero__", "bool.__nonzero__"));
+		CheckOperation(RegisterStatelessMethod<attrlib::Bool_Int>(context, context->builtinClasses._bool->c, "__int__", "bool.__int__"));
+		CheckOperation(RegisterStatelessMethod<attrlib::Bool_Float>(context, context->builtinClasses._bool->c, "__float__", "int.__float__"));
+		CheckOperation(RegisterStatelessMethod<attrlib::Bool_Eq>(context, context->builtinClasses._bool->c, "__eq__", "bool.__eq__"));
 
-		CheckOperation(RegisterStatelessMethod<attrlib::Int_Bool>(context, context->builtinClasses._int->c, "__bool__"));
-		CheckOperation(RegisterStatelessMethod<attrlib::Int_Int>(context, context->builtinClasses._int->c, "__int__"));
-		CheckOperation(RegisterStatelessMethod<attrlib::Int_Float>(context, context->builtinClasses._int->c, "__float__"));
-		CheckOperation(RegisterStatelessMethod<attrlib::Int_Eq>(context, context->builtinClasses._int->c, "__eq__"));
-		CheckOperation(RegisterStatelessMethod<attrlib::Int_Neg>(context, context->builtinClasses._int->c, "__neg__"));
-		CheckOperation(RegisterStatelessMethod<attrlib::Int_Add>(context, context->builtinClasses._int->c, "__add__"));
-		CheckOperation(RegisterStatelessMethod<attrlib::Int_Sub>(context, context->builtinClasses._int->c, "__sub__"));
-		CheckOperation(RegisterStatelessMethod<attrlib::Int_Mul>(context, context->builtinClasses._int->c, "__mul__"));
-		CheckOperation(RegisterStatelessMethod<attrlib::Int_Div>(context, context->builtinClasses._int->c, "__div__"));
-		CheckOperation(RegisterStatelessMethod<attrlib::Int_FloorDiv>(context, context->builtinClasses._int->c, "__floordiv__"));
-		CheckOperation(RegisterStatelessMethod<attrlib::Int_Mod>(context, context->builtinClasses._int->c, "__mod__"));
-		CheckOperation(RegisterStatelessMethod<attrlib::Int_Pow>(context, context->builtinClasses._int->c, "__pow__"));
-		CheckOperation(RegisterStatelessMethod<attrlib::Int_BitAnd>(context, context->builtinClasses._int->c, "__and__"));
-		CheckOperation(RegisterStatelessMethod<attrlib::Int_BitOr>(context, context->builtinClasses._int->c, "__or__"));
-		CheckOperation(RegisterStatelessMethod<attrlib::Int_BitXor>(context, context->builtinClasses._int->c, "__xor__"));
-		CheckOperation(RegisterStatelessMethod<attrlib::Int_BitNot>(context, context->builtinClasses._int->c, "__invert__"));
-		CheckOperation(RegisterStatelessMethod<attrlib::Int_ShiftLeft>(context, context->builtinClasses._int->c, "__lshift__"));
-		CheckOperation(RegisterStatelessMethod<attrlib::Int_ShiftRight>(context, context->builtinClasses._int->c, "__rshift__"));
+		CheckOperation(RegisterStatelessMethod<attrlib::Int_Bool>(context, context->builtinClasses._int->c, "__nonzero__", "int.__nonzero__"));
+		CheckOperation(RegisterStatelessMethod<attrlib::Int_Int>(context, context->builtinClasses._int->c, "__int__", "int.__int__"));
+		CheckOperation(RegisterStatelessMethod<attrlib::Int_Float>(context, context->builtinClasses._int->c, "__float__", "int.__float__"));
+		CheckOperation(RegisterStatelessMethod<attrlib::Int_Eq>(context, context->builtinClasses._int->c, "__eq__", "int.__eq__"));
+		CheckOperation(RegisterStatelessMethod<attrlib::Int_Neg>(context, context->builtinClasses._int->c, "__neg__", "int.__neg__"));
+		CheckOperation(RegisterStatelessMethod<attrlib::Int_Add>(context, context->builtinClasses._int->c, "__add__", "int.__add__"));
+		CheckOperation(RegisterStatelessMethod<attrlib::Int_Sub>(context, context->builtinClasses._int->c, "__sub__", "int.__sub__"));
+		CheckOperation(RegisterStatelessMethod<attrlib::Int_Mul>(context, context->builtinClasses._int->c, "__mul__", "int.__mul__"));
+		CheckOperation(RegisterStatelessMethod<attrlib::Int_Div>(context, context->builtinClasses._int->c, "__div__", "int.__div__"));
+		CheckOperation(RegisterStatelessMethod<attrlib::Int_FloorDiv>(context, context->builtinClasses._int->c, "__floordiv__", "int.__floordiv__"));
+		CheckOperation(RegisterStatelessMethod<attrlib::Int_Mod>(context, context->builtinClasses._int->c, "__mod__", "int.__mod__"));
+		CheckOperation(RegisterStatelessMethod<attrlib::Int_Pow>(context, context->builtinClasses._int->c, "__pow__", "int.__pow__"));
+		CheckOperation(RegisterStatelessMethod<attrlib::Int_BitAnd>(context, context->builtinClasses._int->c, "__and__", "int.__and__"));
+		CheckOperation(RegisterStatelessMethod<attrlib::Int_BitOr>(context, context->builtinClasses._int->c, "__or__", "int.__or__"));
+		CheckOperation(RegisterStatelessMethod<attrlib::Int_BitXor>(context, context->builtinClasses._int->c, "__xor__", "int.__xor__"));
+		CheckOperation(RegisterStatelessMethod<attrlib::Int_BitNot>(context, context->builtinClasses._int->c, "__invert__", "int.__not__"));
+		CheckOperation(RegisterStatelessMethod<attrlib::Int_ShiftLeft>(context, context->builtinClasses._int->c, "__lshift__", "int.__lshift__"));
+		CheckOperation(RegisterStatelessMethod<attrlib::Int_ShiftRight>(context, context->builtinClasses._int->c, "__rshift__", "int.__rshift__"));
 
-		CheckOperation(RegisterStatelessMethod<attrlib::Float_Bool>(context, context->builtinClasses._float->c, "__bool__"));
-		CheckOperation(RegisterStatelessMethod<attrlib::Float_Int>(context, context->builtinClasses._float->c, "__float__"));
-		CheckOperation(RegisterStatelessMethod<attrlib::Float_Float>(context, context->builtinClasses._float->c, "__float__"));
-		CheckOperation(RegisterStatelessMethod<attrlib::Float_Eq>(context, context->builtinClasses._float->c, "__eq__"));
-		CheckOperation(RegisterStatelessMethod<attrlib::Float_Neg>(context, context->builtinClasses._float->c, "__neg__"));
-		CheckOperation(RegisterStatelessMethod<attrlib::Float_Add>(context, context->builtinClasses._float->c, "__add__"));
-		CheckOperation(RegisterStatelessMethod<attrlib::Float_Sub>(context, context->builtinClasses._float->c, "__sub__"));
-		CheckOperation(RegisterStatelessMethod<attrlib::Float_Mul>(context, context->builtinClasses._float->c, "__mul__"));
-		CheckOperation(RegisterStatelessMethod<attrlib::Float_Div>(context, context->builtinClasses._float->c, "__div__"));
-		CheckOperation(RegisterStatelessMethod<attrlib::Float_FloorDiv>(context, context->builtinClasses._float->c, "__floordiv__"));
-		CheckOperation(RegisterStatelessMethod<attrlib::Float_Mod>(context, context->builtinClasses._float->c, "__mod__"));
-		CheckOperation(RegisterStatelessMethod<attrlib::Float_Pow>(context, context->builtinClasses._float->c, "__pow__"));
+		CheckOperation(RegisterStatelessMethod<attrlib::Float_Bool>(context, context->builtinClasses._float->c, "__nonzero__", "float.__nonzero__"));
+		CheckOperation(RegisterStatelessMethod<attrlib::Float_Int>(context, context->builtinClasses._float->c, "__int__", "float.__int__"));
+		CheckOperation(RegisterStatelessMethod<attrlib::Float_Float>(context, context->builtinClasses._float->c, "__float__", "float.__float__"));
+		CheckOperation(RegisterStatelessMethod<attrlib::Float_Eq>(context, context->builtinClasses._float->c, "__eq__", "float.__eq__"));
+		CheckOperation(RegisterStatelessMethod<attrlib::Float_Neg>(context, context->builtinClasses._float->c, "__neg__", "float.__neg__"));
+		CheckOperation(RegisterStatelessMethod<attrlib::Float_Add>(context, context->builtinClasses._float->c, "__add__", "float.__add__"));
+		CheckOperation(RegisterStatelessMethod<attrlib::Float_Sub>(context, context->builtinClasses._float->c, "__sub__", "float.__sub__"));
+		CheckOperation(RegisterStatelessMethod<attrlib::Float_Mul>(context, context->builtinClasses._float->c, "__mul__", "float.__mul__"));
+		CheckOperation(RegisterStatelessMethod<attrlib::Float_Div>(context, context->builtinClasses._float->c, "__div__", "float.__div__"));
+		CheckOperation(RegisterStatelessMethod<attrlib::Float_FloorDiv>(context, context->builtinClasses._float->c, "__floordiv__", "float.__floordiv__"));
+		CheckOperation(RegisterStatelessMethod<attrlib::Float_Mod>(context, context->builtinClasses._float->c, "__mod__", "float.__mod__"));
+		CheckOperation(RegisterStatelessMethod<attrlib::Float_Pow>(context, context->builtinClasses._float->c, "__pow__", "float.__pow__"));
 
-		CheckOperation(RegisterStatelessMethod<attrlib::Str_Bool>(context, context->builtinClasses.str->c, "__nonzero__"));
-		CheckOperation(RegisterStatelessMethod<attrlib::Str_Int>(context, context->builtinClasses.str->c, "__int__"));
-		CheckOperation(RegisterStatelessMethod<attrlib::Str_Float>(context, context->builtinClasses.str->c, "__float__"));
-		CheckOperation(RegisterStatelessMethod<attrlib::Str_Eq>(context, context->builtinClasses.str->c, "__eq__"));
-		CheckOperation(RegisterStatelessMethod<attrlib::Str_Mul>(context, context->builtinClasses.str->c, "__mul__"));
-		CheckOperation(RegisterStatelessMethod<attrlib::Str_Contains>(context, context->builtinClasses.str->c, "__contains__"));
+		CheckOperation(RegisterStatelessMethod<attrlib::Str_Bool>(context, context->builtinClasses.str->c, "__nonzero__", "str.__nonzero__"));
+		CheckOperation(RegisterStatelessMethod<attrlib::Str_Int>(context, context->builtinClasses.str->c, "__int__", "str.__int__"));
+		CheckOperation(RegisterStatelessMethod<attrlib::Str_Float>(context, context->builtinClasses.str->c, "__float__", "str.__float__"));
+		CheckOperation(RegisterStatelessMethod<attrlib::Str_Eq>(context, context->builtinClasses.str->c, "__eq__", "str.__eq__"));
+		CheckOperation(RegisterStatelessMethod<attrlib::Str_Mul>(context, context->builtinClasses.str->c, "__mul__", "str.__mul__"));
+		CheckOperation(RegisterStatelessMethod<attrlib::Str_Contains>(context, context->builtinClasses.str->c, "__contains__", "str.__contains__"));
 
-		CheckOperation(RegisterStatelessMethod<attrlib::List_GetItem>(context, context->builtinClasses.list->c, "__getitem__"));
-		CheckOperation(RegisterStatelessMethod<attrlib::List_SetItem>(context, context->builtinClasses.list->c, "__setitem__"));
+		CheckOperation(RegisterStatelessMethod<attrlib::List_GetItem>(context, context->builtinClasses.list->c, "__getitem__", "list.__getitem__"));
+		CheckOperation(RegisterStatelessMethod<attrlib::List_SetItem>(context, context->builtinClasses.list->c, "__setitem__", "list.__setitem__"));
 		//CheckOperation(RegisterStatelessMethod<attrlib::List_Contains>(context, context->builtinClasses.list->c, "__contains__"));
-		CheckOperation(RegisterStatelessMethod<attrlib::List_Insert>(context, context->builtinClasses.list->c, "insert"));
-		CheckOperation(RegisterStatelessMethod<attrlib::List_Append>(context, context->builtinClasses.list->c, "append"));
+		CheckOperation(RegisterStatelessMethod<attrlib::List_Insert>(context, context->builtinClasses.list->c, "insert", "list.insert"));
+		CheckOperation(RegisterStatelessMethod<attrlib::List_Append>(context, context->builtinClasses.list->c, "append", "list.append"));
 		//CheckOperation(RegisterStatelessMethod<attrlib::List_Extend>(context, context->builtinClasses.list->c, "extend"));
-		CheckOperation(RegisterStatelessMethod<attrlib::List_Pop>(context, context->builtinClasses.list->c, "pop"));
-		CheckOperation(RegisterStatelessMethod<attrlib::List_Remove>(context, context->builtinClasses.list->c, "remove"));
+		CheckOperation(RegisterStatelessMethod<attrlib::List_Pop>(context, context->builtinClasses.list->c, "pop", "list.pop"));
+		CheckOperation(RegisterStatelessMethod<attrlib::List_Remove>(context, context->builtinClasses.list->c, "remove", "list.remove"));
 		//CheckOperation(RegisterStatelessMethod<attrlib::List_Clear>(context, context->builtinClasses.list->c, "clear"));
 		//CheckOperation(RegisterStatelessMethod<attrlib::List_Copy>(context, context->builtinClasses.list->c, "copy"));
 		//CheckOperation(RegisterStatelessMethod<attrlib::List_Index>(context, context->builtinClasses.list->c, "index"));

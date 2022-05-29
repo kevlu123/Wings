@@ -1,5 +1,6 @@
 #include "impl.h"
 #include "gc.h"
+#include "executor.h"
 #include <algorithm>
 
 using namespace wings;
@@ -24,20 +25,6 @@ bool operator==(const WObj& lhs, const WObj& rhs) {
 
 bool operator!=(const WObj& lhs, const WObj& rhs) {
     return !(lhs == rhs);
-}
-
-static bool IsImmutable(const WObj* obj) {
-    return obj->type == WObj::Type::Null
-        || obj->type == WObj::Type::Bool
-        || obj->type == WObj::Type::Int
-        || obj->type == WObj::Type::Float
-        || obj->type == WObj::Type::String;
-}
-
-static void AppendTraceback(const WObj* func) {
-    TraceFrame frame{};
-    frame.func = func->fn.prettyName ? func->fn.prettyName : "";
-    func->context->err.trace.push_back(std::move(frame));
 }
 
 extern "C" {
@@ -196,6 +183,14 @@ extern "C" {
     bool WObjIsUserdata(const WObj* obj) {
         WASSERT(obj);
         return obj->type == WObj::Type::Userdata;
+    }
+
+    bool WObjIsImmutableType(const WObj* obj) {
+        return obj->type == WObj::Type::Null
+            || obj->type == WObj::Type::Bool
+            || obj->type == WObj::Type::Int
+            || obj->type == WObj::Type::Float
+            || obj->type == WObj::Type::String;
     }
 
     bool WObjGetBool(const WObj* obj) {
@@ -443,8 +438,13 @@ extern "C" {
             }
             WGcUnprotect(callable);
 
-            if (ret == nullptr) {
-                AppendTraceback(callable);
+            if (ret == nullptr && callable->fn.fptr != &DefObject::Run) {
+                // Native function failed
+                callable->context->err.trace.push_back({
+                    0,
+                    "<Native>",
+                    callable->fn.prettyName ? callable->fn.prettyName : "",
+                    });
             }
 
             return ret;

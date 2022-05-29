@@ -14,6 +14,7 @@ namespace wings {
 		WContext* context{};
 		RcPtr<std::vector<Instruction>> instructions;
 		std::string module;
+		std::string prettyName;
 		std::vector<std::string> localVariables;
 		std::vector<std::string> parameterNames;
 		std::vector<WObj*> defaultParameterValues;

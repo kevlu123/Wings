@@ -109,6 +109,7 @@ WDLL_EXPORT bool WObjIsFunc(const WObj* obj);
 WDLL_EXPORT bool WObjIsObject(const WObj* obj);
 WDLL_EXPORT bool WObjIsClass(const WObj* obj);
 WDLL_EXPORT bool WObjIsUserdata(const WObj* obj);
+WDLL_EXPORT bool WObjIsImmutableType(const WObj* obj);
 
 WDLL_EXPORT bool WObjGetBool(const WObj* obj);
 WDLL_EXPORT wint WObjGetInt(const WObj* obj);

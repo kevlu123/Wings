@@ -16,6 +16,7 @@ namespace wings {
 
 	struct DefInstructionInfo {
 		size_t defaultParameterCount;
+		std::string prettyName;
 		std::vector<Parameter> parameters;
 		std::vector<std::string> globalCaptures;
 		std::vector<std::string> localCaptures;

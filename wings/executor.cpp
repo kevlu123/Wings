@@ -85,8 +85,11 @@ namespace wings {
 			DoInstruction(instr);
 			if (returnValue.has_value()) {
 				if (returnValue.value() == nullptr) {
-					context->err.trace.back().line = instr.trace.line;
-					context->err.trace.back().module = def->module;
+					context->err.trace.push_back({
+						instr.trace.line,
+						def->module,
+						def->prettyName
+						});
 				}
 				return returnValue.value();
 			}
@@ -124,6 +127,7 @@ namespace wings {
 			DefObject* def = new DefObject();
 			def->context = context;
 			def->module = this->def->module;
+			def->prettyName = instr.data.def->prettyName;
 			def->instructions = instr.data.def->instructions;
 
 			for (const auto& param : instr.data.def->parameters)
@@ -225,23 +229,32 @@ namespace wings {
 			PushStack(var);
 			break;
 		}
-		case Operation::ListLiteral: {
-			WObj* li = WObjCreateList(context);
-			for (int i = 0; i < op.argc; i++)
-				li->v.insert(li->v.begin(), PopStack());
-			PushStack(li);
-			break;
-		}
-		case Operation::MapLiteral: {
-			WObj* li = WObjCreateMap(context);
-			for (int i = 0; i < op.argc; i++) {
-				WObj* val = PopStack();
-				WObj* key = PopStack();
-				li->m.insert({ *key, val });
+		case Operation::ListLiteral:
+			if (WObj* li = WObjCreateList(context)) {
+				for (int i = 0; i < op.argc; i++)
+					li->v.insert(li->v.begin(), PopStack());
+				PushStack(li);
+			} else {
+				returnValue = nullptr;
 			}
-			PushStack(li);
 			break;
-		}
+		case Operation::MapLiteral:
+			if (WObj* li = WObjCreateMap(context)) {
+				for (int i = 0; i < op.argc; i++) {
+					WObj* val = PopStack();
+					WObj* key = PopStack();
+					if (!WObjIsImmutableType(key)) {
+						WErrorSetRuntimeError(context, "Only an immutable type can be used as a dictionary key");
+						returnValue = nullptr;
+						return;
+					}
+					li->m.insert({ *key, val });
+				}
+				PushStack(li);
+			} else {
+				returnValue = nullptr;
+			}
+			break;
 		case Operation::Call: {
 			WObj* fn = stack[stack.size() - op.argc - 1];
 			WObj** args = stack.data() + stack.size() - op.argc;
@@ -256,8 +269,13 @@ namespace wings {
 		}
 		case Operation::Dot: {
 			WObj* self = PopStack();
-			WObj* attr = WObjGetAttribute(self, op.token.text.c_str());
-			PushStack(attr);
+			if (WObj* attr = WObjGetAttribute(self, op.token.text.c_str())) {
+				PushStack(attr);
+			} else {
+
+				//WErrorSetRuntimeError(context, "object has no attribute");
+				returnValue = nullptr;
+			}
 			break;
 		}
 

@@ -205,6 +205,7 @@ namespace wings {
 		def.data.def->defaultParameterCount = defaultParamCount;
 		def.data.def->parameters = node.def.parameters;
 		def.data.def->instructions = MakeRcPtr<std::vector<Instruction>>();
+		def.data.def->prettyName = node.def.name;
 		CompileBody(node, *def.data.def->instructions);
 		instructions.push_back(std::move(def));
 

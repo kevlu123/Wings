@@ -8,21 +8,50 @@
 using namespace wings;
 
 static std::string CreateTracebackMessage(WContext* context) {
-    std::string s = "Traceback (most recent call last):\n";
+    std::stringstream ss;
+    ss << "Traceback (most recent call last):\n";
+
     for (const auto& frame : context->err.trace) {
-        s += "  Module \"";
-        s += frame.module;
-        s += "\", line " + std::to_string(frame.line);
-        if (!frame.func.empty()) {
-            s += ", in ";
-            s += frame.func;
-        } else {
-            s += ", in <no name>";
+        ss << "  ";
+        bool written = false;
+
+        if (!frame.module.empty()) {
+            ss << "Module " << frame.module;
+            written = true;
         }
-        s += "\n";
+
+        if (frame.line != 0) {
+            if (written) ss << ", ";
+            ss << "Line " << frame.line;
+            written = true;
+        }
+
+        if (!frame.func.empty()) {
+            if (written) ss << ", ";
+            ss << "Function " << frame.func << "()";
+        }
+
+        ss << "\n";
     }
-    s += context->err.message + "\n";
-    return s;
+
+    ss << context->err.message << "\n";
+    return ss.str();
+
+    //std::string s = "Traceback (most recent call last):\n";
+    //for (const auto& frame : context->err.trace) {
+    //    s += "  Module \"";
+    //    s += frame.module;
+    //    s += "\", line " + std::to_string(frame.line);
+    //    if (!frame.func.empty()) {
+    //        s += ", in ";
+    //        s += frame.func;
+    //    } else {
+    //        s += ", in <no name>";
+    //    }
+    //    s += "\n";
+    //}
+    //s += context->err.message + "\n";
+    //return s;
 }
 
 static void SetCompileError(WContext* context, const std::string& message) {
@@ -126,13 +155,14 @@ extern "C" {
         DefObject* def = new DefObject();
         def->context = context;
         def->module = moduleName;
+        def->prettyName = "";
         auto instructions = Compile(parseResult.parseTree);
         def->instructions = MakeRcPtr<std::vector<Instruction>>(std::move(instructions));
 
         WFunc func{};
         func.fptr = &DefObject::Run;
         func.userdata = def;
-        func.prettyName = "__root__";
+        func.prettyName = "";
         WObj* obj = WObjCreateFunc(context, &func);
         if (obj == nullptr) {
             delete def;
