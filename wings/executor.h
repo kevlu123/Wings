@@ -29,9 +29,6 @@ namespace wings {
 		WObj* PeekStack();
 
 		void DoInstruction(const Instruction& instr);
-		void DoOperation(const OperationInstructionInfo& op);
-		void DoAssignment(const OperationInstructionInfo& op);
-		void DoLiteral(const Token& t);
 
 		WObj* GetVariable(const std::string& name);
 		void SetVariable(const std::string& name, WObj* value);
@@ -41,7 +38,7 @@ namespace wings {
 		size_t pc{};
 		std::vector<WObj*> stack;
 		std::unordered_map<std::string, RcPtr<WObj*>> variables;
-		std::optional<WObj*> returnValue;
+		std::optional<WObj*> exitValue;
 	};
 
 }

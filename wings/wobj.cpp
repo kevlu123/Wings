@@ -237,130 +237,6 @@ extern "C" {
 		obj->finalizer = *finalizer;
 	}
 
-    //bool WObjIn(const WObj* container, const WObj* value) {
-    //    WASSERT(container && value);
-    //    switch (container->type) {
-    //    case WObj::Type::String:
-    //        return WObjIsString(value)
-    //            && container->s.find(value->s) != std::string::npos;
-    //    case WObj::Type::List:
-    //        return std::any_of(
-    //            container->v.begin(),
-    //            container->v.end(),
-    //            [value](const WObj* obj) { return WObjEquals(obj, value); }
-    //        );
-    //    case WObj::Type::Map:
-    //        return container->m.find(*value) != container->m.end();
-    //    default:
-    //        WUNREACHABLE();
-    //    }
-    //}
-    //
-    //bool WObjTruthy(const WObj* obj) {
-    //    WASSERT(obj);
-    //    switch (obj->type) {
-    //    case WObj::Type::Null: return false;
-    //    case WObj::Type::Bool: return obj->b;
-    //    case WObj::Type::Int: return obj->i;
-    //    case WObj::Type::Float: return obj->f;
-    //    case WObj::Type::String: return obj->s.size();
-    //    case WObj::Type::List: return obj->v.size();
-    //    case WObj::Type::Map: return obj->m.size();
-    //    case WObj::Type::Func: return true;
-    //    case WObj::Type::Userdata: return true;
-    //    default: WUNREACHABLE();
-    //    }
-    //}
-    //    
-    //bool WObjEquals(const WObj* lhs, const WObj* rhs) {
-    //    WASSERT(lhs && rhs);
-    //    return *lhs == *rhs;
-    //}
-    //    
-    //int WObjLen(const WObj* obj) {
-    //    WASSERT(obj);
-    //    switch (obj->type) {
-    //    case WObj::Type::String: return (int)obj->s.size();
-    //    case WObj::Type::List: return (int)obj->s.size();
-    //    case WObj::Type::Map: return (int)obj->s.size();
-    //    default: WUNREACHABLE();
-    //    }
-    //}
-    //    
-    //WObj* WObjCall(const WObj* func, WObj** args, int argc) {
-    //    WASSERT(func && argc >= 0 && (WObjIsFunc(func) || WObjIsClass(func)));
-    //    if (argc)
-    //        WASSERT(args);
-    //    for (int i = 0; i < argc; i++)
-    //        WASSERT(args[i]);
-    //
-    //    WObj* ret;
-    //    WGcProtect(func);
-    //    if (func->self) {
-    //        std::vector<WObj*> argsWithSelf = { func->self };
-    //        argsWithSelf.insert(argsWithSelf.end(), args, args + argc);
-    //        ret = func->fn.fptr(argsWithSelf.data(), argc + 1, func->fn.userdata);
-    //    } else {
-    //        ret = func->fn.fptr(args, argc, func->fn.userdata);
-    //    }
-    //    WGcUnprotect(func);
-    //
-    //    if (ret == nullptr) {
-    //        AppendTraceback(func);
-    //    }
-    //
-    //    return ret;
-    //}
-    //    
-    //WObj* WObjListGet(const WObj* list, int index) {
-    //    WASSERT(list && WObjIsList(list) && index >= 0 && (size_t)index < list->v.size());
-    //    return list->v[index];
-    //}
-    //    
-    //void WObjListSet(WObj* list, int index, WObj* value) {
-    //    WASSERT(list && WObjIsList(list) && index >= 0 && (size_t)index < list->v.size());
-    //    list->v[index] = value;
-    //}
-    //    
-    //void WObjListPush(WObj* list, WObj* value) {
-    //    WASSERT(list && value && WObjIsList(list));
-    //    WObjListInsert(list, (int)list->v.size(), value);
-    //}
-    //    
-    //void WObjListPop(WObj* list) {
-    //    WASSERT(list && WObjIsList(list));
-    //    WObjListRemoveAt(list, (int)list->v.size() - 1);
-    //}
-    //    
-    //void WObjListInsert(WObj* list, int index, WObj* value) {
-    //    WASSERT(list && WObjIsList(list) && index >= 0 && (size_t)index <= list->v.size() && value);
-    //    list->v.insert(list->v.begin() + index, value);
-    //}
-    //    
-    //void WObjListRemoveAt(WObj* list, int index) {
-    //    WASSERT(list && WObjIsList(list) && index >= 0 && (size_t)index < list->v.size());
-    //    list->v.erase(list->v.begin() + index);
-    //}
-    //    
-    //WObj* WObjMapGet(WObj* map, const WObj* key) {
-    //    WASSERT(map && key && WObjIsMap(map) && IsImmutable(key));
-    //    auto it = map->m.find(*key);
-    //    WASSERT(it != map->m.end());
-    //    return it->second;
-    //}
-    //
-    //void WObjMapSet(WObj* map, const WObj* key, WObj* value) {
-    //    WASSERT(map && key && value && WObjIsMap(map) && IsImmutable(key));
-    //    map->m[*key] = value;
-    //}
-    //
-    //void WObjMapRemove(WObj* map, const WObj* key) {
-    //    WASSERT(map && key && WObjIsMap(map) && IsImmutable(key));
-    //    auto it = map->m.find(*key);
-    //    WASSERT(it != map->m.end());
-    //    map->m.erase(it);
-    //}
-
     WObj* WObjGetAttribute(WObj* obj, const char* member) {
         WASSERT(obj && member);
         WObj* mem = obj->attributes.Get(member);
@@ -584,20 +460,20 @@ extern "C" {
         return nullptr;
     }
 
-    WObj* WOpIn(WObj* lhs, WObj* rhs) {
-        if (WObj* res = WOpCallMethod(lhs, "__contains__", &rhs, 1)) {
+    WObj* WOpIn(WObj* container, WObj* obj) {
+        if (WObj* res = WOpCallMethod(container, "__contains__", &obj, 1)) {
             if (WObjIsBool(res)) {
                 return res;
             } else {
-                WErrorSetRuntimeError(lhs->context, "__contains__() returned a non bool type");
+                WErrorSetRuntimeError(container->context, "__contains__() returned a non bool type");
             }
         }
         return nullptr;
     }
 
-    WObj* WOpNotIn(WObj* lhs, WObj* rhs) {
-        if (WObj* inOp = WOpIn(lhs, rhs)) {
-            return WObjCreateBool(lhs->context, !WObjGetBool(inOp));
+    WObj* WOpNotIn(WObj* container, WObj* obj) {
+        if (WObj* inOp = WOpIn(container, obj)) {
+            return WObjCreateBool(container->context, !WObjGetBool(inOp));
         } else {
             return nullptr;
         }

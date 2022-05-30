@@ -3,19 +3,23 @@
 #include "wings.h"
 #include "rcptr.h"
 #include <vector>
+#include <variant>
 
 namespace wings {
 
-	struct OperationInstructionInfo {
-		Operation op;
-		Token token; // Holds literal, variable, and/or source location of operation
-		size_t argc;
+	struct OpInstruction {
+		std::string operation;
+		size_t argc{};
+	};
+
+	struct VariadicOpInstruction {
+		size_t argc{};
 	};
 
 	struct Instruction;
 
-	struct DefInstructionInfo {
-		size_t defaultParameterCount;
+	struct DefInstruction {
+		size_t defaultParameterCount{};
 		std::string prettyName;
 		std::vector<Parameter> parameters;
 		std::vector<std::string> globalCaptures;
@@ -24,40 +28,60 @@ namespace wings {
 		RcPtr<std::vector<Instruction>> instructions;
 	};
 
+	using LiteralInstruction = std::variant<std::nullptr_t, bool, wint, wfloat, std::string>;
+
+	struct VariableLoadInstruction {
+		std::string variableName;
+	};
+
+	struct MemberAccessInstruction {
+		std::string memberName;
+	};
+
+	struct JumpInstruction {
+		size_t location;
+	};
+
+	struct DirectAssignInstruction {
+		std::string variableName;
+	};
+
 	struct Instruction {
 		enum class Type {
-			Operation,
-			Pop,
+			Literal,
+			ListLiteral,
+			MapLiteral,
+			Def,
+			Variable,
+			Dot,
+
+			DirectAssign,
+			MemberAssign,
+
 			Jump,
 			JumpIfFalse,
-			Def,
 			Return,
-			Assign,
+
+			Operation,
+			Call,
+			Pop,
+			And,
+			Or,
+			Not,
+			In,
+			NotIn,
 		} type{};
 
-		union {
-			OperationInstructionInfo* operation = nullptr;
-			DefInstructionInfo* def;
-			struct {
-				// Location to execute next
-				size_t location;
-			} jump;
-			struct {
-				// Distance from the next unused index on the stack
-				size_t offset;
-			} push;
-		} data;
+		std::unique_ptr<OpInstruction> op;
+		std::unique_ptr<VariadicOpInstruction> variadicOp;
+		std::unique_ptr<DirectAssignInstruction> directAssign;
+		std::unique_ptr<MemberAccessInstruction> memberAccess;
+		std::unique_ptr<LiteralInstruction> literal;
+		std::unique_ptr<VariableLoadInstruction> variable;
+		std::unique_ptr<DefInstruction> def;
+		std::unique_ptr<JumpInstruction> jump;
 
-		struct {
-			size_t line;
-		} trace;
-
-		Instruction() = default;
-		Instruction(const Instruction&) = delete;
-		Instruction(Instruction&&) noexcept;
-		Instruction& operator=(const Instruction&) = delete;
-		Instruction& operator=(Instruction&&) noexcept;
-		~Instruction();
+		size_t traceLine;
 	};
 
 	std::vector<Instruction> Compile(const Statement& parseTree);

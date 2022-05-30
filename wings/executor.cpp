@@ -83,15 +83,15 @@ namespace wings {
 		for (pc = 0; pc < def->instructions->size(); pc++) {
 			const auto& instr = (*def->instructions)[pc];
 			DoInstruction(instr);
-			if (returnValue.has_value()) {
-				if (returnValue.value() == nullptr) {
+			if (exitValue.has_value()) {
+				if (exitValue.value() == nullptr) {
 					context->err.trace.push_back({
-						instr.trace.line,
+						instr.traceLine,
 						def->module,
 						def->prettyName
 						});
 				}
-				return returnValue.value();
+				return exitValue.value();
 			}
 		}
 		return WObjCreateNull(context);
@@ -99,52 +99,46 @@ namespace wings {
 
 	void Executor::DoInstruction(const Instruction& instr) {
 		switch (instr.type) {
-		case Instruction::Type::Jump: {
-			pc = instr.data.jump.location - 1;
+		case Instruction::Type::Jump:
+			pc = instr.jump->location - 1;
 			break;
-		}
-		case Instruction::Type::JumpIfFalse: {
-			auto arg = PopStack();
-			if (WObj* truthy = WOpTruthy(arg)) {
+		case Instruction::Type::JumpIfFalse:
+			if (WObj* truthy = WOpTruthy(PopStack())) {
 				if (!WObjGetBool(truthy)) {
-					pc = instr.data.jump.location - 1;
-					break;
+					pc = instr.jump->location - 1;
 				}
+			} else {
+				exitValue = nullptr;
 			}
-			returnValue = nullptr;
 			break;
-		}
-		case Instruction::Type::Pop: {
+		case Instruction::Type::Pop:
 			PopStack();
 			break;
-		}
-		case Instruction::Type::Return: {
-			returnValue = PopStack();
+		case Instruction::Type::Return:
+			exitValue = PopStack();
 			break;
-		}
 		case Instruction::Type::Def: {
-
 			DefObject* def = new DefObject();
 			def->context = context;
 			def->module = this->def->module;
-			def->prettyName = instr.data.def->prettyName;
-			def->instructions = instr.data.def->instructions;
+			def->prettyName = instr.def->prettyName;
+			def->instructions = instr.def->instructions;
 
-			for (const auto& param : instr.data.def->parameters)
+			for (const auto& param : instr.def->parameters)
 				def->parameterNames.push_back(param.name);
-			for (size_t i = 0; i < instr.data.def->defaultParameterCount; i++) {
+			for (size_t i = 0; i < instr.def->defaultParameterCount; i++) {
 				WObj* value = PopStack();
 				WGcProtect(value);
 				def->defaultParameterValues.push_back(value);
 			}
 
-			for (const auto& capture : instr.data.def->localCaptures) {
+			for (const auto& capture : instr.def->localCaptures) {
 				def->captures.insert({ capture, variables[capture] });
 			}
-			for (const auto& capture : instr.data.def->globalCaptures) {
+			for (const auto& capture : instr.def->globalCaptures) {
 				def->captures.insert({ capture, context->globals.at(capture) });
 			}
-			def->localVariables = instr.data.def->variables;
+			def->localVariables = instr.def->variables;
 
 			WFunc func{};
 			func.fptr = &DefObject::Run;
@@ -152,7 +146,7 @@ namespace wings {
 			WObj* obj = WObjCreateFunc(context, &func);
 			if (obj == nullptr) {
 				delete def;
-				returnValue = nullptr;
+				exitValue = nullptr;
 				return;
 			}
 
@@ -164,166 +158,203 @@ namespace wings {
 			PushStack(obj);
 			break;
 		}
-		case Instruction::Type::Assign: {
-			DoAssignment(*instr.data.operation);
-			break;
-		}
-		case Instruction::Type::Operation: {
-			DoOperation(*instr.data.operation);
-			break;
-		}
-		default:
-			WUNREACHABLE();
-		}
-	}
-
-	void Executor::DoLiteral(const Token& t) {
-		switch (t.type) {
-		case Token::Type::Null:
-			PushStack(WObjCreateNull(context));
-			break;
-		case Token::Type::Bool:
-			PushStack(WObjCreateBool(context, t.literal.b));
-			break;
-		case Token::Type::Int:
-			PushStack(WObjCreateInt(context, t.literal.i));
-			break;
-		case Token::Type::Float:
-			PushStack(WObjCreateFloat(context, t.literal.f));
-			break;
-		case Token::Type::String:
-			PushStack(WObjCreateString(context, t.literal.s.c_str()));
-			break;
-		default:
-			WUNREACHABLE();
-		}
-	}
-
-	void Executor::DoAssignment(const OperationInstructionInfo& op) {
-		switch (op.op) {
-		case Operation::Assign:
-			if (!op.token.text.empty()) {
-				// Direct assignment
-				SetVariable(op.token.text, PeekStack());
+		case Instruction::Type::Literal: {
+			WObj* value{};
+			if (auto* n = std::get_if<std::nullptr_t>(instr.literal.get())) {
+				value = WObjCreateNull(context);
+			} else if (auto* b = std::get_if<bool>(instr.literal.get())) {
+				value = WObjCreateBool(context, *b);
+			} else if (auto* i = std::get_if<wint>(instr.literal.get())) {
+				value = WObjCreateInt(context, *i);
+			} else if (auto* f = std::get_if<wfloat>(instr.literal.get())) {
+				value = WObjCreateFloat(context, *f);
+			} else if (auto* s = std::get_if<std::string>(instr.literal.get())) {
+				value = WObjCreateString(context, s->c_str());
 			} else {
-				// Assignment to index
+				WUNREACHABLE();
 			}
-			break;
-		default:
-			WUNREACHABLE();
-		}
-	}
 
-	void Executor::DoOperation(const OperationInstructionInfo& op) {
-		switch (op.op) {
-		case Operation::Literal:
-			DoLiteral(op.token);
-			break;
-		case Operation::Variable: {
-			WObj* var = GetVariable(op.token.text);
-			if (var == nullptr) {
-				WErrorSetRuntimeError(context, ("name '" + op.token.text + "' is not defined").c_str());
-				returnValue = nullptr;
-				return;
+			if (value) {
+				PushStack(value);
+			} else {
+				exitValue = nullptr;
 			}
-			PushStack(var);
 			break;
 		}
-		case Operation::ListLiteral:
+		case Instruction::Type::ListLiteral:
 			if (WObj* li = WObjCreateList(context)) {
-				for (int i = 0; i < op.argc; i++)
+				for (int i = 0; i < instr.variadicOp->argc; i++)
 					li->v.insert(li->v.begin(), PopStack());
 				PushStack(li);
 			} else {
-				returnValue = nullptr;
+				exitValue = nullptr;
 			}
 			break;
-		case Operation::MapLiteral:
+		case Instruction::Type::MapLiteral:
 			if (WObj* li = WObjCreateMap(context)) {
-				for (int i = 0; i < op.argc; i++) {
+				for (int i = 0; i < instr.variadicOp->argc; i++) {
 					WObj* val = PopStack();
 					WObj* key = PopStack();
 					if (!WObjIsImmutableType(key)) {
 						WErrorSetRuntimeError(context, "Only an immutable type can be used as a dictionary key");
-						returnValue = nullptr;
+						exitValue = nullptr;
 						return;
 					}
 					li->m.insert({ *key, val });
 				}
 				PushStack(li);
 			} else {
-				returnValue = nullptr;
+				exitValue = nullptr;
 			}
 			break;
-		case Operation::Call: {
-			WObj* fn = stack[stack.size() - op.argc - 1];
-			WObj** args = stack.data() + stack.size() - op.argc;
-			if (WObj* ret = WOpCall(fn, args, (int)op.argc)) {
-				for (size_t i = 0; i < op.argc + 1; i++)
+		case Instruction::Type::Variable:
+			if (WObj* value = GetVariable(instr.variable->variableName)) {
+				PushStack(value);
+			} else {
+				exitValue = nullptr;
+			}
+			break;
+		case Instruction::Type::DirectAssign:
+			SetVariable(instr.directAssign->variableName, PeekStack());
+			break;
+		case Instruction::Type::MemberAssign: {
+			WObj* value = PopStack();
+			WObj* obj = PopStack();
+			WObjSetAttribute(obj, instr.memberAccess->memberName.c_str(), value);
+			break;
+		}
+		case Instruction::Type::Call: {
+			size_t argc = instr.variadicOp->argc;
+			WObj* fn = stack[stack.size() - argc];
+			WObj** args = stack.data() + stack.size() - argc + 1;
+			if (WObj* ret = WOpCall(fn, args, (int)argc - 1)) {
+				for (size_t i = 0; i < argc; i++)
 					PopStack();
 				PushStack(ret);
 			} else {
-				returnValue = nullptr;
+				exitValue = nullptr;
 			}
 			break;
 		}
-		case Operation::Dot: {
-			WObj* self = PopStack();
-			if (WObj* attr = WObjGetAttribute(self, op.token.text.c_str())) {
+		case Instruction::Type::Dot: {
+			WObj* obj = PopStack();
+			if (WObj* attr = WObjGetAttribute(obj, instr.memberAccess->memberName.c_str())) {
 				PushStack(attr);
 			} else {
-
-				//WErrorSetRuntimeError(context, "object has no attribute");
-				returnValue = nullptr;
+				std::string msg = "Object of type " + WObjTypeToString(obj->type) +
+					" has no attribute " + instr.memberAccess->memberName;
+				WErrorSetRuntimeError(context, msg.c_str());
+				exitValue = nullptr;
 			}
 			break;
 		}
-
-
-#define DEFINE_UNARY_OPERATION(enumVal, fn)				\
-		case enumVal:									\
-			if (WObj* res = fn(PopStack())) {			\
-				PushStack(res);						    \
-			} else {								    \
-				returnValue = nullptr;				    \
-			}										    \
-			break
-#define DEFINE_BINARY_OPERATION(enumVal, fn)			\
-		case enumVal: {									\
-			WObj* arg2 = PopStack();					\
-			if (WObj* res = fn(PopStack(), arg2)) {		\
-				PushStack(res);						    \
-			} else {								    \
-				returnValue = nullptr;				    \
-			}										    \
-			break;										\
+		case Instruction::Type::Operation: {
+			std::vector<WObj*> args;
+			for (size_t i = 0; i < instr.op->argc - 1; i++) {
+				args.push_back(PopStack());
 			}
 
-			DEFINE_UNARY_OPERATION(Operation::Pos, WOpPositive);
-			DEFINE_UNARY_OPERATION(Operation::Neg, WOpNegative);
-			DEFINE_UNARY_OPERATION(Operation::BitNot, WOpBitNot);
-			DEFINE_BINARY_OPERATION(Operation::Add, WOpAdd);
-			DEFINE_BINARY_OPERATION(Operation::Sub, WOpSubtract);
-			DEFINE_BINARY_OPERATION(Operation::Mul, WOpMultiply);
-			DEFINE_BINARY_OPERATION(Operation::Div, WOpDivide);
-			DEFINE_BINARY_OPERATION(Operation::IDiv, WOpFloorDivide);
-			DEFINE_BINARY_OPERATION(Operation::Mod, WOpModulo);
-			DEFINE_BINARY_OPERATION(Operation::Pow, WOpPower);
-			DEFINE_BINARY_OPERATION(Operation::Eq, WOpEquals);
-			DEFINE_BINARY_OPERATION(Operation::Ne, WOpNotEquals);
-			DEFINE_BINARY_OPERATION(Operation::Lt, WOpLessThan);
-			DEFINE_BINARY_OPERATION(Operation::Le, WOpLessThanOrEqual);
-			DEFINE_BINARY_OPERATION(Operation::Gt, WOpGreaterThan);
-			DEFINE_BINARY_OPERATION(Operation::Ge, WOpGreaterThanOrEqual);
-			DEFINE_BINARY_OPERATION(Operation::In, WOpIn);
-			DEFINE_BINARY_OPERATION(Operation::NotIn, WOpNotIn);
-			DEFINE_BINARY_OPERATION(Operation::BitAnd, WOpBitAnd);
-			DEFINE_BINARY_OPERATION(Operation::BitOr, WOpBitOr);
-			DEFINE_BINARY_OPERATION(Operation::BitXor, WOpBitXor);
-			DEFINE_BINARY_OPERATION(Operation::ShiftL, WOpShiftLeft);
-			DEFINE_BINARY_OPERATION(Operation::ShiftR, WOpShiftRight);
-			DEFINE_BINARY_OPERATION(Operation::Index, WOpGetIndex);
+			if (WObj* res = WOpCallMethod(PopStack(), instr.op->operation.c_str(), args.data(), (int)args.size())) {
+				PushStack(res);
+			} else {
+				exitValue = nullptr;
+			}
+			break;
+		}
+		case Instruction::Type::And: {
+			WObj* arg1 = WOpTruthy(PopStack());
+			if (arg1 == nullptr) {
+				exitValue = nullptr;
+				break;
+			}
 
+			if (!WObjGetBool(arg1)) {
+				// Short circuit
+				if (WObj* value = WObjCreateBool(context, false)) {
+					PushStack(value);
+				} else {
+					exitValue = nullptr;
+					break;
+				}
+			}
+
+			WObj* arg2 = WOpTruthy(PopStack());
+			if (arg2 == nullptr) {
+				exitValue = nullptr;
+				break;
+			}
+			
+			if (WObj* value = WObjCreateBool(context, WObjGetBool(arg2))) {
+				PushStack(value);
+			} else {
+				exitValue = nullptr;
+			}
+			break;
+		}
+		case Instruction::Type::Or: {
+			WObj* arg1 = WOpTruthy(PopStack());
+			if (arg1 == nullptr) {
+				exitValue = nullptr;
+				break;
+			}
+
+			if (WObjGetBool(arg1)) {
+				// Short circuit
+				if (WObj* value = WObjCreateBool(context, true)) {
+					PushStack(value);
+				} else {
+					exitValue = nullptr;
+					break;
+				}
+			}
+
+			WObj* arg2 = WOpTruthy(PopStack());
+			if (arg2 == nullptr) {
+				exitValue = nullptr;
+				break;
+			}
+
+			if (WObj* value = WObjCreateBool(context, WObjGetBool(arg2))) {
+				PushStack(value);
+			} else {
+				exitValue = nullptr;
+			}
+			break;
+		}
+		case Instruction::Type::Not: {
+			WObj* arg = WOpTruthy(PopStack());
+			if (arg == nullptr) {
+				exitValue = nullptr;
+				break;
+			}
+
+			if (WObj* value = WObjCreateBool(context, WObjGetBool(arg))) {
+				PushStack(value);
+			} else {
+				exitValue = nullptr;
+			}
+			break;
+		}
+		case Instruction::Type::In: {
+			WObj* obj = PopStack();
+			WObj* container = PopStack();
+			if (WObj* value = WOpIn(container, obj)) {
+				PushStack(value);
+			} else {
+				exitValue = nullptr;
+			}
+			break;
+		}
+		case Instruction::Type::NotIn: {
+			WObj* obj = PopStack();
+			WObj* container = PopStack();
+			if (WObj* value = WOpNotIn(container, obj)) {
+				PushStack(value);
+			} else {
+				exitValue = nullptr;
+			}
+			break;
+		}
 		default:
 			WUNREACHABLE();
 		}

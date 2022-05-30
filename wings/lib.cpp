@@ -86,7 +86,7 @@ static size_t ConvertNegativeIndex(wint index, size_t size) {
 static void SetInvalidArgumentCountError(WContext* context, int given, int expected = -1) {
 	std::string msg;
 	if (expected != -1) {
-		msg = "function takes " +
+		msg = "Function takes " +
 			std::to_string(expected) +
 			" argument(s) but " +
 			std::to_string(given) +
@@ -100,7 +100,7 @@ static void SetInvalidArgumentCountError(WContext* context, int given, int expec
 }
 
 static void SetArgumentError(WContext* context, size_t paramIndex, const std::string& message) {
-	std::string msg = "argument " + std::to_string(paramIndex) + " " + message;
+	std::string msg = "Argument " + std::to_string(paramIndex) + " " + message;
 	WErrorSetRuntimeError(context, msg.c_str());
 }
 
@@ -132,7 +132,7 @@ static void SetIndexOutOfRangeError(WContext* context, WObj** argv, size_t param
 }
 
 static void SetDivisionByZeroError(WContext* context) {
-	WErrorSetRuntimeError(context, "division by zero");
+	WErrorSetRuntimeError(context, "Division by zero");
 }
 
 #define EXPECT_ARG_COUNT(n) do if (argc != n) { SetInvalidArgumentCountError(context, argc, n); return nullptr; } while (0)
@@ -570,7 +570,7 @@ namespace wings {
 
 			wint shift = WObjGetInt(argv[1]);
 			if (shift < 0) {
-				WErrorSetRuntimeError(context, "shift cannot be negative");
+				WErrorSetRuntimeError(context, "Shift cannot be negative");
 				return nullptr;
 			}
 			shift = std::min(shift, (wint)sizeof(wint) * 8);
@@ -584,7 +584,7 @@ namespace wings {
 
 			wint shift = WObjGetInt(argv[1]);
 			if (shift < 0) {
-				WErrorSetRuntimeError(context, "shift cannot be negative");
+				WErrorSetRuntimeError(context, "Shift cannot be negative");
 				return nullptr;
 			}
 			shift = std::min(shift, (wint)sizeof(wint) * 8);
@@ -727,9 +727,9 @@ namespace wings {
 
 				if (!isDigit(*p, base)) {
 					if (base == 2) {
-						WErrorSetRuntimeError(context, "invalid binary string");
+						WErrorSetRuntimeError(context, "Invalid binary string");
 					} else {
-						WErrorSetRuntimeError(context, "invalid hexadecimal string");
+						WErrorSetRuntimeError(context, "Invalid hexadecimal string");
 					}
 					return nullptr;
 				}
@@ -741,12 +741,12 @@ namespace wings {
 			}
 
 			if (value > std::numeric_limits<wuint>::max()) {
-				WErrorSetRuntimeError(context, "integer string is too large");
+				WErrorSetRuntimeError(context, "Integer string is too large");
 				return nullptr;
 			}
 
 			if (*p) {
-				WErrorSetRuntimeError(context, "invalid integer string");
+				WErrorSetRuntimeError(context, "Invalid integer string");
 				return nullptr;
 			}
 
@@ -804,9 +804,9 @@ namespace wings {
 
 				if (!isDigit(*p, base) && *p != '.') {
 					if (base == 2) {
-						WErrorSetRuntimeError(context, "invalid binary string");
+						WErrorSetRuntimeError(context, "Invalid binary string");
 					} else {
-						WErrorSetRuntimeError(context, "invalid hexadecimal string");
+						WErrorSetRuntimeError(context, "Invalid hexadecimal string");
 					}
 					return nullptr;
 				}
@@ -826,7 +826,7 @@ namespace wings {
 			}
 
 			if (*p) {
-				WErrorSetRuntimeError(context, "invalid float string");
+				WErrorSetRuntimeError(context, "Invalid float string");
 				return nullptr;
 			}
 
@@ -934,7 +934,7 @@ namespace wings {
 				}
 
 				if (i >= v.size()) {
-					WErrorSetRuntimeError(context, "list modified while iterating");
+					WErrorSetRuntimeError(context, "List modified while iterating");
 					return nullptr;
 				}
 				
@@ -942,7 +942,7 @@ namespace wings {
 				return argv[0];
 			}
 
-			WErrorSetRuntimeError(context, "value not found in list");
+			WErrorSetRuntimeError(context, "Value not found in list");
 			return nullptr;
 		}
 
