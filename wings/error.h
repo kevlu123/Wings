@@ -5,8 +5,8 @@
 namespace wings {
 
 	struct SourcePosition {
-		size_t line;
-		size_t column;
+		size_t line = (size_t)-1;
+		size_t column = (size_t)-1;
 	};
 
 	struct CodeError {

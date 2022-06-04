@@ -1,6 +1,7 @@
 #pragma once
 #include "rcptr.h"
 #include "wings.h"
+#include "error.h"
 #include "attributetable.h"
 #include <string>
 #include <vector>
@@ -59,7 +60,8 @@ struct WObj {
 };
 
 struct TraceFrame {
-    size_t line;
+    wings::SourcePosition srcPos;
+    std::string lineText;
     std::string module;
     std::string func;
 };
@@ -71,8 +73,8 @@ struct WContext {
     size_t lastObjectCountAfterGC = 0;
     std::deque<std::unique_ptr<WObj>> mem;
     std::unordered_multiset<const WObj*> protectedObjects;
-
     std::unordered_map<std::string, wings::RcPtr<WObj*>> globals;
+
 
     struct {
         WError code;

@@ -230,7 +230,11 @@ namespace wings {
 	static CodeError ParsePostfix(TokenIter& p, Expression arg, Expression& out) {
 		if (p.EndReached()) {
 			out = std::move(arg);
-		} else if (p->text == "++" || p->text == "--") {
+			return CodeError::Good();
+		}
+
+		out.srcPos = p->srcPos;
+		if (p->text == "++" || p->text == "--") {
 			switch (arg.operation) {
 			case Operation::Variable:
 				out.assignType = AssignType::Direct;
@@ -295,7 +299,7 @@ namespace wings {
 				return CodeError::Bad("Expected an attribute name", p->srcPos);
 			}
 			out.children = { std::move(arg) };
-			out.literal = *p;
+			out.variableName = p->text;
 			++p;
 		} else {
 			out = std::move(arg);
@@ -321,9 +325,10 @@ namespace wings {
 	}
 
 	static CodeError ParseListLiteral(TokenIter& p, Expression& out) {
+		out.srcPos = p->srcPos;
+		out.operation = Operation::ListLiteral;
 		++p;
 
-		out.operation = Operation::ListLiteral;
 		if (p.EndReached()) {
 			return CodeError::Bad("Expected an expression", (--p)->srcPos);
 		} else if (auto error = ParseExpressionList(p, "]", out.children)) {
@@ -336,8 +341,9 @@ namespace wings {
 	}
 
 	static CodeError ParseMapLiteral(TokenIter& p, Expression& out) {
-		++p;
+		out.srcPos = p->srcPos;
 		out.operation = Operation::MapLiteral;
+		++p;
 		bool mustTerminate = false;
 		while (true) {
 			// Check for terminating token
@@ -399,19 +405,32 @@ namespace wings {
 		} else {
 			switch (p->type) {
 			case Token::Type::Null:
+				out.literalValue.type = LiteralValue::Type::Null;
+				break;
 			case Token::Type::Bool:
+				out.literalValue.type = LiteralValue::Type::Bool;
+				out.literalValue.b = p->literal.b;
+				break;
 			case Token::Type::Int:
+				out.literalValue.type = LiteralValue::Type::Int;
+				out.literalValue.i = p->literal.i;
+				break;
 			case Token::Type::Float:
+				out.literalValue.type = LiteralValue::Type::Float;
+				out.literalValue.f = p->literal.f;
+				break;
 			case Token::Type::String:
-				out.operation = Operation::Literal;
+				out.literalValue.type = LiteralValue::Type::String;
+				out.literalValue.s = p->literal.s;
 				break;
 			case Token::Type::Word:
 				out.operation = Operation::Variable;
+				out.variableName = p->text;
 				break;
 			default:
 				return CodeError::Bad("Unexpected expression", p->srcPos);
 			}
-			out.literal = *p;
+			out.srcPos = p->srcPos;
 			++p;
 		}
 
@@ -432,6 +451,7 @@ namespace wings {
 	static CodeError ParsePrefix(TokenIter& p, Expression& out) {
 		if (PREFIX_UNARY_OP_STRINGS.contains(p->text)) {
 			Operation op = PREFIX_UNARY_OP_STRINGS.at(p->text);
+			out.srcPos = p->srcPos;
 			++p;
 			if (p.EndReached()) {
 				return CodeError::Bad("Expected an expression", (--p)->srcPos);
@@ -465,6 +485,7 @@ namespace wings {
 			return CodeError::Good();
 		} else if (op == Operation::NotIn) {
 			// 'not in' is a special case since it contains 2 tokens
+			out.srcPos = p->srcPos;
 			++p;
 			if (p.EndReached()) {
 				return CodeError::Bad("Expected a 'in'", (--p)->srcPos);
@@ -480,6 +501,7 @@ namespace wings {
 		if (p.EndReached()) {
 			return CodeError::Bad("Expected an expression", (--p)->srcPos);
 		}
+		out.srcPos = p->srcPos;
 		if (BINARY_RIGHT_ASSOCIATIVE_OPS.contains(op)) {
 			// Binary operation is an assignment operation if and only if it is right associative
 			switch (lhs.operation) {

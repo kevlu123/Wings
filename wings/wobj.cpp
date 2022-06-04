@@ -317,7 +317,8 @@ extern "C" {
             if (ret == nullptr && callable->fn.fptr != &DefObject::Run) {
                 // Native function failed
                 callable->context->err.trace.push_back({
-                    0,
+                    {},
+                    "",
                     "<Native>",
                     callable->fn.prettyName ? callable->fn.prettyName : "",
                     });

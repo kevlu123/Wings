@@ -43,15 +43,16 @@ namespace wings {
 		}
 
 		Instruction instr{};
+		instr.srcPos = expression.srcPos;
+
 		switch (expression.assignType) {
 		case AssignType::Direct:
 			// <assign>
 			//		<assignee>
 			//		<expr>
 			CompileExpression(expression.children[1], instructions);
-			instr.traceLine = expression.children[0].literal.srcPos.line;
 			instr.directAssign = std::make_unique<DirectAssignInstruction>();
-			instr.directAssign->variableName = expression.children[0].literal.text;
+			instr.directAssign->variableName = expression.children[0].variableName;
 			instr.type = Instruction::Type::DirectAssign;
 			break;
 		case AssignType::Index:
@@ -60,10 +61,9 @@ namespace wings {
 			//			<var>
 			//			<index>
 			//		<expr>
-			CompileExpression(expression.children[0].children[0], instructions); //
+			CompileExpression(expression.children[0].children[0], instructions);
 			CompileExpression(expression.children[0].children[1], instructions);
 			CompileExpression(expression.children[1], instructions);
-			instr.traceLine = expression.children[0].literal.srcPos.line;
 			instr.op = std::make_unique<OpInstruction>();
 			instr.op->argc = 2;
 			instr.op->operation = "__setitem__";
@@ -76,22 +76,20 @@ namespace wings {
 			//		<expr>
 			CompileExpression(expression.children[0], instructions);
 			CompileExpression(expression.children[1], instructions);
-			instr.traceLine = expression.children[0].literal.srcPos.line;
 			instr.memberAccess = std::make_unique<MemberAccessInstruction>();
-			instr.memberAccess->memberName = expression.children[0].literal.text;
+			instr.memberAccess->memberName = expression.children[0].variableName;
 			instr.type = Instruction::Type::MemberAssign;
 			break;
 		case AssignType::None:
-			instr.traceLine = expression.literal.srcPos.line;
 			switch (expression.operation) {
 			case Operation::Literal:
 				instr.literal = std::make_unique<LiteralInstruction>();
-				switch (expression.literal.type) {
-				case Token::Type::Null: *instr.literal = nullptr; break;
-				case Token::Type::Bool: *instr.literal = expression.literal.literal.b; break;
-				case Token::Type::Int: *instr.literal = expression.literal.literal.i; break;
-				case Token::Type::Float: *instr.literal = expression.literal.literal.f; break;
-				case Token::Type::String: *instr.literal = expression.literal.literal.s; break;
+				switch (expression.literalValue.type) {
+				case LiteralValue::Type::Null: *instr.literal = nullptr; break;
+				case LiteralValue::Type::Bool: *instr.literal = expression.literalValue.b; break;
+				case LiteralValue::Type::Int: *instr.literal = expression.literalValue.i; break;
+				case LiteralValue::Type::Float: *instr.literal = expression.literalValue.f; break;
+				case LiteralValue::Type::String: *instr.literal = expression.literalValue.s; break;
 				default: WUNREACHABLE();
 				}
 				instr.type = Instruction::Type::Literal;
@@ -108,12 +106,12 @@ namespace wings {
 				break;
 			case Operation::Variable:
 				instr.variable = std::make_unique<VariableLoadInstruction>();
-				instr.variable->variableName = expression.literal.text;
+				instr.variable->variableName = expression.variableName;
 				instr.type = Instruction::Type::Variable;
 				break;
 			case Operation::Dot:
 				instr.memberAccess = std::make_unique<MemberAccessInstruction>();
-				instr.memberAccess->memberName = expression.children[0].literal.text;
+				instr.memberAccess->memberName = expression.children[0].variableName;
 				instr.type = Instruction::Type::Dot;
 				break;
 			case Operation::Call:
@@ -163,6 +161,7 @@ namespace wings {
 		CompileExpression(node.expr, instructions);
 
 		Instruction instr{};
+		instr.srcPos = node.expr.srcPos;
 		instr.type = Instruction::Type::Pop;
 		instructions.push_back(std::move(instr));
 	}
@@ -172,6 +171,7 @@ namespace wings {
 
 		size_t falseJumpInstrIndex = instructions.size();
 		Instruction falseJump{};
+		falseJump.srcPos = node.srcPos;
 		falseJump.type = Instruction::Type::JumpIfFalse;
 		falseJump.jump = std::make_unique<JumpInstruction>();
 		instructions.push_back(std::move(falseJump));
@@ -181,6 +181,7 @@ namespace wings {
 		if (node.elseClause) {
 			size_t trueJumpInstrIndex = instructions.size();
 			Instruction trueJump{};
+			trueJump.srcPos = node.elseClause->srcPos;
 			trueJump.type = Instruction::Type::Jump;
 			trueJump.jump = std::make_unique<JumpInstruction>();
 			instructions.push_back(std::move(trueJump));
@@ -201,6 +202,7 @@ namespace wings {
 		
 		size_t terminateJumpInstrIndex = instructions.size();
 		Instruction terminateJump{};
+		terminateJump.srcPos = node.srcPos;
 		terminateJump.type = Instruction::Type::JumpIfFalse;
 		terminateJump.jump = std::make_unique<JumpInstruction>();
 		instructions.push_back(std::move(terminateJump));
@@ -208,6 +210,7 @@ namespace wings {
 		CompileBody(node, instructions);
 
 		Instruction loopJump{};
+		loopJump.srcPos = node.srcPos;
 		loopJump.type = Instruction::Type::Jump;
 		loopJump.jump = std::make_unique<JumpInstruction>();
 		loopJump.jump->location = conditionLocation;
@@ -233,6 +236,7 @@ namespace wings {
 		breakInstructions.push_back(instructions.size());
 
 		Instruction jump{};
+		jump.srcPos = node.srcPos;
 		jump.type = Instruction::Type::Jump;
 		jump.jump = std::make_unique<JumpInstruction>();
 		instructions.push_back(std::move(jump));
@@ -242,6 +246,7 @@ namespace wings {
 		continueInstructions.push_back(instructions.size());
 
 		Instruction jump{};
+		jump.srcPos = node.srcPos;
 		jump.type = Instruction::Type::Jump;
 		jump.jump = std::make_unique<JumpInstruction>();
 		instructions.push_back(std::move(jump));
@@ -251,6 +256,7 @@ namespace wings {
 		CompileExpression(node.expr, instructions);
 
 		Instruction in{};
+		in.srcPos = node.srcPos;
 		in.type = Instruction::Type::Return;
 		instructions.push_back(std::move(in));
 	}
@@ -269,6 +275,7 @@ namespace wings {
 		}
 
 		Instruction def{};
+		def.srcPos = node.srcPos;
 		def.type = Instruction::Type::Def;
 		def.def = std::make_unique<DefInstruction>();
 		def.def->variables = std::vector<std::string>(
@@ -291,6 +298,7 @@ namespace wings {
 		instructions.push_back(std::move(def));
 
 		Instruction assign{};
+		assign.srcPos = node.srcPos;
 		assign.type = Instruction::Type::DirectAssign;
 		assign.directAssign = std::make_unique<DirectAssignInstruction>();
 		assign.directAssign->variableName = node.def.name;

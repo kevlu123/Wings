@@ -86,7 +86,8 @@ namespace wings {
 			if (exitValue.has_value()) {
 				if (exitValue.value() == nullptr) {
 					context->err.trace.push_back({
-						instr.traceLine,
+						instr.srcPos,
+						(*def->originalSource)[instr.srcPos.line],
 						def->module,
 						def->prettyName
 						});
@@ -123,6 +124,7 @@ namespace wings {
 			def->module = this->def->module;
 			def->prettyName = instr.def->prettyName;
 			def->instructions = instr.def->instructions;
+			def->originalSource = this->def->originalSource;
 
 			for (const auto& param : instr.def->parameters)
 				def->parameterNames.push_back(param.name);
@@ -211,6 +213,8 @@ namespace wings {
 			if (WObj* value = GetVariable(instr.variable->variableName)) {
 				PushStack(value);
 			} else {
+				std::string msg = "The name '" + instr.variable->variableName + "' is not defined";
+				WErrorSetRuntimeError(context, msg.c_str());
 				exitValue = nullptr;
 			}
 			break;

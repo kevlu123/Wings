@@ -101,10 +101,9 @@ namespace wings {
 		// __VarXXX = expression
 		std::string rangeVarName = "__For" + std::to_string(Guid());
 		Expression rangeVar{};
+		rangeVar.srcPos = forLoop.expr.srcPos;
 		rangeVar.operation = Operation::Variable;
-		rangeVar.literal.type = Token::Type::Word;
-		rangeVar.literal.literal.s = rangeVarName;
-		rangeVar.literal.text = rangeVarName;
+		rangeVar.variableName = rangeVarName;
 
 		Statement rangeEval{};
 		rangeEval.type = Statement::Type::Expr;
@@ -115,17 +114,18 @@ namespace wings {
 
 		// while not __VarXXX.__iterend__():
 		Expression loadEndCheck{};
+		loadEndCheck.srcPos = forLoop.expr.srcPos;
 		loadEndCheck.operation = Operation::Dot;
-		loadEndCheck.literal.type = Token::Type::Word;
-		loadEndCheck.literal.literal.s = "__iterend__";
-		loadEndCheck.literal.text = "__iterend__";
+		loadEndCheck.variableName = "__iterend__";
 		loadEndCheck.children.push_back(rangeVar);
 
 		Expression callEndCheck{};
+		callEndCheck.srcPos = forLoop.expr.srcPos;
 		callEndCheck.operation = Operation::Call;
 		callEndCheck.children.push_back(std::move(loadEndCheck));
 
 		Expression condition{};
+		condition.srcPos = forLoop.expr.srcPos;
 		condition.operation = Operation::Not;
 		condition.children.push_back(std::move(callEndCheck));
 
@@ -135,17 +135,18 @@ namespace wings {
 
 		// vars = __VarXXX.__iternext__()
 		Expression loadNext{};
+		loadNext.srcPos = forLoop.expr.srcPos;
 		loadNext.operation = Operation::Dot;
-		loadNext.literal.type = Token::Type::Word;
-		loadNext.literal.literal.s = "__iternext__";
-		loadNext.literal.text = "__iternext__";
+		loadNext.variableName = "__iternext__";
 		loadNext.children.push_back(rangeVar);
 
 		Expression callNext{};
+		callNext.srcPos = forLoop.expr.srcPos;
 		callNext.operation = Operation::Call;
 		callNext.children.push_back(std::move(loadNext));
 
-		Expression iterAssign{}; //
+		Expression iterAssign{};
+		iterAssign.srcPos = forLoop.expr.srcPos;
 		iterAssign.operation = Operation::Assign;
 		iterAssign.assignType = AssignType::Direct;
 		iterAssign.children.push_back(forLoop.forLoop.variable);
@@ -252,7 +253,7 @@ namespace wings {
 	static std::unordered_set<std::string> GetReferencedVariables(const Expression& expr) {
 		std::unordered_set<std::string> variables;
 		if (expr.operation == Operation::Variable) {
-			variables.insert(expr.literal.text);
+			variables.insert(expr.variableName);
 		} else {
 			for (const auto& child : expr.children) {
 				variables.merge(GetReferencedVariables(child));
@@ -265,7 +266,7 @@ namespace wings {
 	static std::unordered_set<std::string> GetWriteVariables(const Expression& expr) {
 		std::unordered_set<std::string> variables;
 		if (expr.operation == Operation::Assign && expr.children[0].operation == Operation::Variable) {
-			variables.insert(expr.children[0].literal.text);
+			variables.insert(expr.children[0].variableName);
 		} else {
 			for (const auto& child : expr.children) {
 				variables.merge(GetWriteVariables(child));
@@ -339,8 +340,8 @@ namespace wings {
 
 	static CodeError ParseDef(const LexTree& node, Statement& out) {
 		TokenIter p(node.tokens);
-		++p;
 		out.type = Statement::Type::Def;
+		++p;
 
 		if (p.EndReached()) {
 			return CodeError::Bad("Expected a function name", (--p)->srcPos);
@@ -388,7 +389,7 @@ namespace wings {
 		out.type = Statement::Type::Return;
 		if (p.EndReached()) {
 			out.expr.operation = Operation::Literal;
-			out.expr.literal.type = Token::Type::Null;
+			out.expr.literalValue.type = LiteralValue::Type::Null;
 			return CodeError::Good();
 		} else if (auto error = ParseExpression(p, out.expr)) {
 			return error;
@@ -501,7 +502,7 @@ namespace wings {
 			}
 		}
 
-		out.token = node.tokens[0];
+		out.srcPos = node.tokens[0].srcPos;
 		return CodeError::Good();
 	}
 
@@ -543,14 +544,14 @@ namespace wings {
 				if (lastType != Statement::Type::If && lastType != Statement::Type::Elif) {
 					return CodeError::Bad(
 						"An 'elif' clause may only appear after an 'if' or 'elif' clause",
-						stat.token.srcPos
+						stat.srcPos
 					);
 				}
 			} else if (stat.type == Statement::Type::Else) {
 				if (lastType != Statement::Type::If && lastType != Statement::Type::Elif && lastType != Statement::Type::While) {
 					return CodeError::Bad(
 						"An 'else' clause may only appear after an 'if', 'elif', 'while', or 'for' clause",
-						stat.token.srcPos
+						stat.srcPos
 					);
 				}
 			}

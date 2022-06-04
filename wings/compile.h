@@ -55,12 +55,12 @@ namespace wings {
 			Variable,
 			Dot,
 
-			DirectAssign,
-			MemberAssign,
+			DirectAssign,	// Cannot fail
+			MemberAssign,	// Cannot fail
 
-			Jump,
+			Jump,			// Cannot fail
 			JumpIfFalse,
-			Return,
+			Return,			// Cannot fail
 
 			Operation,
 			Call,
@@ -81,7 +81,7 @@ namespace wings {
 		std::unique_ptr<DefInstruction> def;
 		std::unique_ptr<JumpInstruction> jump;
 
-		size_t traceLine;
+		SourcePosition srcPos;
 	};
 
 	std::vector<Instruction> Compile(const Statement& parseTree);

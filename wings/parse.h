@@ -24,7 +24,7 @@ namespace wings {
 			Composite,
 		} type;
 
-		Token token;
+		SourcePosition srcPos;
 		Expression expr;
 		std::vector<Statement> body;
 		std::unique_ptr<Statement> elseClause;

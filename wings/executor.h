@@ -19,6 +19,7 @@ namespace wings {
 		std::vector<std::string> parameterNames;
 		std::vector<WObj*> defaultParameterValues;
 		std::unordered_map<std::string, RcPtr<WObj*>> captures;
+		RcPtr<std::vector<std::string>> originalSource;
 	};
 
 	struct Executor {

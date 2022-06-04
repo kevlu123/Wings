@@ -4,6 +4,7 @@
 #include <iostream>
 #include <memory>
 #include <sstream>
+#include <algorithm>
 
 using namespace wings;
 
@@ -20,9 +21,9 @@ static std::string CreateTracebackMessage(WContext* context) {
             written = true;
         }
 
-        if (frame.line != 0) {
+        if (frame.srcPos.line != (size_t)-1) {
             if (written) ss << ", ";
-            ss << "Line " << frame.line;
+            ss << "Line " << (frame.srcPos.line + 1); 
             written = true;
         }
 
@@ -32,26 +33,19 @@ static std::string CreateTracebackMessage(WContext* context) {
         }
 
         ss << "\n";
+
+        if (!frame.lineText.empty()) {
+            std::string lineText = frame.lineText;
+            std::replace(lineText.begin(), lineText.end(), '\t', ' ');
+
+            size_t skip = lineText.find_first_not_of(' ');
+            ss << "    " << (lineText.c_str() + skip) << "\n";
+            ss << std::string(frame.srcPos.column + 4 - skip, ' ') << "^\n";
+        }
     }
 
     ss << context->err.message << "\n";
     return ss.str();
-
-    //std::string s = "Traceback (most recent call last):\n";
-    //for (const auto& frame : context->err.trace) {
-    //    s += "  Module \"";
-    //    s += frame.module;
-    //    s += "\", line " + std::to_string(frame.line);
-    //    if (!frame.func.empty()) {
-    //        s += ", in ";
-    //        s += frame.func;
-    //    } else {
-    //        s += ", in <no name>";
-    //    }
-    //    s += "\n";
-    //}
-    //s += context->err.message + "\n";
-    //return s;
 }
 
 static void SetCompileError(WContext* context, const std::string& message) {
@@ -141,14 +135,15 @@ extern "C" {
         };
 
         auto lexResult = Lex(code);
+        auto originalSource = MakeRcPtr<std::vector<std::string>>(lexResult.originalSource);
         if (lexResult.error) {
-            SetCompileError(context, formatError(lexResult.error, lexResult.rawCode));
+            SetCompileError(context, formatError(lexResult.error, *originalSource));
             return nullptr;
         }
 
         auto parseResult = Parse(lexResult.lexTree);
         if (parseResult.error) {
-            SetCompileError(context, formatError(parseResult.error, lexResult.rawCode));
+            SetCompileError(context, formatError(parseResult.error, *originalSource));
             return nullptr;
         }
 
@@ -156,6 +151,7 @@ extern "C" {
         def->context = context;
         def->module = moduleName;
         def->prettyName = "";
+        def->originalSource = std::move(originalSource);
         auto instructions = Compile(parseResult.parseTree);
         def->instructions = MakeRcPtr<std::vector<Instruction>>(std::move(instructions));
 

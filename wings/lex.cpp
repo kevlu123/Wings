@@ -384,10 +384,9 @@ namespace wings {
 
 	LexResult Lex(std::string code) {
 		code = NormalizeLineEndings(code);
-		auto rawCode = SplitLines(code);
-		
-		// Clean out comments
-		std::vector<std::string> lines = rawCode;
+		auto originalSource = SplitLines(code);
+
+		std::vector<std::string> lines = originalSource;
 		for (auto& line : lines)
 			StripComments(line);
 
@@ -452,7 +451,7 @@ namespace wings {
 		LexResult result{};
 		result.error = std::move(error);
 		result.lexTree = std::move(rootTree);
-		result.rawCode = std::move(rawCode);
+		result.originalSource = std::move(originalSource);
 		return result;
 	}
 }

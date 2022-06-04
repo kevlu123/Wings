@@ -38,7 +38,7 @@ namespace wings {
 	};
 
 	struct LexResult {
-		std::vector<std::string> rawCode;
+		std::vector<std::string> originalSource;
 		LexTree lexTree; // Root tree contains no tokens
 		CodeError error;
 	};

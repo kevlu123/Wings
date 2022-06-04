@@ -34,11 +34,33 @@ namespace wings {
 		Member,
 	};
 
+	struct LiteralValue {
+		enum class Type {
+			Null,
+			Bool,
+			Int,
+			Float,
+			String,
+		} type;
+
+		struct {
+			union {
+				bool b;
+				wint i;
+				wfloat f;
+			};
+			std::string s;
+		};
+	};
+
 	struct Expression {
 		Operation operation;
 		AssignType assignType = AssignType::None;
 		std::vector<Expression> children;
-		Token literal;
+		SourcePosition srcPos;
+
+		std::string variableName;
+		LiteralValue literalValue;
 	};
 
 	struct TokenIter {
