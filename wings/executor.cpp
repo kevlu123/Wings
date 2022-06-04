@@ -19,8 +19,13 @@ namespace wings {
 			executor.variables.insert({ localVar, MakeRcPtr<WObj*>(null) });
 		}
 
+		// Add captures
+		for (const auto& capture : def->captures) {
+			executor.variables.insert(capture);
+		}
+
 		// Initialize parameters
-		if (argc > (int)def->parameterNames.size()) {
+		if (argc != (int)def->parameterNames.size()) {
 			std::string msg = "function takes " +
 				std::to_string(def->parameterNames.size()) +
 				" argument(s) but " +
@@ -135,7 +140,11 @@ namespace wings {
 			}
 
 			for (const auto& capture : instr.def->localCaptures) {
-				def->captures.insert({ capture, variables[capture] });
+				if (variables.contains(capture)) {
+					def->captures.insert({ capture, variables[capture] });
+				} else {
+					def->captures.insert({ capture, context->globals.at(capture) });
+				}
 			}
 			for (const auto& capture : instr.def->globalCaptures) {
 				def->captures.insert({ capture, context->globals.at(capture) });

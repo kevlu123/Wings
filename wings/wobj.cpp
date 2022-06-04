@@ -339,7 +339,7 @@ extern "C" {
 
         WObj* method = WObjGetAttribute(obj, member);
         if (method == nullptr) {
-            std::string msg = "object of type " +
+            std::string msg = "Object of type " +
                 WObjTypeToString(obj->type) +
                 " has no attribute " +
                 member;

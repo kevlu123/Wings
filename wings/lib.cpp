@@ -100,7 +100,7 @@ static void SetInvalidArgumentCountError(WContext* context, int given, int expec
 }
 
 static void SetArgumentError(WContext* context, size_t paramIndex, const std::string& message) {
-	std::string msg = "Argument " + std::to_string(paramIndex) + " " + message;
+	std::string msg = "Argument " + std::to_string(paramIndex + 1) + " " + message;
 	WErrorSetRuntimeError(context, msg.c_str());
 }
 
@@ -196,13 +196,18 @@ static WObj* CreateClass(WContext* context, const char* name = nullptr) {
 		WObj* instance = Constructor(argv, argc, _class->context);
 		if (instance == nullptr)
 			return (WObj*)nullptr;
-		if (instance->attributes.Empty())
+
+		if (instance->attributes.Empty()) {
+			// Just created a fresh instance
 			instance->attributes = _class->c.Copy();
+		}
+
 		return instance;
 	};
 
 	_class->type = WObj::Type::Class;
 	_class->fn = constructor;
+	_class->c.Set("__class__", _class);
 
 	if (name) {
 		WContextSetGlobal(context, name, _class);
@@ -968,62 +973,6 @@ namespace wings {
 			return WObjCreateNull(context);
 		}
 
-		static WObj* range(WObj** argv, int argc, WContext* context) {
-			if (argc < 1) {
-				SetInvalidArgumentCountError(context, argc, 1);
-				return nullptr;
-			} else if (argc > 3) {
-				SetInvalidArgumentCountError(context, argc, 3);
-				return nullptr;
-			}
-
-			WObj* rangeObj = WObjCreateObject(context);
-			WGcProtect(rangeObj);
-			switch (argc) {
-			case 1:
-				WObjSetAttribute(rangeObj, "_cur", WObjCreateInt(context, 0));
-				WObjSetAttribute(rangeObj, "_end", argv[0]);
-				WObjSetAttribute(rangeObj, "_step", WObjCreateInt(context, 1));
-				break;
-			case 2:
-				WObjSetAttribute(rangeObj, "_cur", argv[0]);
-				WObjSetAttribute(rangeObj, "_end", argv[1]);
-				WObjSetAttribute(rangeObj, "_step", WObjCreateInt(context, 1));
-				break;
-			case 3:
-				WObjSetAttribute(rangeObj, "_cur", argv[0]);
-				WObjSetAttribute(rangeObj, "_end", argv[1]);
-				WObjSetAttribute(rangeObj, "_step", argv[2]);
-				break;
-			}
-
-			auto iterend = [](WObj** argv, int argc, WContext* context) {
-				WObj* cur = WObjGetAttribute(argv[0], "_cur");
-				WObj* end = WObjGetAttribute(argv[0], "_end");
-				WObj* step = WObjGetAttribute(argv[0], "_step");
-				if (WObjGetInt(step) > 0) {
-					return WObjCreateBool(context, WObjGetInt(cur) >= WObjGetInt(end));
-				} else {
-					return WObjCreateBool(context, WObjGetInt(cur) <= WObjGetInt(end));
-				}
-			};
-			RegisterStatelessMethod<iterend>(context, rangeObj->attributes, "__iterend__", "range.__iterend__");
-
-			auto next = [](WObj** argv, int argc, WContext* context) {
-				WObj* cur = WObjGetAttribute(argv[0], "_cur");
-				WObj* end = WObjGetAttribute(argv[0], "_end");
-				WObj* step = WObjGetAttribute(argv[0], "_step");
-
-				int nextVal = WObjGetInt(cur) + WObjGetInt(step);
-				WObjSetAttribute(argv[0], "_cur", WObjCreateInt(context, nextVal));
-				return cur;
-			};
-			RegisterStatelessMethod<next>(context, rangeObj->attributes, "__iternext__", "range.__iternext__");
-
-			WGcUnprotect(rangeObj);
-			return rangeObj;
-		}
-
 	} // namespace lib
 
 	bool InitLibrary(WContext* context) {
@@ -1054,6 +1003,16 @@ namespace wings {
 		context->builtinClasses.map->c.SetSuper(objectAttributes);
 		context->builtinClasses.func->c.SetSuper(objectAttributes);
 		context->builtinClasses.userdata->c.SetSuper(objectAttributes);
+
+		context->builtinClasses.null->attributes.SetSuper(objectAttributes);
+		context->builtinClasses._bool->attributes.SetSuper(objectAttributes);
+		context->builtinClasses._int->attributes.SetSuper(objectAttributes);
+		context->builtinClasses._float->attributes.SetSuper(objectAttributes);
+		context->builtinClasses.str->attributes.SetSuper(objectAttributes);
+		context->builtinClasses.list->attributes.SetSuper(objectAttributes);
+		context->builtinClasses.map->attributes.SetSuper(objectAttributes);
+		context->builtinClasses.func->attributes.SetSuper(objectAttributes);
+		context->builtinClasses.userdata->attributes.SetSuper(objectAttributes);
 
 		// Create null (None) singleton
 		CheckOperation(context->nullSingleton = WOpCall(context->builtinClasses.null, nullptr, 0));

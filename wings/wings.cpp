@@ -211,6 +211,7 @@ namespace wings {
         case WObj::Type::Object: return "object";
         case WObj::Type::Func: return "function";
         case WObj::Type::Userdata: return "userdata";
+        case WObj::Type::Class: return "class";
         default: WUNREACHABLE();
         }
     }

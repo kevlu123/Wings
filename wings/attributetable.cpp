@@ -28,13 +28,7 @@ namespace wings {
 			owned = true;
 		}
 
-		for (auto* table = &attributes; *table; table = &(*table)->super) {
-			if ((*table)->entries.contains(name)) {
-				(*table)->entries[name] = value;
-				return;
-			}
-		}
-		attributes->entries.insert({ name, value });
+		attributes->entries[name] = value;
 	}
 
 	void AttributeTable::SetSuper(AttributeTable& super, bool validate) {

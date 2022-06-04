@@ -78,8 +78,9 @@ extern "C" {
                     }
                     break;
                 case WObj::Type::Func:
-                    if (obj->self)
+                    if (obj->self) {
                         inUse.push_back(obj->self);
+                    }
                     break;
                 case WObj::Type::Class:
                     obj->c.ForEach([&](auto& entry) {

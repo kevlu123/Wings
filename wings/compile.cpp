@@ -111,7 +111,7 @@ namespace wings {
 				break;
 			case Operation::Dot:
 				instr.memberAccess = std::make_unique<MemberAccessInstruction>();
-				instr.memberAccess->memberName = expression.children[0].variableName;
+				instr.memberAccess->memberName = expression.variableName;
 				instr.type = Instruction::Type::Dot;
 				break;
 			case Operation::Call:
