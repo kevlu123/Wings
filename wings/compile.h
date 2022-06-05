@@ -21,11 +21,16 @@ namespace wings {
 	struct DefInstruction {
 		size_t defaultParameterCount{};
 		std::string prettyName;
+		bool isMethod = false;
 		std::vector<Parameter> parameters;
 		std::vector<std::string> globalCaptures;
 		std::vector<std::string> localCaptures;
 		std::vector<std::string> variables;
 		RcPtr<std::vector<Instruction>> instructions;
+	};
+
+	struct ClassInstruction {
+		std::vector<std::string> methodNames;
 	};
 
 	using LiteralInstruction = std::variant<std::nullptr_t, bool, wint, wfloat, std::string>;
@@ -52,6 +57,7 @@ namespace wings {
 			ListLiteral,
 			MapLiteral,
 			Def,
+			Class,
 			Variable,
 			Dot,
 
@@ -79,6 +85,7 @@ namespace wings {
 		std::unique_ptr<LiteralInstruction> literal;
 		std::unique_ptr<VariableLoadInstruction> variable;
 		std::unique_ptr<DefInstruction> def;
+		std::unique_ptr<ClassInstruction> _class;
 		std::unique_ptr<JumpInstruction> jump;
 
 		SourcePosition srcPos;

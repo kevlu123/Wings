@@ -18,6 +18,13 @@ struct WFunc {
     bool isMethod;
 };
 
+struct WClass {
+    WObj** methods;
+    const char** methodNames;
+    int methodCount;
+    const char* prettyName;
+};
+
 struct WFinalizer {
     void (*fptr)(WObj* obj, void* userdata);
     void* userdata;
@@ -95,7 +102,7 @@ WDLL_EXPORT WObj* WObjCreateList(WContext* context);
 WDLL_EXPORT WObj* WObjCreateMap(WContext* context);
 WDLL_EXPORT WObj* WObjCreateFunc(WContext* context, const WFunc* value);
 WDLL_EXPORT WObj* WObjCreateObject(WContext* context);
-WDLL_EXPORT WObj* WObjCreateClass(WContext* context, WObj* );
+WDLL_EXPORT WObj* WObjCreateClass(WContext* context, const WClass* value);
 WDLL_EXPORT WObj* WObjCreateUserdata(WContext* context, void* value);
 
 WDLL_EXPORT bool WObjIsNull(const WObj* obj);

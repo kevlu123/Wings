@@ -382,6 +382,41 @@ namespace wings {
 		return CodeError::Good();
 	}
 
+	static CodeError ParseClass(const LexTree& node, Statement& out) {
+		TokenIter p(node.tokens);
+		out.type = Statement::Type::Class;
+		++p;
+
+		if (p.EndReached()) {
+			return CodeError::Bad("Expected a class name", (--p)->srcPos);
+		} else if (p->type != Token::Type::Word) {
+			return CodeError::Bad("Expected a class name", p->srcPos);
+		}
+		out._class.name = p->text;
+		++p;
+
+		if (auto error = ExpectColonEnding(p)) {
+			return error;
+		}
+
+		for (const auto& method : node.children) {
+			if (method.tokens[0].text == "pass") {
+				continue;
+			} else if (method.tokens[0].text != "def") {
+				return CodeError::Bad("Expected a method definition");
+			}
+
+			Statement stat{};
+			if (auto error = ParseDef(method, stat)) {
+				return error;
+			}
+			out._class.methodNames.push_back(stat.def.name);
+			out.body.push_back(std::move(stat));
+		}
+
+		return CodeError::Good();
+	}
+
 	static CodeError ParseReturn(const LexTree& node, Statement& out) {
 		TokenIter p(node.tokens);
 		++p;
@@ -484,6 +519,7 @@ namespace wings {
 		{ "break", ParseBreak },
 		{ "continue", ParseContinue },
 		{ "def", ParseDef },
+		{ "class", ParseClass },
 		{ "return", ParseReturn },
 		{ "pass", ParsePass },
 		{ "nonlocal", ParseNonlocal },

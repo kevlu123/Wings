@@ -74,7 +74,7 @@ namespace wings {
 			//		<assignee>
 			//			<var>
 			//		<expr>
-			CompileExpression(expression.children[0], instructions);
+			CompileExpression(expression.children[0].children[0], instructions);
 			CompileExpression(expression.children[1], instructions);
 			instr.memberAccess = std::make_unique<MemberAccessInstruction>();
 			instr.memberAccess->memberName = expression.children[0].variableName;
@@ -303,6 +303,39 @@ namespace wings {
 		assign.directAssign = std::make_unique<DirectAssignInstruction>();
 		assign.directAssign->variableName = node.def.name;
 		instructions.push_back(std::move(assign));
+
+		Instruction pop{};
+		pop.srcPos = node.srcPos;
+		pop.type = Instruction::Type::Pop;
+		instructions.push_back(std::move(pop));
+	}
+
+	static void CompileClass(const Statement& node, std::vector<Instruction>& instructions) {
+		for (const auto& child : node.body) {
+			CompileDef(child, instructions);
+			instructions.pop_back();
+			instructions.pop_back();
+			instructions.back().def->isMethod = true;
+		}
+
+		Instruction _class{};
+		_class.srcPos = node.srcPos;
+		_class.type = Instruction::Type::Class;
+		_class._class = std::make_unique<ClassInstruction>();
+		_class._class->methodNames = node._class.methodNames;
+		instructions.push_back(std::move(_class));
+
+		Instruction assign{};
+		assign.srcPos = node.srcPos;
+		assign.type = Instruction::Type::DirectAssign;
+		assign.directAssign = std::make_unique<DirectAssignInstruction>();
+		assign.directAssign->variableName = node._class.name;
+		instructions.push_back(std::move(assign));
+
+		Instruction pop{};
+		pop.srcPos = node.srcPos;
+		pop.type = Instruction::Type::Pop;
+		instructions.push_back(std::move(pop));
 	}
 
 	using CompileFn = void(*)(const Statement&, std::vector<Instruction>&);
@@ -315,6 +348,7 @@ namespace wings {
 		{ Statement::Type::Continue, CompileContinue },
 		{ Statement::Type::Return, CompileReturn },
 		{ Statement::Type::Def, CompileDef },
+		{ Statement::Type::Class, CompileClass },
 	};
 
 	static void CompileStatement(const Statement& node, std::vector<Instruction>& instructions) {

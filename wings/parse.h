@@ -17,7 +17,7 @@ namespace wings {
 			Pass,
 			Expr,
 			Nonlocal, Global,
-			Def, Return,
+			Def, Class, Return,
 			If, Elif, Else,
 			While, For,
 			Break, Continue,
@@ -42,6 +42,10 @@ namespace wings {
 			std::unordered_set<std::string> localCaptures;
 			std::unordered_set<std::string> variables;
 		} def;
+		struct {
+			std::string name;
+			std::vector<std::string> methodNames;
+		} _class;
 	};
 
 	struct ParseResult {

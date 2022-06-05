@@ -130,6 +130,63 @@ extern "C" {
         return instance;
     }
 
+    WObj* WObjCreateClass(WContext* context, const WClass* value) {
+        WASSERT(context && value && value->methodCount >= 0);
+        if (value->methodCount) {
+            WASSERT(value->methods && value->methodNames);
+            for (int i = 0; i < value->methodCount; i++) {
+                WASSERT(value->methods[i] && value->methodNames[i] && WObjIsFunc(value->methods[i]));
+            }
+        }
+
+        WObj* _class = Alloc(context);
+        if (_class == nullptr) {
+            return nullptr;
+        }
+
+        _class->type = WObj::Type::Class;
+        for (int i = 0; i < value->methodCount; i++) {
+            _class->c.Set(value->methodNames[i], value->methods[i]);
+        }
+        _class->c.Set("__class__", _class);
+        _class->c.SetSuper(context->builtinClasses.object->c);
+
+        WFunc constructor{};
+        constructor.userdata = _class;
+        constructor.isMethod = true;
+        constructor.prettyName = "__init__";
+        constructor.fptr = [](WObj** argv, int argc, void* userdata) {
+            WObj* _class = (WObj*)userdata;
+            WContext* context = _class->context;
+
+            WObj* instance = WObjCreateObject(context);
+            if (instance == nullptr)
+                return (WObj*)nullptr;
+
+            instance->attributes = _class->c.Copy();
+
+            if (WObj* init = _class->c.Get("__init__")) {
+                if (WObjIsFunc(init)) {
+                    std::vector<WObj*> newArgv = { instance };
+                    newArgv.insert(newArgv.end(), argv, argv + argc);
+                    WObj* ret = WOpCall(init, newArgv.data(), argc + 1);
+                    if (ret == nullptr) {
+                        return (WObj*)nullptr;
+                    } else if (!WObjIsNull(ret)) {
+                        WErrorSetRuntimeError(context, "Constructor returned a non NoneType type");
+                        return (WObj*)nullptr;
+                    }
+                }
+            }
+
+            return instance;
+        };
+        _class->fn = constructor;
+
+
+        return _class;
+    }
+
     bool WObjIsNull(const WObj* obj) {
         WASSERT(obj);
         return obj->type == WObj::Type::Null;

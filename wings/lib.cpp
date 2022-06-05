@@ -34,6 +34,10 @@ static std::string WObjToString(const WObj* val, std::unordered_set<const WObj*>
 		return "<function at " + PtrToString(val) + ">";
 	case WObj::Type::Userdata:
 		return "<userdata at " + PtrToString(val) + ">";
+	case WObj::Type::Object:
+		return "<object at " + PtrToString(val) + ">";
+	case WObj::Type::Class:
+		return "<class at " + PtrToString(val) + ">";
 	case WObj::Type::List:
 		if (seen.contains(val)) {
 			return "[...]";
@@ -188,7 +192,7 @@ static WObj* CreateClass(WContext* context, const char* name = nullptr) {
 
 	WFunc constructor{};
 	constructor.userdata = _class;
-	constructor.isMethod = false;
+	constructor.isMethod = true;
 	constructor.prettyName = name;
 
 	constructor.fptr = [](WObj** argv, int argc, void* userdata) {
@@ -1086,7 +1090,19 @@ namespace wings {
 
 		// Register builtin functions
 		CheckOperation(RegisterStatelessFunction<lib::print>(context, "print"));
-		//CheckOperation(RegisterStatelessFunction<lib::range>(context, "range"));
+
+		WObj* builtins = WContextCompile(context,
+			R"(
+def isinstance(o, t):
+	return o.__class__ == t
+
+			)",
+			"__builtins__"
+		);
+
+		CheckOperation(builtins);
+
+		CheckOperation(WOpCall(builtins, nullptr, 0));
 
 		return true;
 	}

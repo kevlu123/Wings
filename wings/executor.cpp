@@ -107,6 +107,8 @@ namespace wings {
 		}
 
 	end:
+		while (!stack.empty())
+			PopStack();
 		for (const auto& var : variables)
 			WGcUnprotect(*var.second);
 
@@ -168,6 +170,7 @@ namespace wings {
 			WFunc func{};
 			func.fptr = &DefObject::Run;
 			func.userdata = def;
+			func.isMethod = instr.def->isMethod;
 			WObj* obj = WObjCreateFunc(context, &func);
 			if (obj == nullptr) {
 				delete def;
@@ -181,6 +184,28 @@ namespace wings {
 			WObjSetFinalizer(obj, &finalizer);
 
 			PushStack(obj);
+			break;
+		}
+		case Instruction::Type::Class: {
+			size_t methodCount = instr._class->methodNames.size();
+			std::vector<const char*> methodNames;
+			for (const auto& methodName : instr._class->methodNames)
+				methodNames.push_back(methodName.c_str());
+
+			WClass wclass{};
+			wclass.methodCount = (int)methodCount;
+			wclass.methods = stack.data() + stack.size() - methodCount;
+			wclass.methodNames = methodNames.data();
+			WObj* _class = WObjCreateClass(context, &wclass);
+
+			for (size_t i = 0; i < methodCount; i++)
+				PopStack();
+
+			if (_class == nullptr) {
+				exitValue = nullptr;
+			} else {
+				PushStack(_class);
+			}
 			break;
 		}
 		case Instruction::Type::Literal: {
@@ -248,6 +273,7 @@ namespace wings {
 			WObj* value = PopStack();
 			WObj* obj = PopStack();
 			WObjSetAttribute(obj, instr.memberAccess->memberName.c_str(), value);
+			PushStack(value);
 			break;
 		}
 		case Instruction::Type::Call: {
