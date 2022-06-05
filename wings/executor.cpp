@@ -159,6 +159,8 @@ namespace wings {
 				if (variables.contains(capture)) {
 					def->captures.insert({ capture, variables[capture] });
 				} else {
+					if (!context->globals.contains(capture))
+						WContextSetGlobal(context, capture.c_str(), WObjCreateNull(context));
 					def->captures.insert({ capture, context->globals.at(capture) });
 				}
 			}

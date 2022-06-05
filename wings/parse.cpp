@@ -98,19 +98,30 @@ namespace wings {
 	}
 
 	static Statement TransformForToWhile(Statement forLoop) {
-		// __VarXXX = expression
+		// __VarXXX = expression.__iter__()
 		std::string rangeVarName = "__For" + std::to_string(Guid());
 		Expression rangeVar{};
 		rangeVar.srcPos = forLoop.expr.srcPos;
 		rangeVar.operation = Operation::Variable;
 		rangeVar.variableName = rangeVarName;
 
+		Expression loadIter{};
+		loadIter.srcPos = forLoop.expr.srcPos;
+		loadIter.operation = Operation::Dot;
+		loadIter.variableName = "__iter__";
+		loadIter.children.push_back(std::move(forLoop.expr));
+
+		Expression callIter{};
+		callIter.srcPos = forLoop.expr.srcPos;
+		callIter.operation = Operation::Call;
+		callIter.children.push_back(std::move(loadIter));
+
 		Statement rangeEval{};
 		rangeEval.type = Statement::Type::Expr;
 		rangeEval.expr.operation = Operation::Assign;
 		rangeEval.expr.assignType = AssignType::Direct;
 		rangeEval.expr.children.push_back(rangeVar);
-		rangeEval.expr.children.push_back(std::move(forLoop.expr));
+		rangeEval.expr.children.push_back(std::move(callIter));
 
 		// while not __VarXXX.__end__():
 		Expression loadEndCheck{};
@@ -314,6 +325,10 @@ namespace wings {
 					}
 
 					allVars.insert(child.def.localCaptures.begin(), child.def.localCaptures.end());
+					break;
+				case Statement::Type::Class:
+					writeVars.insert(child._class.name);
+					allVars.insert(child._class.name);
 					break;
 				case Statement::Type::Global:
 					defNode.def.globalCaptures.insert(child.capture.name);

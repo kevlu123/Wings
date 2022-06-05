@@ -308,6 +308,46 @@ extern "C" {
         obj->attributes.Set(member, value);
     }
 
+    bool WOpIterate(WObj* obj, void* userdata, bool(*callback)(WObj*, void*)) {
+        WASSERT(obj && callback);
+        WObj* iter = WOpCallMethod(obj, "__iter__", nullptr, 0);
+        if (iter == nullptr) {
+            WErrorSetRuntimeError(obj->context, "Object is not iterable (does not implement the __iter__ method)");
+            return false;
+        }
+        WGcProtect(iter);
+
+        while (true) {
+            WObj* endReached = WOpCallMethod(iter, "__end__", nullptr, 0);
+            if (endReached == nullptr) {
+                WErrorSetRuntimeError(obj->context, "Iterator does not implement the __end__ method");
+                WGcUnprotect(iter);
+                return false;
+            }
+
+            WObj* truthy = WOpTruthy(endReached);
+            if (truthy == nullptr) {
+                WGcUnprotect(iter);
+                return false;
+            } else if (WObjGetBool(truthy)) {
+                WGcUnprotect(iter);
+                return true;
+            }
+
+            WObj* value = WOpCallMethod(iter, "__next__", nullptr, 0);
+            if (endReached == nullptr) {
+                WErrorSetRuntimeError(obj->context, "Iterator does not implement the __next__ method");
+                WGcUnprotect(iter);
+                return false;
+            }
+
+            if (!callback(value, userdata)) {
+                WGcUnprotect(iter);
+                return false;
+            }
+        }
+    }
+
     WObj* WOpTruthy(WObj* arg) {
         if (WObj* res = WOpCallMethod(arg, "__nonzero__", nullptr, 0)) {
             if (WObjIsBool(res)) {

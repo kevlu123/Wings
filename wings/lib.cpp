@@ -314,13 +314,31 @@ namespace wings {
 		}
 
 		static WObj* List(WObj** argv, int argc, WContext* context) {
-			// TODO: validate params
-
-			WObj* obj = Alloc(context);
-			if (obj == nullptr)
+			if (argc > 1) {
+				SetInvalidArgumentCountError(context, argc, 1);
 				return nullptr;
-			obj->type = WObj::Type::List;
-			return obj;
+			}
+
+			WObj* list = Alloc(context);
+			if (list == nullptr)
+				return nullptr;
+			list->type = WObj::Type::List;
+
+			if (argc == 1) {
+				auto f = [](WObj* value, void* list) {
+					((WObj*)list)->v.push_back(value);
+					return true;
+				};
+
+				WGcProtect(list);
+				bool success = WOpIterate(argv[0], list, f);
+				WGcUnprotect(list);
+				if (!success) {
+					return nullptr;
+				}
+			}
+
+			return list;
 		}
 
 		static WObj* Map(WObj** argv, int argc, WContext* context) {
@@ -1139,6 +1157,14 @@ def isinstance(o, t):
 	return o.__class__ == t
 
 class __Range:
+	def __init__(self, start, end, step):
+		self.start = start
+		self.end = end
+		self.step = step
+	def __iter__(self):
+		return __RangeIter(self.start, self.end, self.step)
+
+class __RangeIter:
 	def __init__(self, start, end, step):
 		self.cur = start
 		self.end = end

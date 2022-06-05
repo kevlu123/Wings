@@ -103,10 +103,7 @@ extern "C" {
     bool WContextCreate(WContext** context, const WConfig* config) {
         *context = new WContext();
         WContextSetConfig(*context, config);
-        if (!InitLibrary(*context)) {
-            return false;
-        }
-        return true;
+        return InitLibrary(*context);
     }
 
     void WContextDestroy(WContext* context) {

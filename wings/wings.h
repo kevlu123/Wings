@@ -147,6 +147,8 @@ WDLL_EXPORT void WObjSetFinalizer(WObj* obj, const WFinalizer* finalizer);
 WDLL_EXPORT WObj* WObjGetAttribute(WObj* obj, const char* member);
 WDLL_EXPORT void WObjSetAttribute(WObj* obj, const char* member, WObj* value);
 
+WDLL_EXPORT bool WOpIterate(WObj* obj, void* userdata, bool(*callback)(WObj*, void*));
+
 WDLL_EXPORT WObj* WOpTruthy(WObj* arg);
 WDLL_EXPORT WObj* WOpCastToInt(WObj* arg);
 WDLL_EXPORT WObj* WOpCastToFloat(WObj* arg);
