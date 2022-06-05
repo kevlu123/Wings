@@ -14,8 +14,6 @@ namespace wings {
 		// Create local variables
 		for (const auto& localVar : def->localVariables) {
 			WObj* null = WObjCreateNull(def->context);
-			if (null == nullptr)
-				return nullptr;
 			executor.variables.insert({ localVar, MakeRcPtr<WObj*>(null) });
 		}
 
@@ -25,7 +23,7 @@ namespace wings {
 		}
 
 		// Initialize parameters
-		if (argc != (int)def->parameterNames.size()) {
+		if ((size_t)argc > def->parameterNames.size() || (size_t)argc < def->parameterNames.size() - def->defaultParameterValues.size()) {
 			std::string msg = "function takes " +
 				std::to_string(def->parameterNames.size()) +
 				" argument(s) but " +
@@ -78,13 +76,20 @@ namespace wings {
 	void Executor::SetVariable(const std::string& name, WObj* value) {
 		auto it = variables.find(name);
 		if (it != variables.end()) {
-			*it->second = value;
+			if (*it->second != value) {
+				WGcUnprotect(*it->second);
+				WGcProtect(value);
+				*it->second = value;
+			}
 		} else {
 			WContextSetGlobal(context, name.c_str(), value);
 		}
 	}
 
 	WObj* Executor::Run(WObj** args, int argc) {
+		for (const auto& var : variables)
+			WGcProtect(*var.second);
+
 		for (pc = 0; pc < def->instructions->size(); pc++) {
 			const auto& instr = (*def->instructions)[pc];
 			DoInstruction(instr);
@@ -97,10 +102,19 @@ namespace wings {
 						def->prettyName
 						});
 				}
-				return exitValue.value();
+				goto end;
 			}
 		}
-		return WObjCreateNull(context);
+
+	end:
+		for (const auto& var : variables)
+			WGcUnprotect(*var.second);
+
+		if (exitValue.has_value()) {
+			return exitValue.value();
+		} else {
+			return WObjCreateNull(context);
+		}
 	}
 
 	void Executor::DoInstruction(const Instruction& instr) {
