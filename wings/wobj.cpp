@@ -88,7 +88,7 @@ extern "C" {
         return instance;
     }
 
-    WObj* WCreateMap(WContext* context) {
+    WObj* WCreateDictionary(WContext* context) {
         WASSERT(context);
         WObj* _class = context->builtinClasses.map;
         WObj* instance = _class->fn.fptr(nullptr, 0, _class->fn.userdata);
@@ -135,7 +135,7 @@ extern "C" {
         if (value->methodCount) {
             WASSERT(value->methods && value->methodNames);
             for (int i = 0; i < value->methodCount; i++) {
-                WASSERT(value->methods[i] && value->methodNames[i] && WIsFunc(value->methods[i]));
+                WASSERT(value->methods[i] && value->methodNames[i] && WIsFunction(value->methods[i]));
             }
         }
 
@@ -166,7 +166,7 @@ extern "C" {
             instance->attributes = _class->c.Copy();
 
             if (WObj* init = _class->c.Get("__init__")) {
-                if (WIsFunc(init)) {
+                if (WIsFunction(init)) {
                     std::vector<WObj*> newArgv = { instance };
                     newArgv.insert(newArgv.end(), argv, argv + argc);
                     WObj* ret = WCall(init, newArgv.data(), argc + 1);
@@ -217,7 +217,7 @@ extern "C" {
         return obj->type == WObj::Type::List;
     }
 
-    bool WIsMap(const WObj* obj) {
+    bool WIsDictionary(const WObj* obj) {
         WASSERT(obj);
         return obj->type == WObj::Type::Map;
     }
@@ -232,7 +232,7 @@ extern "C" {
         return obj->type == WObj::Type::Class;
     }
 
-    bool WIsFunc(const WObj* obj) {
+    bool WIsFunction(const WObj* obj) {
         WASSERT(obj);
         return obj->type == WObj::Type::Func;
     }
@@ -274,8 +274,8 @@ extern "C" {
         return obj->s.c_str();
     }
 
-    void WGetFunc(const WObj* obj, WFunc* fn) {
-        WASSERT(obj && fn && WIsFunc(obj));
+    void WGetFunction(const WObj* obj, WFunc* fn) {
+        WASSERT(obj && fn && WIsFunction(obj));
         *fn = obj->fn;
     }
 
@@ -297,7 +297,7 @@ extern "C" {
     WObj* WGetAttribute(WObj* obj, const char* member) {
         WASSERT(obj && member);
         WObj* mem = obj->attributes.Get(member);
-        if (mem && WIsFunc(mem) && mem->fn.isMethod) {
+        if (mem && WIsFunction(mem) && mem->fn.isMethod) {
             mem->self = obj;
         }
         return mem;
@@ -308,7 +308,7 @@ extern "C" {
         obj->attributes.Set(member, value);
     }
 
-    bool WIterate(WObj* obj, void* userdata, bool(*callback)(WObj*, void*)) {
+    bool WIterate(WObj* obj, void* userdata, bool(*callback)(WObj* value, void* userdata)) {
         WASSERT(obj && callback);
         WObj* iter = WCallMethod(obj, "__iter__", nullptr, 0);
         if (iter == nullptr) {
@@ -359,7 +359,7 @@ extern "C" {
         return nullptr;
     }
 
-    WObj* WCastToInt(WObj* arg) {
+    WObj* WConvertToInt(WObj* arg) {
         if (WObj* res = WCallMethod(arg, "__int__", nullptr, 0)) {
             if (WIsInt(res)) {
                 return res;
@@ -370,7 +370,7 @@ extern "C" {
         return nullptr;
     }
 
-    WObj* WCastToFloat(WObj* arg) {
+    WObj* WConvertToFloat(WObj* arg) {
         if (WObj* res = WCallMethod(arg, "__float__", nullptr, 0)) {
             if (WIsIntOrFloat(res)) {
                 return res;
@@ -381,7 +381,7 @@ extern "C" {
         return nullptr;
     }
 
-    WObj* WCastToString(WObj* arg) {
+    WObj* WConvertToString(WObj* arg) {
         if (WObj* res = WCallMethod(arg, "__str__", nullptr, 0)) {
             if (WIsString(res)) {
                 return res;
@@ -394,7 +394,7 @@ extern "C" {
 
     WObj* WCall(WObj* callable, WObj** argv, int argc) {
         WASSERT(callable && argc >= 0 && (argc == 0 || argv));
-        if (WIsFunc(callable) || WIsClass(callable)) {
+        if (WIsFunction(callable) || WIsClass(callable)) {
             if (argc)
                 WASSERT(argv);
             for (int i = 0; i < argc; i++)

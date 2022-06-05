@@ -243,7 +243,7 @@ namespace wings {
 			}
 			break;
 		case Instruction::Type::MapLiteral:
-			if (WObj* li = WCreateMap(context)) {
+			if (WObj* li = WCreateDictionary(context)) {
 				for (int i = 0; i < instr.variadicOp->argc; i++) {
 					WObj* val = PopStack();
 					WObj* key = PopStack();

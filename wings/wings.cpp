@@ -78,6 +78,13 @@ extern "C" {
         context->err.message = message;
     }
 
+    void WClearError(WContext* context) {
+        context->err.code = WError::WERROR_OK;
+        context->err.message.clear();
+        context->err.trace.clear();
+        context->err.traceMessage.clear();
+    }
+
     void WGetConfig(const WContext* context, WConfig* config) {
         WASSERT(context && config);
         *config = context->config;
@@ -208,7 +215,7 @@ namespace wings {
         case WObj::Type::Float: return "float";
         case WObj::Type::String: return "str";
         case WObj::Type::List: return "list";
-        case WObj::Type::Map: return "map";
+        case WObj::Type::Map: return "dict";
         case WObj::Type::Object: return "object";
         case WObj::Type::Func: return "function";
         case WObj::Type::Userdata: return "userdata";

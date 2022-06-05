@@ -271,7 +271,7 @@ namespace wings {
 					return nullptr;
 				}
 			case 1:
-				return WCastToInt(argv[0]);
+				return WConvertToInt(argv[0]);
 			default:
 				SetInvalidArgumentCountError(context, argc);
 				return nullptr;
