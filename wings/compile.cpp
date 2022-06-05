@@ -36,11 +36,10 @@ namespace wings {
 	};
 
 	static void CompileExpression(const Expression& expression, std::vector<Instruction>& instructions) {
-		if (expression.assignType == AssignType::None) {
-			for (size_t i = 0; i < expression.children.size(); i++) {
+		auto compileChildExpressions = [&] {
+			for (size_t i = 0; i < expression.children.size(); i++)
 				CompileExpression(expression.children[i], instructions);
-			}
-		}
+		};
 
 		Instruction instr{};
 		instr.srcPos = expression.srcPos;
@@ -95,11 +94,13 @@ namespace wings {
 				instr.type = Instruction::Type::Literal;
 				break;
 			case Operation::ListLiteral:
+				compileChildExpressions();
 				instr.variadicOp = std::make_unique<VariadicOpInstruction>();
 				instr.variadicOp->argc = expression.children.size();
 				instr.type = Instruction::Type::ListLiteral;
 				break;
 			case Operation::MapLiteral:
+				compileChildExpressions();
 				instr.variadicOp = std::make_unique<VariadicOpInstruction>();
 				instr.variadicOp->argc = expression.children.size() / 2;
 				instr.type = Instruction::Type::MapLiteral;
@@ -110,11 +111,13 @@ namespace wings {
 				instr.type = Instruction::Type::Variable;
 				break;
 			case Operation::Dot:
+				compileChildExpressions();
 				instr.memberAccess = std::make_unique<MemberAccessInstruction>();
 				instr.memberAccess->memberName = expression.variableName;
 				instr.type = Instruction::Type::Dot;
 				break;
 			case Operation::Call:
+				compileChildExpressions();
 				instr.variadicOp = std::make_unique<VariadicOpInstruction>();
 				instr.variadicOp->argc = expression.children.size();
 				instr.type = Instruction::Type::Call;
@@ -144,6 +147,7 @@ namespace wings {
 				instr.type = Instruction::Type::NotIn;
 				break;
 			default:
+				compileChildExpressions();
 				instr.op = std::make_unique<OpInstruction>();
 				*instr.op = OP_DATA.at(expression.operation);
 				instr.type = Instruction::Type::Operation;

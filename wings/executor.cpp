@@ -381,7 +381,7 @@ namespace wings {
 				break;
 			}
 
-			if (WObj* value = WObjCreateBool(context, WObjGetBool(arg))) {
+			if (WObj* value = WObjCreateBool(context, !WObjGetBool(arg))) {
 				PushStack(value);
 			} else {
 				exitValue = nullptr;

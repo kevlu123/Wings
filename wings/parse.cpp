@@ -112,11 +112,11 @@ namespace wings {
 		rangeEval.expr.children.push_back(rangeVar);
 		rangeEval.expr.children.push_back(std::move(forLoop.expr));
 
-		// while not __VarXXX.__iterend__():
+		// while not __VarXXX.__end__():
 		Expression loadEndCheck{};
 		loadEndCheck.srcPos = forLoop.expr.srcPos;
 		loadEndCheck.operation = Operation::Dot;
-		loadEndCheck.variableName = "__iterend__";
+		loadEndCheck.variableName = "__end__";
 		loadEndCheck.children.push_back(rangeVar);
 
 		Expression callEndCheck{};
@@ -133,11 +133,11 @@ namespace wings {
 		wh.type = Statement::Type::While;
 		wh.expr = std::move(condition);
 
-		// vars = __VarXXX.__iternext__()
+		// vars = __VarXXX.__next__()
 		Expression loadNext{};
 		loadNext.srcPos = forLoop.expr.srcPos;
 		loadNext.operation = Operation::Dot;
-		loadNext.variableName = "__iternext__";
+		loadNext.variableName = "__next__";
 		loadNext.children.push_back(rangeVar);
 
 		Expression callNext{};
@@ -229,7 +229,7 @@ namespace wings {
 					return error;
 				}
 				defaultValue = std::move(expr);
-			} if (!out.empty() && out.back().defaultValue) {
+			} else if (!out.empty() && out.back().defaultValue) {
 				// If last parameter has a default value,
 				// this parameter must also have a default value
 				return CodeError::Bad(

@@ -380,6 +380,15 @@ namespace wings {
 			return WObjCreateBool(context, argv[0] == argv[1]);
 		}
 
+		static WObj* Object_Ne(WObj** argv, int argc, WContext* context) {
+			EXPECT_ARG_COUNT(2);
+			if (WObj* eq = WOpEquals(argv[0], argv[1])) {
+				return WObjCreateBool(context, !WObjGetBool(eq));
+			} else {
+				return nullptr;
+			}
+		}
+
 		static WObj* Null_Bool(WObj** argv, int argc, WContext* context) {
 			EXPECT_ARG_COUNT(1);
 			EXPECT_ARG_TYPE_NULL(0);
@@ -438,6 +447,34 @@ namespace wings {
 			EXPECT_ARG_COUNT(2);
 			EXPECT_ARG_TYPE_INT(0);
 			return WObjCreateBool(context, WObjIsInt(argv[1]) && WObjGetInt(argv[0]) == WObjGetInt(argv[1]));
+		}
+
+		static WObj* Int_Gt(WObj** argv, int argc, WContext* context) {
+			EXPECT_ARG_COUNT(2);
+			EXPECT_ARG_TYPE_INT(0);
+			EXPECT_ARG_TYPE_INT_OR_FLOAT(1);
+			return WObjCreateBool(context, WObjGetFloat(argv[0]) > WObjGetFloat(argv[1]));
+		}
+
+		static WObj* Int_Ge(WObj** argv, int argc, WContext* context) {
+			EXPECT_ARG_COUNT(2);
+			EXPECT_ARG_TYPE_INT(0);
+			EXPECT_ARG_TYPE_INT_OR_FLOAT(1);
+			return WObjCreateBool(context, WObjGetFloat(argv[0]) >= WObjGetFloat(argv[1]));
+		}
+
+		static WObj* Int_Lt(WObj** argv, int argc, WContext* context) {
+			EXPECT_ARG_COUNT(2);
+			EXPECT_ARG_TYPE_INT(0);
+			EXPECT_ARG_TYPE_INT_OR_FLOAT(1);
+			return WObjCreateBool(context, WObjGetFloat(argv[0]) < WObjGetFloat(argv[1]));
+		}
+
+		static WObj* Int_Le(WObj** argv, int argc, WContext* context) {
+			EXPECT_ARG_COUNT(2);
+			EXPECT_ARG_TYPE_INT(0);
+			EXPECT_ARG_TYPE_INT_OR_FLOAT(1);
+			return WObjCreateBool(context, WObjGetFloat(argv[0]) <= WObjGetFloat(argv[1]));
 		}
 
 		static WObj* Int_Neg(WObj** argv, int argc, WContext* context) {
@@ -1025,6 +1062,7 @@ namespace wings {
 		CheckOperation(RegisterStatelessMethod<attrlib::Object_Pos>(context, context->builtinClasses.object->c, "__pos__", "object.__pos__"));
 		CheckOperation(RegisterStatelessMethod<attrlib::Object_Str>(context, context->builtinClasses.object->c, "__str__", "object.__str__"));
 		CheckOperation(RegisterStatelessMethod<attrlib::Object_Eq>(context, context->builtinClasses.object->c, "__eq__", "object.__eq__"));
+		CheckOperation(RegisterStatelessMethod<attrlib::Object_Ne>(context, context->builtinClasses.object->c, "__eq__", "object.__ne__"));
 
 		CheckOperation(RegisterStatelessMethod<attrlib::Null_Bool>(context, context->builtinClasses.null->c, "__nonzero__", "NoneType.__nonzero__"));
 		CheckOperation(RegisterStatelessMethod<attrlib::Null_Eq>(context, context->builtinClasses.null->c, "__eq__", "NoneType.__eq__"));
@@ -1038,6 +1076,10 @@ namespace wings {
 		CheckOperation(RegisterStatelessMethod<attrlib::Int_Int>(context, context->builtinClasses._int->c, "__int__", "int.__int__"));
 		CheckOperation(RegisterStatelessMethod<attrlib::Int_Float>(context, context->builtinClasses._int->c, "__float__", "int.__float__"));
 		CheckOperation(RegisterStatelessMethod<attrlib::Int_Eq>(context, context->builtinClasses._int->c, "__eq__", "int.__eq__"));
+		CheckOperation(RegisterStatelessMethod<attrlib::Int_Gt>(context, context->builtinClasses._int->c, "__gt__", "int.__gt__"));
+		CheckOperation(RegisterStatelessMethod<attrlib::Int_Ge>(context, context->builtinClasses._int->c, "__ge__", "int.__ge__"));
+		CheckOperation(RegisterStatelessMethod<attrlib::Int_Lt>(context, context->builtinClasses._int->c, "__lt__", "int.__lt__"));
+		CheckOperation(RegisterStatelessMethod<attrlib::Int_Le>(context, context->builtinClasses._int->c, "__le__", "int.__le__"));
 		CheckOperation(RegisterStatelessMethod<attrlib::Int_Neg>(context, context->builtinClasses._int->c, "__neg__", "int.__neg__"));
 		CheckOperation(RegisterStatelessMethod<attrlib::Int_Add>(context, context->builtinClasses._int->c, "__add__", "int.__add__"));
 		CheckOperation(RegisterStatelessMethod<attrlib::Int_Sub>(context, context->builtinClasses._int->c, "__sub__", "int.__sub__"));
@@ -1096,6 +1138,28 @@ namespace wings {
 def isinstance(o, t):
 	return o.__class__ == t
 
+class __Range:
+	def __init__(self, start, end, step):
+		self.cur = start
+		self.end = end
+		self.step = step
+	def __next__(self):
+		cur = self.cur
+		self.cur = self.cur + self.step
+		return cur
+	def __end__(self):
+		if self.step > 0:
+			return self.cur >= self.end
+		else:
+			return self.cur <= self.end
+
+def range(start, end=None, step=None):
+	if end == None:
+		return __Range(0, start, 1)
+	elif step == None:
+		return __Range(start, end, 1)
+	else:
+		return __Range(start, end, step)
 			)",
 			"__builtins__"
 		);

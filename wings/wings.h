@@ -77,7 +77,7 @@ WDLL_EXPORT WError WErrorGet(WContext* context);
 WDLL_EXPORT const char* WErrorMessageGet(WContext* context);
 WDLL_EXPORT void WErrorSetRuntimeError(WContext* context, const char* message);
 
-WDLL_EXPORT WContext* WContextCreate(const WConfig* config WDEFAULT_ARG(nullptr));
+WDLL_EXPORT bool WContextCreate(WContext** context, const WConfig* config WDEFAULT_ARG(nullptr));
 WDLL_EXPORT void WContextDestroy(WContext* context);
 WDLL_EXPORT WObj* WContextCompile(WContext* context, const char* code, const char* moduleName WDEFAULT_ARG(nullptr));
 WDLL_EXPORT void WContextGetConfig(const WContext* context, WConfig* config);

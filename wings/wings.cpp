@@ -100,14 +100,13 @@ extern "C" {
         }
     }
 
-    WContext* WContextCreate(const WConfig* config) {
-        WContext* context = new WContext();
-        WContextSetConfig(context, config);
-        if (!InitLibrary(context)) {
-            WContextDestroy(context);
-            return nullptr;
+    bool WContextCreate(WContext** context, const WConfig* config) {
+        *context = new WContext();
+        WContextSetConfig(*context, config);
+        if (!InitLibrary(*context)) {
+            return false;
         }
-        return context;
+        return true;
     }
 
     void WContextDestroy(WContext* context) {
