@@ -10,7 +10,7 @@ namespace wings {
         // Check if GC should run
         size_t threshold = (size_t)(context->config.gcRunFactor * context->lastObjectCountAfterGC);
         if (context->mem.size() >= threshold) {
-            WGcCollect(context);
+            WCollectGarbage(context);
         }
 
         // Allocate new object
@@ -25,7 +25,7 @@ namespace wings {
 
 extern "C" {
 
-    void WGcCollect(WContext* context) {
+    void WCollectGarbage(WContext* context) {
         WASSERT(context);
 
         if (context->lockGc) {
@@ -113,23 +113,23 @@ extern "C" {
         context->lastObjectCountAfterGC = context->mem.size();
     }
 
-    void WGcProtect(const WObj* obj) {
+    void WProtectObject(const WObj* obj) {
         WASSERT(obj);
         obj->context->protectedObjects.insert(obj);
     }
 
-    void WGcUnprotect(const WObj* obj) {
+    void WUnprotectObject(const WObj* obj) {
         WASSERT(obj);
         auto it = obj->context->protectedObjects.find(obj);
         WASSERT(it != obj->context->protectedObjects.end());
         obj->context->protectedObjects.erase(it);
     }
 
-    void WGcCreateReference(WObj* parent, WObj* child) {
+    void WLinkReference(WObj* parent, WObj* child) {
         WASSERT(parent && child);
         parent->references.push_back(child);
     }
-    void WGcRemoveReference(WObj* parent, WObj* child) {
+    void WUnlinkReference(WObj* parent, WObj* child) {
         WASSERT(parent && child);
         auto it = std::find(
             parent->references.begin(),

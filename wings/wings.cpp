@@ -55,12 +55,12 @@ static void SetCompileError(WContext* context, const std::string& message) {
 
 extern "C" {
 
-    WError WErrorGet(WContext* context) {
+    WError WGetErrorCode(WContext* context) {
         WASSERT(context);
         return context->err.code;
     }
 
-    const char* WErrorMessageGet(WContext* context) {
+    const char* WGetErrorMessage(WContext* context) {
         WASSERT(context);
         switch (context->err.code) {
         case WError::WERROR_OK: return "Ok";
@@ -72,18 +72,18 @@ extern "C" {
         }
     }
 
-    void WErrorSetRuntimeError(WContext* context, const char* message) {
+    void WRaiseError(WContext* context, const char* message) {
         WASSERT(context && message);
         context->err.code = WError::WERROR_RUNTIME_ERROR;
         context->err.message = message;
     }
 
-    void WContextGetConfig(const WContext* context, WConfig* config) {
+    void WGetConfig(const WContext* context, WConfig* config) {
         WASSERT(context && config);
         *config = context->config;
     }
 
-    void WContextSetConfig(WContext* context, const WConfig* config) {
+    void WSetConfig(WContext* context, const WConfig* config) {
         WASSERT(context);
         if (config) {
             WASSERT(config->maxAlloc >= 0);
@@ -96,29 +96,34 @@ extern "C" {
             context->config.maxRecursion = 100;
             context->config.maxCollectionSize = 1'000'000'000;
             context->config.gcRunFactor = 2.0f;
-            context->config.log = [](const char* message) { std::cout << message << '\n'; };
+            context->config.print = [](const char* message, int len) { std::cout << std::string(message, (size_t)len) << '\n'; };
         }
     }
 
-    bool WContextCreate(WContext** context, const WConfig* config) {
+    bool WCreateContext(WContext** context, const WConfig* config) {
         *context = new WContext();
-        WContextSetConfig(*context, config);
+        WSetConfig(*context, config);
         return InitLibrary(*context);
     }
 
-    void WContextDestroy(WContext* context) {
+    void WDestroyContext(WContext* context) {
         if (context) {
             delete context;
         }
     }
 
-    void WContextLog(const WContext* context, const char* message) {
+    void WPrint(const WContext* context, const char* message, int len) {
         WASSERT(context && message);
-        if (context->config.log)
-            context->config.log(message);
+        if (context->config.print) {
+            context->config.print(message, len);
+        }
     }
 
-    WObj* WContextCompile(WContext* context, const char* code, const char* moduleName) {
+    void WPrintString(const WContext* context, const char* message) {
+        WPrint(context, message, (int)std::strlen(message));
+    }
+
+    WObj* WCompile(WContext* context, const char* code, const char* moduleName) {
         WASSERT(context && code && moduleName);
 
         auto formatError = [](const auto& err, const auto& rawCode) {
@@ -155,7 +160,7 @@ extern "C" {
         func.fptr = &DefObject::Run;
         func.userdata = def;
         func.prettyName = "";
-        WObj* obj = WObjCreateFunc(context, &func);
+        WObj* obj = WCreateFunction(context, &func);
         if (obj == nullptr) {
             delete def;
             return nullptr;
@@ -164,12 +169,12 @@ extern "C" {
         WFinalizer finalizer{};
         finalizer.fptr = [](WObj* obj, void* userdata) { delete (DefObject*)userdata; };
         finalizer.userdata = def;
-        WObjSetFinalizer(obj, &finalizer);
+        WSetFinalizer(obj, &finalizer);
 
         return obj;
     }
 
-    WObj* WContextGetGlobal(WContext* context, const char* name) {
+    WObj* WGetGlobal(WContext* context, const char* name) {
         auto it = context->globals.find(std::string(name));
         if (it == context->globals.end()) {
             return nullptr;
@@ -178,7 +183,7 @@ extern "C" {
         }
     }
 
-    void WContextSetGlobal(WContext* context, const char* name, WObj* value) {
+    void WSetGlobal(WContext* context, const char* name, WObj* value) {
         if (context->globals.contains(std::string(name))) {
             *context->globals.at(std::string(name)) = value;
         } else {

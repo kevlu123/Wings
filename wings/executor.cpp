@@ -13,7 +13,7 @@ namespace wings {
 
 		// Create local variables
 		for (const auto& localVar : def->localVariables) {
-			WObj* null = WObjCreateNull(def->context);
+			WObj* null = WCreateNoneType(def->context);
 			executor.variables.insert({ localVar, MakeRcPtr<WObj*>(null) });
 		}
 
@@ -29,7 +29,7 @@ namespace wings {
 				" argument(s) but " +
 				std::to_string(argc) +
 				(argc == 1 ? " was given" : " were given");
-			WErrorSetRuntimeError(context, msg.c_str());
+			WRaiseError(context, msg.c_str());
 			return nullptr;
 		}
 		for (size_t i = 0; i < def->parameterNames.size(); i++) {
@@ -43,11 +43,11 @@ namespace wings {
 
 	DefObject::~DefObject() {
 		for (WObj* val : defaultParameterValues)
-			WGcUnprotect(val);
+			WUnprotectObject(val);
 	}
 
 	void  Executor::PushStack(WObj* obj) {
-		WGcProtect(obj);
+		WProtectObject(obj);
 		stack.push_back(obj);
 	}
 
@@ -55,7 +55,7 @@ namespace wings {
 		WASSERT(!stack.empty());
 		auto obj = stack.back();
 		stack.pop_back();
-		WGcUnprotect(obj);
+		WUnprotectObject(obj);
 		return obj;
 	}
 
@@ -69,7 +69,7 @@ namespace wings {
 		if (it != variables.end()) {
 			return *it->second;
 		} else {
-			return WContextGetGlobal(context, name.c_str());
+			return WGetGlobal(context, name.c_str());
 		}
 	}
 
@@ -77,18 +77,18 @@ namespace wings {
 		auto it = variables.find(name);
 		if (it != variables.end()) {
 			if (*it->second != value) {
-				WGcUnprotect(*it->second);
-				WGcProtect(value);
+				WUnprotectObject(*it->second);
+				WProtectObject(value);
 				*it->second = value;
 			}
 		} else {
-			WContextSetGlobal(context, name.c_str(), value);
+			WSetGlobal(context, name.c_str(), value);
 		}
 	}
 
 	WObj* Executor::Run(WObj** args, int argc) {
 		for (const auto& var : variables)
-			WGcProtect(*var.second);
+			WProtectObject(*var.second);
 
 		for (pc = 0; pc < def->instructions->size(); pc++) {
 			const auto& instr = (*def->instructions)[pc];
@@ -110,12 +110,12 @@ namespace wings {
 		while (!stack.empty())
 			PopStack();
 		for (const auto& var : variables)
-			WGcUnprotect(*var.second);
+			WUnprotectObject(*var.second);
 
 		if (exitValue.has_value()) {
 			return exitValue.value();
 		} else {
-			return WObjCreateNull(context);
+			return WCreateNoneType(context);
 		}
 	}
 
@@ -125,8 +125,8 @@ namespace wings {
 			pc = instr.jump->location - 1;
 			break;
 		case Instruction::Type::JumpIfFalse:
-			if (WObj* truthy = WOpTruthy(PopStack())) {
-				if (!WObjGetBool(truthy)) {
+			if (WObj* truthy = WTruthy(PopStack())) {
+				if (!WGetBool(truthy)) {
 					pc = instr.jump->location - 1;
 				}
 			} else {
@@ -151,7 +151,7 @@ namespace wings {
 				def->parameterNames.push_back(param.name);
 			for (size_t i = 0; i < instr.def->defaultParameterCount; i++) {
 				WObj* value = PopStack();
-				WGcProtect(value);
+				WProtectObject(value);
 				def->defaultParameterValues.push_back(value);
 			}
 
@@ -160,7 +160,7 @@ namespace wings {
 					def->captures.insert({ capture, variables[capture] });
 				} else {
 					if (!context->globals.contains(capture))
-						WContextSetGlobal(context, capture.c_str(), WObjCreateNull(context));
+						WSetGlobal(context, capture.c_str(), WCreateNoneType(context));
 					def->captures.insert({ capture, context->globals.at(capture) });
 				}
 			}
@@ -173,7 +173,7 @@ namespace wings {
 			func.fptr = &DefObject::Run;
 			func.userdata = def;
 			func.isMethod = instr.def->isMethod;
-			WObj* obj = WObjCreateFunc(context, &func);
+			WObj* obj = WCreateFunction(context, &func);
 			if (obj == nullptr) {
 				delete def;
 				exitValue = nullptr;
@@ -183,7 +183,7 @@ namespace wings {
 			WFinalizer finalizer{};
 			finalizer.fptr = [](WObj* obj, void* userdata) { delete (DefObject*)userdata; };
 			finalizer.userdata = def;
-			WObjSetFinalizer(obj, &finalizer);
+			WSetFinalizer(obj, &finalizer);
 
 			PushStack(obj);
 			break;
@@ -198,7 +198,7 @@ namespace wings {
 			wclass.methodCount = (int)methodCount;
 			wclass.methods = stack.data() + stack.size() - methodCount;
 			wclass.methodNames = methodNames.data();
-			WObj* _class = WObjCreateClass(context, &wclass);
+			WObj* _class = WCreateClass(context, &wclass);
 
 			for (size_t i = 0; i < methodCount; i++)
 				PopStack();
@@ -213,15 +213,15 @@ namespace wings {
 		case Instruction::Type::Literal: {
 			WObj* value{};
 			if (auto* n = std::get_if<std::nullptr_t>(instr.literal.get())) {
-				value = WObjCreateNull(context);
+				value = WCreateNoneType(context);
 			} else if (auto* b = std::get_if<bool>(instr.literal.get())) {
-				value = WObjCreateBool(context, *b);
+				value = WCreateBool(context, *b);
 			} else if (auto* i = std::get_if<wint>(instr.literal.get())) {
-				value = WObjCreateInt(context, *i);
+				value = WCreateInt(context, *i);
 			} else if (auto* f = std::get_if<wfloat>(instr.literal.get())) {
-				value = WObjCreateFloat(context, *f);
+				value = WCreateFloat(context, *f);
 			} else if (auto* s = std::get_if<std::string>(instr.literal.get())) {
-				value = WObjCreateString(context, s->c_str());
+				value = WCreateString(context, s->c_str());
 			} else {
 				WUNREACHABLE();
 			}
@@ -234,7 +234,7 @@ namespace wings {
 			break;
 		}
 		case Instruction::Type::ListLiteral:
-			if (WObj* li = WObjCreateList(context)) {
+			if (WObj* li = WCreateList(context)) {
 				for (int i = 0; i < instr.variadicOp->argc; i++)
 					li->v.insert(li->v.begin(), PopStack());
 				PushStack(li);
@@ -243,12 +243,12 @@ namespace wings {
 			}
 			break;
 		case Instruction::Type::MapLiteral:
-			if (WObj* li = WObjCreateMap(context)) {
+			if (WObj* li = WCreateMap(context)) {
 				for (int i = 0; i < instr.variadicOp->argc; i++) {
 					WObj* val = PopStack();
 					WObj* key = PopStack();
-					if (!WObjIsImmutableType(key)) {
-						WErrorSetRuntimeError(context, "Only an immutable type can be used as a dictionary key");
+					if (!WIsImmutableType(key)) {
+						WRaiseError(context, "Only an immutable type can be used as a dictionary key");
 						exitValue = nullptr;
 						return;
 					}
@@ -264,7 +264,7 @@ namespace wings {
 				PushStack(value);
 			} else {
 				std::string msg = "The name '" + instr.variable->variableName + "' is not defined";
-				WErrorSetRuntimeError(context, msg.c_str());
+				WRaiseError(context, msg.c_str());
 				exitValue = nullptr;
 			}
 			break;
@@ -274,7 +274,7 @@ namespace wings {
 		case Instruction::Type::MemberAssign: {
 			WObj* value = PopStack();
 			WObj* obj = PopStack();
-			WObjSetAttribute(obj, instr.memberAccess->memberName.c_str(), value);
+			WSetAttribute(obj, instr.memberAccess->memberName.c_str(), value);
 			PushStack(value);
 			break;
 		}
@@ -282,7 +282,7 @@ namespace wings {
 			size_t argc = instr.variadicOp->argc;
 			WObj* fn = stack[stack.size() - argc];
 			WObj** args = stack.data() + stack.size() - argc + 1;
-			if (WObj* ret = WOpCall(fn, args, (int)argc - 1)) {
+			if (WObj* ret = WCall(fn, args, (int)argc - 1)) {
 				for (size_t i = 0; i < argc; i++)
 					PopStack();
 				PushStack(ret);
@@ -293,12 +293,12 @@ namespace wings {
 		}
 		case Instruction::Type::Dot: {
 			WObj* obj = PopStack();
-			if (WObj* attr = WObjGetAttribute(obj, instr.memberAccess->memberName.c_str())) {
+			if (WObj* attr = WGetAttribute(obj, instr.memberAccess->memberName.c_str())) {
 				PushStack(attr);
 			} else {
 				std::string msg = "Object of type " + WObjTypeToString(obj->type) +
 					" has no attribute " + instr.memberAccess->memberName;
-				WErrorSetRuntimeError(context, msg.c_str());
+				WRaiseError(context, msg.c_str());
 				exitValue = nullptr;
 			}
 			break;
@@ -309,7 +309,7 @@ namespace wings {
 				args.push_back(PopStack());
 			}
 
-			if (WObj* res = WOpCallMethod(PopStack(), instr.op->operation.c_str(), args.data(), (int)args.size())) {
+			if (WObj* res = WCallMethod(PopStack(), instr.op->operation.c_str(), args.data(), (int)args.size())) {
 				PushStack(res);
 			} else {
 				exitValue = nullptr;
@@ -317,15 +317,15 @@ namespace wings {
 			break;
 		}
 		case Instruction::Type::And: {
-			WObj* arg1 = WOpTruthy(PopStack());
+			WObj* arg1 = WTruthy(PopStack());
 			if (arg1 == nullptr) {
 				exitValue = nullptr;
 				break;
 			}
 
-			if (!WObjGetBool(arg1)) {
+			if (!WGetBool(arg1)) {
 				// Short circuit
-				if (WObj* value = WObjCreateBool(context, false)) {
+				if (WObj* value = WCreateBool(context, false)) {
 					PushStack(value);
 				} else {
 					exitValue = nullptr;
@@ -333,13 +333,13 @@ namespace wings {
 				}
 			}
 
-			WObj* arg2 = WOpTruthy(PopStack());
+			WObj* arg2 = WTruthy(PopStack());
 			if (arg2 == nullptr) {
 				exitValue = nullptr;
 				break;
 			}
 			
-			if (WObj* value = WObjCreateBool(context, WObjGetBool(arg2))) {
+			if (WObj* value = WCreateBool(context, WGetBool(arg2))) {
 				PushStack(value);
 			} else {
 				exitValue = nullptr;
@@ -347,15 +347,15 @@ namespace wings {
 			break;
 		}
 		case Instruction::Type::Or: {
-			WObj* arg1 = WOpTruthy(PopStack());
+			WObj* arg1 = WTruthy(PopStack());
 			if (arg1 == nullptr) {
 				exitValue = nullptr;
 				break;
 			}
 
-			if (WObjGetBool(arg1)) {
+			if (WGetBool(arg1)) {
 				// Short circuit
-				if (WObj* value = WObjCreateBool(context, true)) {
+				if (WObj* value = WCreateBool(context, true)) {
 					PushStack(value);
 				} else {
 					exitValue = nullptr;
@@ -363,13 +363,13 @@ namespace wings {
 				}
 			}
 
-			WObj* arg2 = WOpTruthy(PopStack());
+			WObj* arg2 = WTruthy(PopStack());
 			if (arg2 == nullptr) {
 				exitValue = nullptr;
 				break;
 			}
 
-			if (WObj* value = WObjCreateBool(context, WObjGetBool(arg2))) {
+			if (WObj* value = WCreateBool(context, WGetBool(arg2))) {
 				PushStack(value);
 			} else {
 				exitValue = nullptr;
@@ -377,13 +377,13 @@ namespace wings {
 			break;
 		}
 		case Instruction::Type::Not: {
-			WObj* arg = WOpTruthy(PopStack());
+			WObj* arg = WTruthy(PopStack());
 			if (arg == nullptr) {
 				exitValue = nullptr;
 				break;
 			}
 
-			if (WObj* value = WObjCreateBool(context, !WObjGetBool(arg))) {
+			if (WObj* value = WCreateBool(context, !WGetBool(arg))) {
 				PushStack(value);
 			} else {
 				exitValue = nullptr;
@@ -393,7 +393,7 @@ namespace wings {
 		case Instruction::Type::In: {
 			WObj* obj = PopStack();
 			WObj* container = PopStack();
-			if (WObj* value = WOpIn(container, obj)) {
+			if (WObj* value = WIn(container, obj)) {
 				PushStack(value);
 			} else {
 				exitValue = nullptr;
@@ -403,7 +403,7 @@ namespace wings {
 		case Instruction::Type::NotIn: {
 			WObj* obj = PopStack();
 			WObj* container = PopStack();
-			if (WObj* value = WOpNotIn(container, obj)) {
+			if (WObj* value = WNotIn(container, obj)) {
 				PushStack(value);
 			} else {
 				exitValue = nullptr;
