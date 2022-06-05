@@ -289,7 +289,7 @@ namespace wings {
 					return nullptr;
 				}
 			case 1:
-				return WCastToFloat(argv[0]);
+				return WConvertToFloat(argv[0]);
 			default:
 				SetInvalidArgumentCountError(context, argc);
 				return nullptr;
@@ -306,7 +306,7 @@ namespace wings {
 					return nullptr;
 				}
 			case 1:
-				return WCastToString(argv[0]);
+				return WConvertToString(argv[0]);
 			default:
 				SetInvalidArgumentCountError(context, argc);
 				return nullptr;
@@ -1017,7 +1017,7 @@ namespace wings {
 		static WObj* print(WObj** argv, int argc, WContext* context) {
 			std::string text;
 			for (int i = 0; i < argc; i++) {
-				if (WObj* s = WCastToString(argv[i])) {
+				if (WObj* s = WConvertToString(argv[i])) {
 					text += WGetString(s);
 				} else {
 					return nullptr;
