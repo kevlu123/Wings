@@ -615,6 +615,7 @@ WDLL_EXPORT WObj* WConvertToString(WObj* obj);
 * 
 * @param callable the object to call.
 * @param argv a pointer to an array of objects used as arguments to the function call.
+*             If argc is 0 then this can be nullptr.
 * @param argc the number of arguments to pass.
 * @return the return value of the callable, or nullptr on failure.
 */
@@ -628,6 +629,7 @@ WDLL_EXPORT WObj* WCall(WObj* callable, WObj** argv, int argc);
 * @param obj the object to call the method on.
 * @param member a null terminated ASCII string containing the name of the method to call.
 * @param argv a pointer to an array of objects used as arguments to the method call.
+*             If argc is 0 then this can be nullptr.
 * @param argc the number of arguments to pass.
 * @return the return value of the method, or nullptr on failure.
 */
