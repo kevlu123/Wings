@@ -93,17 +93,23 @@ namespace wings {
 				}
 				instr.type = Instruction::Type::Literal;
 				break;
-			case Operation::ListLiteral:
+			case Operation::Tuple:
 				compileChildExpressions();
 				instr.variadicOp = std::make_unique<VariadicOpInstruction>();
 				instr.variadicOp->argc = expression.children.size();
-				instr.type = Instruction::Type::ListLiteral;
+				instr.type = Instruction::Type::Tuple;
 				break;
-			case Operation::MapLiteral:
+			case Operation::List:
+				compileChildExpressions();
+				instr.variadicOp = std::make_unique<VariadicOpInstruction>();
+				instr.variadicOp->argc = expression.children.size();
+				instr.type = Instruction::Type::List;
+				break;
+			case Operation::Map:
 				compileChildExpressions();
 				instr.variadicOp = std::make_unique<VariadicOpInstruction>();
 				instr.variadicOp->argc = expression.children.size() / 2;
-				instr.type = Instruction::Type::MapLiteral;
+				instr.type = Instruction::Type::Map;
 				break;
 			case Operation::Variable:
 				instr.variable = std::make_unique<VariableLoadInstruction>();

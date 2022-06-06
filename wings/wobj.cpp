@@ -78,22 +78,68 @@ extern "C" {
         return instance;
     }
 
-    WObj* WCreateList(WContext* context) {
-        WASSERT(context);
-        WObj* _class = context->builtinClasses.list;
-        WObj* instance = _class->fn.fptr(nullptr, 0, _class->fn.userdata);
-        if (instance) {
-            instance->attributes = _class->c.Copy();
+    WObj* WCreateTuple(WContext* context, WObj** argv, int argc) {
+        WASSERT(context && argc >= 0);
+        if (argc > 0) {
+            WASSERT(argv);
+            for (int i = 0; i < argc; i++) {
+                WProtectObject(argv[i]);
+                WASSERT(argv[i]);
+            }
         }
+
+        WObj* _class = context->builtinClasses.tuple;
+        WObj* instance = _class->fn.fptr(nullptr, 0, _class->fn.userdata);
+        if (argc > 0)
+            instance->v.insert(instance->v.begin(), argv, argv + argc);
+        if (instance)
+            instance->attributes = _class->c.Copy();
+        for (int i = 0; i < argc; i++)
+            WUnprotectObject(argv[i]);
         return instance;
     }
 
-    WObj* WCreateDictionary(WContext* context) {
-        WASSERT(context);
+    WObj* WCreateList(WContext* context, WObj** argv, int argc) {
+        WASSERT(context && argc >= 0);
+        if (argc > 0) {
+            WASSERT(argv);
+            for (int i = 0; i < argc; i++) {
+                WProtectObject(argv[i]);
+                WASSERT(argv[i]);
+            }
+        }
+
+        WObj* _class = context->builtinClasses.list;
+        WObj* instance = _class->fn.fptr(nullptr, 0, _class->fn.userdata);
+        if (argc > 0)
+            instance->v.insert(instance->v.begin(), argv, argv + argc);
+        if (instance)
+            instance->attributes = _class->c.Copy();
+        for (int i = 0; i < argc; i++)
+            WUnprotectObject(argv[i]);
+        return instance;
+    }
+
+    WObj* WCreateDictionary(WContext* context, WObj** keys, WObj** values, int argc) {
+        WASSERT(context && argc >= 0);
+        if (argc > 0) {
+            WASSERT(keys && values);
+            for (int i = 0; i < argc; i++) {
+                WProtectObject(keys[i]);
+                WProtectObject(values[i]);
+                WASSERT(keys[i] && values[i] && WIsImmutableType(keys[i]));
+            }
+        }
+
         WObj* _class = context->builtinClasses.map;
         WObj* instance = _class->fn.fptr(nullptr, 0, _class->fn.userdata);
-        if (instance) {
+        for (int i = 0; i < argc; i++)
+            instance->m.insert({ *keys[i], values[i] });
+        if (instance)
             instance->attributes = _class->c.Copy();
+        for (int i = 0; i < argc; i++) {
+            WUnprotectObject(keys[i]);
+            WUnprotectObject(values[i]);
         }
         return instance;
     }
@@ -212,6 +258,11 @@ extern "C" {
         return obj->type == WObj::Type::String;
     }
 
+    bool WIsTuple(const WObj* obj) {
+        WASSERT(obj);
+        return obj->type == WObj::Type::Tuple;
+    }
+
     bool WIsList(const WObj* obj) {
         WASSERT(obj);
         return obj->type == WObj::Type::List;
@@ -243,11 +294,19 @@ extern "C" {
     }
 
     bool WIsImmutableType(const WObj* obj) {
-        return obj->type == WObj::Type::Null
-            || obj->type == WObj::Type::Bool
-            || obj->type == WObj::Type::Int
-            || obj->type == WObj::Type::Float
-            || obj->type == WObj::Type::String;
+        WASSERT(obj);
+        if (obj->type == WObj::Type::Tuple) {
+            for (WObj* elem : obj->v)
+                if (!WIsImmutableType(elem))
+                    return false;
+            return true;
+        } else {
+            return obj->type == WObj::Type::Null
+                || obj->type == WObj::Type::Bool
+                || obj->type == WObj::Type::Int
+                || obj->type == WObj::Type::Float
+                || obj->type == WObj::Type::String;
+        }
     }
 
     bool WGetBool(const WObj* obj) {
@@ -606,6 +665,7 @@ extern "C" {
 namespace std {
     size_t hash<WObj>::operator()(const WObj& obj) const {
         auto doHash = []<typename T>(const T & val) { return std::hash<T>()(val); };
+        auto rotate = [](size_t x, size_t shift) { return (x << shift) | (x >> (sizeof(size_t) - shift)); };
 
         switch (obj.type) {
         case WObj::Type::Null:     return doHash(nullptr);
@@ -613,6 +673,12 @@ namespace std {
         case WObj::Type::Int:      return doHash(obj.i);
         case WObj::Type::Float:    return doHash(obj.f);
         case WObj::Type::String:   return doHash(obj.s);
+        case WObj::Type::Tuple: {
+            size_t h = 0;
+            for (size_t i = 0; i < obj.v.size(); i++)
+                h ^= rotate(doHash(*obj.v[i]), i);
+            return h;
+        }
         default: WUNREACHABLE();
         }
     }

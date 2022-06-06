@@ -103,7 +103,7 @@ extern "C" {
             context->config.maxRecursion = 100;
             context->config.maxCollectionSize = 1'000'000'000;
             context->config.gcRunFactor = 2.0f;
-            context->config.print = [](const char* message, int len) { std::cout << std::string(message, (size_t)len) << '\n'; };
+            context->config.print = [](const char* message, int len) { std::cout << std::string(message, (size_t)len); };
         }
     }
 
@@ -214,6 +214,7 @@ namespace wings {
         case WObj::Type::Int: return "int";
         case WObj::Type::Float: return "float";
         case WObj::Type::String: return "str";
+        case WObj::Type::Tuple: return "tuple";
         case WObj::Type::List: return "list";
         case WObj::Type::Map: return "dict";
         case WObj::Type::Object: return "object";

@@ -38,21 +38,26 @@ static std::string WObjToString(const WObj* val, std::unordered_set<const WObj*>
 		return "<object at " + PtrToString(val) + ">";
 	case WObj::Type::Class:
 		return "<class at " + PtrToString(val) + ">";
-	case WObj::Type::List:
+	case WObj::Type::Tuple:
+	case WObj::Type::List: {
+		bool isTuple = val->type == WObj::Type::Tuple;
 		if (seen.contains(val)) {
-			return "[...]";
+			return isTuple ? "(...)" : "[...]";
 		} else {
 			seen.insert(val);
-			std::string s = "[";
-			for (WObj* child : val->v) {;
+			std::string s(1, isTuple ? '(' : '[');
+			for (WObj* child : val->v) {
 				s += WObjToString(child, seen) + ", ";
 			}
 			if (!val->v.empty()) {
 				s.pop_back();
 				s.pop_back();
 			}
-			return s + "]";
+			if (isTuple && val->v.size() == 1)
+				s.push_back(',');
+			return s + (isTuple ? ')' : ']');
 		}
+	}
 	case WObj::Type::Map:
 		if (seen.contains(val)) {
 			return "{...}";
@@ -311,6 +316,34 @@ namespace wings {
 				SetInvalidArgumentCountError(context, argc);
 				return nullptr;
 			}
+		}
+
+		static WObj* Tuple(WObj** argv, int argc, WContext* context) {
+			if (argc > 1) {
+				SetInvalidArgumentCountError(context, argc, 1);
+				return nullptr;
+			}
+
+			WObj* tuple = Alloc(context);
+			if (tuple == nullptr)
+				return nullptr;
+			tuple->type = WObj::Type::Tuple;
+
+			if (argc == 1) {
+				auto f = [](WObj* value, void* list) {
+					((WObj*)list)->v.push_back(value);
+					return true;
+				};
+
+				WProtectObject(tuple);
+				bool success = WIterate(argv[0], tuple, f);
+				WUnprotectObject(tuple);
+				if (!success) {
+					return nullptr;
+				}
+			}
+
+			return tuple;
 		}
 
 		static WObj* List(WObj** argv, int argc, WContext* context) {
@@ -1045,6 +1078,7 @@ namespace wings {
 		CheckOperation(context->builtinClasses._int = CreateClass<classlib::Int>(context, "int"));
 		CheckOperation(context->builtinClasses._float = CreateClass<classlib::Float>(context, "float"));
 		CheckOperation(context->builtinClasses.str = CreateClass<classlib::Str>(context, "str"));
+		CheckOperation(context->builtinClasses.tuple = CreateClass<classlib::Tuple>(context, "tuple"));
 		CheckOperation(context->builtinClasses.list = CreateClass<classlib::List>(context, "list"));
 		CheckOperation(context->builtinClasses.map = CreateClass<classlib::Map>(context, "dict"));
 		CheckOperation(context->builtinClasses.func = CreateClass<classlib::Func>(context));
@@ -1058,6 +1092,7 @@ namespace wings {
 		context->builtinClasses._int->c.SetSuper(objectAttributes);
 		context->builtinClasses._float->c.SetSuper(objectAttributes);
 		context->builtinClasses.str->c.SetSuper(objectAttributes);
+		context->builtinClasses.tuple->c.SetSuper(objectAttributes);
 		context->builtinClasses.list->c.SetSuper(objectAttributes);
 		context->builtinClasses.map->c.SetSuper(objectAttributes);
 		context->builtinClasses.func->c.SetSuper(objectAttributes);
@@ -1068,6 +1103,7 @@ namespace wings {
 		context->builtinClasses._int->attributes.SetSuper(objectAttributes);
 		context->builtinClasses._float->attributes.SetSuper(objectAttributes);
 		context->builtinClasses.str->attributes.SetSuper(objectAttributes);
+		context->builtinClasses.tuple->attributes.SetSuper(objectAttributes);
 		context->builtinClasses.list->attributes.SetSuper(objectAttributes);
 		context->builtinClasses.map->attributes.SetSuper(objectAttributes);
 		context->builtinClasses.func->attributes.SetSuper(objectAttributes);

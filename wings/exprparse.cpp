@@ -199,8 +199,9 @@ namespace wings {
 		return std::distance(it, PRECEDENCE.end());
 	}
 
-	static CodeError ParseExpressionList(TokenIter& p, const std::string& terminate, std::vector<Expression>& out) {
+	static CodeError ParseExpressionList(TokenIter& p, const std::string& terminate, std::vector<Expression>& out, bool* seenComma = nullptr) {
 		bool mustTerminate = false;
+		if (seenComma) *seenComma = false;
 		while (true) {
 			// Check for terminating token
 			if (p.EndReached()) {
@@ -220,6 +221,7 @@ namespace wings {
 
 			// Check for comma
 			if (!p.EndReached() && p->text == ",") {
+				if (seenComma) *seenComma = true;
 				++p;
 			} else {
 				mustTerminate = true;
@@ -307,26 +309,31 @@ namespace wings {
 		return CodeError::Good();
 	}
 
-	static CodeError ParseBracket(TokenIter& p, Expression& out) {
+	static CodeError ParseTuple(TokenIter& p, Expression& out) {
+		out.srcPos = p->srcPos;
+		out.operation = Operation::Tuple;
 		++p;
 
-		if (auto error = ParseExpression(p, out)) {
+		bool seenComma = false;
+		if (p.EndReached()) {
+			return CodeError::Bad("Expected an expression", (--p)->srcPos);
+		} else if (auto error = ParseExpressionList(p, ")", out.children, &seenComma)) {
 			return error;
 		}
-
-		if (p.EndReached()) {
-			return CodeError::Bad("Expected a ')'", (--p)->srcPos);
-		} else if (p->text != ")") {
-			return CodeError::Bad("Expected a ')'", p->srcPos);
-		}
 		++p;
+
+		if (!out.children.empty() && !seenComma) {
+			// Was just an expression in brackets and not a tuple.
+			Expression e = std::move(out.children[0]);
+			out = std::move(e);
+		}
 
 		return CodeError::Good();
 	}
 
 	static CodeError ParseListLiteral(TokenIter& p, Expression& out) {
 		out.srcPos = p->srcPos;
-		out.operation = Operation::ListLiteral;
+		out.operation = Operation::List;
 		++p;
 
 		if (p.EndReached()) {
@@ -342,7 +349,7 @@ namespace wings {
 
 	static CodeError ParseMapLiteral(TokenIter& p, Expression& out) {
 		out.srcPos = p->srcPos;
-		out.operation = Operation::MapLiteral;
+		out.operation = Operation::Map;
 		++p;
 		bool mustTerminate = false;
 		while (true) {
@@ -391,7 +398,7 @@ namespace wings {
 		// Parse standalone values
 		out = {};
 		if (p->text == "(") {
-			if (auto error = ParseBracket(p, out)) {
+			if (auto error = ParseTuple(p, out)) {
 				return error;
 			}
 		} else if (p->text == "[") {
@@ -428,7 +435,7 @@ namespace wings {
 				out.variableName = p->text;
 				break;
 			default:
-				return CodeError::Bad("Unexpected expression", p->srcPos);
+				return CodeError::Bad("Unexpected token", p->srcPos);
 			}
 			out.srcPos = p->srcPos;
 			++p;

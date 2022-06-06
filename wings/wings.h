@@ -295,14 +295,30 @@ WDLL_EXPORT WObj* WCreateFloat(WContext* context, wfloat value WDEFAULT_ARG(0));
 WDLL_EXPORT WObj* WCreateString(WContext* context, const char* value WDEFAULT_ARG(nullptr));
 
 /**
+* Instantiate a tuple object.
+*
+* Call WGetErrorCode() or WGetErrorMessage() to get any errors.
+*
+* @param context the relevant context.
+* @param argv a pointer to an array of objects to initialize the tuple with.
+*             This can be nullptr if argc is 0.
+* @param argc the number of objects to initialize the tuple with.
+* @return the instantiated object, or nullptr on failure.
+*/
+WDLL_EXPORT WObj* WCreateTuple(WContext* context, WObj** argv, int argc);
+
+/**
 * Instantiate a list object.
 *
 * Call WGetErrorCode() or WGetErrorMessage() to get any errors.
 *
 * @param context the relevant context.
+* @param argv a pointer to an array of objects to initialize the list with.
+*             This can be nullptr if argc is 0.
+* @param argc the number of objects to initialize the list with.
 * @return the instantiated object, or nullptr on failure.
 */
-WDLL_EXPORT WObj* WCreateList(WContext* context);
+WDLL_EXPORT WObj* WCreateList(WContext* context, WObj** argv WDEFAULT_ARG(nullptr), int argc WDEFAULT_ARG(0));
 
 /**
 * Instantiate a dictionary object.
@@ -310,9 +326,14 @@ WDLL_EXPORT WObj* WCreateList(WContext* context);
 * Call WGetErrorCode() or WGetErrorMessage() to get any errors.
 *
 * @param context the relevant context.
+* @param keys a pointer to an array of keys to initialize the dictionary with.
+*             This can be nullptr if argc is 0.
+* @param values a pointer to an array of values to initialize the dictionary with.
+*             This can be nullptr if argc is 0.
+* @param argc the number of key value pairs to initialize the dictionary with.
 * @return the instantiated object, or nullptr on failure.
 */
-WDLL_EXPORT WObj* WCreateDictionary(WContext* context);
+WDLL_EXPORT WObj* WCreateDictionary(WContext* context, WObj** keys WDEFAULT_ARG(nullptr), WObj** values WDEFAULT_ARG(nullptr), int argc WDEFAULT_ARG(0));
 
 /**
 * Instantiate a function object.
@@ -448,7 +469,7 @@ WDLL_EXPORT bool WIsUserdata(const WObj* obj);
 /**
 * Check if an object is an immutable type.
 *
-* Immutable types are None, bool, int, float, and str.
+* Immutable types are None, bool, int, float, str, and tuples with immutable elements.
 * 
 * @param obj the object to inspect.
 * @return true if the object is an immutable type, otherwise false.

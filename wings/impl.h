@@ -30,6 +30,7 @@ struct WObj {
         Int,
         Float,
         String,
+        Tuple,
         List,
         Map,
         Func,
@@ -89,6 +90,7 @@ struct WContext {
         WObj* _int;
         WObj* _float;
         WObj* str;
+        WObj* tuple;
         WObj* list;
         WObj* map;
         WObj* object;

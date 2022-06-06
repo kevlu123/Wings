@@ -54,8 +54,9 @@ namespace wings {
 	struct Instruction {
 		enum class Type {
 			Literal,
-			ListLiteral,
-			MapLiteral,
+			Tuple,
+			List,
+			Map,
 			Def,
 			Class,
 			Variable,

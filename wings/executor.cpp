@@ -233,16 +233,21 @@ namespace wings {
 			}
 			break;
 		}
-		case Instruction::Type::ListLiteral:
-			if (WObj* li = WCreateList(context)) {
-				for (int i = 0; i < instr.variadicOp->argc; i++)
-					li->v.insert(li->v.begin(), PopStack());
+		case Instruction::Type::Tuple:
+		case Instruction::Type::List: {
+			auto creator = instr.type == Instruction::Type::Tuple ? WCreateTuple : WCreateList;
+			size_t argc = instr.variadicOp->argc;
+			WObj** argv = stack.data() + stack.size() - argc;
+			if (WObj* li = creator(context, argv, (int)argc)) {
+				for (size_t i = 0; i < argc; i++)
+					PopStack();
 				PushStack(li);
 			} else {
 				exitValue = nullptr;
 			}
 			break;
-		case Instruction::Type::MapLiteral:
+		}
+		case Instruction::Type::Map:
 			if (WObj* li = WCreateDictionary(context)) {
 				for (int i = 0; i < instr.variadicOp->argc; i++) {
 					WObj* val = PopStack();
