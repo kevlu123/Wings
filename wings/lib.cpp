@@ -132,11 +132,10 @@ static void SetMissingAttributeError(WContext* context, WObj** argv, size_t para
 }
 
 static void SetIndexOutOfRangeError(WContext* context, WObj** argv, size_t paramIndex) {
-	WASSERT(WIsInt(argv[paramIndex]));
 	SetArgumentError(
 		context,
 		paramIndex,
-		"index out of range with value " + std::to_string(WGetInt(argv[paramIndex]))
+		"index out of range"
 	);
 }
 
@@ -145,6 +144,7 @@ static void SetDivisionByZeroError(WContext* context) {
 }
 
 #define EXPECT_ARG_COUNT(n) do if (argc != n) { SetInvalidArgumentCountError(context, argc, n); return nullptr; } while (0)
+#define EXPECT_ARG_COUNT_BETWEEN(min, max) do if (argc < min && argc > max) { SetInvalidArgumentCountError(context, argc); return nullptr; } while (0)
 #define EXPECT_ARG_TYPE(index, check, expect) do if (!check(argv[index])) { SetInvalidTypeError(context, argv, index, expect); return nullptr; } while (0)
 #define EXPECT_ARG_TYPE_NULL(index) EXPECT_ARG_TYPE(index, WIsNoneType, "NoneType");
 #define EXPECT_ARG_TYPE_BOOL(index) EXPECT_ARG_TYPE(index, WIsBool, "bool");
@@ -957,10 +957,86 @@ namespace wings {
 		static WObj* List_GetItem(WObj** argv, int argc, WContext* context) {
 			EXPECT_ARG_COUNT(2);
 			EXPECT_ARG_TYPE_LIST(0);
-			EXPECT_ARG_TYPE_INT(1);
 
-			GET_LIST_INDEX(0, 1);
-			return argv[0]->v[listIndex];
+			if (WIsInt(argv[1])) {
+				GET_LIST_INDEX(0, 1);
+				return argv[0]->v[listIndex];
+			}
+
+			WObj* range[3]{};
+			for (size_t i = 0; i < std::size(range); i++) {
+				const char* attrs[3] = { "start", "stop", "step" };
+				auto& entry = range[i];
+				entry = WGetAttribute(argv[1], attrs[i]);
+				if (entry == nullptr) {
+					SetMissingAttributeError(context, argv, i + 1, attrs[i]);
+					return nullptr;
+				} else if (!WIsInt(entry) && !WIsNoneType(entry)) {
+					SetArgumentError(context, 1,
+						std::string("attribute ") + attrs[i] +
+						" expected type int or NoneType"
+						" but got " + WObjTypeToString(range[i]->type)
+					);
+					return nullptr;
+				}
+			}
+
+			size_t size = argv[0]->v.size();
+
+			WObj* slice = WCreateList(context);
+			WProtectObject(slice);
+
+			wint step = 1;
+			if (WIsInt(range[2])) {
+				step = WGetInt(range[2]);
+				if (step == 0) {
+					WRaiseError(context, "Step cannot be zero");
+					WUnprotectObject(slice);
+					return nullptr;
+				}
+			}
+
+			wint start = step > 0 ? 0 : ((wint)size - 1);
+			if (WIsInt(range[0]))
+				start = WGetInt(range[0]);
+			
+			wint stop = (wint)size;
+			bool includeStop = false; // Only applicable when step is negative
+			if (WIsInt(range[1])) {
+				stop = WGetInt(range[1]);
+			} else if (step < 0) {
+				stop = 0;
+				includeStop = true;
+			}
+
+			int64_t startRaw = (int64_t)ConvertNegativeIndex(start, size);
+			int64_t stopRaw = (int64_t)ConvertNegativeIndex(stop, size);
+
+			bool failed = false;
+			auto appendElem = [&](size_t i) {
+				if (i >= size) {
+					SetIndexOutOfRangeError(context, argv, 1);
+					failed = true;
+					return false;
+				}
+				slice->v.push_back(argv[0]->v[i]);
+				return true;
+			};
+
+			if (step > 0) {
+				for (int64_t i = startRaw; i < stopRaw; i += step)
+					if (!appendElem((size_t)i))
+						break;
+			} else {
+				if (includeStop)
+					stopRaw--;
+				for (int64_t i = startRaw; i > stopRaw; i += step)
+					if (!appendElem((size_t)i))
+						break;
+			}
+
+			WUnprotectObject(slice);
+			return failed ? nullptr : slice;
 		}
 
 		static WObj* List_SetItem(WObj** argv, int argc, WContext* context) {
@@ -991,13 +1067,10 @@ namespace wings {
 		}
 
 		static WObj* List_Pop(WObj** argv, int argc, WContext* context) {
-			if (argc >= 2) {
-				SetInvalidArgumentCountError(context, argc, 2);
-				return nullptr;
-			}
+			EXPECT_ARG_COUNT_BETWEEN(0, 1);
 			EXPECT_ARG_TYPE_LIST(0);
 
-			int negIndex = -1;
+			wint negIndex = -1;
 			if (argc == 1) {
 				EXPECT_ARG_TYPE_INT(1);
 				negIndex = WGetInt(argv[1]);
@@ -1222,6 +1295,21 @@ def range(start, end=None, step=None):
 		return __Range(start, end, 1)
 	else:
 		return __Range(start, end, step)
+
+class __Slice:
+	def __init__(self, start, stop, step):
+		self.start = start
+		self.stop = stop
+		self.step = step
+
+def slice(start, stop=None, step=None):
+	if stop == None:
+		return slice(None, start, None)
+	elif step == None:
+		return slice(start, stop, None)
+	else:
+		return slice(start, stop, step)
+
 			)",
 			"__builtins__"
 		);
@@ -1229,6 +1317,8 @@ def range(start, end=None, step=None):
 		CheckOperation(builtins);
 
 		CheckOperation(WCall(builtins, nullptr, 0));
+
+		CheckOperation(context->builtinClasses.slice = WGetGlobal(context, "__Slice"));
 
 		return true;
 	}

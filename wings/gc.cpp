@@ -44,10 +44,12 @@ extern "C" {
             context->builtinClasses._int,
             context->builtinClasses._float,
             context->builtinClasses.str,
+            context->builtinClasses.tuple,
             context->builtinClasses.list,
             context->builtinClasses.map,
             context->builtinClasses.func,
             context->builtinClasses.userdata,
+            context->builtinClasses.slice,
             context->nullSingleton,
         };
         for (auto& _class : builtinClasses) {

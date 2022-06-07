@@ -166,7 +166,7 @@ namespace wings {
 	};
 
 	const std::vector<std::vector<Operation>> PRECEDENCE = {
-		{ Operation::Call, Operation::Index, Operation::Incr, Operation::Decr, Operation::Dot },
+		{ Operation::Call, Operation::Index, Operation::Slice, Operation::Incr, Operation::Decr, Operation::Dot },
 		{ Operation::Pow },
 		{ Operation::Pos, Operation::Neg, Operation::BitNot },
 		{ Operation::Mul, Operation::Div, Operation::IDiv, Operation::Mod },
@@ -243,6 +243,7 @@ namespace wings {
 				out.assignType = AssignType::Direct;
 				break;
 			case Operation::Index:
+			case Operation::Slice:
 				out.assignType = AssignType::Index;
 				break;
 			case Operation::Dot:
@@ -271,25 +272,47 @@ namespace wings {
 			++p;
 		} else if (p->text == "[") {
 			// Consume opening bracket
-			out.operation = Operation::Index;
+			SourcePosition srcPos = p->srcPos;
 			++p;
 
-			// Consume expression
-			Expression index{};
-			if (p.EndReached()) {
-				return CodeError::Bad("Expected an expression", (--p)->srcPos);
-			} else if (auto error = ParseExpression(p, index)) {
-				return error;
-			}
-			out.children = { std::move(arg), std::move(index) };
+			std::optional<Expression> indices[3];
 
-			// Consume closing bracket
-			if (p.EndReached()) {
-				return CodeError::Bad("Expected a ']'", (--p)->srcPos);
-			} else if (p->text != "]") {
-				return CodeError::Bad("Expected a ']'", p->srcPos);
+			bool isSlice = false;
+			for (size_t i = 0; i < std::size(indices); i++) {
+				if (p.EndReached()) {
+					return CodeError::Bad("Expected an expression", (--p)->srcPos);
+				} else if (p->text != ":") {
+					indices[i] = Expression();
+					if (auto error = ParseExpression(p, indices[i].value())) {
+						return error;
+					}
+				}
+
+				// Consume ']' or ':'
+				if (p.EndReached()) {
+					return CodeError::Bad("Expected a ']'", (--p)->srcPos);
+				} else if (p->text == "]") {
+					++p;
+					break;
+				} else if (p->text != ":") {
+					return CodeError::Bad("Expected a ']'", p->srcPos);
+				}
+				isSlice = true;
+				++p;
 			}
-			++p;
+
+			out.operation = isSlice ? Operation::Slice : Operation::Index;
+			out.children = { std::move(arg) };
+			for (size_t i = 0; i < std::size(indices); i++) {
+				if (indices[i].has_value()) {
+					out.children.push_back(std::move(indices[i].value()));
+				} else {
+					Expression none{};
+					none.srcPos = srcPos;
+					none.literalValue.type = LiteralValue::Type::Null;
+					out.children.push_back(std::move(none));
+				}
+			}
 		} else if (p->text == ".") {
 			// Consume dot
 			out.operation = Operation::Dot;
@@ -549,6 +572,7 @@ namespace wings {
 				out.assignType = AssignType::Direct;
 				break;
 			case Operation::Index:
+			case Operation::Slice:
 				out.assignType = AssignType::Index;
 				break;
 			case Operation::Dot:

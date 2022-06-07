@@ -186,6 +186,28 @@ namespace wings {
 			case Operation::IfElse:
 				CompileInlineIfElse(expression, instructions);
 				return;
+			case Operation::Slice: {
+				CompileExpression(expression.children[0], instructions);
+
+				Instruction sliceClass{};
+				sliceClass.srcPos = expression.srcPos;
+				sliceClass.type = Instruction::Type::SliceClass;
+				instructions.push_back(std::move(sliceClass));
+
+				for (size_t i = 1; i < expression.children.size(); i++)
+					CompileExpression(expression.children[i], instructions);
+
+				Instruction instantiateSlice{};
+				instantiateSlice.variadicOp = std::make_unique<VariadicOpInstruction>();
+				instantiateSlice.variadicOp->argc = 4;
+				instantiateSlice.type = Instruction::Type::Call;
+				instructions.push_back(std::move(instantiateSlice));
+
+				instr.op = std::make_unique<OpInstruction>();
+				*instr.op = OP_DATA.at(Operation::Index);
+				instr.type = Instruction::Type::Operation;
+				break;
+			}
 			default:
 				compileChildExpressions();
 				instr.op = std::make_unique<OpInstruction>();

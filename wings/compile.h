@@ -57,6 +57,7 @@ namespace wings {
 			Tuple,
 			List,
 			Map,
+			SliceClass,
 			Def,
 			Class,
 			Variable,

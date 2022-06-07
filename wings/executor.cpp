@@ -308,6 +308,9 @@ namespace wings {
 			}
 			break;
 		}
+		case Instruction::Type::SliceClass:
+			PushStack(context->builtinClasses.slice);
+			break;
 		case Instruction::Type::Operation: {
 			std::vector<WObj*> args;
 			for (size_t i = 0; i < instr.op->argc - 1; i++) {

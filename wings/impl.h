@@ -96,6 +96,8 @@ struct WContext {
         WObj* object;
         WObj* func;
         WObj* userdata;
+
+        WObj* slice;
     } builtinClasses;
     WObj* nullSingleton;
 };

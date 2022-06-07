@@ -8,7 +8,7 @@ namespace wings {
 		Literal, Variable,
 		Tuple, List, Map,
 		ListComprehension,
-		Index, Call,
+		Index, Call, Slice,
 		Pos, Neg,
 		Add, Sub, Mul, Div, IDiv, Mod, Pow,
 		Eq, Ne, Lt, Le, Gt, Ge,
