@@ -131,7 +131,7 @@ extern "C" {
     }
 
     WObj* WCompile(WContext* context, const char* code, const char* moduleName) {
-        WASSERT(context && code && moduleName);
+        WASSERT(context && code);
 
         auto formatError = [](const auto& err, const auto& rawCode) {
             std::stringstream ss;
@@ -157,7 +157,7 @@ extern "C" {
 
         DefObject* def = new DefObject();
         def->context = context;
-        def->module = moduleName;
+        def->module = moduleName ? moduleName : "<unnamed>";
         def->prettyName = "";
         def->originalSource = std::move(originalSource);
         auto instructions = Compile(parseResult.parseTree);

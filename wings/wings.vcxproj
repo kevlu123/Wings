@@ -153,6 +153,7 @@
     <ClCompile Include="lib.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="parse.cpp" />
+    <ClCompile Include="testing.cpp" />
     <ClCompile Include="wings.cpp" />
     <ClCompile Include="wobj.cpp" />
   </ItemGroup>
