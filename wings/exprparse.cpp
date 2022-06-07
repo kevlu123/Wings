@@ -182,6 +182,7 @@ namespace wings {
 		{ Operation::Not },
 		{ Operation::And },
 		{ Operation::Or },
+		{ Operation::IfElse },
 		{
 			Operation::Assign, Operation::AddAssign, Operation::SubAssign,
 			Operation::MulAssign, Operation::DivAssign, Operation::IDivAssign,
@@ -303,6 +304,38 @@ namespace wings {
 			out.children = { std::move(arg) };
 			out.variableName = p->text;
 			++p;
+		} else if (p->text == "if") {
+			// Might as well handle if-else here
+			out.operation = Operation::IfElse;
+
+			// Consume 'if'
+			++p;
+
+			// Consume condition
+			Expression condition;
+			if (p.EndReached()) {
+				return CodeError::Bad("Expected an expression", (--p)->srcPos);
+			} else if (auto error = ParseExpression(p, condition, (size_t)0)) {
+				return error;
+			}
+
+			// Consume 'else'
+			if (p.EndReached()) {
+				return CodeError::Bad("Expected 'else'", (--p)->srcPos);
+			} else if (p->text != "else") {
+				return CodeError::Bad("Expected 'else'", p->srcPos);
+			}
+			++p;
+
+			// Consume false case expression
+			Expression falseCase;
+			if (p.EndReached()) {
+				return CodeError::Bad("Expected an expression", (--p)->srcPos);
+			} else if (auto error = ParseExpression(p, falseCase, (size_t)0)) {
+				return error;
+			}
+
+			out.children = { std::move(condition), std::move(arg), std::move(falseCase) };
 		} else {
 			out = std::move(arg);
 		}

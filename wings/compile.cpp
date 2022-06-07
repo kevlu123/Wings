@@ -8,6 +8,7 @@ namespace wings {
 	static thread_local std::vector<size_t> continueInstructions;
 
 	static void CompileBody(const Statement& node, std::vector<Instruction>& instructions);
+	static void CompileExpression(const Expression& expression, std::vector<Instruction>& instructions);
 
 	static const std::unordered_map<Operation, OpInstruction> OP_DATA = {
 		{ Operation::Index,  { "__getitem__", 2 } },
@@ -34,6 +35,36 @@ namespace wings {
 		{ Operation::ShiftL, { "__lshift__", 2 } },
 		{ Operation::ShiftR, { "__rshift__", 2 } },
 	};
+
+	static void CompileInlineIfElse(const Expression& expression, std::vector<Instruction>& instructions) {
+		const auto& condition = expression.children[0];
+		const auto& trueCase = expression.children[1];
+		const auto& falseCase = expression.children[2];
+		
+		CompileExpression(condition, instructions);
+
+		Instruction falseJump{};
+		falseJump.srcPos = condition.srcPos;
+		falseJump.type = Instruction::Type::JumpIfFalse;
+		falseJump.jump = std::make_unique<JumpInstruction>();
+		size_t falseJumpIndex = instructions.size();
+		instructions.push_back(std::move(falseJump));
+
+		CompileExpression(trueCase, instructions);
+
+		Instruction trueJump{};
+		trueJump.srcPos = condition.srcPos;
+		trueJump.type = Instruction::Type::Jump;
+		trueJump.jump = std::make_unique<JumpInstruction>();
+		size_t trueJumpIndex = instructions.size();
+		instructions.push_back(std::move(trueJump));
+
+		instructions[falseJumpIndex].jump->location = instructions.size();
+
+		CompileExpression(falseCase, instructions);
+
+		instructions[trueJumpIndex].jump->location = instructions.size();
+	}
 
 	static void CompileExpression(const Expression& expression, std::vector<Instruction>& instructions) {
 		auto compileChildExpressions = [&] {
@@ -152,6 +183,9 @@ namespace wings {
 				CompileExpression(expression.children[1], instructions);
 				instr.type = Instruction::Type::NotIn;
 				break;
+			case Operation::IfElse:
+				CompileInlineIfElse(expression, instructions);
+				return;
 			default:
 				compileChildExpressions();
 				instr.op = std::make_unique<OpInstruction>();

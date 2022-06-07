@@ -16,6 +16,7 @@ namespace wings {
 		In, NotIn,
 		BitAnd, BitOr, BitNot, BitXor,
 		ShiftL, ShiftR,
+		IfElse,
 		Assign, AddAssign, SubAssign, MulAssign,
 		DivAssign, IDivAssign, ModAssign, PowAssign,
 		AndAssign, OrAssign, XorAssign,
