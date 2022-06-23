@@ -26,7 +26,7 @@ namespace wings {
 
 		struct {
 			Expression variable;
-			AssignType assignType{};
+			AssignTarget assignTarget;
 		} forLoop;
 		struct {
 			std::string name;

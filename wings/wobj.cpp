@@ -400,10 +400,13 @@ extern "C" {
                 return false;
             }
 
+            WProtectObject(value);
             if (!callback(value, userdata)) {
+                WUnprotectObject(value);
                 WUnprotectObject(iter);
                 return false;
             }
+            WUnprotectObject(value);
         }
     }
 

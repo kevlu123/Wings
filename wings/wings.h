@@ -632,6 +632,8 @@ WDLL_EXPORT WObj* WConvertToString(WObj* obj);
 * If the object is a function object then the function is called.
 * If the object is a class object then the class is instantiated.
 * Otherwise the object's __call__() method is called.
+* The callable object and arguments are protected from garbage
+* collection while the function call is being executed.
 * Call WGetErrorCode() or WGetErrorMessage() to get any errors.
 * 
 * @param callable the object to call.

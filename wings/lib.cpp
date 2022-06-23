@@ -1049,6 +1049,13 @@ namespace wings {
 			return argv[0];
 		}
 
+		static WObj* List_Len(WObj** argv, int argc, WContext* context) {
+			EXPECT_ARG_COUNT(1);
+			EXPECT_ARG_TYPE_LIST(0);
+
+			return WCreateInt(context, (wint)argv[0]->v.size());
+		}
+
 		static WObj* List_Append(WObj** argv, int argc, WContext* context) {
 			EXPECT_ARG_COUNT(2);
 			EXPECT_ARG_TYPE_LIST(0);
@@ -1135,6 +1142,13 @@ namespace wings {
 			}
 			text += '\n';
 			WPrint(context, text.c_str(), (int)text.size());
+			return WCreateNoneType(context);
+		}
+
+		static WObj* set_class_attr(WObj** argv, int argc, WContext* context) {
+			// Not callable from user code
+			argv[2]->fn.isMethod = true;
+			argv[0]->c.Set(argv[1]->s, argv[2]);
 			return WCreateNoneType(context);
 		}
 
@@ -1244,6 +1258,7 @@ namespace wings {
 
 		CheckOperation(RegisterStatelessMethod<attrlib::List_GetItem>(context, context->builtinClasses.list->c, "__getitem__", "list.__getitem__"));
 		CheckOperation(RegisterStatelessMethod<attrlib::List_SetItem>(context, context->builtinClasses.list->c, "__setitem__", "list.__setitem__"));
+		CheckOperation(RegisterStatelessMethod<attrlib::List_Len>(context, context->builtinClasses.list->c, "__len__", "list.__len__"));
 		//CheckOperation(RegisterStatelessMethod<attrlib::List_Contains>(context, context->builtinClasses.list->c, "__contains__"));
 		CheckOperation(RegisterStatelessMethod<attrlib::List_Insert>(context, context->builtinClasses.list->c, "insert", "list.insert"));
 		CheckOperation(RegisterStatelessMethod<attrlib::List_Append>(context, context->builtinClasses.list->c, "append", "list.append"));
@@ -1259,11 +1274,15 @@ namespace wings {
 
 		// Register builtin functions
 		CheckOperation(RegisterStatelessFunction<lib::print>(context, "print"));
+		CheckOperation(RegisterStatelessFunction<lib::set_class_attr>(context, "set_class_attr"));
 
 		WObj* builtins = WCompile(context,
 			R"(
 def isinstance(o, t):
 	return o.__class__ == t
+
+def len(x):
+	return x.__len__()
 
 class __Range:
 	def __init__(self, start, end, step):
@@ -1310,6 +1329,20 @@ def slice(start, stop=None, step=None):
 	else:
 		return slice(start, stop, step)
 
+class __ListIter:
+	def __init__(self, li):
+		self.li = li
+		self.i = 0
+
+	def __next__(self):
+		v = self.li[self.i]
+		self.i = self.i + 1
+		return v
+
+	def __end__(self):
+		return self.i >= len(self.li)
+		
+set_class_attr(list, "__iter__", lambda self: __ListIter(self))
 			)",
 			"__builtins__"
 		);

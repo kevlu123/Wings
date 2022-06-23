@@ -4,3 +4,4 @@
 #define WDLL_EXPORT __declspec(dllexport)
 #define WDLL_EXPORT
 #define WDEFAULT_ARG
+#define WUNREACHABLE

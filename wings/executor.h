@@ -34,6 +34,8 @@ namespace wings {
 		WObj* GetVariable(const std::string& name);
 		void SetVariable(const std::string& name, WObj* value);
 
+		WObj* DirectAssign(const AssignTarget& target, WObj* value);
+
 		DefObject* def;
 		WContext* context;
 		size_t pc{};

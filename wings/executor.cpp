@@ -86,6 +86,49 @@ namespace wings {
 		}
 	}
 
+	WObj* Executor::DirectAssign(const AssignTarget& target, WObj* value) {
+		switch (target.type) {
+		case AssignType::Direct:
+			SetVariable(target.direct, value);
+			return value;
+		case AssignType::Pack: {
+			std::vector<WObj*> values;
+			auto f = [](WObj* value, void* userdata) {
+				WProtectObject(value);
+				((std::vector<WObj*>*)userdata)->push_back(value);
+				return true;
+			};
+
+			auto unprotectValues = [&] {
+				for (WObj* v : values)
+					WUnprotectObject(v);
+			};
+
+			if (!WIterate(value, &values, f)) {
+				unprotectValues();
+				return nullptr;
+			}
+
+			if (values.size() != target.pack.size()) {
+				WRaiseError(context, "Packed assignment argument count mismatch.");
+				unprotectValues();
+				return nullptr;
+			}
+
+			for (size_t i = 0; i < values.size(); i++)
+				if (!DirectAssign(target.pack[i], values[i])) {
+					unprotectValues();
+					return nullptr;
+				}
+
+			unprotectValues();
+			return WCreateTuple(context, values.data(), (int)values.size());
+		}
+		default:
+			WUNREACHABLE();
+		}
+	}
+
 	WObj* Executor::Run(WObj** args, int argc) {
 		for (const auto& var : variables)
 			WProtectObject(*var.second);
@@ -273,9 +316,14 @@ namespace wings {
 				exitValue = nullptr;
 			}
 			break;
-		case Instruction::Type::DirectAssign:
-			SetVariable(instr.directAssign->variableName, PeekStack());
+		case Instruction::Type::DirectAssign: {
+			if (WObj* v = DirectAssign(instr.directAssign->assignTarget, PopStack())) {
+				PushStack(v);
+			} else {
+				exitValue = nullptr;
+			}
 			break;
+		}
 		case Instruction::Type::MemberAssign: {
 			WObj* value = PopStack();
 			WObj* obj = PopStack();

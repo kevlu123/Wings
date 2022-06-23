@@ -122,8 +122,9 @@ namespace wings {
 		Statement rangeEval{};
 		rangeEval.type = Statement::Type::Expr;
 		rangeEval.expr.operation = Operation::Assign;
-		rangeEval.expr.assignType = AssignType::Direct;
-		rangeEval.expr.children.push_back(rangeVar());
+		rangeEval.expr.assignTarget.type = AssignType::Direct;
+		rangeEval.expr.assignTarget.direct = rangeVarName;
+		rangeEval.expr.children.push_back({}); // Dummy
 		rangeEval.expr.children.push_back(std::move(callIter));
 
 		// while not __VarXXX.__end__():
@@ -162,8 +163,8 @@ namespace wings {
 		Expression iterAssign{};
 		iterAssign.srcPos = forLoop.expr.srcPos;
 		iterAssign.operation = Operation::Assign;
-		iterAssign.assignType = forLoop.forLoop.assignType;
-		iterAssign.children.push_back(std::move(forLoop.forLoop.variable));
+		iterAssign.assignTarget = forLoop.forLoop.assignTarget;
+		iterAssign.children.push_back({}); // Dummy
 		iterAssign.children.push_back(std::move(callNext));
 
 		Statement iterAssignStat{};
@@ -189,7 +190,7 @@ namespace wings {
 
 		if (auto error = ParseExpression(p, out.forLoop.variable, true)) {
 			return error;
-		} else if (!IsAssignableExpression(out.forLoop.variable, &out.forLoop.assignType)) {
+		} else if (!IsAssignableExpression(out.forLoop.variable, out.forLoop.assignTarget)) {
 			return CodeError::Bad("Expression is not assignable", (--p)->srcPos);
 		}
 

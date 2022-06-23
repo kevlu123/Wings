@@ -48,7 +48,7 @@ namespace wings {
 	};
 
 	struct DirectAssignInstruction {
-		std::string variableName;
+		AssignTarget assignTarget;
 	};
 
 	struct Instruction {
@@ -63,7 +63,7 @@ namespace wings {
 			Variable,
 			Dot,
 
-			DirectAssign,	// Cannot fail
+			DirectAssign,
 			MemberAssign,	// Cannot fail
 
 			Jump,			// Cannot fail

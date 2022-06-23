@@ -70,10 +70,10 @@ namespace wings {
 
 	struct Expression {
 		Operation operation{};
-		AssignType assignType = AssignType::None;
 		std::vector<Expression> children;
 		SourcePosition srcPos;
 
+		AssignTarget assignTarget;
 		std::string variableName;
 		LiteralValue literalValue;
 		struct {
@@ -110,6 +110,6 @@ namespace wings {
 	};
 
 	CodeError ParseExpression(TokenIter& p, Expression& out, bool disableInOp = false);
-	bool IsAssignableExpression(const Expression& expr, AssignType* type = nullptr);
+	bool IsAssignableExpression(const Expression& expr, AssignTarget& target, bool onlyDirectOrPack = false);
 
 }

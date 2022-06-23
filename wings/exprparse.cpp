@@ -79,6 +79,7 @@ namespace wings {
 		{ "not", Operation::NotIn },
 
 		{ "=",  Operation::Assign },
+		{ ":=",  Operation::Assign },
 		{ "+=", Operation::AddAssign },
 		{ "-=", Operation::SubAssign },
 		{ "*=", Operation::MulAssign },
@@ -201,30 +202,33 @@ namespace wings {
 		return std::distance(it, PRECEDENCE.end());
 	}
 
-	bool IsAssignableExpression(const Expression& expr, AssignType* type) {
+	bool IsAssignableExpression(const Expression& expr, AssignTarget& target, bool onlyDirectOrPack) {
+		target.type = AssignType::None;
 		switch (expr.operation) {
 		case Operation::Variable:
-			if (type) *type = AssignType::Direct;
+			target.type = AssignType::Direct;
+			target.direct = expr.variableName;
 			return true;
 		case Operation::Index:
 		case Operation::Slice:
-			if (type) *type = AssignType::Index;
+			if (onlyDirectOrPack)
+				return false;
+			target.type = AssignType::Index;
 			return true;
 		case Operation::Dot:
-			if (type) *type = AssignType::Member;
+			if (onlyDirectOrPack)
+				return false;
+			target.type = AssignType::Member;
 			return true;
-		default:
-			if (type) *type = AssignType::None;
-			return false;
 		case Operation::Tuple:
 		case Operation::List:
 			for (const auto& child : expr.children)
-				if (!IsAssignableExpression(child)) {
-					if (type) *type = AssignType::Pack;
+				if (!IsAssignableExpression(child, target.pack.emplace_back(), true))
 					return false;
-				}
-			if (type) *type = AssignType::None;
+			target.type = AssignType::Pack;
 			return true;
+		default:
+			return false;
 		}
 	}
 
@@ -266,7 +270,7 @@ namespace wings {
 
 		out.srcPos = p->srcPos;
 		if (p->text == "++" || p->text == "--") {
-			if (!IsAssignableExpression(arg, &out.assignType)) {
+			if (!IsAssignableExpression(arg, out.assignTarget)) {
 				return CodeError::Bad("Expression is not assignable", (--p)->srcPos);
 			}
 
@@ -324,7 +328,7 @@ namespace wings {
 			for (size_t i = 0; i < std::size(indices); i++) {
 				if (indices[i].has_value()) {
 					out.children.push_back(std::move(indices[i].value()));
-				} else {
+				} else if (isSlice) {
 					Expression none{};
 					none.srcPos = srcPos;
 					none.literalValue.type = LiteralValue::Type::Null;
@@ -494,12 +498,12 @@ namespace wings {
 		++p;
 
 		Expression var{};
-		AssignType assignType{};
+		AssignTarget assignTarget{};
 		if (p.EndReached()) {
 			return CodeError::Bad("Expected a variable name", (--p)->srcPos);
 		} else if (auto error = ParseExpression(p, var, true)) {
 			return error;
-		} else if (!IsAssignableExpression(var, &assignType)) {
+		} else if (!IsAssignableExpression(var, assignTarget, true)) {
 			return CodeError::Bad("Expression is not assignable", (--p)->srcPos);
 		}
 
@@ -530,7 +534,7 @@ namespace wings {
 		Expression assignExpr{};
 		assignExpr.srcPos = var.srcPos;
 		assignExpr.operation = Operation::Assign;
-		assignExpr.assignType = assignType;
+		assignExpr.assignTarget = assignTarget;
 		assignExpr.children.push_back(std::move(var));
 		assignExpr.children.push_back(std::move(loadParam));
 		Statement assignStat{};
@@ -730,7 +734,7 @@ namespace wings {
 		out.srcPos = p->srcPos;
 		if (BINARY_RIGHT_ASSOCIATIVE_OPS.contains(op)) {
 			// Binary operation is an assignment operation only if it is right associative
-			if (!IsAssignableExpression(lhs, &out.assignType)) {
+			if (!IsAssignableExpression(lhs, out.assignTarget)) {
 				return CodeError::Bad("Expression is not assignable", (----p)->srcPos);
 			}
 

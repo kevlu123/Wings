@@ -76,14 +76,15 @@ namespace wings {
 		Instruction instr{};
 		instr.srcPos = expression.srcPos;
 
-		switch (expression.assignType) {
+		switch (expression.assignTarget.type) {
 		case AssignType::Direct:
+		case AssignType::Pack:
 			// <assign>
 			//		<assignee>
 			//		<expr>
 			CompileExpression(expression.children[1], instructions);
 			instr.directAssign = std::make_unique<DirectAssignInstruction>();
-			instr.directAssign->variableName = expression.children[0].variableName;
+			instr.directAssign->assignTarget = expression.assignTarget;
 			instr.type = Instruction::Type::DirectAssign;
 			break;
 		case AssignType::Index:
@@ -379,7 +380,8 @@ namespace wings {
 		assign.srcPos = node.srcPos;
 		assign.type = Instruction::Type::DirectAssign;
 		assign.directAssign = std::make_unique<DirectAssignInstruction>();
-		assign.directAssign->variableName = node.expr.def.name;
+		assign.directAssign->assignTarget.type = AssignType::Direct;
+		assign.directAssign->assignTarget.direct = node.expr.def.name;
 		instructions.push_back(std::move(assign));
 
 		Instruction pop{};
@@ -407,7 +409,8 @@ namespace wings {
 		assign.srcPos = node.srcPos;
 		assign.type = Instruction::Type::DirectAssign;
 		assign.directAssign = std::make_unique<DirectAssignInstruction>();
-		assign.directAssign->variableName = node._class.name;
+		assign.directAssign->assignTarget.type = AssignType::Direct;
+		assign.directAssign->assignTarget.direct = node._class.name;
 		instructions.push_back(std::move(assign));
 
 		Instruction pop{};

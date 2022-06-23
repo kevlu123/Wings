@@ -53,6 +53,7 @@ namespace wings {
 		"+", "-", "*", "**", "/", "//", "%",
 		"<", ">", "<=", ">=", "==", "!=",
 		"!", "&&", "||", "^", "&", "|", "~",
+		"=", ":=",
 		"+=", "-=", "*=", "**=", "%=", "/=", "//=",
 		">>=", "<<=", "|=", "&=", "^=", ";", "--", "++"
 	};
@@ -312,13 +313,17 @@ namespace wings {
 			++p;
 	}
 
-	static Token ConsumeSymbol(StringIter& p) {
-		Token t{};
+	static CodeError ConsumeSymbol(StringIter& p, Token& t) {
 		for (; *p && IsPossibleSymbol(t.text + *p); ++p) {
 			t.text += *p;
 		}
 		t.type = Token::Type::Symbol;
-		return t;
+
+		if (std::find(SYMBOLS.begin(), SYMBOLS.end(), t.text) == SYMBOLS.end()) {
+			return CodeError::Bad("Unrecognised symbol " + t.text);
+		} else {
+			return CodeError::Good();
+		}
 	}
 
 	static CodeError TokenizeLine(const std::string& line, std::vector<Token>& out) {
@@ -343,7 +348,10 @@ namespace wings {
 					tokens.push_back(std::move(t));
 				}
 			} else if (IsPossibleSymbol(*p)) {
-				tokens.push_back(ConsumeSymbol(p));
+				Token t{};
+				if (!(error = ConsumeSymbol(p, t))) {
+					tokens.push_back(std::move(t));
+				}
 			} else if (IsWhitespaceChar(*p)) {
 				ConsumeWhitespace(p);
 				wasWhitespace = true;
