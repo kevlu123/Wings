@@ -7,8 +7,9 @@ namespace wings {
 	static thread_local std::vector<size_t> breakInstructions;
 	static thread_local std::vector<size_t> continueInstructions;
 
-	static void CompileBody(const Statement& node, std::vector<Instruction>& instructions);
+	static void CompileBody(const std::vector<Statement>& body, std::vector<Instruction>& instructions);
 	static void CompileExpression(const Expression& expression, std::vector<Instruction>& instructions);
+	static void CompileFunction(const Expression& node, std::vector<Instruction>& instructions);
 
 	static const std::unordered_map<Operation, OpInstruction> OP_DATA = {
 		{ Operation::Index,  { "__getitem__", 2 } },
@@ -208,6 +209,13 @@ namespace wings {
 				instr.type = Instruction::Type::Operation;
 				break;
 			}
+			case Operation::ListComprehension:
+				compileChildExpressions();
+				instr.type = Instruction::Type::ListComprehension;
+				break;
+			case Operation::Function:
+				CompileFunction(expression, instructions);
+				return;
 			default:
 				compileChildExpressions();
 				instr.op = std::make_unique<OpInstruction>();
@@ -242,7 +250,7 @@ namespace wings {
 		falseJump.jump = std::make_unique<JumpInstruction>();
 		instructions.push_back(std::move(falseJump));
 
-		CompileBody(node, instructions);
+		CompileBody(node.body, instructions);
 
 		if (node.elseClause) {
 			size_t trueJumpInstrIndex = instructions.size();
@@ -254,7 +262,7 @@ namespace wings {
 
 			instructions[falseJumpInstrIndex].jump->location = instructions.size();
 
-			CompileBody(*node.elseClause, instructions);
+			CompileBody(node.elseClause->body, instructions);
 
 			instructions[trueJumpInstrIndex].jump->location = instructions.size();
 		} else {
@@ -273,7 +281,7 @@ namespace wings {
 		terminateJump.jump = std::make_unique<JumpInstruction>();
 		instructions.push_back(std::move(terminateJump));
 
-		CompileBody(node, instructions);
+		CompileBody(node.body, instructions);
 
 		Instruction loopJump{};
 		loopJump.srcPos = node.srcPos;
@@ -285,7 +293,7 @@ namespace wings {
 		instructions[terminateJumpInstrIndex].jump->location = instructions.size();
 
 		if (node.elseClause) {
-			CompileBody(*node.elseClause, instructions);
+			CompileBody(node.elseClause->body, instructions);
 		}
 
 		for (size_t index : breakInstructions) {
@@ -327,10 +335,10 @@ namespace wings {
 		instructions.push_back(std::move(in));
 	}
 
-	static void CompileDef(const Statement& node, std::vector<Instruction>& instructions) {
+	static void CompileFunction(const Expression& node, std::vector<Instruction>& instructions) {
 		const auto& parameters = node.def.parameters;
 		size_t defaultParamCount = 0;
-		for (size_t i = parameters.size(); i--> 0; ) {
+		for (size_t i = parameters.size(); i-- > 0; ) {
 			const auto& param = parameters[i];
 			if (param.defaultValue.has_value()) {
 				CompileExpression(param.defaultValue.value(), instructions);
@@ -357,17 +365,21 @@ namespace wings {
 			node.def.globalCaptures.end()
 			);
 		def.def->defaultParameterCount = defaultParamCount;
-		def.def->parameters = node.def.parameters;
+		def.def->parameters = std::move(node.def.parameters);
 		def.def->instructions = MakeRcPtr<std::vector<Instruction>>();
 		def.def->prettyName = node.def.name;
-		CompileBody(node, *def.def->instructions);
+		CompileBody(node.def.body, *def.def->instructions);
 		instructions.push_back(std::move(def));
+	}
+
+	static void CompileDef(const Statement& node, std::vector<Instruction>& instructions) {
+		CompileFunction(node.expr, instructions);
 
 		Instruction assign{};
 		assign.srcPos = node.srcPos;
 		assign.type = Instruction::Type::DirectAssign;
 		assign.directAssign = std::make_unique<DirectAssignInstruction>();
-		assign.directAssign->variableName = node.def.name;
+		assign.directAssign->variableName = node.expr.def.name;
 		instructions.push_back(std::move(assign));
 
 		Instruction pop{};
@@ -423,8 +435,8 @@ namespace wings {
 		}
 	}
 
-	static void CompileBody(const Statement& node, std::vector<Instruction>& instructions) {
-		for (const auto& child : node.body) {
+	static void CompileBody(const std::vector<Statement>& body, std::vector<Instruction>& instructions) {
+		for (const auto& child : body) {
 			CompileStatement(child, instructions);
 		}
 	}
@@ -434,7 +446,7 @@ namespace wings {
 		continueInstructions.clear();
 
 		std::vector<Instruction> instructions;
-		CompileBody(parseTree, instructions);
+		CompileBody(parseTree.expr.def.body, instructions);
 
 		return instructions;
 	}

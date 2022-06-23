@@ -1,6 +1,8 @@
 #pragma once
 #include "lex.h"
 #include <vector>
+#include <optional>
+#include <unordered_set>
 
 namespace wings {
 
@@ -23,6 +25,7 @@ namespace wings {
 		ShiftLAssign, ShiftRAssign,
 		Incr, Decr,
 		Dot,
+		Function,
 	};
 
 	enum class AssignType {
@@ -33,6 +36,14 @@ namespace wings {
 		Index,
 		// var.member = value
 		Member,
+		// (x, y) = (a, b)
+		Pack,
+	};
+
+	struct AssignTarget {
+		AssignType type{}; // Either Direct or Pack
+		std::string direct;
+		std::vector<AssignTarget> pack;
 	};
 
 	struct LiteralValue {
@@ -54,14 +65,34 @@ namespace wings {
 		};
 	};
 
+	struct Statement;
+	struct Parameter;
+
 	struct Expression {
-		Operation operation;
+		Operation operation{};
 		AssignType assignType = AssignType::None;
 		std::vector<Expression> children;
 		SourcePosition srcPos;
 
 		std::string variableName;
 		LiteralValue literalValue;
+		struct {
+			std::string name;
+			mutable std::vector<Parameter> parameters;
+			std::unordered_set<std::string> globalCaptures;
+			std::unordered_set<std::string> localCaptures;
+			std::unordered_set<std::string> variables;
+			std::vector<Statement> body;
+		} def;
+
+		Expression() = default;
+		Expression(Expression&&) = default;
+		Expression& operator=(Expression&&) = default;
+	};
+
+	struct Parameter {
+		std::string name;
+		std::optional<Expression> defaultValue;
 	};
 
 	struct TokenIter {
@@ -79,5 +110,6 @@ namespace wings {
 	};
 
 	CodeError ParseExpression(TokenIter& p, Expression& out, bool disableInOp = false);
+	bool IsAssignableExpression(const Expression& expr, AssignType* type = nullptr);
 
 }

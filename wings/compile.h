@@ -78,6 +78,7 @@ namespace wings {
 			Not,
 			In,
 			NotIn,
+			ListComprehension,
 		} type{};
 
 		std::unique_ptr<OpInstruction> op;

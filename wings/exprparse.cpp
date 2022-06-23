@@ -1,4 +1,5 @@
 #include "exprparse.h"
+#include "parse.h"
 #include "impl.h"
 #include <unordered_map>
 #include <unordered_set>
@@ -200,6 +201,33 @@ namespace wings {
 		return std::distance(it, PRECEDENCE.end());
 	}
 
+	bool IsAssignableExpression(const Expression& expr, AssignType* type) {
+		switch (expr.operation) {
+		case Operation::Variable:
+			if (type) *type = AssignType::Direct;
+			return true;
+		case Operation::Index:
+		case Operation::Slice:
+			if (type) *type = AssignType::Index;
+			return true;
+		case Operation::Dot:
+			if (type) *type = AssignType::Member;
+			return true;
+		default:
+			if (type) *type = AssignType::None;
+			return false;
+		case Operation::Tuple:
+		case Operation::List:
+			for (const auto& child : expr.children)
+				if (!IsAssignableExpression(child)) {
+					if (type) *type = AssignType::Pack;
+					return false;
+				}
+			if (type) *type = AssignType::None;
+			return true;
+		}
+	}
+
 	static CodeError ParseExpressionList(TokenIter& p, const std::string& terminate, std::vector<Expression>& out, bool* seenComma = nullptr) {
 		bool mustTerminate = false;
 		if (seenComma) *seenComma = false;
@@ -238,22 +266,12 @@ namespace wings {
 
 		out.srcPos = p->srcPos;
 		if (p->text == "++" || p->text == "--") {
-			switch (arg.operation) {
-			case Operation::Variable:
-				out.assignType = AssignType::Direct;
-				break;
-			case Operation::Index:
-			case Operation::Slice:
-				out.assignType = AssignType::Index;
-				break;
-			case Operation::Dot:
-				out.assignType = AssignType::Member;
-				break;
-			default:
+			if (!IsAssignableExpression(arg, &out.assignType)) {
 				return CodeError::Bad("Expression is not assignable", (--p)->srcPos);
 			}
+
 			out.operation = p->text == "++" ? Operation::Incr : Operation::Decr;
-			out.children = { std::move(arg) };
+			out.children.push_back(std::move(arg));
 			++p;
 		} else if (p->text == "(") {
 			// Consume opening bracket
@@ -261,7 +279,7 @@ namespace wings {
 			++p;
 
 			// Consume expression list
-			out.children = { std::move(arg) };
+			out.children.push_back(std::move(arg));
 			if (p.EndReached()) {
 				return CodeError::Bad("Expected an expression", (--p)->srcPos);
 			} else if (auto error = ParseExpressionList(p, ")", out.children)) {
@@ -282,7 +300,7 @@ namespace wings {
 				if (p.EndReached()) {
 					return CodeError::Bad("Expected an expression", (--p)->srcPos);
 				} else if (p->text != ":") {
-					indices[i] = Expression();
+					indices[i].emplace();
 					if (auto error = ParseExpression(p, indices[i].value())) {
 						return error;
 					}
@@ -302,7 +320,7 @@ namespace wings {
 			}
 
 			out.operation = isSlice ? Operation::Slice : Operation::Index;
-			out.children = { std::move(arg) };
+			out.children.push_back(std::move(arg));
 			for (size_t i = 0; i < std::size(indices); i++) {
 				if (indices[i].has_value()) {
 					out.children.push_back(std::move(indices[i].value()));
@@ -324,7 +342,7 @@ namespace wings {
 			} else if (p->type != Token::Type::Word) {
 				return CodeError::Bad("Expected an attribute name", p->srcPos);
 			}
-			out.children = { std::move(arg) };
+			out.children.push_back(std::move(arg));
 			out.variableName = p->text;
 			++p;
 		} else if (p->text == "if") {
@@ -358,7 +376,9 @@ namespace wings {
 				return error;
 			}
 
-			out.children = { std::move(condition), std::move(arg), std::move(falseCase) };
+			out.children.push_back(std::move(condition));
+			out.children.push_back(std::move(arg));
+			out.children.push_back(std::move(falseCase));
 		} else {
 			out = std::move(arg);
 		}
@@ -450,6 +470,140 @@ namespace wings {
 		}
 	}
 
+	static CodeError TryParseListComprehension(TokenIter& p, Expression& out, bool& isListComp) {
+		isListComp = false;
+		out.srcPos = p->srcPos;
+		out.operation = Operation::ListComprehension;
+		TokenIter begin = p;
+		++p;
+
+		Expression value{};
+		if (auto error = ParseExpression(p, value)) {
+			p = begin;
+			return CodeError::Good();
+		}
+
+		if (p.EndReached()) {
+			p = begin;
+			return CodeError::Good();
+		} else if (p->text != "for") {
+			p = begin;
+			return CodeError::Good();
+		}
+		isListComp = true;
+		++p;
+
+		Expression var{};
+		AssignType assignType{};
+		if (p.EndReached()) {
+			return CodeError::Bad("Expected a variable name", (--p)->srcPos);
+		} else if (auto error = ParseExpression(p, var, true)) {
+			return error;
+		} else if (!IsAssignableExpression(var, &assignType)) {
+			return CodeError::Bad("Expression is not assignable", (--p)->srcPos);
+		}
+
+		if (p.EndReached()) {
+			return CodeError::Bad("Expected a 'in'", (--p)->srcPos);
+		} else if (p->text != "in") {
+			return CodeError::Bad("Expected a 'in'", p->srcPos);
+		}
+		++p;
+
+		Expression iterable{};
+		if (auto error = ParseExpression(p, iterable)) {
+			return error;
+		}
+
+		if (p.EndReached()) {
+			return CodeError::Bad("Expected a ']'", (--p)->srcPos);
+		} else if (p->text != "]") {
+			return CodeError::Bad("Expected a ']'", p->srcPos);
+		}
+		++p;
+
+		auto assignCaptures = GetReferencedVariables(var);
+		Expression loadParam{};
+		loadParam.srcPos = var.srcPos;
+		loadParam.operation = Operation::Variable;
+		loadParam.variableName = "_Arg";
+		Expression assignExpr{};
+		assignExpr.srcPos = var.srcPos;
+		assignExpr.operation = Operation::Assign;
+		assignExpr.assignType = assignType;
+		assignExpr.children.push_back(std::move(var));
+		assignExpr.children.push_back(std::move(loadParam));
+		Statement assignStat{};
+		assignStat.srcPos = var.srcPos;
+		assignStat.type = Statement::Type::Expr;
+		assignStat.expr = std::move(assignExpr);
+		Expression assignFn{};
+		assignFn.srcPos = var.srcPos;
+		assignFn.operation = Operation::Function;
+		assignFn.def.name = "<lambda>";
+		assignFn.def.localCaptures = std::move(assignCaptures);
+		assignFn.def.parameters.push_back(Parameter{ "_Arg", {} });
+		assignFn.def.body.push_back(std::move(assignStat));
+
+		auto exprCaptures = GetReferencedVariables(value);
+		Statement exprRet{};
+		exprRet.srcPos = value.srcPos;
+		exprRet.type = Statement::Type::Return;
+		exprRet.expr = std::move(value);
+		Expression exprFn{};
+		exprFn.srcPos = value.srcPos;
+		exprFn.operation = Operation::Function;
+		exprFn.def.name = "<lambda>";
+		exprFn.def.localCaptures = std::move(exprCaptures);
+		exprFn.def.body.push_back(std::move(exprRet));
+
+		out.children.push_back(std::move(exprFn));
+		out.children.push_back(std::move(assignFn));
+		out.children.push_back(std::move(iterable));
+		return CodeError::Good();
+	}
+
+	static CodeError ParseLambda(TokenIter& p, Expression& out) {
+		out.srcPos = p->srcPos;
+		++p;
+
+		std::vector<Parameter> params;
+		if (p.EndReached()) {
+			return CodeError::Bad("Expected a ':'", (--p)->srcPos);
+		} else if (auto error = ParseParameterList(p, params)) {
+			return error;
+		}
+
+		if (p.EndReached()) {
+			return CodeError::Bad("Expected a ':'", (--p)->srcPos);
+		} else if (p->text != ":") {
+			return CodeError::Bad("Expected a ':'", p->srcPos);
+		}
+
+		++p;
+		Expression lambdaExpr{};
+		if (auto error = ParseExpression(p, lambdaExpr)) {
+			return error;
+		}
+
+		auto captures = GetReferencedVariables(lambdaExpr);
+		for (const auto& param : params)
+			captures.erase(param.name);
+
+		Statement lambdaRet{};
+		lambdaRet.srcPos = out.srcPos;
+		lambdaRet.type = Statement::Type::Return;
+		lambdaRet.expr = std::move(lambdaExpr);
+
+		out.operation = Operation::Function;
+		out.def.localCaptures = std::move(captures);
+		out.def.name = "<lambda>";
+		out.def.parameters = std::move(params);
+		out.def.body.push_back(std::move(lambdaRet));
+
+		return CodeError::Good();
+	}
+
 	static CodeError ParseValue(TokenIter& p, Expression& out) {
 		// Parse standalone values
 		out = {};
@@ -458,11 +612,20 @@ namespace wings {
 				return error;
 			}
 		} else if (p->text == "[") {
-			if (auto error = ParseListLiteral(p, out)) {
+			bool isListComprehension = false;
+			if (auto error = TryParseListComprehension(p, out, isListComprehension)) {
+				return error;
+			} else if (isListComprehension) {
+				// Do nothing
+			} else if (auto error = ParseListLiteral(p, out)) {
 				return error;
 			}
 		} else if (p->text == "{") {
 			if (auto error = ParseMapLiteral(p, out)) {
+				return error;
+			}
+		} else if (p->text == "lambda") {
+			if (auto error = ParseLambda(p, out)) {
 				return error;
 			}
 		} else {
@@ -503,7 +666,7 @@ namespace wings {
 			Expression operand = std::move(out);
 			out = {};
 			oldP = p;
-			if (auto error = ParsePostfix(p, operand, out)) {
+			if (auto error = ParsePostfix(p, std::move(operand), out)) {
 				return error;
 			}
 		} while (oldP != p);
@@ -566,19 +729,8 @@ namespace wings {
 		}
 		out.srcPos = p->srcPos;
 		if (BINARY_RIGHT_ASSOCIATIVE_OPS.contains(op)) {
-			// Binary operation is an assignment operation if and only if it is right associative
-			switch (lhs.operation) {
-			case Operation::Variable:
-				out.assignType = AssignType::Direct;
-				break;
-			case Operation::Index:
-			case Operation::Slice:
-				out.assignType = AssignType::Index;
-				break;
-			case Operation::Dot:
-				out.assignType = AssignType::Member;
-				break;
-			default:
+			// Binary operation is an assignment operation only if it is right associative
+			if (!IsAssignableExpression(lhs, &out.assignType)) {
 				return CodeError::Bad("Expression is not assignable", (----p)->srcPos);
 			}
 
@@ -587,7 +739,8 @@ namespace wings {
 				return error;
 			}
 			out.operation = op;
-			out.children = { std::move(lhs), std::move(rhs) };
+			out.children.push_back(std::move(lhs));
+			out.children.push_back(std::move(rhs));
 			return CodeError::Good();
 		} else {
 			Expression rhs{};
@@ -595,7 +748,8 @@ namespace wings {
 				return error;
 			}
 			out.operation = op;
-			out.children = { std::move(lhs), std::move(rhs) };
+			out.children.push_back(std::move(lhs));
+			out.children.push_back(std::move(rhs));
 
 			TokenIter oldP = p;
 			do {

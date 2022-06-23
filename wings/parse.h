@@ -6,11 +6,6 @@
 
 namespace wings {
 
-	struct Parameter {
-		std::string name;
-		std::optional<Expression> defaultValue;
-	};
-
 	struct Statement {
 		enum class Type {
 			Root,
@@ -31,17 +26,11 @@ namespace wings {
 
 		struct {
 			Expression variable;
+			AssignType assignType{};
 		} forLoop;
 		struct {
 			std::string name;
 		} capture;
-		struct {
-			std::string name;
-			std::vector<Parameter> parameters;
-			std::unordered_set<std::string> globalCaptures;
-			std::unordered_set<std::string> localCaptures;
-			std::unordered_set<std::string> variables;
-		} def;
 		struct {
 			std::string name;
 			std::vector<std::string> methodNames;
@@ -54,5 +43,8 @@ namespace wings {
 	};
 
 	ParseResult Parse(const LexTree& lexTree);
+
+	std::unordered_set<std::string> GetReferencedVariables(const Expression& expr);
+	CodeError ParseParameterList(TokenIter& p, std::vector<Parameter>& out);
 
 }

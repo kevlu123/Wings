@@ -418,6 +418,48 @@ namespace wings {
 			}
 			break;
 		}
+		case Instruction::Type::ListComprehension: {
+			WObj* expr = stack[stack.size() - 3];
+			WObj* assign = stack[stack.size() - 2];
+			WObj* iterable = stack[stack.size() - 1];
+
+			WObj* list = WCreateList(context);
+			if (list == nullptr) {
+				exitValue = nullptr;
+				return;
+			}
+			WProtectObject(list);
+
+			struct State {
+				WObj* expr;
+				WObj* assign;
+				WObj* list;
+			} state = { expr, assign, list };
+
+			bool success = WIterate(iterable, &state, [](WObj* value, void* userdata) {
+				State& state = *(State*)userdata;
+
+				if (WCall(state.assign, &value, 1) == nullptr)
+					return false;
+
+				WObj* entry = WCall(state.expr, nullptr, 0);
+				if (entry == nullptr)
+					return false;
+
+				return (bool)WCallMethod(state.list, "append", &entry, 1);
+				});
+
+			WUnprotectObject(list);
+			for (int i = 0; i < 3; i++)
+				PopStack();
+
+			if (!success) {
+				exitValue = nullptr;
+			} else {
+				PushStack(list);
+			}
+			break;
+		}
 		default:
 			WUNREACHABLE();
 		}

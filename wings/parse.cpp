@@ -100,10 +100,13 @@ namespace wings {
 	static Statement TransformForToWhile(Statement forLoop) {
 		// __VarXXX = expression.__iter__()
 		std::string rangeVarName = "__For" + std::to_string(Guid());
-		Expression rangeVar{};
-		rangeVar.srcPos = forLoop.expr.srcPos;
-		rangeVar.operation = Operation::Variable;
-		rangeVar.variableName = rangeVarName;
+		auto rangeVar = [&] {
+			Expression rangeVar{};
+			rangeVar.srcPos = forLoop.expr.srcPos;
+			rangeVar.operation = Operation::Variable;
+			rangeVar.variableName = rangeVarName;
+			return rangeVar;
+		};
 
 		Expression loadIter{};
 		loadIter.srcPos = forLoop.expr.srcPos;
@@ -120,7 +123,7 @@ namespace wings {
 		rangeEval.type = Statement::Type::Expr;
 		rangeEval.expr.operation = Operation::Assign;
 		rangeEval.expr.assignType = AssignType::Direct;
-		rangeEval.expr.children.push_back(rangeVar);
+		rangeEval.expr.children.push_back(rangeVar());
 		rangeEval.expr.children.push_back(std::move(callIter));
 
 		// while not __VarXXX.__end__():
@@ -128,7 +131,7 @@ namespace wings {
 		loadEndCheck.srcPos = forLoop.expr.srcPos;
 		loadEndCheck.operation = Operation::Dot;
 		loadEndCheck.variableName = "__end__";
-		loadEndCheck.children.push_back(rangeVar);
+		loadEndCheck.children.push_back(rangeVar());
 
 		Expression callEndCheck{};
 		callEndCheck.srcPos = forLoop.expr.srcPos;
@@ -149,7 +152,7 @@ namespace wings {
 		loadNext.srcPos = forLoop.expr.srcPos;
 		loadNext.operation = Operation::Dot;
 		loadNext.variableName = "__next__";
-		loadNext.children.push_back(rangeVar);
+		loadNext.children.push_back(rangeVar());
 
 		Expression callNext{};
 		callNext.srcPos = forLoop.expr.srcPos;
@@ -159,8 +162,8 @@ namespace wings {
 		Expression iterAssign{};
 		iterAssign.srcPos = forLoop.expr.srcPos;
 		iterAssign.operation = Operation::Assign;
-		iterAssign.assignType = AssignType::Direct;
-		iterAssign.children.push_back(forLoop.forLoop.variable);
+		iterAssign.assignType = forLoop.forLoop.assignType;
+		iterAssign.children.push_back(std::move(forLoop.forLoop.variable));
 		iterAssign.children.push_back(std::move(callNext));
 
 		Statement iterAssignStat{};
@@ -186,10 +189,14 @@ namespace wings {
 
 		if (auto error = ParseExpression(p, out.forLoop.variable, true)) {
 			return error;
+		} else if (!IsAssignableExpression(out.forLoop.variable, &out.forLoop.assignType)) {
+			return CodeError::Bad("Expression is not assignable", (--p)->srcPos);
 		}
 
 		if (p.EndReached()) {
-			return CodeError::Bad("Expected a 'in'");
+			return CodeError::Bad("Expected a 'in'", (--p)->srcPos);
+		} else if (p->text != "in") {
+			return CodeError::Bad("Expected a 'in'", p->srcPos);
 		}
 		++p;
 
@@ -209,7 +216,7 @@ namespace wings {
 		return CodeError::Good();
 	}
 
-	static CodeError ParseParameterList(TokenIter& p, std::vector<Parameter>& out) {
+	CodeError ParseParameterList(TokenIter& p, std::vector<Parameter>& out) {
 		out.clear();
 		while (true) {
 			if (p.EndReached()) {
@@ -261,7 +268,7 @@ namespace wings {
 	}
 
 	// Get a set of variables referenced by an expression
-	static std::unordered_set<std::string> GetReferencedVariables(const Expression& expr) {
+	std::unordered_set<std::string> GetReferencedVariables(const Expression& expr) {
 		std::unordered_set<std::string> variables;
 		if (expr.operation == Operation::Variable) {
 			variables.insert(expr.variableName);
@@ -304,41 +311,41 @@ namespace wings {
 
 		std::function<void(const Statement&)> scanNode = [&](const Statement& node) {
 			for (const auto& child : node.body) {
+				bool isFn = child.expr.operation == Operation::Function;
 				switch (child.type) {
 				case Statement::Type::Expr:
 				case Statement::Type::If:
 				case Statement::Type::Elif:
 				case Statement::Type::While:
 				case Statement::Type::Return:
-					writeVars.merge(GetWriteVariables(child.expr));
-					allVars.merge(GetReferencedVariables(child.expr));
-					break;
-				case Statement::Type::Def:
-					writeVars.insert(child.def.name);
-					allVars.insert(child.def.name);
-
-					for (const auto& parameter : child.def.parameters) {
-						if (parameter.defaultValue) {
-							writeVars.merge(GetWriteVariables(parameter.defaultValue.value()));
-							allVars.merge(GetReferencedVariables(parameter.defaultValue.value()));
+					if (isFn) {
+						writeVars.insert(child.expr.def.name);
+						allVars.insert(child.expr.def.name);
+						for (const auto& parameter : child.expr.def.parameters) {
+							if (parameter.defaultValue) {
+								writeVars.merge(GetWriteVariables(parameter.defaultValue.value()));
+								allVars.merge(GetReferencedVariables(parameter.defaultValue.value()));
+							}
 						}
+						allVars.insert(child.expr.def.localCaptures.begin(), child.expr.def.localCaptures.end());
+					} else {
+						writeVars.merge(GetWriteVariables(child.expr));
+						allVars.merge(GetReferencedVariables(child.expr));
 					}
-
-					allVars.insert(child.def.localCaptures.begin(), child.def.localCaptures.end());
 					break;
 				case Statement::Type::Class:
 					writeVars.insert(child._class.name);
 					allVars.insert(child._class.name);
 					break;
 				case Statement::Type::Global:
-					defNode.def.globalCaptures.insert(child.capture.name);
+					defNode.expr.def.globalCaptures.insert(child.capture.name);
 					break;
 				case Statement::Type::Nonlocal:
-					defNode.def.localCaptures.insert(child.capture.name);
+					defNode.expr.def.localCaptures.insert(child.capture.name);
 					break;
 				}
 
-				if (child.type != Statement::Type::Def) {
+				if (!isFn) {
 					scanNode(child);
 				}
 			}
@@ -347,10 +354,10 @@ namespace wings {
 		scanNode(defNode);
 
 		std::vector<std::string> parameterVars;
-		for (const auto& param : defNode.def.parameters)
+		for (const auto& param : defNode.expr.def.parameters)
 			parameterVars.push_back(param.name);
-		defNode.def.localCaptures.merge(SetDifference(allVars, writeVars, parameterVars));
-		defNode.def.variables = SetDifference(writeVars, defNode.def.globalCaptures, defNode.def.localCaptures, parameterVars);
+		defNode.expr.def.localCaptures.merge(SetDifference(allVars, writeVars, parameterVars));
+		defNode.expr.def.variables = SetDifference(writeVars, defNode.expr.def.globalCaptures, defNode.expr.def.localCaptures, parameterVars);
 	}
 
 	static CodeError ParseDef(const LexTree& node, Statement& out) {
@@ -358,12 +365,15 @@ namespace wings {
 		out.type = Statement::Type::Def;
 		++p;
 
+		Expression fn{};
+		fn.operation = Operation::Function;
+
 		if (p.EndReached()) {
 			return CodeError::Bad("Expected a function name", (--p)->srcPos);
 		} else if (p->type != Token::Type::Word) {
 			return CodeError::Bad("Expected a function name", p->srcPos);
 		}
-		out.def.name = p->text;
+		fn.def.name = p->text;
 		++p;
 
 		if (p.EndReached()) {
@@ -373,7 +383,7 @@ namespace wings {
 		}
 		++p;
 
-		if (auto error = ParseParameterList(p, out.def.parameters)) {
+		if (auto error = ParseParameterList(p, fn.def.parameters)) {
 			return error;
 		}
 
@@ -388,9 +398,11 @@ namespace wings {
 			return error;
 		}
 
-		if (auto error = ParseBody(node, Statement::Type::Def, out.body)) {
+		if (auto error = ParseBody(node, Statement::Type::Def, fn.def.body)) {
 			return error;
 		}
+
+		out.expr = std::move(fn);
 
 		ResolveCaptures(out);
 
@@ -425,7 +437,7 @@ namespace wings {
 			if (auto error = ParseDef(method, stat)) {
 				return error;
 			}
-			out._class.methodNames.push_back(stat.def.name);
+			out._class.methodNames.push_back(stat.expr.def.name);
 			out.body.push_back(std::move(stat));
 		}
 
@@ -650,12 +662,12 @@ namespace wings {
 		}
 
 		statementHierarchy.clear();
-		result.error = ParseBody(lexTree, Statement::Type::Root, result.parseTree.body);
+		result.error = ParseBody(lexTree, Statement::Type::Root, result.parseTree.expr.def.body);
 		statementHierarchy.clear();
 
 		ResolveCaptures(result.parseTree);
-		result.parseTree.def.variables.merge(result.parseTree.def.localCaptures);
-		result.parseTree.def.localCaptures.clear();
+		result.parseTree.expr.def.variables.merge(result.parseTree.expr.def.localCaptures);
+		result.parseTree.expr.def.localCaptures.clear();
 
 		return result;
 	}
