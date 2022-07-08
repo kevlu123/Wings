@@ -54,6 +54,7 @@ struct WObj {
     std::unordered_map<WObj, WObj*> m;
     wings::AttributeTable c;
 
+    std::string className;
     wings::AttributeTable attributes;
     WFinalizer finalizer{};
     std::vector<WObj*> references;
@@ -78,7 +79,7 @@ struct WContext {
 
 
     struct {
-        WError code;
+        WError code{};
         std::string message;
         std::vector<TraceFrame> trace;
         std::string traceMessage;

@@ -152,8 +152,9 @@ static void SetDivisionByZeroError(WContext* context) {
 #define EXPECT_ARG_TYPE_INT_OR_FLOAT(index) EXPECT_ARG_TYPE(index, WIsIntOrFloat, "int or float");
 #define EXPECT_ARG_TYPE_STRING(index) EXPECT_ARG_TYPE(index, WIsString, "str");
 #define EXPECT_ARG_TYPE_LIST(index) EXPECT_ARG_TYPE(index, WIsList, "list");
+#define EXPECT_ARG_TYPE_TUPLE(index) EXPECT_ARG_TYPE(index, WIsTuple, "tuple");
 #define GET_LIST_INDEX(list, index)														\
-size_t listIndex = ConvertNegativeIndex(WGetInt(argv[index]), argv[list]->v.size()); \
+size_t listIndex = ConvertNegativeIndex(WGetInt(argv[index]), argv[list]->v.size());	\
 if (listIndex >= argv[list]->v.size()) {												\
 	SetIndexOutOfRangeError(context, argv, index);										\
 	return nullptr;																		\
@@ -954,9 +955,14 @@ namespace wings {
 			return WCreateBool(context, std::strstr(WGetString(argv[0]), WGetString(argv[1])));
 		}
 
-		static WObj* List_GetItem(WObj** argv, int argc, WContext* context) {
+		template <int IsList>
+		static WObj* TupleList_GetItem(WObj** argv, int argc, WContext* context) {
 			EXPECT_ARG_COUNT(2);
-			EXPECT_ARG_TYPE_LIST(0);
+			if constexpr (IsList) {
+				EXPECT_ARG_TYPE_LIST(0);
+			} else {
+				EXPECT_ARG_TYPE_TUPLE(0);
+			}
 
 			if (WIsInt(argv[1])) {
 				GET_LIST_INDEX(0, 1);
@@ -1049,9 +1055,14 @@ namespace wings {
 			return argv[0];
 		}
 
-		static WObj* List_Len(WObj** argv, int argc, WContext* context) {
+		template <int IsList>
+		static WObj* TupleList_Len(WObj** argv, int argc, WContext* context) {
 			EXPECT_ARG_COUNT(1);
-			EXPECT_ARG_TYPE_LIST(0);
+			if constexpr (IsList) {
+				EXPECT_ARG_TYPE_LIST(0);
+			} else {
+				EXPECT_ARG_TYPE_TUPLE(0);
+			}
 
 			return WCreateInt(context, (wint)argv[0]->v.size());
 		}
@@ -1123,6 +1134,13 @@ namespace wings {
 			return nullptr;
 		}
 
+		static WObj* Tuple_Len(WObj** argv, int argc, WContext* context) {
+			EXPECT_ARG_COUNT(1);
+			EXPECT_ARG_TYPE_TUPLE(0);
+
+			return WCreateInt(context, (wint)argv[0]->v.size());
+		}
+
 	} // namespace attrlib
 
 	namespace lib {
@@ -1172,29 +1190,33 @@ namespace wings {
 		CheckOperation(context->builtinClasses.object = CreateClass<classlib::Object>(context, "object"));
 		CheckOperation(context->builtinClasses.userdata = CreateClass<classlib::Userdata>(context));
 
-		// Subclass the object class
-		AttributeTable& objectAttributes = context->builtinClasses.object->c;
-		context->builtinClasses.null->c.SetSuper(objectAttributes);
-		context->builtinClasses._bool->c.SetSuper(objectAttributes);
-		context->builtinClasses._int->c.SetSuper(objectAttributes);
-		context->builtinClasses._float->c.SetSuper(objectAttributes);
-		context->builtinClasses.str->c.SetSuper(objectAttributes);
-		context->builtinClasses.tuple->c.SetSuper(objectAttributes);
-		context->builtinClasses.list->c.SetSuper(objectAttributes);
-		context->builtinClasses.map->c.SetSuper(objectAttributes);
-		context->builtinClasses.func->c.SetSuper(objectAttributes);
-		context->builtinClasses.userdata->c.SetSuper(objectAttributes);
+		WObj* emptyBasesTuple{};
+		CheckOperation(emptyBasesTuple = WCreateTuple(context, nullptr, 0));
+		context->builtinClasses.object->attributes.AddParent(context->builtinClasses.object->c);
+		context->builtinClasses.object->attributes.Set("__bases__", emptyBasesTuple);
 
-		context->builtinClasses.null->attributes.SetSuper(objectAttributes);
-		context->builtinClasses._bool->attributes.SetSuper(objectAttributes);
-		context->builtinClasses._int->attributes.SetSuper(objectAttributes);
-		context->builtinClasses._float->attributes.SetSuper(objectAttributes);
-		context->builtinClasses.str->attributes.SetSuper(objectAttributes);
-		context->builtinClasses.tuple->attributes.SetSuper(objectAttributes);
-		context->builtinClasses.list->attributes.SetSuper(objectAttributes);
-		context->builtinClasses.map->attributes.SetSuper(objectAttributes);
-		context->builtinClasses.func->attributes.SetSuper(objectAttributes);
-		context->builtinClasses.userdata->attributes.SetSuper(objectAttributes);
+		// Subclass the object class
+		WObj* basesTuple{};
+		CheckOperation(basesTuple = WCreateTuple(context, &context->builtinClasses.object, 1));
+
+		AttributeTable& objectAttributes = context->builtinClasses.object->c;
+		auto subclassObject = [&](WObj* _class) {
+			_class->c.AddParent(objectAttributes, false);
+			_class->attributes.AddParent(objectAttributes, false);
+
+			_class->attributes.Set("__bases__", basesTuple, false);
+		};
+
+		subclassObject(context->builtinClasses.null);
+		subclassObject(context->builtinClasses._bool);
+		subclassObject(context->builtinClasses._int);
+		subclassObject(context->builtinClasses._float);
+		subclassObject(context->builtinClasses.str);
+		subclassObject(context->builtinClasses.tuple);
+		subclassObject(context->builtinClasses.list);
+		subclassObject(context->builtinClasses.map);
+		subclassObject(context->builtinClasses.func);
+		subclassObject(context->builtinClasses.userdata);
 
 		// Create null (None) singleton
 		CheckOperation(context->nullSingleton = WCall(context->builtinClasses.null, nullptr, 0));
@@ -1203,7 +1225,7 @@ namespace wings {
 		CheckOperation(RegisterStatelessMethod<attrlib::Object_Pos>(context, context->builtinClasses.object->c, "__pos__", "object.__pos__"));
 		CheckOperation(RegisterStatelessMethod<attrlib::Object_Str>(context, context->builtinClasses.object->c, "__str__", "object.__str__"));
 		CheckOperation(RegisterStatelessMethod<attrlib::Object_Eq>(context, context->builtinClasses.object->c, "__eq__", "object.__eq__"));
-		CheckOperation(RegisterStatelessMethod<attrlib::Object_Ne>(context, context->builtinClasses.object->c, "__eq__", "object.__ne__"));
+		CheckOperation(RegisterStatelessMethod<attrlib::Object_Ne>(context, context->builtinClasses.object->c, "__ne__", "object.__ne__"));
 
 		CheckOperation(RegisterStatelessMethod<attrlib::Null_Bool>(context, context->builtinClasses.null->c, "__nonzero__", "NoneType.__nonzero__"));
 		CheckOperation(RegisterStatelessMethod<attrlib::Null_Eq>(context, context->builtinClasses.null->c, "__eq__", "NoneType.__eq__"));
@@ -1256,9 +1278,9 @@ namespace wings {
 		CheckOperation(RegisterStatelessMethod<attrlib::Str_Mul>(context, context->builtinClasses.str->c, "__mul__", "str.__mul__"));
 		CheckOperation(RegisterStatelessMethod<attrlib::Str_Contains>(context, context->builtinClasses.str->c, "__contains__", "str.__contains__"));
 
-		CheckOperation(RegisterStatelessMethod<attrlib::List_GetItem>(context, context->builtinClasses.list->c, "__getitem__", "list.__getitem__"));
+		CheckOperation(RegisterStatelessMethod<attrlib::TupleList_GetItem<1>>(context, context->builtinClasses.list->c, "__getitem__", "list.__getitem__"));
 		CheckOperation(RegisterStatelessMethod<attrlib::List_SetItem>(context, context->builtinClasses.list->c, "__setitem__", "list.__setitem__"));
-		CheckOperation(RegisterStatelessMethod<attrlib::List_Len>(context, context->builtinClasses.list->c, "__len__", "list.__len__"));
+		CheckOperation(RegisterStatelessMethod<attrlib::TupleList_Len<1>>(context, context->builtinClasses.list->c, "__len__", "list.__len__"));
 		//CheckOperation(RegisterStatelessMethod<attrlib::List_Contains>(context, context->builtinClasses.list->c, "__contains__"));
 		CheckOperation(RegisterStatelessMethod<attrlib::List_Insert>(context, context->builtinClasses.list->c, "insert", "list.insert"));
 		CheckOperation(RegisterStatelessMethod<attrlib::List_Append>(context, context->builtinClasses.list->c, "append", "list.append"));
@@ -1271,6 +1293,8 @@ namespace wings {
 		//CheckOperation(RegisterStatelessMethod<attrlib::List_Reverse>(context, context->builtinClasses.list->c, "reverse"));
 		//CheckOperation(RegisterStatelessMethod<attrlib::List_Count>(context, context->builtinClasses.list->c, "count"));
 
+		CheckOperation(RegisterStatelessMethod<attrlib::TupleList_GetItem<0>>(context, context->builtinClasses.tuple->c, "__getitem__", "list.__getitem__"));
+		CheckOperation(RegisterStatelessMethod<attrlib::TupleList_Len<0>>(context, context->builtinClasses.tuple->c, "__len__", "tuple.__len__"));
 
 		// Register builtin functions
 		CheckOperation(RegisterStatelessFunction<lib::print>(context, "print"));
@@ -1279,7 +1303,14 @@ namespace wings {
 		WObj* builtins = WCompile(context,
 			R"(
 def isinstance(o, t):
-	return o.__class__ == t
+	def f(cls):
+		if cls == t:
+			return True
+		for base in cls.__bases__:
+			if f(base):
+				return True
+		return False
+	return f(o.__class__)
 
 def len(x):
 	return x.__len__()
@@ -1343,6 +1374,7 @@ class __ListIter:
 		return self.i >= len(self.li)
 		
 set_class_attr(list, "__iter__", lambda self: __ListIter(self))
+set_class_attr(tuple, "__iter__", lambda self: __ListIter(self))
 			)",
 			"__builtins__"
 		);

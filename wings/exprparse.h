@@ -110,6 +110,7 @@ namespace wings {
 	};
 
 	CodeError ParseExpression(TokenIter& p, Expression& out, bool disableInOp = false);
+	CodeError ParseExpressionList(TokenIter& p, const std::string& terminate, std::vector<Expression>& out, bool* seenComma = nullptr);
 	bool IsAssignableExpression(const Expression& expr, AssignTarget& target, bool onlyDirectOrPack = false);
 
 }

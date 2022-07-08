@@ -11,9 +11,9 @@ namespace wings {
 
 	static CodeError ParseBody(const LexTree& node, Statement::Type statType, std::vector<Statement>& out);
 
-	static CodeError CheckTrailingTokens(const TokenIter& iter) {
-		if (!iter.EndReached()) {
-			return CodeError::Bad("Unexpected trailing tokens", iter->srcPos);
+	static CodeError CheckTrailingTokens(const TokenIter& p) {
+		if (!p.EndReached()) {
+			return CodeError::Bad("Unexpected trailing tokens", p->srcPos);
 		} else {
 			return CodeError::Good();
 		}
@@ -188,9 +188,10 @@ namespace wings {
 		++p;
 		out.type = Statement::Type::For;
 
-		if (auto error = ParseExpression(p, out.forLoop.variable, true)) {
+		Expression variable{};
+		if (auto error = ParseExpression(p, variable, true)) {
 			return error;
-		} else if (!IsAssignableExpression(out.forLoop.variable, out.forLoop.assignTarget)) {
+		} else if (!IsAssignableExpression(variable, out.forLoop.assignTarget)) {
 			return CodeError::Bad("Expression is not assignable", (--p)->srcPos);
 		}
 
@@ -268,6 +269,17 @@ namespace wings {
 		}
 	}
 
+	std::unordered_set<std::string> GetReferencedVariables(const AssignTarget& target) {
+		if (target.type == AssignType::Direct) {
+			return { target.direct };
+		} else {
+			std::unordered_set<std::string> variables;
+			for (const auto& child : target.pack)
+				variables.merge(GetReferencedVariables(child));
+			return variables;
+		}
+	}
+
 	// Get a set of variables referenced by an expression
 	std::unordered_set<std::string> GetReferencedVariables(const Expression& expr) {
 		std::unordered_set<std::string> variables;
@@ -283,15 +295,14 @@ namespace wings {
 
 	// Get a set of variables directly written to by the '=' operator. This excludes compound assignment.
 	static std::unordered_set<std::string> GetWriteVariables(const Expression& expr) {
-		std::unordered_set<std::string> variables;
-		if (expr.operation == Operation::Assign && expr.children[0].operation == Operation::Variable) {
-			variables.insert(expr.children[0].variableName);
+		if (expr.operation == Operation::Assign && (expr.assignTarget.type == AssignType::Direct || expr.assignTarget.type == AssignType::Pack)) {
+			return GetReferencedVariables(expr.assignTarget);
 		} else {
-			for (const auto& child : expr.children) {
+			std::unordered_set<std::string> variables;
+			for (const auto& child : expr.children)
 				variables.merge(GetWriteVariables(child));
-			}
+				return variables;
 		}
-		return variables;
 	}
 
 	template <typename T, typename Subtract, typename... Args>
@@ -310,8 +321,8 @@ namespace wings {
 		std::unordered_set<std::string> writeVars;
 		std::unordered_set<std::string> allVars;
 
-		std::function<void(const Statement&)> scanNode = [&](const Statement& node) {
-			for (const auto& child : node.body) {
+		std::function<void(const std::vector<Statement>&)> scanNode = [&](const std::vector<Statement>& body) {
+			for (const auto& child : body) {
 				bool isFn = child.expr.operation == Operation::Function;
 				switch (child.type) {
 				case Statement::Type::Expr:
@@ -347,12 +358,12 @@ namespace wings {
 				}
 
 				if (!isFn) {
-					scanNode(child);
+					scanNode(child.body);
 				}
 			}
 		};
 
-		scanNode(defNode);
+		scanNode(defNode.expr.def.body);
 
 		std::vector<std::string> parameterVars;
 		for (const auto& param : defNode.expr.def.parameters)
@@ -422,6 +433,16 @@ namespace wings {
 		}
 		out._class.name = p->text;
 		++p;
+
+		if (p.EndReached()) {
+			return CodeError::Bad("Expected a ':'", (--p)->srcPos);
+		} else if (p->text == "(") {
+			++p;
+			if (auto error = ParseExpressionList(p, ")", out._class.bases)) {
+				return error;
+			}
+			++p;
+		}
 
 		if (auto error = ExpectColonEnding(p)) {
 			return error;

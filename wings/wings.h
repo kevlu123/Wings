@@ -22,6 +22,8 @@ struct WClass {
     WObj** methods;
     const char** methodNames;
     int methodCount;
+    WObj** bases;
+    int baseCount;
     const char* prettyName;
 };
 
@@ -362,7 +364,7 @@ WDLL_EXPORT WObj* WCreateObject(WContext* context);
 * Call WGetErrorCode() or WGetErrorMessage() to get any errors.
 *
 * @param context the relevant context.
-* @param value the value of the object.
+* @param value a pointer to a WClass struct containing the class information.
 * @return the instantiated object, or nullptr on failure.
 */
 WDLL_EXPORT WObj* WCreateClass(WContext* context, const WClass* value);
@@ -417,6 +419,14 @@ WDLL_EXPORT bool WIsIntOrFloat(const WObj* obj);
 * @return true if the object is a string, otherwise false.
 */
 WDLL_EXPORT bool WIsString(const WObj* obj);
+
+/**
+* Check if an object is a tuple.
+*
+* @param obj the object to inspect.
+* @return true if the object is a tuple, otherwise false.
+*/
+WDLL_EXPORT bool WIsTuple(const WObj* obj);
 
 /**
 * Check if an object is a list.
@@ -562,6 +572,19 @@ WDLL_EXPORT WObj* WGetAttribute(WObj* obj, const char* member);
 WDLL_EXPORT void WSetAttribute(WObj* obj, const char* member, WObj* value);
 
 /**
+* Get an attribute from the base class of an object.
+* 
+* Use this function if the attribute is shadowed by the derived class.
+* If multiple bases contain this attribute, the first attribute found is returned.
+*
+* @param obj the object to get the attribute from.
+* @param member a null terminated ASCII string containing the attribute name to get.
+* @param baseClass the base class to search in, or nullptr to search in all bases.
+* @return the attribute value, or nullptr if the attribute does not exist.
+*/
+WDLL_EXPORT WObj* WGetAttributeFromBase(WObj* obj, const char* member, WObj* baseClass WDEFAULT_ARG(nullptr));
+
+/**
 * Iterate over an iterable object.
 * 
 * This requires the iterable object to implement a __iter__() method
@@ -657,6 +680,23 @@ WDLL_EXPORT WObj* WCall(WObj* callable, WObj** argv, int argc);
 * @return the return value of the method, or nullptr on failure.
 */
 WDLL_EXPORT WObj* WCallMethod(WObj* obj, const char* member, WObj** argv, int argc);
+
+/**
+* Call a method from the base class.
+*
+* Use this function if the method is shadowed by the derived class.
+* If multiple bases contain this method, the first method found is called.
+* Call WGetErrorCode() or WGetErrorMessage() to get any errors.
+*
+* @param obj the object to call the method on.
+* @param member a null terminated ASCII string containing the name of the method to call.
+* @param argv a pointer to an array of objects used as arguments to the method call.
+*             If argc is 0 then this can be nullptr.
+* @param argc the number of arguments to pass.
+* @param baseClass the base class to search in, or nullptr to search in all bases.
+* @return the return value of the method, or nullptr on failure.
+*/
+WDLL_EXPORT WObj* WCallMethodFromBase(WObj* obj, const char* member, WObj** argv, int argc, WObj* baseClass WDEFAULT_ARG(nullptr));
 
 /**
 * Get at an index of an object. i.e. obj[index]

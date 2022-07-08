@@ -86,13 +86,13 @@ extern "C" {
                     break;
                 case WObj::Type::Class:
                     obj->c.ForEach([&](auto& entry) {
-                        inUse.push_back(entry.second);
+                        inUse.push_back(entry);
                         });
                     break;
                 }
                 
                 obj->attributes.ForEach([&](auto& entry) {
-                    inUse.push_back(entry.second);
+                    inUse.push_back(entry);
                     });
             }
         }

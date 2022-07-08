@@ -25,7 +25,6 @@ namespace wings {
 		std::unique_ptr<Statement> elseClause;
 
 		struct {
-			Expression variable;
 			AssignTarget assignTarget;
 		} forLoop;
 		struct {
@@ -34,6 +33,7 @@ namespace wings {
 		struct {
 			std::string name;
 			std::vector<std::string> methodNames;
+			std::vector<Expression> bases;
 		} _class;
 	};
 

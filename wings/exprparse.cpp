@@ -232,7 +232,7 @@ namespace wings {
 		}
 	}
 
-	static CodeError ParseExpressionList(TokenIter& p, const std::string& terminate, std::vector<Expression>& out, bool* seenComma = nullptr) {
+	CodeError ParseExpressionList(TokenIter& p, const std::string& terminate, std::vector<Expression>& out, bool* seenComma) {
 		bool mustTerminate = false;
 		if (seenComma) *seenComma = false;
 		while (true) {

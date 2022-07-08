@@ -10,7 +10,7 @@ using namespace wings;
 
 static std::string CreateTracebackMessage(WContext* context) {
     std::stringstream ss;
-    ss << "Traceback:\n";
+    ss << "Traceback (most recent call first):\n";
 
     for (const auto& frame : context->err.trace) {
         ss << "  ";

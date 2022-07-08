@@ -177,26 +177,107 @@ extern "C" {
     }
 
     WObj* WCreateClass(WContext* context, const WClass* value) {
-        WASSERT(context && value && value->methodCount >= 0);
+        WASSERT(context && value && value->methodCount >= 0 && value->baseCount >= 0);
         if (value->methodCount) {
             WASSERT(value->methods && value->methodNames);
-            for (int i = 0; i < value->methodCount; i++) {
+            for (int i = 0; i < value->methodCount; i++)
                 WASSERT(value->methods[i] && value->methodNames[i] && WIsFunction(value->methods[i]));
-            }
+        }
+        if (value->baseCount) {
+            WASSERT(value->bases);
+            for (int i = 0; i < value->baseCount; i++)
+                WASSERT(value->bases[i] && WIsClass(value->bases[i]));
         }
 
+        // Allocate class
         WObj* _class = Alloc(context);
         if (_class == nullptr) {
             return nullptr;
         }
-
         _class->type = WObj::Type::Class;
+        _class->className = value->prettyName ? value->prettyName : "<Class>";
+        _class->c.Set("__class__", _class);
+        _class->attributes.AddParent(context->builtinClasses.object->c);
+
+        // Set bases
+        int baseCount = value->baseCount ? value->baseCount : 1;
+        WObj** bases = value->baseCount ? value->bases : &context->builtinClasses.object;
+        for (int i = 0; i < baseCount; i++) {
+            _class->c.AddParent(bases[i]->c);
+        }
+        if (WObj* basesTuple = WCreateTuple(context, bases, baseCount)) {
+            _class->attributes.Set("__bases__", basesTuple);
+        } else {
+            return nullptr;
+        }
+
+        // Set methods
+        bool hasInitMethod = false;
         for (int i = 0; i < value->methodCount; i++) {
             _class->c.Set(value->methodNames[i], value->methods[i]);
+            if (value->methodNames[i] == std::string("__init__"))
+                hasInitMethod = true;
         }
-        _class->c.Set("__class__", _class);
-        _class->c.SetSuper(context->builtinClasses.object->c);
 
+        // Set init method if it is missing
+        if (!hasInitMethod) {
+            struct State {
+                State(WContext* context, WObj* firstBase) :
+                    context(context),
+                    firstBase(firstBase) {
+                }
+                WContext* context;
+                WObj* firstBase;
+            };
+
+            WFunc init{};
+            init.prettyName = "__init__";
+            init.isMethod = true;
+            init.userdata = new State(context, bases[0]);
+            init.fptr = [](WObj** argv, int argc, void* userdata) {
+                WContext* context = ((State*)userdata)->context;
+                WObj* firstBase = ((State*)userdata)->firstBase;
+
+                if (argc != 1) {
+                    std::string msg = "Function takes 1"
+                        " argument(s) but " +
+                        std::to_string(argc) +
+                        (argc == 1 ? " was given" : " were given");
+                    WRaiseError(context, msg.c_str());
+                    return (WObj*)nullptr;
+                }
+
+                if (WObj* init = WGetAttributeFromBase(argv[0], "__init__", firstBase)) {
+                    if (WIsFunction(init)) {
+                        WObj* ret = WCall(init, nullptr, 0);
+                        if (ret == nullptr) {
+                            return (WObj*)nullptr;
+                        } else if (!WIsNoneType(ret)) {
+                            WRaiseError(context, "__init__() returned a non NoneType type");
+                            return (WObj*)nullptr;
+                        }
+                    }
+                }
+
+                return WCreateNoneType(context);
+            };
+
+            WObj* initFn = WCreateFunction(context, &init);
+            if (initFn == nullptr) {
+                delete (State*)init.userdata;
+                return nullptr;
+            }
+            WLinkReference(initFn, bases[0]);
+
+            WFinalizer finalizer{};
+            finalizer.userdata = init.userdata;
+            finalizer.fptr = [](WObj* obj, void* userdata) { delete (State*)userdata; };
+            WSetFinalizer(initFn, &finalizer);
+
+            _class->c.Set("__init__", initFn);
+        }
+
+        // Set construction function. This function forwards to __init__().
         WFunc constructor{};
         constructor.userdata = _class;
         constructor.isMethod = true;
@@ -219,7 +300,7 @@ extern "C" {
                     if (ret == nullptr) {
                         return (WObj*)nullptr;
                     } else if (!WIsNoneType(ret)) {
-                        WRaiseError(context, "Constructor returned a non NoneType type");
+                        WRaiseError(context, "__init__() returned a non NoneType type");
                         return (WObj*)nullptr;
                     }
                 }
@@ -228,7 +309,6 @@ extern "C" {
             return instance;
         };
         _class->fn = constructor;
-
 
         return _class;
     }
@@ -367,6 +447,22 @@ extern "C" {
         obj->attributes.Set(member, value);
     }
 
+    WObj* WGetAttributeFromBase(WObj* obj, const char* member, WObj* baseClass) {
+        WASSERT(obj && member);
+
+        WObj* mem{};
+        if (baseClass == nullptr) {
+            mem = obj->c.GetFromBase(member);
+        } else {
+            mem = baseClass->c.Get(member);
+        }
+
+        if (mem && WIsFunction(mem) && mem->fn.isMethod) {
+            mem->self = obj;
+        }
+        return mem;
+    }
+
     bool WIterate(WObj* obj, void* userdata, bool(*callback)(WObj* value, void* userdata)) {
         WASSERT(obj && callback);
         WObj* iter = WCallMethod(obj, "__iter__", nullptr, 0);
@@ -497,6 +593,26 @@ extern "C" {
             WASSERT(argv[i]);
 
         WObj* method = WGetAttribute(obj, member);
+        if (method == nullptr) {
+            std::string msg = "Object of type " +
+                WObjTypeToString(obj->type) +
+                " has no attribute " +
+                member;
+            WRaiseError(obj->context, msg.c_str());
+            return nullptr;
+        } else {
+            return WCall(method, argv, argc);
+        }
+    }
+
+    WObj* WCallMethodFromBase(WObj* obj, const char* member, WObj** argv, int argc, WObj* baseClass) {
+        WASSERT(obj && member);
+        if (argc)
+            WASSERT(argv);
+        for (int i = 0; i < argc; i++)
+            WASSERT(argv[i]);
+
+        WObj* method = WGetAttributeFromBase(obj, member, baseClass);
         if (method == nullptr) {
             std::string msg = "Object of type " +
                 WObjTypeToString(obj->type) +

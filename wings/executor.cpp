@@ -233,17 +233,22 @@ namespace wings {
 		}
 		case Instruction::Type::Class: {
 			size_t methodCount = instr._class->methodNames.size();
+			size_t baseCount = instr._class->baseClassCount;
+			auto stackEnd = stack.data() + stack.size();
+
 			std::vector<const char*> methodNames;
 			for (const auto& methodName : instr._class->methodNames)
 				methodNames.push_back(methodName.c_str());
 
 			WClass wclass{};
 			wclass.methodCount = (int)methodCount;
-			wclass.methods = stack.data() + stack.size() - methodCount;
+			wclass.methods = stackEnd - methodCount - baseCount;
 			wclass.methodNames = methodNames.data();
+			wclass.bases = stackEnd - baseCount;
+			wclass.baseCount = (int)baseCount;
 			WObj* _class = WCreateClass(context, &wclass);
 
-			for (size_t i = 0; i < methodCount; i++)
+			for (size_t i = 0; i < methodCount + baseCount; i++)
 				PopStack();
 
 			if (_class == nullptr) {

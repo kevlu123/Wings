@@ -398,11 +398,16 @@ namespace wings {
 			instructions.back().def->isMethod = true;
 		}
 
+		for (const auto& base : node._class.bases) {
+			CompileExpression(base, instructions);
+		}
+
 		Instruction _class{};
 		_class.srcPos = node.srcPos;
 		_class.type = Instruction::Type::Class;
 		_class._class = std::make_unique<ClassInstruction>();
 		_class._class->methodNames = node._class.methodNames;
+		_class._class->baseClassCount = node._class.bases.size();
 		instructions.push_back(std::move(_class));
 
 		Instruction assign{};

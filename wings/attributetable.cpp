@@ -9,20 +9,29 @@ namespace wings {
 	}
 
 	WObj* AttributeTable::Get(const std::string& name) const {
-		for (auto* table = &attributes; *table; table = &(*table)->super) {
-			auto it = (*table)->entries.find(name);
-			if (it != (*table)->entries.end()) {
-				return it->second;
-			}
-		}
+		return attributes->Get(name);
+	}
+
+	WObj* AttributeTable::Table::Get(const std::string& name) const {
+		auto it = entries.find(name);
+		if (it != entries.end())
+			return it->second;
+
+		for (const auto& parent : parents)
+			if (WObj* val = parent->Get(name))
+				return val;
+
+		return nullptr;
+	}
+
+	WObj* AttributeTable::GetFromBase(const std::string& name) const {
+		for (const auto& parent : attributes->parents)
+			if (WObj* val = parent->Get(name))
+				return val;
 		return nullptr;
 	}
 
 	void AttributeTable::Set(const std::string& name, WObj* value, bool validate) {
-		if (validate && referenced) {
-			std::abort();
-		}
-
 		if (!owned) {
 			attributes = MakeRcPtr<Table>(*attributes);
 			owned = true;
@@ -31,13 +40,9 @@ namespace wings {
 		attributes->entries[name] = value;
 	}
 
-	void AttributeTable::SetSuper(AttributeTable& super, bool validate) {
-		if (validate && referenced) {
-			std::abort();
-		}
-
-		attributes->super = super.attributes;
-		super.referenced = true;
+	void AttributeTable::AddParent(AttributeTable& parent, bool validate) {
+		attributes->parents.push_back(parent.attributes);
+		parent.referenced = true;
 	}
 
 	AttributeTable AttributeTable::Copy() {
@@ -49,6 +54,6 @@ namespace wings {
 	}
 
 	bool AttributeTable::Empty() const {
-		return attributes->entries.empty();
+		return attributes->entries.empty() && attributes->parents.empty();
 	}
 }
