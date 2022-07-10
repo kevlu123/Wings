@@ -15,6 +15,7 @@ namespace wings {
 			Def, Class, Return,
 			If, Elif, Else,
 			While, For,
+			Try, Except, Finally, Raise,
 			Break, Continue,
 			Composite,
 		} type;
@@ -35,6 +36,14 @@ namespace wings {
 			std::vector<std::string> methodNames;
 			std::vector<Expression> bases;
 		} _class;
+		struct {
+			std::vector<Statement> exceptClauses;
+			std::vector<Statement> finallyClause;
+		} tryBlock;
+		struct {
+			std::string var;
+			std::optional<Expression> exceptType;
+		} exceptBlock;
 	};
 
 	struct ParseResult {

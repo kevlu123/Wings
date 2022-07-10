@@ -64,6 +64,11 @@ namespace wings {
 		return stack.back();
 	}
 
+	void Executor::ClearStack() {
+		while (!stack.empty())
+			PopStack();
+	}
+
 	WObj* Executor::GetVariable(const std::string& name) {
 		auto it = variables.find(name);
 		if (it != variables.end()) {
@@ -136,22 +141,48 @@ namespace wings {
 		for (pc = 0; pc < def->instructions->size(); pc++) {
 			const auto& instr = (*def->instructions)[pc];
 			DoInstruction(instr);
-			if (exitValue.has_value()) {
-				if (exitValue.value() == nullptr) {
-					context->err.trace.push_back({
-						instr.srcPos,
-						(*def->originalSource)[instr.srcPos.line],
-						def->module,
-						def->prettyName
-						});
-				}
-				goto end;
+
+			auto pushTrace = [&] {
+				context->err.trace.push_back({
+					instr.srcPos,
+					(*def->originalSource)[instr.srcPos.line],
+					def->module,
+					def->prettyName
+					});
+			};
+
+			if (!exitValue.has_value())
+				continue;
+
+			// Return normally
+			if (exitValue.value() != nullptr)
+				break;
+
+			// Some non-exception error
+			if (WGetCurrentException(context) == nullptr) {
+				pushTrace();
+				break;
+			}
+
+			// New exception thrown
+			ClearStack();
+			if (tryFrames.empty()) {
+				// No handlers. Propagate to next function.
+				pushTrace();
+				break;
+			} else if (tryFrames.top().isHandlingException) {
+				// Was already handling an exception. Jump to finally.
+				pc = tryFrames.top().finallyJump - 1;
+				exitValue.reset();
+			} else {
+				// Jump to handler
+				pc = tryFrames.top().exceptJump - 1;
+				tryFrames.top().isHandlingException = true;
+				exitValue.reset();
 			}
 		}
 
-	end:
-		while (!stack.empty())
-			PopStack();
+		ClearStack();
 		for (const auto& var : variables)
 			WUnprotectObject(*var.second);
 
@@ -361,9 +392,6 @@ namespace wings {
 			}
 			break;
 		}
-		case Instruction::Type::SliceClass:
-			PushStack(context->builtinClasses.slice);
-			break;
 		case Instruction::Type::Operation: {
 			std::vector<WObj*> args;
 			for (size_t i = 0; i < instr.op->argc - 1; i++) {
@@ -513,6 +541,39 @@ namespace wings {
 			}
 			break;
 		}
+		case Instruction::Type::Raise: {
+			WObj* expr = PopStack();
+			if (WIsClass(expr)) {
+				expr = WCall(expr, nullptr, 0);
+				if (expr == nullptr) {
+					exitValue = nullptr;
+					break;
+				}
+			}
+			context->currentException = expr;
+			exitValue = nullptr;
+			break;
+		}
+		case Instruction::Type::PushTry:
+			tryFrames.push({ instr.pushTry->exceptJump, instr.pushTry->finallyJump });
+			break;
+		case Instruction::Type::PopTry:
+			tryFrames.pop();
+			if (WGetCurrentException(context))
+				exitValue = nullptr;
+			break;
+		case Instruction::Type::Except:
+			WClearCurrentException(context);
+			break;
+		case Instruction::Type::CurrentException:
+			PushStack(WGetCurrentException(context));
+			break;
+		case Instruction::Type::IsInstance:
+			PushStack(context->isinstance);
+			break;
+		case Instruction::Type::SliceClass:
+			PushStack(context->builtinClasses.slice);
+			break;
 		default:
 			WUNREACHABLE();
 		}

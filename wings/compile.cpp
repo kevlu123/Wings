@@ -424,6 +424,129 @@ namespace wings {
 		instructions.push_back(std::move(pop));
 	}
 
+	static void CompileRaise(const Statement& node, std::vector<Instruction>& instructions) {
+		CompileExpression(node.expr, instructions);
+
+		Instruction raise{};
+		raise.srcPos = node.srcPos;
+		raise.type = Instruction::Type::Raise;
+		instructions.push_back(std::move(raise));
+	}
+
+	static void CompileTry(const Statement& node, std::vector<Instruction>& instructions) {
+		/* 
+		 * Push try
+		 * Try body
+		 * Jump to finally
+		 * Check exception type
+		 * Except body
+		 * Jump to finally
+		 * Finally body
+		 * Pop try
+		 */
+
+		std::vector<size_t> jumpToFinallyInstructs;
+		auto jumpToFinally = [&] {
+			jumpToFinallyInstructs.push_back(instructions.size());
+			Instruction tryEnd{};
+			tryEnd.srcPos = node.srcPos;
+			tryEnd.type = Instruction::Type::Jump;
+			tryEnd.jump = std::make_unique<JumpInstruction>();
+			instructions.push_back(std::move(tryEnd));
+		};
+
+
+		size_t pushTryIndex = instructions.size();
+		Instruction pushTry{};
+		pushTry.srcPos = node.srcPos;
+		pushTry.type = Instruction::Type::PushTry;
+		pushTry.pushTry = std::make_unique<TryFrameInstruction>();
+		instructions.push_back(std::move(pushTry));
+
+		CompileBody(node.body, instructions);
+
+		jumpToFinally();
+
+		instructions[pushTryIndex].pushTry->exceptJump = instructions.size();
+		for (const auto& exceptClause : node.tryBlock.exceptClauses) {
+			std::optional<size_t> jumpToNextExceptIndex;
+			if (exceptClause.exceptBlock.exceptType.has_value()) {
+				Instruction isInst{};
+				isInst.srcPos = exceptClause.srcPos;
+				isInst.type = Instruction::Type::IsInstance;
+				instructions.push_back(std::move(isInst));
+
+				Instruction curExcept{};
+				curExcept.srcPos = exceptClause.srcPos;
+				curExcept.type = Instruction::Type::CurrentException;
+				instructions.push_back(std::move(curExcept));
+
+				CompileExpression(exceptClause.exceptBlock.exceptType.value(), instructions);
+
+				Instruction call{};
+				call.srcPos = exceptClause.srcPos;
+				call.type = Instruction::Type::Call;
+				call.variadicOp = std::make_unique<VariadicOpInstruction>();
+				call.variadicOp->argc = 3;
+				instructions.push_back(std::move(call));
+
+				jumpToNextExceptIndex = instructions.size();
+				Instruction jumpToNextExcept{};
+				jumpToNextExcept.srcPos = exceptClause.srcPos;
+				jumpToNextExcept.type = Instruction::Type::JumpIfFalse;
+				jumpToNextExcept.jump = std::make_unique<JumpInstruction>();
+				instructions.push_back(std::move(jumpToNextExcept));
+
+				if (!exceptClause.exceptBlock.var.empty()) {
+					Instruction curExcept{};
+					curExcept.srcPos = exceptClause.srcPos;
+					curExcept.type = Instruction::Type::CurrentException;
+					instructions.push_back(std::move(curExcept));
+
+					Instruction assign{};
+					assign.srcPos = exceptClause.srcPos;
+					assign.type = Instruction::Type::DirectAssign;
+					assign.directAssign = std::make_unique<DirectAssignInstruction>();
+					assign.directAssign->assignTarget.type = AssignType::Direct;
+					assign.directAssign->assignTarget.direct = exceptClause.exceptBlock.var;
+					instructions.push_back(std::move(assign));
+
+					Instruction pop{};
+					pop.srcPos = exceptClause.srcPos;
+					pop.type = Instruction::Type::Pop;
+					instructions.push_back(std::move(pop));
+				}
+			}
+
+			Instruction except{};
+			except.srcPos = exceptClause.srcPos;
+			except.type = Instruction::Type::Except;
+			instructions.push_back(std::move(except));
+
+			CompileBody(exceptClause.body, instructions);
+
+			jumpToFinally();
+
+			if (jumpToNextExceptIndex.has_value()) {
+				instructions[jumpToNextExceptIndex.value()].jump->location = instructions.size();
+			}
+		}
+		
+		instructions[pushTryIndex].pushTry->finallyJump = instructions.size();
+		for (size_t instrIndex : jumpToFinallyInstructs) {
+			instructions[instrIndex].jump->location = instructions.size();
+		}
+
+		CompileBody(node.tryBlock.finallyClause, instructions);
+
+		size_t tryInstrIndex = instructions.size();
+		Instruction popTry{};
+		popTry.srcPos = node.srcPos;
+		popTry.type = Instruction::Type::PopTry;
+		popTry.jump = std::make_unique<JumpInstruction>();
+		instructions.push_back(std::move(popTry));
+	}
+
 	using CompileFn = void(*)(const Statement&, std::vector<Instruction>&);
 
 	static const std::unordered_map<Statement::Type, CompileFn> COMPILE_FUNCTIONS = {
@@ -435,12 +558,13 @@ namespace wings {
 		{ Statement::Type::Return, CompileReturn },
 		{ Statement::Type::Def, CompileDef },
 		{ Statement::Type::Class, CompileClass },
+		{ Statement::Type::Try, CompileTry },
+		{ Statement::Type::Raise, CompileRaise },
+		{ Statement::Type::Pass, [](auto, auto) {}},
 	};
 
 	static void CompileStatement(const Statement& node, std::vector<Instruction>& instructions) {
-		if (COMPILE_FUNCTIONS.contains(node.type)) {
-			COMPILE_FUNCTIONS.at(node.type)(node, instructions);
-		}
+		COMPILE_FUNCTIONS.at(node.type)(node, instructions);
 	}
 
 	static void CompileBody(const std::vector<Statement>& body, std::vector<Instruction>& instructions) {

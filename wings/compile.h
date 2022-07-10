@@ -52,6 +52,11 @@ namespace wings {
 		AssignTarget assignTarget;
 	};
 
+	struct TryFrameInstruction {
+		size_t exceptJump;
+		size_t finallyJump;
+	};
+
 	struct Instruction {
 		enum class Type {
 			Literal,
@@ -70,6 +75,13 @@ namespace wings {
 			Jump,			// Cannot fail
 			JumpIfFalse,
 			Return,			// Cannot fail
+
+			Raise,
+			PushTry,
+			PopTry,
+			Except,
+			CurrentException,
+			IsInstance,
 
 			Operation,
 			Call,
@@ -91,6 +103,7 @@ namespace wings {
 		std::unique_ptr<DefInstruction> def;
 		std::unique_ptr<ClassInstruction> _class;
 		std::unique_ptr<JumpInstruction> jump;
+		std::unique_ptr<TryFrameInstruction> pushTry;
 
 		SourcePosition srcPos;
 	};

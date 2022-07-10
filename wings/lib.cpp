@@ -1315,6 +1315,12 @@ def isinstance(o, t):
 def len(x):
 	return x.__len__()
 
+class Exception:
+	def __init__(self, message=""):
+		self.message = message
+	def __str__(self):
+		return self.message
+
 class __Range:
 	def __init__(self, start, end, step):
 		self.start = start
@@ -1384,6 +1390,7 @@ set_class_attr(tuple, "__iter__", lambda self: __ListIter(self))
 		CheckOperation(WCall(builtins, nullptr, 0));
 
 		CheckOperation(context->builtinClasses.slice = WGetGlobal(context, "__Slice"));
+		CheckOperation(context->isinstance = WGetGlobal(context, "isinstance"));
 
 		return true;
 	}

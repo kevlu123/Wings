@@ -5,6 +5,7 @@
 #include <string>
 #include <unordered_map>
 #include <optional>
+#include <stack>
 
 namespace wings {
 
@@ -22,12 +23,19 @@ namespace wings {
 		RcPtr<std::vector<std::string>> originalSource;
 	};
 
+	struct TryFrame {
+		size_t exceptJump;
+		size_t finallyJump;
+		bool isHandlingException;
+	};
+
 	struct Executor {
 		WObj* Run(WObj** args, int argc);
 
 		void PushStack(WObj* obj);
 		WObj* PopStack();
 		WObj* PeekStack();
+		void ClearStack();
 
 		void DoInstruction(const Instruction& instr);
 
@@ -42,6 +50,8 @@ namespace wings {
 		std::vector<WObj*> stack;
 		std::unordered_map<std::string, RcPtr<WObj*>> variables;
 		std::optional<WObj*> exitValue;
+
+		std::stack<TryFrame> tryFrames;
 	};
 
 }

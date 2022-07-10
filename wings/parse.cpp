@@ -466,6 +466,82 @@ namespace wings {
 		return CodeError::Good();
 	}
 
+	static CodeError ParseTry(const LexTree& node, Statement& out) {
+		TokenIter p(node.tokens);
+		++p;
+
+		if (auto error = ExpectColonEnding(p)) {
+			return error;
+		}
+
+		out.type = Statement::Type::Try;
+		return ParseBody(node, Statement::Type::Try, out.body);
+	}
+
+	static CodeError ParseExcept(const LexTree& node, Statement& out) {
+		TokenIter p(node.tokens);
+		++p;
+
+		Expression exceptType{};
+		if (p.EndReached()) {
+			return CodeError::Bad("Expected a ':'", (--p)->srcPos);
+		} else if (p->text == ":") {
+			goto end;
+		} else if (auto error = ParseExpression(p, exceptType)) {
+			return error;
+		}
+		out.exceptBlock.exceptType = std::move(exceptType);
+
+		if (p.EndReached()) {
+			return CodeError::Bad("Expected a ':'", (--p)->srcPos);
+		} else if (p->text == ":") {
+			goto end;
+		} else if (p->text != "as") {
+			return CodeError::Bad("Expected a 'as'", p->srcPos);
+		}
+		++p;
+
+		if (p.EndReached()) {
+			return CodeError::Bad("Expected a ':'", (--p)->srcPos);
+		} else if (p->type != Token::Type::Word) {
+			return CodeError::Bad("Expected an identifier", p->srcPos);
+		}
+		out.exceptBlock.var = p->text;
+		++p;
+		
+	end:
+		if (auto error = ExpectColonEnding(p)) {
+			return error;
+		}
+
+		out.type = Statement::Type::Except;
+		return ParseBody(node, Statement::Type::Except, out.body);
+	}
+
+	static CodeError ParseFinally(const LexTree& node, Statement& out) {
+		TokenIter p(node.tokens);
+		++p;
+
+		if (auto error = ExpectColonEnding(p)) {
+			return error;
+		}
+
+		out.type = Statement::Type::Finally;
+		return ParseBody(node, Statement::Type::Finally, out.body);
+	}
+
+	static CodeError ParseRaise(const LexTree& node, Statement& out) {
+		TokenIter p(node.tokens);
+		++p;
+
+		out.type = Statement::Type::Raise;
+		if (auto error = ParseExpression(p, out.expr)) {
+			return error;
+		} else {
+			return CheckTrailingTokens(p);
+		}
+	}
+
 	static CodeError ParseReturn(const LexTree& node, Statement& out) {
 		TokenIter p(node.tokens);
 		++p;
@@ -573,6 +649,10 @@ namespace wings {
 		{ "pass", ParsePass },
 		{ "nonlocal", ParseNonlocal },
 		{ "global", ParseGlobal },
+		{ "try", ParseTry },
+		{ "except", ParseExcept },
+		{ "finally", ParseFinally },
+		{ "raise", ParseRaise },
 	};
 
 	static CodeError ParseStatement(const LexTree& node, Statement& out) {
@@ -669,6 +749,48 @@ namespace wings {
 					parent = &parent->elseClause->body.back();
 				}
 				parent->elseClause = std::make_unique<Statement>(std::move(elseClause.value()));
+			}
+		}
+
+		for (size_t i = 0; i < out.size(); i++) {
+			SourcePosition srcPos = out[i].srcPos;
+			switch (out[i].type) {
+			case Statement::Type::Except:
+				return CodeError::Bad("An 'except' clause may only appear after a 'try' or 'except' clause", srcPos);
+			case Statement::Type::Finally:
+				return CodeError::Bad("A 'finally' clause may only appear after a 'try' or 'except' clause", srcPos);
+			case Statement::Type::Try: {
+				auto& tryStat = out[i];
+				
+				for (i++; i < out.size(); i++) {
+					srcPos = out[i].srcPos;
+					switch (out[i].type) {
+					case Statement::Type::Except: {
+						auto& exceptClauses = tryStat.tryBlock.exceptClauses;
+						if (!exceptClauses.empty() && !exceptClauses.back().exceptBlock.exceptType.has_value()) {
+							return CodeError::Bad("Default 'except' clause must be last", srcPos);
+						}
+						exceptClauses.push_back(std::move(out[i]));
+						out.erase(out.begin() + i);
+						i--;
+						break;
+					}
+					case Statement::Type::Finally:
+						tryStat.tryBlock.finallyClause = std::move(out[i].body);
+						out.erase(out.begin() + i);
+						i--;
+						goto end;
+					default:
+						goto end;
+					}
+				}
+
+			end:
+				if (tryStat.tryBlock.exceptClauses.empty() && tryStat.tryBlock.finallyClause.empty()) {
+					return CodeError::Bad("Expected an 'except' or 'finally' clause", srcPos);
+				}
+				i--;
+			}
 			}
 		}
 

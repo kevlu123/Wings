@@ -1,4 +1,5 @@
- #include "impl.h"
+#include "impl.h"
+#include "gc.h"
 #include "executor.h"
 #include "compile.h"
 #include <iostream>
@@ -85,6 +86,14 @@ extern "C" {
         context->err.traceMessage.clear();
     }
 
+    WObj* WGetCurrentException(WContext* context) {
+        return context->currentException;
+    }
+
+    void WClearCurrentException(WContext* context) {
+        context->currentException = nullptr;
+    }
+
     void WGetConfig(const WContext* context, WConfig* config) {
         WASSERT(context && config);
         *config = context->config;
@@ -115,6 +124,7 @@ extern "C" {
 
     void WDestroyContext(WContext* context) {
         if (context) {
+            DestroyAllObjects(context);
             delete context;
         }
     }

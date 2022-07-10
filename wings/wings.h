@@ -141,6 +141,21 @@ WDLL_EXPORT void WClearError(WContext* context);
 WDLL_EXPORT void WRaiseError(WContext* context, const char* message);
 
 /**
+* Get the current exception.
+*
+* @param context the relevant context.
+* @return the current exception object, or nullptr if there is no exception.
+*/
+WDLL_EXPORT WObj* WGetCurrentException(WContext* context);
+
+/**
+* Clear the current exception.
+*
+* @param context the relevant context.
+*/
+WDLL_EXPORT void WClearCurrentException(WContext* context);
+
+/**
 * Get the current configuration.
 * 
 * @param context the relevant context.

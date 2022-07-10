@@ -21,6 +21,16 @@ namespace wings {
         context->mem.push_back(std::move(obj));
         return p;
     }
+
+    void DestroyAllObjects(WContext* context) {
+        // Call finalizers
+        for (auto& obj : context->mem)
+            if (obj->finalizer.fptr)
+                obj->finalizer.fptr(obj.get(), obj->finalizer.userdata);
+
+        // Deallocate
+        context->mem.clear();
+    }
 }
 
 extern "C" {
@@ -37,7 +47,7 @@ extern "C" {
             inUse.push_back(*var.second);
         }
 
-        auto builtinClasses = {
+        auto builtins = {
             context->builtinClasses.object,
             context->builtinClasses.null,
             context->builtinClasses._bool,
@@ -50,13 +60,14 @@ extern "C" {
             context->builtinClasses.func,
             context->builtinClasses.userdata,
             context->builtinClasses.slice,
+
+            context->isinstance,
             context->nullSingleton,
+            context->currentException
         };
-        for (auto& _class : builtinClasses) {
-            if (_class) {
-                inUse.push_back(_class);
-            }
-        }
+        for (auto& obj : builtins)
+            if (obj)
+                inUse.push_back(obj);
 
         // Recursively find objects in use
         std::unordered_set<const WObj*> traversed;
