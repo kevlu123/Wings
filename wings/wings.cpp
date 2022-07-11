@@ -6,6 +6,7 @@
 #include <memory>
 #include <sstream>
 #include <algorithm>
+#include <atomic>
 
 using namespace wings;
 
@@ -213,7 +214,7 @@ extern "C" {
 namespace wings {
 
     size_t Guid() {
-        static size_t i = 0;
+        static std::atomic_size_t i = 0;
         return ++i;
     }
 

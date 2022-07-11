@@ -502,7 +502,7 @@ namespace wings {
 		++p;
 
 		if (p.EndReached()) {
-			return CodeError::Bad("Expected a ':'", (--p)->srcPos);
+			return CodeError::Bad("Expected an identifier", (--p)->srcPos);
 		} else if (p->type != Token::Type::Word) {
 			return CodeError::Bad("Expected an identifier", p->srcPos);
 		}
@@ -540,6 +540,152 @@ namespace wings {
 		} else {
 			return CheckTrailingTokens(p);
 		}
+	}
+
+	static CodeError ParseWith(const LexTree& node, Statement& out) {
+		TokenIter p(node.tokens);
+		SourcePosition srcPos = p->srcPos;
+		++p;
+
+		Expression manager{};
+		if (p.EndReached()) {
+			return CodeError::Bad("Expected a ':'", (--p)->srcPos);
+		} else if (auto error = ParseExpression(p, manager)) {
+			return error;
+		}
+
+		std::string var;
+		if (p.EndReached()) {
+			return CodeError::Bad("Expected a ':'", (--p)->srcPos);
+		} else if (p->text == ":") {
+			goto end;
+		} else if (p->text != "as") {
+			return CodeError::Bad("Expected a 'as'", p->srcPos);
+		}
+		++p;
+
+		if (p.EndReached()) {
+			return CodeError::Bad("Expected an identifier", (--p)->srcPos);
+		} else if (p->type != Token::Type::Word) {
+			return CodeError::Bad("Expected an identifier", p->srcPos);
+		}
+		var = p->text;
+		++p;
+
+	end:
+		if (auto error = ExpectColonEnding(p)) {
+			return error;
+		}
+
+		std::vector<Statement> body;
+		if (auto error = ParseBody(node, Statement::Type::Composite, body)) {
+			return error;
+		}
+
+		/*
+		 * __WithMgr = <expr>
+		 * [<var> =] __WithMgr.__enter__()
+		 * try:
+		 *		<body>
+		 * finally:
+		 * 		__WithMgr.__exit__(None, None, None)
+		 */
+
+		std::vector<Statement> mainBody;
+
+		// __WithMgr = <expr>
+		std::string mgrName = "__WithMgr" + std::to_string(Guid());
+		Expression assignMgr{};
+		assignMgr.srcPos = srcPos;
+		assignMgr.operation = Operation::Assign;
+		assignMgr.assignTarget.type = AssignType::Direct;
+		assignMgr.assignTarget.direct = mgrName;
+		assignMgr.children.push_back({}); // Dummy
+		assignMgr.children.push_back(std::move(manager));
+
+		Statement assignMgrStat{};
+		assignMgrStat.srcPos = srcPos;
+		assignMgrStat.type = Statement::Type::Expr;
+		assignMgrStat.expr = std::move(assignMgr);
+		mainBody.push_back(std::move(assignMgrStat));
+
+		// [<var> =] __WithMgr.__enter__()
+		auto loadMgr = [&] {
+			Expression load{};
+			load.srcPos = srcPos;
+			load.operation = Operation::Variable;
+			load.variableName = mgrName;
+			return load;
+		};
+
+		Expression enter{};
+		enter.srcPos = srcPos;
+		enter.operation = Operation::Dot;
+		enter.variableName = "__enter__";
+		enter.children.push_back(loadMgr());
+
+		Expression enterCall{};
+		enterCall.srcPos = srcPos;
+		enterCall.operation = Operation::Call;
+		enterCall.children.push_back(std::move(enter));
+
+		Statement enterStat{};
+		enterStat.srcPos = srcPos;
+		enterStat.type = Statement::Type::Expr;
+		if (!var.empty()) {
+			Expression assign{};
+			assign.srcPos = srcPos;
+			assign.operation = Operation::Assign;
+			assign.assignTarget.type = AssignType::Direct;
+			assign.assignTarget.direct = std::move(var);
+			assign.children.push_back({}); // Dummy
+			assign.children.push_back(std::move(enterCall));
+			enterStat.expr = std::move(assign);
+		} else {
+			enterStat.expr = std::move(enterCall);
+		}
+		mainBody.push_back(std::move(enterStat));
+
+		// __WithMgr.__exit__(None, None, None)
+		Expression loadExit{};
+		loadExit.srcPos = srcPos;
+		loadExit.operation = Operation::Dot;
+		loadExit.variableName = "__exit__";
+		loadExit.children.push_back(loadMgr());
+
+		auto loadNone = [&] {
+			Expression none{};
+			none.srcPos = srcPos;
+			none.operation = Operation::Literal;
+			none.literalValue.type = LiteralValue::Type::Null;
+			return none;
+		};
+		
+		Expression exit{};
+		exit.srcPos = srcPos;
+		exit.operation = Operation::Call;
+		exit.children.push_back(std::move(loadExit));
+		exit.children.push_back(loadNone());
+		exit.children.push_back(loadNone());
+		exit.children.push_back(loadNone());
+
+		Statement exitStat{};
+		exitStat.srcPos = srcPos;
+		exitStat.type = Statement::Type::Expr;
+		exitStat.expr = std::move(exit);
+
+		// try/finally
+		Statement tryBlock{};
+		tryBlock.srcPos = srcPos;
+		tryBlock.type = Statement::Type::Try;
+		tryBlock.body = std::move(body);
+		tryBlock.tryBlock.finallyClause.push_back(std::move(exitStat));
+		mainBody.push_back(std::move(tryBlock));
+
+		// Produce composite statement
+		out.type = Statement::Type::Composite;
+		out.body = std::move(mainBody);
+		return CodeError::Good();
 	}
 
 	static CodeError ParseReturn(const LexTree& node, Statement& out) {
@@ -653,6 +799,7 @@ namespace wings {
 		{ "except", ParseExcept },
 		{ "finally", ParseFinally },
 		{ "raise", ParseRaise },
+		{ "with", ParseWith },
 	};
 
 	static CodeError ParseStatement(const LexTree& node, Statement& out) {
