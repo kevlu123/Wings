@@ -36,6 +36,7 @@ namespace wings {
 		WObj* PopStack();
 		WObj* PeekStack();
 		void ClearStack();
+		size_t PopArgFrame();
 
 		void DoInstruction(const Instruction& instr);
 
@@ -48,6 +49,7 @@ namespace wings {
 		WContext* context;
 		size_t pc{};
 		std::vector<WObj*> stack;
+		std::stack<size_t> argFrames;
 		std::unordered_map<std::string, RcPtr<WObj*>> variables;
 		std::optional<WObj*> exitValue;
 

@@ -11,30 +11,30 @@ namespace wings {
 	static void CompileExpression(const Expression& expression, std::vector<Instruction>& instructions);
 	static void CompileFunction(const Expression& node, std::vector<Instruction>& instructions);
 
-	static const std::unordered_map<Operation, OpInstruction> OP_DATA = {
-		{ Operation::Index,  { "__getitem__", 2 } },
-		{ Operation::Pos,	 { "__pos__", 1 } },
-		{ Operation::Neg,	 { "__neg__", 1 } },
-		{ Operation::Add,	 { "__add__", 2 } },
-		{ Operation::Sub,	 { "__sub__", 2 } },
-		{ Operation::Mul,	 { "__mul__", 2 } },
-		{ Operation::Div,	 { "__div__", 2 } },
-		{ Operation::IDiv,	 { "__floordiv__", 2 } },
-		{ Operation::Mod,	 { "__mod__", 2 } },
-		{ Operation::Pow,	 { "__pow__", 2 } },
-		{ Operation::Eq,	 { "__eq__", 2 } },
-		{ Operation::Ne,	 { "__ne__", 2 } },
-		{ Operation::Lt,	 { "__lt__", 2 } },
-		{ Operation::Le,	 { "__ge__", 2 } },
-		{ Operation::Gt,	 { "__gt__", 2 } },
-		{ Operation::Ge,	 { "__ge__", 2 } },
-		{ Operation::In,	 { "__contains__", 2 } },
-		{ Operation::BitAnd, { "__and__", 2 } },
-		{ Operation::BitOr,  { "__or__", 2 } },
-		{ Operation::BitNot, { "__invert__", 1 } },
-		{ Operation::BitXor, { "__xor__", 2 } },
-		{ Operation::ShiftL, { "__lshift__", 2 } },
-		{ Operation::ShiftR, { "__rshift__", 2 } },
+	static const std::unordered_map<Operation, std::string> OP_METHODS = {
+		{ Operation::Index,  "__getitem__"  },
+		{ Operation::Pos,	 "__pos__"      },
+		{ Operation::Neg,	 "__neg__"      },
+		{ Operation::Add,	 "__add__"      },
+		{ Operation::Sub,	 "__sub__"      },
+		{ Operation::Mul,	 "__mul__"      },
+		{ Operation::Div,	 "__div__"      },
+		{ Operation::IDiv,	 "__floordiv__" },
+		{ Operation::Mod,	 "__mod__"      },
+		{ Operation::Pow,	 "__pow__"      },
+		{ Operation::Eq,	 "__eq__"       },
+		{ Operation::Ne,	 "__ne__"       },
+		{ Operation::Lt,	 "__lt__"       },
+		{ Operation::Le,	 "__ge__"       },
+		{ Operation::Gt,	 "__gt__"       },
+		{ Operation::Ge,	 "__ge__"       },
+		{ Operation::In,	 "__contains__" },
+		{ Operation::BitAnd, "__and__"      },
+		{ Operation::BitOr,  "__or__"       },
+		{ Operation::BitNot, "__invert__"   },
+		{ Operation::BitXor, "__xor__"      },
+		{ Operation::ShiftL, "__lshift__"   },
+		{ Operation::ShiftR, "__rshift__"   },
 	};
 
 	static void CompileInlineIfElse(const Expression& expression, std::vector<Instruction>& instructions) {
@@ -87,20 +87,32 @@ namespace wings {
 			instr.directAssign->assignTarget = expression.assignTarget;
 			instr.type = Instruction::Type::DirectAssign;
 			break;
-		case AssignType::Index:
+		case AssignType::Index: {
 			// <assign>
 			//		<assignee>
 			//			<var>
 			//			<index>
 			//		<expr>
+			Instruction argFrame{};
+			argFrame.srcPos = expression.srcPos;
+			argFrame.type = Instruction::Type::PushArgFrame;
+			instructions.push_back(std::move(argFrame));
+
 			CompileExpression(expression.children[0].children[0], instructions);
+
+			Instruction dot{};
+			dot.srcPos = expression.srcPos;
+			dot.type = Instruction::Type::Dot;
+			dot.memberAccess = std::make_unique<MemberAccessInstruction>();
+			dot.memberAccess->memberName = "__setitem__";
+			instructions.push_back(std::move(dot));
+
 			CompileExpression(expression.children[0].children[1], instructions);
 			CompileExpression(expression.children[1], instructions);
-			instr.op = std::make_unique<OpInstruction>();
-			instr.op->argc = 2;
-			instr.op->operation = "__setitem__";
-			instr.type = Instruction::Type::Operation;
+
+			instr.type = Instruction::Type::Call;
 			break;
+		}
 		case AssignType::Member:
 			// <assign>
 			//		<assignee>
@@ -127,23 +139,23 @@ namespace wings {
 				instr.type = Instruction::Type::Literal;
 				break;
 			case Operation::Tuple:
-				compileChildExpressions();
-				instr.variadicOp = std::make_unique<VariadicOpInstruction>();
-				instr.variadicOp->argc = expression.children.size();
-				instr.type = Instruction::Type::Tuple;
-				break;
 			case Operation::List:
+			case Operation::Map: {
+				Instruction argFrame{};
+				argFrame.srcPos = expression.srcPos;
+				argFrame.type = Instruction::Type::PushArgFrame;
+				instructions.push_back(std::move(argFrame));
+
 				compileChildExpressions();
-				instr.variadicOp = std::make_unique<VariadicOpInstruction>();
-				instr.variadicOp->argc = expression.children.size();
-				instr.type = Instruction::Type::List;
+
+				switch (expression.operation) {
+				case Operation::Tuple: instr.type = Instruction::Type::Tuple; break;
+				case Operation::List: instr.type = Instruction::Type::List; break;
+				case Operation::Map: instr.type = Instruction::Type::Map; break;
+				default: WUNREACHABLE();
+				}
 				break;
-			case Operation::Map:
-				compileChildExpressions();
-				instr.variadicOp = std::make_unique<VariadicOpInstruction>();
-				instr.variadicOp->argc = expression.children.size() / 2;
-				instr.type = Instruction::Type::Map;
-				break;
+			}
 			case Operation::Variable:
 				instr.variable = std::make_unique<VariableLoadInstruction>();
 				instr.variable->variableName = expression.variableName;
@@ -155,12 +167,16 @@ namespace wings {
 				instr.memberAccess->memberName = expression.variableName;
 				instr.type = Instruction::Type::Dot;
 				break;
-			case Operation::Call:
+			case Operation::Call: {
+				Instruction pushArgFrame{};
+				pushArgFrame.srcPos = expression.srcPos;
+				pushArgFrame.type = Instruction::Type::PushArgFrame;
+				instructions.push_back(std::move(pushArgFrame));
+
 				compileChildExpressions();
-				instr.variadicOp = std::make_unique<VariadicOpInstruction>();
-				instr.variadicOp->argc = expression.children.size();
 				instr.type = Instruction::Type::Call;
 				break;
+			}
 			case Operation::And:
 				CompileExpression(expression.children[0], instructions);
 				CompileExpression(expression.children[1], instructions);
@@ -189,7 +205,25 @@ namespace wings {
 				CompileInlineIfElse(expression, instructions);
 				return;
 			case Operation::Slice: {
+				// var.__getitem__(slice(...))
+				Instruction argFrame{};
+				argFrame.srcPos = expression.srcPos;
+				argFrame.type = Instruction::Type::PushArgFrame;
+				instructions.push_back(std::move(argFrame));
+
 				CompileExpression(expression.children[0], instructions);
+
+				Instruction dot{};
+				dot.srcPos = expression.srcPos;
+				dot.type = Instruction::Type::Dot;
+				dot.memberAccess = std::make_unique<MemberAccessInstruction>();
+				dot.memberAccess->memberName = "__getitem__";
+				instructions.push_back(std::move(dot));
+
+				argFrame = {};
+				argFrame.srcPos = expression.srcPos;
+				argFrame.type = Instruction::Type::PushArgFrame;
+				instructions.push_back(std::move(argFrame));
 
 				Instruction sliceClass{};
 				sliceClass.srcPos = expression.srcPos;
@@ -200,14 +234,10 @@ namespace wings {
 					CompileExpression(expression.children[i], instructions);
 
 				Instruction instantiateSlice{};
-				instantiateSlice.variadicOp = std::make_unique<VariadicOpInstruction>();
-				instantiateSlice.variadicOp->argc = 4;
 				instantiateSlice.type = Instruction::Type::Call;
 				instructions.push_back(std::move(instantiateSlice));
 
-				instr.op = std::make_unique<OpInstruction>();
-				*instr.op = OP_DATA.at(Operation::Index);
-				instr.type = Instruction::Type::Operation;
+				instr.type = Instruction::Type::Call;
 				break;
 			}
 			case Operation::ListComprehension:
@@ -217,13 +247,27 @@ namespace wings {
 			case Operation::Function:
 				CompileFunction(expression, instructions);
 				return;
-			default:
-				compileChildExpressions();
-				instr.op = std::make_unique<OpInstruction>();
-				*instr.op = OP_DATA.at(expression.operation);
-				instr.type = Instruction::Type::Operation;
-				break;
+			default: {
+				Instruction argFrame{};
+				argFrame.srcPos = expression.srcPos;
+				argFrame.type = Instruction::Type::PushArgFrame;
+				instructions.push_back(std::move(argFrame));
+
+				CompileExpression(expression.children[0], instructions);
+
+				Instruction dot{};
+				dot.srcPos = expression.srcPos;
+				dot.type = Instruction::Type::Dot;
+				dot.memberAccess = std::make_unique<MemberAccessInstruction>();
+				dot.memberAccess->memberName = OP_METHODS.at(expression.operation);
+				instructions.push_back(std::move(dot));
+
+				for (size_t i = 1; i < expression.children.size(); i++)
+					CompileExpression(expression.children[i], instructions);
+
+				instr.type = Instruction::Type::Call;
 			}
+			} // End of inner switch
 			break;
 		default:
 			WUNREACHABLE();
@@ -471,6 +515,11 @@ namespace wings {
 		for (const auto& exceptClause : node.tryBlock.exceptClauses) {
 			std::optional<size_t> jumpToNextExceptIndex;
 			if (exceptClause.exceptBlock.exceptType.has_value()) {
+				Instruction argFrame{};
+				argFrame.srcPos = exceptClause.srcPos;
+				argFrame.type = Instruction::Type::PushArgFrame;
+				instructions.push_back(std::move(argFrame));
+
 				Instruction isInst{};
 				isInst.srcPos = exceptClause.srcPos;
 				isInst.type = Instruction::Type::IsInstance;
@@ -486,8 +535,6 @@ namespace wings {
 				Instruction call{};
 				call.srcPos = exceptClause.srcPos;
 				call.type = Instruction::Type::Call;
-				call.variadicOp = std::make_unique<VariadicOpInstruction>();
-				call.variadicOp->argc = 3;
 				instructions.push_back(std::move(call));
 
 				jumpToNextExceptIndex = instructions.size();

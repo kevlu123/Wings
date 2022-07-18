@@ -6,16 +6,6 @@
 #include <variant>
 
 namespace wings {
-
-	struct OpInstruction {
-		std::string operation;
-		size_t argc{};
-	};
-
-	struct VariadicOpInstruction {
-		size_t argc{};
-	};
-
 	struct Instruction;
 
 	struct DefInstruction {
@@ -70,11 +60,11 @@ namespace wings {
 			Dot,
 
 			DirectAssign,
-			MemberAssign,	// Cannot fail
+			MemberAssign,
 
-			Jump,			// Cannot fail
+			Jump,
 			JumpIfFalse,
-			Return,			// Cannot fail
+			Return,
 
 			Raise,
 			PushTry,
@@ -83,8 +73,10 @@ namespace wings {
 			CurrentException,
 			IsInstance,
 
-			Operation,
 			Call,
+			PushArgFrame,
+
+			Operation,
 			Pop,
 			And,
 			Or,
@@ -94,8 +86,6 @@ namespace wings {
 			ListComprehension,
 		} type{};
 
-		std::unique_ptr<OpInstruction> op;
-		std::unique_ptr<VariadicOpInstruction> variadicOp;
 		std::unique_ptr<DirectAssignInstruction> directAssign;
 		std::unique_ptr<MemberAccessInstruction> memberAccess;
 		std::unique_ptr<LiteralInstruction> literal;

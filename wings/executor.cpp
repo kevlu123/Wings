@@ -67,6 +67,13 @@ namespace wings {
 	void Executor::ClearStack() {
 		while (!stack.empty())
 			PopStack();
+		argFrames = {};
+	}
+
+	size_t Executor::PopArgFrame() {
+		size_t ret = stack.size() - argFrames.top();
+		argFrames.pop();
+		return ret;
 	}
 
 	WObj* Executor::GetVariable(const std::string& name) {
@@ -315,7 +322,7 @@ namespace wings {
 		case Instruction::Type::Tuple:
 		case Instruction::Type::List: {
 			auto creator = instr.type == Instruction::Type::Tuple ? WCreateTuple : WCreateList;
-			size_t argc = instr.variadicOp->argc;
+			size_t argc = PopArgFrame();
 			WObj** argv = stack.data() + stack.size() - argc;
 			if (WObj* li = creator(context, argv, (int)argc)) {
 				for (size_t i = 0; i < argc; i++)
@@ -328,7 +335,8 @@ namespace wings {
 		}
 		case Instruction::Type::Map:
 			if (WObj* li = WCreateDictionary(context)) {
-				for (int i = 0; i < instr.variadicOp->argc; i++) {
+				size_t argc = PopArgFrame();
+				for (int i = 0; i < argc / 2; i++) {
 					WObj* val = PopStack();
 					WObj* key = PopStack();
 					if (!WIsImmutableType(key)) {
@@ -367,8 +375,12 @@ namespace wings {
 			PushStack(value);
 			break;
 		}
+		case Instruction::Type::PushArgFrame:
+			argFrames.push(stack.size());
+			break;
 		case Instruction::Type::Call: {
-			size_t argc = instr.variadicOp->argc;
+			size_t argc = PopArgFrame();
+
 			WObj* fn = stack[stack.size() - argc];
 			WObj** args = stack.data() + stack.size() - argc + 1;
 			if (WObj* ret = WCall(fn, args, (int)argc - 1)) {
@@ -388,19 +400,6 @@ namespace wings {
 				std::string msg = "Object of type " + WObjTypeToString(obj->type) +
 					" has no attribute " + instr.memberAccess->memberName;
 				WRaiseError(context, msg.c_str());
-				exitValue = nullptr;
-			}
-			break;
-		}
-		case Instruction::Type::Operation: {
-			std::vector<WObj*> args;
-			for (size_t i = 0; i < instr.op->argc - 1; i++) {
-				args.push_back(PopStack());
-			}
-
-			if (WObj* res = WCallMethod(PopStack(), instr.op->operation.c_str(), args.data(), (int)args.size())) {
-				PushStack(res);
-			} else {
 				exitValue = nullptr;
 			}
 			break;
