@@ -3,7 +3,7 @@
 
 namespace wings {
 
-	WObj* DefObject::Run(WObj** args, int argc, void* userdata) {
+	WObj* DefObject::Run(WObj** args, int argc, WObj* kwargs, void* userdata) {
 		DefObject* def = (DefObject*)userdata;
 		WContext* context = def->context;
 
@@ -38,7 +38,7 @@ namespace wings {
 			executor.variables.insert({ def->parameterNames[i], MakeRcPtr<WObj*>(value) });
 		}
 
-		return executor.Run(args, argc);
+		return executor.Run(args, argc, kwargs);
 	}
 
 	DefObject::~DefObject() {
@@ -68,9 +68,11 @@ namespace wings {
 		while (!stack.empty())
 			PopStack();
 		argFrames = {};
+		kwargsStack = {};
 	}
 
 	size_t Executor::PopArgFrame() {
+		kwargsStack.pop();
 		size_t ret = stack.size() - argFrames.top();
 		argFrames.pop();
 		return ret;
@@ -141,7 +143,7 @@ namespace wings {
 		}
 	}
 
-	WObj* Executor::Run(WObj** args, int argc) {
+	WObj* Executor::Run(WObj** args, int argc, WObj* kwargs) {
 		for (const auto& var : variables)
 			WProtectObject(*var.second);
 
@@ -271,7 +273,7 @@ namespace wings {
 		}
 		case Instruction::Type::Class: {
 			size_t methodCount = instr._class->methodNames.size();
-			size_t baseCount = instr._class->baseClassCount;
+			size_t baseCount = PopArgFrame();
 			auto stackEnd = stack.data() + stack.size();
 
 			std::vector<const char*> methodNames;
@@ -336,16 +338,20 @@ namespace wings {
 		case Instruction::Type::Map:
 			if (WObj* li = WCreateDictionary(context)) {
 				size_t argc = PopArgFrame();
-				for (int i = 0; i < argc / 2; i++) {
-					WObj* val = PopStack();
-					WObj* key = PopStack();
+				WObj** start = stack.data() + stack.size() - argc;
+				for (size_t i = 0; i < argc / 2; i++) {
+					WObj* key = start[2 * i];
+					WObj* val = start[2 * i + 1];
 					if (!WIsImmutableType(key)) {
 						WRaiseError(context, "Only an immutable type can be used as a dictionary key");
 						exitValue = nullptr;
 						return;
 					}
-					li->m.insert({ *key, val });
+					li->m[key] = val;
 				}
+
+				for (size_t i = 0; i < argc; i++)
+					PopStack();
 				PushStack(li);
 			} else {
 				exitValue = nullptr;
@@ -377,19 +383,30 @@ namespace wings {
 		}
 		case Instruction::Type::PushArgFrame:
 			argFrames.push(stack.size());
+			kwargsStack.push({});
 			break;
 		case Instruction::Type::Call: {
-			size_t argc = PopArgFrame();
+			size_t kwargc = kwargsStack.top().size();
+			size_t argc = stack.size() - argFrames.top() - kwargc - 1;
 
-			WObj* fn = stack[stack.size() - argc];
-			WObj** args = stack.data() + stack.size() - argc + 1;
-			if (WObj* ret = WCall(fn, args, (int)argc - 1)) {
-				for (size_t i = 0; i < argc; i++)
+			WObj* fn = stack[stack.size() - argc - kwargc - 1];
+			WObj** args = stack.data() + stack.size() - argc - kwargc;
+			WObj** kwargsv = stack.data() + stack.size() - kwargc;
+
+			WObj* kwargs = WCreateDictionary(context, kwargsStack.top().data(), kwargsv, (int)kwargc);
+			if (kwargs == nullptr) {
+				exitValue = nullptr;
+				return;
+			}
+
+			if (WObj* ret = WCall(fn, args, (int)argc, kwargs)) {
+				for (size_t i = 0; i < argc + kwargc + 1; i++)
 					PopStack();
 				PushStack(ret);
 			} else {
 				exitValue = nullptr;
 			}
+			PopArgFrame();
 			break;
 		}
 		case Instruction::Type::Dot: {
@@ -401,6 +418,53 @@ namespace wings {
 					" has no attribute " + instr.memberAccess->memberName;
 				WRaiseError(context, msg.c_str());
 				exitValue = nullptr;
+			}
+			break;
+		}
+		case Instruction::Type::Unpack: {
+			WObj* iterable = PopStack();
+
+			auto f = [](WObj* value, void* userdata) {
+				Executor* executor = (Executor*)userdata;
+				executor->PushStack(value);
+				return true;
+			};
+
+			if (!WIterate(iterable, this, f)) {
+				exitValue = nullptr;
+			}
+			break;
+		}
+		case Instruction::Type::UnpackMapForMapCreation: {
+			WObj* map = PopStack();
+			if (!WIsDictionary(map)) {
+				WRaiseError(context, "Unary '**' must be applied to a dictionary");
+				exitValue = nullptr;
+				return;
+			}
+
+			for (const auto& [key, value] : map->m) {
+				PushStack(key);
+				PushStack(value);
+			}
+			break;
+		}
+		case Instruction::Type::UnpackMapForCall: {
+			WObj* map = PopStack();
+			if (!WIsDictionary(map)) {
+				WRaiseError(context, "Unary '**' must be applied to a dictionary");
+				exitValue = nullptr;
+				return;
+			}
+
+			for (const auto& [key, value] : map->m) {
+				if (!WIsString(key)) {
+					WRaiseError(context, "Keywords arguments must be strings");
+					exitValue = nullptr;
+					return;
+				}
+				kwargsStack.top().push_back(key);
+				PushStack(value);
 			}
 			break;
 		}

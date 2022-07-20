@@ -154,6 +154,7 @@
     <ClCompile Include="main.cpp" />
     <ClCompile Include="parse.cpp" />
     <ClCompile Include="testing.cpp" />
+    <ClCompile Include="wdict.cpp" />
     <ClCompile Include="wings.cpp" />
     <ClCompile Include="wobj.cpp" />
   </ItemGroup>
@@ -169,6 +170,7 @@
     <ClInclude Include="parse.h" />
     <ClInclude Include="rcptr.h" />
     <ClInclude Include="resource.h" />
+    <ClInclude Include="wdict.h" />
     <ClInclude Include="wings.h" />
   </ItemGroup>
   <ItemGroup>

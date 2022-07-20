@@ -12,7 +12,7 @@ typedef uint32_t wuint;
 typedef float wfloat;
 
 struct WFunc {
-    WObj* (*fptr)(WObj** args, int argc, void* userdata);
+    WObj* (*fptr)(WObj** args, int argc, WObj* kwargs, void* userdata);
     void* userdata;
     const char* prettyName;
     bool isMethod;
@@ -678,9 +678,10 @@ WDLL_EXPORT WObj* WConvertToString(WObj* obj);
 * @param argv a pointer to an array of objects used as arguments to the function call.
 *             If argc is 0 then this can be nullptr.
 * @param argc the number of arguments to pass.
+* @param kwargsDict a dictionary object containing the keyword arguments or nullptr if none.
 * @return the return value of the callable, or nullptr on failure.
 */
-WDLL_EXPORT WObj* WCall(WObj* callable, WObj** argv, int argc);
+WDLL_EXPORT WObj* WCall(WObj* callable, WObj** argv, int argc, WObj* kwargsDict WDEFAULT_ARG(nullptr));
 
 /**
 * Call a method.
@@ -692,9 +693,10 @@ WDLL_EXPORT WObj* WCall(WObj* callable, WObj** argv, int argc);
 * @param argv a pointer to an array of objects used as arguments to the method call.
 *             If argc is 0 then this can be nullptr.
 * @param argc the number of arguments to pass.
+* @param kwargsDict a dictionary object containing the keyword arguments or nullptr if none.
 * @return the return value of the method, or nullptr on failure.
 */
-WDLL_EXPORT WObj* WCallMethod(WObj* obj, const char* member, WObj** argv, int argc);
+WDLL_EXPORT WObj* WCallMethod(WObj* obj, const char* member, WObj** argv, int argc, WObj* kwargsDict WDEFAULT_ARG(nullptr));
 
 /**
 * Call a method from the base class.

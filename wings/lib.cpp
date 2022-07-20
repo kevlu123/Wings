@@ -65,7 +65,7 @@ static std::string WObjToString(const WObj* val, std::unordered_set<const WObj*>
 			seen.insert(val);
 			std::string s = "{";
 			for (const auto& [key, val] : val->m) {
-				s += WObjToString(&key, seen) + ": ";
+				s += WObjToString(key, seen) + ": ";
 				s += WObjToString(val, seen) + ", ";
 			}
 			if (!val->m.empty()) {
@@ -161,13 +161,13 @@ if (listIndex >= argv[list]->v.size()) {												\
 }
 
 
-using WFuncSignature = WObj * (*)(WObj**, int, WContext*);
+using WFuncSignature = WObj * (*)(WObj**, int, WObj*, WContext*);
 
 template <WFuncSignature fn>
 static WObj* RegisterStatelessFunction(WContext* context, const char* name) {
 	WFunc wfn{};
 	wfn.userdata = context;
-	wfn.fptr = [](WObj** argv, int argc, void* userdata) { return fn(argv, argc, (WContext*)userdata); };
+	wfn.fptr = [](WObj** argv, int argc, WObj* kwargs, void* userdata) { return fn(argv, argc, kwargs, (WContext*)userdata); };
 	wfn.isMethod = false;
 	wfn.prettyName = name;
 
@@ -180,7 +180,7 @@ template <WFuncSignature fn>
 static WObj* RegisterStatelessMethod(WContext* context, AttributeTable& attributeTable, const char* attribute, const char* prettyName) {
 	WFunc wfn{};
 	wfn.userdata = context;
-	wfn.fptr = [](WObj** argv, int argc, void* userdata) { return fn(argv, argc, (WContext*)userdata); };
+	wfn.fptr = [](WObj** argv, int argc, WObj* kwargs, void* userdata) { return fn(argv, argc, kwargs, (WContext*)userdata); };
 	wfn.isMethod = true;
 	wfn.prettyName = prettyName;
 
@@ -201,9 +201,9 @@ static WObj* CreateClass(WContext* context, const char* name = nullptr) {
 	constructor.isMethod = true;
 	constructor.prettyName = name;
 
-	constructor.fptr = [](WObj** argv, int argc, void* userdata) {
+	constructor.fptr = [](WObj** argv, int argc, WObj* kwargs, void* userdata) {
 		WObj* _class = (WObj*)userdata;
-		WObj* instance = Constructor(argv, argc, _class->context);
+		WObj* instance = Constructor(argv, argc, kwargs, _class->context);
 		if (instance == nullptr)
 			return (WObj*)nullptr;
 
@@ -230,7 +230,7 @@ namespace wings {
 
 	namespace classlib {
 
-		static WObj* Null(WObj** argv, int argc, WContext* context) {
+		static WObj* Null(WObj** argv, int argc, WObj* kwargs, WContext* context) {
 			// Not callable from user code
 			WASSERT(argc == 0);
 
@@ -241,7 +241,7 @@ namespace wings {
 			return obj;
 		}
 
-		static WObj* Bool(WObj** argv, int argc, WContext* context) {
+		static WObj* Bool(WObj** argv, int argc, WObj* kwargs, WContext* context) {
 			switch (argc) {
 			case 0:
 				if (WObj* obj = Alloc(context)) {
@@ -266,7 +266,7 @@ namespace wings {
 			}
 		}
 
-		static WObj* Int(WObj** argv, int argc, WContext* context) {
+		static WObj* Int(WObj** argv, int argc, WObj* kwargs, WContext* context) {
 			switch (argc) {
 			case 0:
 				if (WObj* obj = Alloc(context)) {
@@ -284,7 +284,7 @@ namespace wings {
 			}
 		}
 
-		static WObj* Float(WObj** argv, int argc, WContext* context) {
+		static WObj* Float(WObj** argv, int argc, WObj* kwargs, WContext* context) {
 			switch (argc) {
 			case 0:
 				if (WObj* obj = Alloc(context)) {
@@ -302,7 +302,7 @@ namespace wings {
 			}
 		}
 
-		static WObj* Str(WObj** argv, int argc, WContext* context) {
+		static WObj* Str(WObj** argv, int argc, WObj* kwargs, WContext* context) {
 			switch (argc) {
 			case 0:
 				if (WObj* obj = Alloc(context)) {
@@ -319,7 +319,7 @@ namespace wings {
 			}
 		}
 
-		static WObj* Tuple(WObj** argv, int argc, WContext* context) {
+		static WObj* Tuple(WObj** argv, int argc, WObj* kwargs, WContext* context) {
 			if (argc > 1) {
 				SetInvalidArgumentCountError(context, argc, 1);
 				return nullptr;
@@ -347,7 +347,7 @@ namespace wings {
 			return tuple;
 		}
 
-		static WObj* List(WObj** argv, int argc, WContext* context) {
+		static WObj* List(WObj** argv, int argc, WObj* kwargs, WContext* context) {
 			if (argc > 1) {
 				SetInvalidArgumentCountError(context, argc, 1);
 				return nullptr;
@@ -375,7 +375,7 @@ namespace wings {
 			return list;
 		}
 
-		static WObj* Map(WObj** argv, int argc, WContext* context) {
+		static WObj* Map(WObj** argv, int argc, WObj* kwargs, WContext* context) {
 			// TODO: validate params
 
 			WObj* obj = Alloc(context);
@@ -385,7 +385,7 @@ namespace wings {
 			return obj;
 		}
 
-		static WObj* Func(WObj** argv, int argc, WContext* context) {
+		static WObj* Func(WObj** argv, int argc, WObj* kwargs, WContext* context) {
 			// Not callable from user code
 			WObj* obj = Alloc(context);
 			if (obj == nullptr)
@@ -394,7 +394,7 @@ namespace wings {
 			return obj;
 		}
 
-		static WObj* Object(WObj** argv, int argc, WContext* context) {
+		static WObj* Object(WObj** argv, int argc, WObj* kwargs, WContext* context) {
 			EXPECT_ARG_COUNT(0);
 			WObj* obj = Alloc(context);
 			if (obj == nullptr)
@@ -403,7 +403,7 @@ namespace wings {
 			return obj;
 		}
 
-		static WObj* Userdata(WObj** argv, int argc, WContext* context) {
+		static WObj* Userdata(WObj** argv, int argc, WObj* kwargs, WContext* context) {
 			// Not callable from user code
 			WObj* obj = Alloc(context);
 			if (obj == nullptr)
@@ -416,23 +416,23 @@ namespace wings {
 
 	namespace attrlib {
 
-		static WObj* Object_Pos(WObj** argv, int argc, WContext* context) {
+		static WObj* Object_Pos(WObj** argv, int argc, WObj* kwargs, WContext* context) {
 			EXPECT_ARG_COUNT(1);
 			return argv[0];
 		}
 
-		static WObj* Object_Str(WObj** argv, int argc, WContext* context) {
+		static WObj* Object_Str(WObj** argv, int argc, WObj* kwargs, WContext* context) {
 			EXPECT_ARG_COUNT(1);
 			std::string s = WObjToString(argv[0]);
 			return WCreateString(context, s.c_str());
 		}
 
-		static WObj* Object_Eq(WObj** argv, int argc, WContext* context) {
+		static WObj* Object_Eq(WObj** argv, int argc, WObj* kwargs, WContext* context) {
 			EXPECT_ARG_COUNT(2);
 			return WCreateBool(context, argv[0] == argv[1]);
 		}
 
-		static WObj* Object_Ne(WObj** argv, int argc, WContext* context) {
+		static WObj* Object_Ne(WObj** argv, int argc, WObj* kwargs, WContext* context) {
 			EXPECT_ARG_COUNT(2);
 			if (WObj* eq = WEquals(argv[0], argv[1])) {
 				return WCreateBool(context, !WGetBool(eq));
@@ -441,101 +441,101 @@ namespace wings {
 			}
 		}
 
-		static WObj* Null_Bool(WObj** argv, int argc, WContext* context) {
+		static WObj* Null_Bool(WObj** argv, int argc, WObj* kwargs, WContext* context) {
 			EXPECT_ARG_COUNT(1);
 			EXPECT_ARG_TYPE_NULL(0);
 			return WCreateNoneType(context);
 		}
 
-		static WObj* Null_Eq(WObj** argv, int argc, WContext* context) {
+		static WObj* Null_Eq(WObj** argv, int argc, WObj* kwargs, WContext* context) {
 			EXPECT_ARG_COUNT(2);
 			EXPECT_ARG_TYPE_NULL(0);
 			return WCreateBool(context, WIsNoneType(argv[1]));
 		}
 
-		static WObj* Bool_Bool(WObj** argv, int argc, WContext* context) {
+		static WObj* Bool_Bool(WObj** argv, int argc, WObj* kwargs, WContext* context) {
 			EXPECT_ARG_COUNT(1);
 			EXPECT_ARG_TYPE_BOOL(0);
 			return argv[0];
 		}
 
-		static WObj* Bool_Int(WObj** argv, int argc, WContext* context) {
+		static WObj* Bool_Int(WObj** argv, int argc, WObj* kwargs, WContext* context) {
 			EXPECT_ARG_COUNT(1);
 			EXPECT_ARG_TYPE_BOOL(0);
 			return WCreateInt(context, WGetBool(argv[0]) ? 1 : 0);
 		}
 
-		static WObj* Bool_Float(WObj** argv, int argc, WContext* context) {
+		static WObj* Bool_Float(WObj** argv, int argc, WObj* kwargs, WContext* context) {
 			EXPECT_ARG_COUNT(1);
 			EXPECT_ARG_TYPE_BOOL(0);
 			return WCreateFloat(context, WGetBool(argv[0]) ? (wfloat)1 : (wfloat)0);
 		}
 
-		static WObj* Bool_Eq(WObj** argv, int argc, WContext* context) {
+		static WObj* Bool_Eq(WObj** argv, int argc, WObj* kwargs, WContext* context) {
 			EXPECT_ARG_COUNT(2);
 			EXPECT_ARG_TYPE_BOOL(0);
 			return WCreateBool(context, WIsBool(argv[1]) && WGetBool(argv[0]) == WGetBool(argv[1]));
 		}
 
-		static WObj* Int_Bool(WObj** argv, int argc, WContext* context) {
+		static WObj* Int_Bool(WObj** argv, int argc, WObj* kwargs, WContext* context) {
 			EXPECT_ARG_COUNT(1);
 			EXPECT_ARG_TYPE_INT(0);
 			return WCreateBool(context, WGetInt(argv[0]) != 0);
 		}
 
-		static WObj* Int_Int(WObj** argv, int argc, WContext* context) {
+		static WObj* Int_Int(WObj** argv, int argc, WObj* kwargs, WContext* context) {
 			EXPECT_ARG_COUNT(1);
 			EXPECT_ARG_TYPE_INT(0);
 			return argv[0];
 		}
 
-		static WObj* Int_Float(WObj** argv, int argc, WContext* context) {
+		static WObj* Int_Float(WObj** argv, int argc, WObj* kwargs, WContext* context) {
 			EXPECT_ARG_COUNT(1);
 			EXPECT_ARG_TYPE_INT(0);
 			return WCreateFloat(context, WGetFloat(argv[0]));
 		}
 
-		static WObj* Int_Eq(WObj** argv, int argc, WContext* context) {
+		static WObj* Int_Eq(WObj** argv, int argc, WObj* kwargs, WContext* context) {
 			EXPECT_ARG_COUNT(2);
 			EXPECT_ARG_TYPE_INT(0);
 			return WCreateBool(context, WIsInt(argv[1]) && WGetInt(argv[0]) == WGetInt(argv[1]));
 		}
 
-		static WObj* Int_Gt(WObj** argv, int argc, WContext* context) {
+		static WObj* Int_Gt(WObj** argv, int argc, WObj* kwargs, WContext* context) {
 			EXPECT_ARG_COUNT(2);
 			EXPECT_ARG_TYPE_INT(0);
 			EXPECT_ARG_TYPE_INT_OR_FLOAT(1);
 			return WCreateBool(context, WGetFloat(argv[0]) > WGetFloat(argv[1]));
 		}
 
-		static WObj* Int_Ge(WObj** argv, int argc, WContext* context) {
+		static WObj* Int_Ge(WObj** argv, int argc, WObj* kwargs, WContext* context) {
 			EXPECT_ARG_COUNT(2);
 			EXPECT_ARG_TYPE_INT(0);
 			EXPECT_ARG_TYPE_INT_OR_FLOAT(1);
 			return WCreateBool(context, WGetFloat(argv[0]) >= WGetFloat(argv[1]));
 		}
 
-		static WObj* Int_Lt(WObj** argv, int argc, WContext* context) {
+		static WObj* Int_Lt(WObj** argv, int argc, WObj* kwargs, WContext* context) {
 			EXPECT_ARG_COUNT(2);
 			EXPECT_ARG_TYPE_INT(0);
 			EXPECT_ARG_TYPE_INT_OR_FLOAT(1);
 			return WCreateBool(context, WGetFloat(argv[0]) < WGetFloat(argv[1]));
 		}
 
-		static WObj* Int_Le(WObj** argv, int argc, WContext* context) {
+		static WObj* Int_Le(WObj** argv, int argc, WObj* kwargs, WContext* context) {
 			EXPECT_ARG_COUNT(2);
 			EXPECT_ARG_TYPE_INT(0);
 			EXPECT_ARG_TYPE_INT_OR_FLOAT(1);
 			return WCreateBool(context, WGetFloat(argv[0]) <= WGetFloat(argv[1]));
 		}
 
-		static WObj* Int_Neg(WObj** argv, int argc, WContext* context) {
+		static WObj* Int_Neg(WObj** argv, int argc, WObj* kwargs, WContext* context) {
 			EXPECT_ARG_COUNT(1);
 			EXPECT_ARG_TYPE_INT(0);
 			return WCreateInt(context, -WGetInt(argv[0]));
 		}
 
-		static WObj* Int_Add(WObj** argv, int argc, WContext* context) {
+		static WObj* Int_Add(WObj** argv, int argc, WObj* kwargs, WContext* context) {
 			EXPECT_ARG_COUNT(2);
 			EXPECT_ARG_TYPE_INT(0);
 			EXPECT_ARG_TYPE_INT_OR_FLOAT(1);
@@ -546,7 +546,7 @@ namespace wings {
 			}
 		}
 
-		static WObj* Int_Sub(WObj** argv, int argc, WContext* context) {
+		static WObj* Int_Sub(WObj** argv, int argc, WObj* kwargs, WContext* context) {
 			EXPECT_ARG_COUNT(2);
 			EXPECT_ARG_TYPE_INT(0);
 			EXPECT_ARG_TYPE_INT_OR_FLOAT(1);
@@ -557,7 +557,7 @@ namespace wings {
 			}
 		}
 
-		static WObj* Int_Mul(WObj** argv, int argc, WContext* context) {
+		static WObj* Int_Mul(WObj** argv, int argc, WObj* kwargs, WContext* context) {
 			EXPECT_ARG_COUNT(2);
 			EXPECT_ARG_TYPE_INT(0);
 
@@ -577,7 +577,7 @@ namespace wings {
 			}
 		}
 
-		static WObj* Int_Div(WObj** argv, int argc, WContext* context) {
+		static WObj* Int_Div(WObj** argv, int argc, WObj* kwargs, WContext* context) {
 			EXPECT_ARG_COUNT(2);
 			EXPECT_ARG_TYPE_INT(0);
 			EXPECT_ARG_TYPE_INT_OR_FLOAT(0);
@@ -589,7 +589,7 @@ namespace wings {
 			return WCreateFloat(context, WGetFloat(argv[0]) / WGetFloat(argv[1]));
 		}
 
-		static WObj* Int_FloorDiv(WObj** argv, int argc, WContext* context) {
+		static WObj* Int_FloorDiv(WObj** argv, int argc, WObj* kwargs, WContext* context) {
 			EXPECT_ARG_COUNT(2);
 			EXPECT_ARG_TYPE_INT(0);
 			EXPECT_ARG_TYPE_INT_OR_FLOAT(1);
@@ -606,7 +606,7 @@ namespace wings {
 			}
 		}
 
-		static WObj* Int_Mod(WObj** argv, int argc, WContext* context) {
+		static WObj* Int_Mod(WObj** argv, int argc, WObj* kwargs, WContext* context) {
 			EXPECT_ARG_COUNT(2);
 			EXPECT_ARG_TYPE_INT(0);
 			EXPECT_ARG_TYPE_INT_OR_FLOAT(1);
@@ -627,41 +627,41 @@ namespace wings {
 			}
 		}
 
-		static WObj* Int_Pow(WObj** argv, int argc, WContext* context) {
+		static WObj* Int_Pow(WObj** argv, int argc, WObj* kwargs, WContext* context) {
 			EXPECT_ARG_COUNT(2);
 			EXPECT_ARG_TYPE_INT(0);
 			EXPECT_ARG_TYPE_INT_OR_FLOAT(1);
 			return WCreateFloat(context, std::pow(WGetFloat(argv[0]), WGetFloat(argv[1])));
 		}
 
-		static WObj* Int_BitAnd(WObj** argv, int argc, WContext* context) {
+		static WObj* Int_BitAnd(WObj** argv, int argc, WObj* kwargs, WContext* context) {
 			EXPECT_ARG_COUNT(2);
 			EXPECT_ARG_TYPE_INT(0);
 			EXPECT_ARG_TYPE_INT(1);
 			return WCreateInt(context, WGetInt(argv[0]) & WGetInt(argv[1]));
 		}
 
-		static WObj* Int_BitOr(WObj** argv, int argc, WContext* context) {
+		static WObj* Int_BitOr(WObj** argv, int argc, WObj* kwargs, WContext* context) {
 			EXPECT_ARG_COUNT(2);
 			EXPECT_ARG_TYPE_INT(0);
 			EXPECT_ARG_TYPE_INT(1);
 			return WCreateInt(context, WGetInt(argv[0]) | WGetInt(argv[1]));
 		}
 
-		static WObj* Int_BitXor(WObj** argv, int argc, WContext* context) {
+		static WObj* Int_BitXor(WObj** argv, int argc, WObj* kwargs, WContext* context) {
 			EXPECT_ARG_COUNT(2);
 			EXPECT_ARG_TYPE_INT(0);
 			EXPECT_ARG_TYPE_INT(1);
 			return WCreateInt(context, WGetInt(argv[0]) ^ WGetInt(argv[1]));
 		}
 
-		static WObj* Int_BitNot(WObj** argv, int argc, WContext* context) {
+		static WObj* Int_BitNot(WObj** argv, int argc, WObj* kwargs, WContext* context) {
 			EXPECT_ARG_COUNT(1);
 			EXPECT_ARG_TYPE_INT(0);
 			return WCreateInt(context, ~WGetInt(argv[0]));
 		}
 
-		static WObj* Int_ShiftLeft(WObj** argv, int argc, WContext* context) {
+		static WObj* Int_ShiftLeft(WObj** argv, int argc, WObj* kwargs, WContext* context) {
 			EXPECT_ARG_COUNT(2);
 			EXPECT_ARG_TYPE_INT(0);
 			EXPECT_ARG_TYPE_INT(1);
@@ -675,7 +675,7 @@ namespace wings {
 			return WCreateInt(context, WGetInt(argv[0]) << shift);
 		}
 
-		static WObj* Int_ShiftRight(WObj** argv, int argc, WContext* context) {
+		static WObj* Int_ShiftRight(WObj** argv, int argc, WObj* kwargs, WContext* context) {
 			EXPECT_ARG_COUNT(2);
 			EXPECT_ARG_TYPE_INT(0);
 			EXPECT_ARG_TYPE_INT(1);
@@ -689,93 +689,93 @@ namespace wings {
 			return WCreateInt(context, WGetInt(argv[0]) >> shift);
 		}
 
-		static WObj* Float_Bool(WObj** argv, int argc, WContext* context) {
+		static WObj* Float_Bool(WObj** argv, int argc, WObj* kwargs, WContext* context) {
 			EXPECT_ARG_COUNT(1);
 			EXPECT_ARG_TYPE_INT_OR_FLOAT(0);
 			return WCreateBool(context, WGetFloat(argv[0]) != 0);
 		}
 
-		static WObj* Float_Int(WObj** argv, int argc, WContext* context) {
+		static WObj* Float_Int(WObj** argv, int argc, WObj* kwargs, WContext* context) {
 			EXPECT_ARG_COUNT(1);
 			EXPECT_ARG_TYPE_INT_OR_FLOAT(0);
 			return WCreateInt(context, (wint)WGetFloat(argv[0]));
 		}
 
-		static WObj* Float_Float(WObj** argv, int argc, WContext* context) {
+		static WObj* Float_Float(WObj** argv, int argc, WObj* kwargs, WContext* context) {
 			EXPECT_ARG_COUNT(1);
 			EXPECT_ARG_TYPE_INT_OR_FLOAT(0);
 			return argv[0];
 		}
 
-		static WObj* Float_Eq(WObj** argv, int argc, WContext* context) {
+		static WObj* Float_Eq(WObj** argv, int argc, WObj* kwargs, WContext* context) {
 			EXPECT_ARG_COUNT(2);
 			EXPECT_ARG_TYPE_INT_OR_FLOAT(0);
 			return WCreateBool(context, WIsIntOrFloat(argv[1]) && WGetFloat(argv[0]) == WGetFloat(argv[1]));
 		}
 
-		static WObj* Float_Neg(WObj** argv, int argc, WContext* context) {
+		static WObj* Float_Neg(WObj** argv, int argc, WObj* kwargs, WContext* context) {
 			EXPECT_ARG_COUNT(1);
 			EXPECT_ARG_TYPE_INT_OR_FLOAT(0);
 			return WCreateFloat(context, -WGetFloat(argv[0]));
 		}
 
-		static WObj* Float_Add(WObj** argv, int argc, WContext* context) {
+		static WObj* Float_Add(WObj** argv, int argc, WObj* kwargs, WContext* context) {
 			EXPECT_ARG_COUNT(2);
 			EXPECT_ARG_TYPE_INT_OR_FLOAT(0);
 			EXPECT_ARG_TYPE_INT_OR_FLOAT(1);
 			return WCreateFloat(context, WGetFloat(argv[0]) + WGetFloat(argv[1]));
 		}
 
-		static WObj* Float_Sub(WObj** argv, int argc, WContext* context) {
+		static WObj* Float_Sub(WObj** argv, int argc, WObj* kwargs, WContext* context) {
 			EXPECT_ARG_COUNT(2);
 			EXPECT_ARG_TYPE_INT_OR_FLOAT(0);
 			EXPECT_ARG_TYPE_INT_OR_FLOAT(1);
 			return WCreateFloat(context, WGetFloat(argv[0]) - WGetFloat(argv[1]));
 		}
 
-		static WObj* Float_Mul(WObj** argv, int argc, WContext* context) {
+		static WObj* Float_Mul(WObj** argv, int argc, WObj* kwargs, WContext* context) {
 			EXPECT_ARG_COUNT(2);
 			EXPECT_ARG_TYPE_INT_OR_FLOAT(0);
 			EXPECT_ARG_TYPE_INT_OR_FLOAT(1);
 			return WCreateFloat(context, WGetFloat(argv[0]) * WGetFloat(argv[1]));
 		}
 
-		static WObj* Float_Div(WObj** argv, int argc, WContext* context) {
+		static WObj* Float_Div(WObj** argv, int argc, WObj* kwargs, WContext* context) {
 			EXPECT_ARG_COUNT(2);
 			EXPECT_ARG_TYPE_INT_OR_FLOAT(0);
 			EXPECT_ARG_TYPE_INT_OR_FLOAT(1);
 			return WCreateFloat(context, WGetFloat(argv[0]) / WGetFloat(argv[1]));
 		}
 
-		static WObj* Float_FloorDiv(WObj** argv, int argc, WContext* context) {
+		static WObj* Float_FloorDiv(WObj** argv, int argc, WObj* kwargs, WContext* context) {
 			EXPECT_ARG_COUNT(2);
 			EXPECT_ARG_TYPE_INT_OR_FLOAT(0);
 			EXPECT_ARG_TYPE_INT_OR_FLOAT(1);
 			return WCreateFloat(context, std::floor(WGetFloat(argv[0]) / WGetFloat(argv[1])));
 		}
 
-		static WObj* Float_Mod(WObj** argv, int argc, WContext* context) {
+		static WObj* Float_Mod(WObj** argv, int argc, WObj* kwargs, WContext* context) {
 			EXPECT_ARG_COUNT(2);
 			EXPECT_ARG_TYPE_INT_OR_FLOAT(0);
 			EXPECT_ARG_TYPE_INT_OR_FLOAT(1);
 			return WCreateFloat(context, std::fmod(WGetFloat(argv[0]), WGetFloat(argv[1])));
 		}
 
-		static WObj* Float_Pow(WObj** argv, int argc, WContext* context) {
+		static WObj* Float_Pow(WObj** argv, int argc, WObj* kwargs, WContext* context) {
 			EXPECT_ARG_COUNT(2);
 			EXPECT_ARG_TYPE_INT_OR_FLOAT(0);
 			EXPECT_ARG_TYPE_INT_OR_FLOAT(1);
 			return WCreateFloat(context, std::pow(WGetFloat(argv[0]), WGetFloat(argv[1])));
 		}
 
-		static WObj* Str_Bool(WObj** argv, int argc, WContext* context) {
+		static WObj* Str_Bool(WObj** argv, int argc, WObj* kwargs, WContext* context) {
 			EXPECT_ARG_COUNT(1);
 			EXPECT_ARG_TYPE_STRING(0);
 			std::string s = WGetString(argv[0]);
 			return WCreateBool(context, !s.empty());
 		}
 
-		static WObj* Str_Int(WObj** argv, int argc, WContext* context) {
+		static WObj* Str_Int(WObj** argv, int argc, WObj* kwargs, WContext* context) {
 			EXPECT_ARG_COUNT(1);
 			EXPECT_ARG_TYPE_STRING(0);
 
@@ -851,7 +851,7 @@ namespace wings {
 			return WCreateInt(context, (wint)value);
 		}
 
-		static WObj* Str_Float(WObj** argv, int argc, WContext* context) {
+		static WObj* Str_Float(WObj** argv, int argc, WObj* kwargs, WContext* context) {
 			EXPECT_ARG_COUNT(1);
 			EXPECT_ARG_TYPE_STRING(0);
 
@@ -931,13 +931,13 @@ namespace wings {
 			return WCreateFloat(context, fvalue);
 		}
 
-		static WObj* Str_Eq(WObj** argv, int argc, WContext* context) {
+		static WObj* Str_Eq(WObj** argv, int argc, WObj* kwargs, WContext* context) {
 			EXPECT_ARG_COUNT(2);
 			EXPECT_ARG_TYPE_STRING(0);
 			return WCreateBool(context, WIsString(argv[1]) && std::strcmp(WGetString(argv[0]), WGetString(argv[1])) == 0);
 		}
 
-		static WObj* Str_Mul(WObj** argv, int argc, WContext* context) {
+		static WObj* Str_Mul(WObj** argv, int argc, WObj* kwargs, WContext* context) {
 			EXPECT_ARG_COUNT(2);
 			EXPECT_ARG_TYPE_STRING(0);
 			EXPECT_ARG_TYPE_INT(1);
@@ -948,7 +948,7 @@ namespace wings {
 			return WCreateString(context, s.c_str());
 		}
 
-		static WObj* Str_Contains(WObj** argv, int argc, WContext* context) {
+		static WObj* Str_Contains(WObj** argv, int argc, WObj* kwargs, WContext* context) {
 			EXPECT_ARG_COUNT(2);
 			EXPECT_ARG_TYPE_STRING(0);
 			EXPECT_ARG_TYPE_STRING(1);
@@ -956,7 +956,7 @@ namespace wings {
 		}
 
 		template <int IsList>
-		static WObj* TupleList_GetItem(WObj** argv, int argc, WContext* context) {
+		static WObj* TupleList_GetItem(WObj** argv, int argc, WObj* kwargs, WContext* context) {
 			EXPECT_ARG_COUNT(2);
 			if constexpr (IsList) {
 				EXPECT_ARG_TYPE_LIST(0);
@@ -1045,7 +1045,7 @@ namespace wings {
 			return failed ? nullptr : slice;
 		}
 
-		static WObj* List_SetItem(WObj** argv, int argc, WContext* context) {
+		static WObj* List_SetItem(WObj** argv, int argc, WObj* kwargs, WContext* context) {
 			EXPECT_ARG_COUNT(3);
 			EXPECT_ARG_TYPE_LIST(0);
 			EXPECT_ARG_TYPE_INT(1);
@@ -1056,7 +1056,7 @@ namespace wings {
 		}
 
 		template <int IsList>
-		static WObj* TupleList_Len(WObj** argv, int argc, WContext* context) {
+		static WObj* TupleList_Len(WObj** argv, int argc, WObj* kwargs, WContext* context) {
 			EXPECT_ARG_COUNT(1);
 			if constexpr (IsList) {
 				EXPECT_ARG_TYPE_LIST(0);
@@ -1067,14 +1067,14 @@ namespace wings {
 			return WCreateInt(context, (wint)argv[0]->v.size());
 		}
 
-		static WObj* List_Append(WObj** argv, int argc, WContext* context) {
+		static WObj* List_Append(WObj** argv, int argc, WObj* kwargs, WContext* context) {
 			EXPECT_ARG_COUNT(2);
 			EXPECT_ARG_TYPE_LIST(0);
 			argv[0]->v.push_back(argv[1]);
 			return argv[0];
 		}
 
-		static WObj* List_Insert(WObj** argv, int argc, WContext* context) {
+		static WObj* List_Insert(WObj** argv, int argc, WObj* kwargs, WContext* context) {
 			EXPECT_ARG_COUNT(3);
 			EXPECT_ARG_TYPE_LIST(0);
 			EXPECT_ARG_TYPE_INT(1);
@@ -1084,7 +1084,7 @@ namespace wings {
 			return argv[0];
 		}
 
-		static WObj* List_Pop(WObj** argv, int argc, WContext* context) {
+		static WObj* List_Pop(WObj** argv, int argc, WObj* kwargs, WContext* context) {
 			EXPECT_ARG_COUNT_BETWEEN(0, 1);
 			EXPECT_ARG_TYPE_LIST(0);
 
@@ -1105,7 +1105,7 @@ namespace wings {
 			return popped;
 		}
 
-		static WObj* List_Remove(WObj** argv, int argc, WContext* context) {
+		static WObj* List_Remove(WObj** argv, int argc, WObj* kwargs, WContext* context) {
 			EXPECT_ARG_COUNT(2);
 			EXPECT_ARG_TYPE_LIST(0);
 
@@ -1134,7 +1134,7 @@ namespace wings {
 			return nullptr;
 		}
 
-		static WObj* Tuple_Len(WObj** argv, int argc, WContext* context) {
+		static WObj* Tuple_Len(WObj** argv, int argc, WObj* kwargs, WContext* context) {
 			EXPECT_ARG_COUNT(1);
 			EXPECT_ARG_TYPE_TUPLE(0);
 
@@ -1145,7 +1145,7 @@ namespace wings {
 
 	namespace lib {
 
-		static WObj* print(WObj** argv, int argc, WContext* context) {
+		static WObj* print(WObj** argv, int argc, WObj* kwargs, WContext* context) {
 			std::string text;
 			for (int i = 0; i < argc; i++) {
 				if (WObj* s = WConvertToString(argv[i])) {
@@ -1163,7 +1163,7 @@ namespace wings {
 			return WCreateNoneType(context);
 		}
 
-		static WObj* set_class_attr(WObj** argv, int argc, WContext* context) {
+		static WObj* set_class_attr(WObj** argv, int argc, WObj* kwargs, WContext* context) {
 			// Not callable from user code
 			argv[2]->fn.isMethod = true;
 			argv[0]->c.Set(argv[1]->s, argv[2]);
@@ -1381,6 +1381,7 @@ class __ListIter:
 		
 set_class_attr(list, "__iter__", lambda self: __ListIter(self))
 set_class_attr(tuple, "__iter__", lambda self: __ListIter(self))
+set_class_attr = None
 			)",
 			"__builtins__"
 		);

@@ -21,7 +21,6 @@ namespace wings {
 
 	struct ClassInstruction {
 		std::vector<std::string> methodNames;
-		size_t baseClassCount;
 	};
 
 	using LiteralInstruction = std::variant<std::nullptr_t, bool, wint, wfloat, std::string>;
@@ -75,6 +74,9 @@ namespace wings {
 
 			Call,
 			PushArgFrame,
+			Unpack,
+			UnpackMapForMapCreation,
+			UnpackMapForCall,
 
 			Operation,
 			Pop,

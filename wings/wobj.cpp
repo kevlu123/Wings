@@ -5,28 +5,6 @@
 
 using namespace wings;
 
-bool operator==(const WObj& lhs, const WObj& rhs) {
-    if (lhs.type != rhs.type)
-        return false;
-
-    switch (lhs.type) {
-    case WObj::Type::Null: return true;
-    case WObj::Type::Bool: return lhs.b == rhs.b;
-    case WObj::Type::Int: return lhs.i == rhs.i;
-    case WObj::Type::Float: return lhs.f == rhs.f;
-    case WObj::Type::String: return lhs.s == rhs.s;
-    case WObj::Type::List:
-    case WObj::Type::Map:
-    case WObj::Type::Func:
-    case WObj::Type::Userdata: return &lhs == &rhs;
-    default: WUNREACHABLE();
-    }
-}
-
-bool operator!=(const WObj& lhs, const WObj& rhs) {
-    return !(lhs == rhs);
-}
-
 extern "C" {
 
     WObj* WCreateNoneType(WContext* context) {
@@ -36,8 +14,12 @@ extern "C" {
 
     WObj* WCreateBool(WContext* context, bool value) {
         WASSERT(context);
+        WObj* kwargs = WCreateDictionary(context);
+        if (kwargs == nullptr)
+            return nullptr;
+
         WObj* _class = context->builtinClasses._bool;
-        WObj* instance = _class->fn.fptr(nullptr, 0, _class->fn.userdata);
+        WObj* instance = _class->fn.fptr(nullptr, 0, kwargs, _class->fn.userdata);
         if (instance) {
             instance->attributes = _class->c.Copy();
             instance->b = value;
@@ -47,8 +29,12 @@ extern "C" {
 
     WObj* WCreateInt(WContext* context, wint value) {
         WASSERT(context);
+        WObj* kwargs = WCreateDictionary(context);
+        if (kwargs == nullptr)
+            return nullptr;
+
         WObj* _class = context->builtinClasses._int;
-        WObj* instance = _class->fn.fptr(nullptr, 0, _class->fn.userdata);
+        WObj* instance = _class->fn.fptr(nullptr, 0, kwargs, _class->fn.userdata);
         if (instance) {
             instance->attributes = _class->c.Copy();
             instance->i = value;
@@ -58,8 +44,12 @@ extern "C" {
 
     WObj* WCreateFloat(WContext* context, wfloat value) {
         WASSERT(context);
+        WObj* kwargs = WCreateDictionary(context);
+        if (kwargs == nullptr)
+            return nullptr;
+
         WObj* _class = context->builtinClasses._float;
-        WObj* instance = _class->fn.fptr(nullptr, 0, _class->fn.userdata);
+        WObj* instance = _class->fn.fptr(nullptr, 0, kwargs, _class->fn.userdata);
         if (instance) {
             instance->attributes = _class->c.Copy();
             instance->f = value;
@@ -69,8 +59,12 @@ extern "C" {
 
     WObj* WCreateString(WContext* context, const char* value) {
         WASSERT(context);
+        WObj* kwargs = WCreateDictionary(context);
+        if (kwargs == nullptr)
+            return nullptr;
+
         WObj* _class = context->builtinClasses.str;
-        WObj* instance = _class->fn.fptr(nullptr, 0, _class->fn.userdata);
+        WObj* instance = _class->fn.fptr(nullptr, 0, kwargs, _class->fn.userdata);
         if (instance) {
             instance->attributes = _class->c.Copy();
             instance->s = value ? value : "";
@@ -87,9 +81,12 @@ extern "C" {
                 WASSERT(argv[i]);
             }
         }
+        WObj* kwargs = WCreateDictionary(context);
+        if (kwargs == nullptr)
+            return nullptr;
 
         WObj* _class = context->builtinClasses.tuple;
-        WObj* instance = _class->fn.fptr(nullptr, 0, _class->fn.userdata);
+        WObj* instance = _class->fn.fptr(nullptr, 0, kwargs, _class->fn.userdata);
         if (argc > 0)
             instance->v.insert(instance->v.begin(), argv, argv + argc);
         if (instance)
@@ -108,9 +105,12 @@ extern "C" {
                 WASSERT(argv[i]);
             }
         }
+        WObj* kwargs = WCreateDictionary(context);
+        if (kwargs == nullptr)
+            return nullptr;
 
         WObj* _class = context->builtinClasses.list;
-        WObj* instance = _class->fn.fptr(nullptr, 0, _class->fn.userdata);
+        WObj* instance = _class->fn.fptr(nullptr, 0, kwargs, _class->fn.userdata);
         if (argc > 0)
             instance->v.insert(instance->v.begin(), argv, argv + argc);
         if (instance)
@@ -130,11 +130,10 @@ extern "C" {
                 WASSERT(keys[i] && values[i] && WIsImmutableType(keys[i]));
             }
         }
-
         WObj* _class = context->builtinClasses.map;
-        WObj* instance = _class->fn.fptr(nullptr, 0, _class->fn.userdata);
+        WObj* instance = _class->fn.fptr(nullptr, 0, nullptr, _class->fn.userdata);
         for (int i = 0; i < argc; i++)
-            instance->m.insert({ *keys[i], values[i] });
+            instance->m.insert({ keys[i], values[i] });
         if (instance)
             instance->attributes = _class->c.Copy();
         for (int i = 0; i < argc; i++) {
@@ -146,8 +145,12 @@ extern "C" {
 
     WObj* WCreateObject(WContext* context) {
         WASSERT(context);
+        WObj* kwargs = WCreateDictionary(context);
+        if (kwargs == nullptr)
+            return nullptr;
+
         WObj* _class = context->builtinClasses.object;
-        WObj* instance = _class->fn.fptr(nullptr, 0, _class->fn.userdata);
+        WObj* instance = _class->fn.fptr(nullptr, 0, kwargs, _class->fn.userdata);
         if (instance) {
             instance->attributes = _class->c.Copy();
         }
@@ -156,8 +159,12 @@ extern "C" {
 
     WObj* WCreateFunction(WContext* context, const WFunc* value) {
         WASSERT(context && value && value->fptr);
+        WObj* kwargs = WCreateDictionary(context);
+        if (kwargs == nullptr)
+            return nullptr;
+
         WObj* _class = context->builtinClasses.func;
-        WObj* instance = _class->fn.fptr(nullptr, 0, _class->fn.userdata);
+        WObj* instance = _class->fn.fptr(nullptr, 0, kwargs, _class->fn.userdata);
         if (instance) {
             instance->attributes = _class->c.Copy();
             instance->fn = *value;
@@ -167,8 +174,12 @@ extern "C" {
 
     WObj* WCreateUserdata(WContext* context, void* value) {
         WASSERT(context);
+        WObj* kwargs = WCreateDictionary(context);
+        if (kwargs == nullptr)
+            return nullptr;
+
         WObj* _class = context->builtinClasses.userdata;
-        WObj* instance = _class->fn.fptr(nullptr, 0, _class->fn.userdata);
+        WObj* instance = _class->fn.fptr(nullptr, 0, kwargs, _class->fn.userdata);
         if (instance) {
             instance->attributes = _class->c.Copy();
             instance->u = value;
@@ -234,7 +245,7 @@ extern "C" {
             init.prettyName = "__init__";
             init.isMethod = true;
             init.userdata = new State(context, bases[0]);
-            init.fptr = [](WObj** argv, int argc, void* userdata) {
+            init.fptr = [](WObj** argv, int argc, WObj* kwargs, void* userdata) {
                 WContext* context = ((State*)userdata)->context;
                 WObj* firstBase = ((State*)userdata)->firstBase;
 
@@ -282,7 +293,7 @@ extern "C" {
         constructor.userdata = _class;
         constructor.isMethod = true;
         constructor.prettyName = "__init__";
-        constructor.fptr = [](WObj** argv, int argc, void* userdata) {
+        constructor.fptr = [](WObj** argv, int argc, WObj* kwargs, void* userdata) {
             WObj* _class = (WObj*)userdata;
             WContext* context = _class->context;
 
@@ -550,7 +561,7 @@ extern "C" {
         return nullptr;
     }
 
-    WObj* WCall(WObj* callable, WObj** argv, int argc) {
+    WObj* WCall(WObj* callable, WObj** argv, int argc, WObj* kwargsDict) {
         WASSERT(callable && argc >= 0 && (argc == 0 || argv));
         if (WIsFunction(callable) || WIsClass(callable)) {
             if (argc)
@@ -558,15 +569,37 @@ extern "C" {
             for (int i = 0; i < argc; i++)
                 WASSERT(argv[i]);
 
-            WObj* ret;
-            WProtectObject(callable);
-            if (callable->self) {
-                std::vector<WObj*> argsWithSelf = { callable->self };
-                argsWithSelf.insert(argsWithSelf.end(), argv, argv + argc);
-                ret = callable->fn.fptr(argsWithSelf.data(), argc + 1, callable->fn.userdata);
-            } else {
-                ret = callable->fn.fptr(argv, argc, callable->fn.userdata);
+            if (kwargsDict) {
+                if (!WIsDictionary(kwargsDict)) {
+                    //... error
+                    return nullptr;
+                }
+                for (const auto& [key, value] : kwargsDict->m) {
+                    if (!WIsString(key)) {
+                        //... error
+                        return nullptr;
+                    }
+                }
             }
+
+            WProtectObject(callable);
+
+            std::vector<WObj*> argsWithSelf;
+            if (callable->self) {
+                argsWithSelf.push_back(callable->self);
+                argsWithSelf.insert(argsWithSelf.end(), argv, argv + argc);
+                argv = argsWithSelf.data();
+                argc++;
+            }
+            if (kwargsDict == nullptr) {
+                kwargsDict = WCreateDictionary(callable->context);
+                if (kwargsDict == nullptr) {
+                    WUnprotectObject(callable);
+                    return nullptr;
+                }
+            }
+            WObj* ret = callable->fn.fptr(argv, argc, kwargsDict, callable->fn.userdata);
+
             WUnprotectObject(callable);
 
             if (ret == nullptr && callable->fn.fptr != &DefObject::Run) {
@@ -585,7 +618,7 @@ extern "C" {
         }
     }
 
-    WObj* WCallMethod(WObj* obj, const char* member, WObj** argv, int argc) {
+    WObj* WCallMethod(WObj* obj, const char* member, WObj** argv, int argc, WObj* kwargsDict) {
         WASSERT(obj && member);
         if (argc)
             WASSERT(argv);
@@ -601,7 +634,7 @@ extern "C" {
             WRaiseError(obj->context, msg.c_str());
             return nullptr;
         } else {
-            return WCall(method, argv, argc);
+            return WCall(method, argv, argc, kwargsDict);
         }
     }
 
@@ -780,25 +813,3 @@ extern "C" {
     }
 
 } // extern "C"
-
-namespace std {
-    size_t hash<WObj>::operator()(const WObj& obj) const {
-        auto doHash = []<typename T>(const T & val) { return std::hash<T>()(val); };
-        auto rotate = [](size_t x, size_t shift) { return (x << shift) | (x >> (sizeof(size_t) - shift)); };
-
-        switch (obj.type) {
-        case WObj::Type::Null:     return doHash(nullptr);
-        case WObj::Type::Bool:     return doHash(obj.b);
-        case WObj::Type::Int:      return doHash(obj.i);
-        case WObj::Type::Float:    return doHash(obj.f);
-        case WObj::Type::String:   return doHash(obj.s);
-        case WObj::Type::Tuple: {
-            size_t h = 0;
-            for (size_t i = 0; i < obj.v.size(); i++)
-                h ^= rotate(doHash(*obj.v[i]), i);
-            return h;
-        }
-        default: WUNREACHABLE();
-        }
-    }
-}

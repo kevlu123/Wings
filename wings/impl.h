@@ -3,6 +3,7 @@
 #include "wings.h"
 #include "error.h"
 #include "attributetable.h"
+#include "wdict.h"
 #include <string>
 #include <vector>
 #include <deque>
@@ -51,7 +52,7 @@ struct WObj {
     };
     std::string s;
     std::vector<WObj*> v;
-    std::unordered_map<WObj, WObj*> m;
+    wings::WDict m;
     wings::AttributeTable c;
 
     std::string className;

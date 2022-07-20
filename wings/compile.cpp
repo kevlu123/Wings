@@ -204,6 +204,18 @@ namespace wings {
 			case Operation::IfElse:
 				CompileInlineIfElse(expression, instructions);
 				return;
+			case Operation::Unpack:
+				compileChildExpressions();
+				instr.type = Instruction::Type::Unpack;
+				break;
+			case Operation::UnpackMapForMapCreation:
+				compileChildExpressions();
+				instr.type = Instruction::Type::UnpackMapForMapCreation;
+				break;
+			case Operation::UnpackMapForCall:
+				compileChildExpressions();
+				instr.type = Instruction::Type::UnpackMapForCall;
+				break;
 			case Operation::Slice: {
 				// var.__getitem__(slice(...))
 				Instruction argFrame{};
@@ -442,6 +454,11 @@ namespace wings {
 			instructions.back().def->isMethod = true;
 		}
 
+		Instruction argFrame{};
+		argFrame.srcPos = node.srcPos;
+		argFrame.type = Instruction::Type::PushArgFrame;
+		instructions.push_back(std::move(argFrame));
+
 		for (const auto& base : node._class.bases) {
 			CompileExpression(base, instructions);
 		}
@@ -451,7 +468,6 @@ namespace wings {
 		_class.type = Instruction::Type::Class;
 		_class._class = std::make_unique<ClassInstruction>();
 		_class._class->methodNames = node._class.methodNames;
-		_class._class->baseClassCount = node._class.bases.size();
 		instructions.push_back(std::move(_class));
 
 		Instruction assign{};

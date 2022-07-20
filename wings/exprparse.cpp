@@ -232,7 +232,7 @@ namespace wings {
 		}
 	}
 
-	CodeError ParseExpressionList(TokenIter& p, const std::string& terminate, std::vector<Expression>& out, bool* seenComma) {
+	CodeError ParseExpressionList(TokenIter& p, const std::string& terminate, std::vector<Expression>& out, bool allowMapUnpack, bool* seenComma) {
 		bool mustTerminate = false;
 		if (seenComma) *seenComma = false;
 		while (true) {
@@ -245,10 +245,26 @@ namespace wings {
 				return CodeError::Bad("Expected a closing bracket", p->srcPos);
 			}
 
+			// Check unpack operators
+			Operation unpackType{};
+			if (p->text == "*") {
+				unpackType = Operation::Unpack;
+				++p;
+			} else if (allowMapUnpack && p->text == "**") {
+				unpackType = Operation::UnpackMapForCall;
+				++p;
+			}
+			
 			// Get expression
 			Expression expr{};
 			if (auto error = ParseExpression(p, expr)) {
 				return error;
+			} else if (unpackType != Operation{}) {
+				Expression tmp = std::move(expr);
+				expr = {};
+				expr.srcPos = tmp.srcPos;
+				expr.operation = unpackType;
+				expr.children.push_back(std::move(tmp));
 			}
 			out.push_back(std::move(expr));
 
@@ -286,7 +302,7 @@ namespace wings {
 			out.children.push_back(std::move(arg));
 			if (p.EndReached()) {
 				return CodeError::Bad("Expected an expression", (--p)->srcPos);
-			} else if (auto error = ParseExpressionList(p, ")", out.children)) {
+			} else if (auto error = ParseExpressionList(p, ")", out.children, true)) {
 				return error;
 			}
 
@@ -397,7 +413,7 @@ namespace wings {
 		bool seenComma = false;
 		if (p.EndReached()) {
 			return CodeError::Bad("Expected an expression", (--p)->srcPos);
-		} else if (auto error = ParseExpressionList(p, ")", out.children, &seenComma)) {
+		} else if (auto error = ParseExpressionList(p, ")", out.children, false, &seenComma)) {
 			return error;
 		}
 		++p;
@@ -443,27 +459,45 @@ namespace wings {
 				return CodeError::Bad("Expected a closing bracket", p->srcPos);
 			}
 
-			// Get key
-			Expression key{};
-			if (auto error = ParseExpression(p, key)) {
-				return error;
-			}
-			out.children.push_back(std::move(key));
+			if (p->text == "**") {
+				// Unpack map
+				Expression unpack{};
+				unpack.srcPos = p->srcPos;
+				unpack.operation = Operation::UnpackMapForMapCreation;
+				++p;
 
-			// Check for colon
-			if (p.EndReached()) {
-				return CodeError::Bad("Expected a ':'", (--p)->srcPos);
-			} else if (p->text != ":") {
-				return CodeError::Bad("Expected a ':'", p->srcPos);
-			}
-			++p;
+				Expression map{};
+				if (p.EndReached()) {
+					return CodeError::Bad("Expected a closing bracket", (--p)->srcPos);
+				} else if (auto error = ParseExpression(p, map)) {
+					return error;
+				}
+				
+				unpack.children.push_back(std::move(map));
+				out.children.push_back(std::move(unpack));
+			} else {
+				// Get key
+				Expression key{};
+				if (auto error = ParseExpression(p, key)) {
+					return error;
+				}
+				out.children.push_back(std::move(key));
 
-			// Get value
-			Expression value{};
-			if (auto error = ParseExpression(p, value)) {
-				return error;
+				// Check for colon
+				if (p.EndReached()) {
+					return CodeError::Bad("Expected a ':'", (--p)->srcPos);
+				} else if (p->text != ":") {
+					return CodeError::Bad("Expected a ':'", p->srcPos);
+				}
+				++p;
+
+				// Get value
+				Expression value{};
+				if (auto error = ParseExpression(p, value)) {
+					return error;
+				}
+				out.children.push_back(std::move(value));
 			}
-			out.children.push_back(std::move(value));
 
 			// Check for comma
 			if (!p.EndReached() && p->text == ",") {

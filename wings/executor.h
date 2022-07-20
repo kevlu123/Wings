@@ -11,7 +11,7 @@ namespace wings {
 
 	struct DefObject {
 		~DefObject();
-		static WObj* Run(WObj** args, int argc, void* userdata);
+		static WObj* Run(WObj** args, int argc, WObj* kwargs, void* userdata);
 		WContext* context{};
 		RcPtr<std::vector<Instruction>> instructions;
 		std::string module;
@@ -30,7 +30,7 @@ namespace wings {
 	};
 
 	struct Executor {
-		WObj* Run(WObj** args, int argc);
+		WObj* Run(WObj** args, int argc, WObj* kwargs);
 
 		void PushStack(WObj* obj);
 		WObj* PopStack();
@@ -50,6 +50,7 @@ namespace wings {
 		size_t pc{};
 		std::vector<WObj*> stack;
 		std::stack<size_t> argFrames;
+		std::stack<std::vector<WObj*>> kwargsStack;
 		std::unordered_map<std::string, RcPtr<WObj*>> variables;
 		std::optional<WObj*> exitValue;
 
