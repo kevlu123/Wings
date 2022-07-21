@@ -183,24 +183,59 @@ namespace wings {
 		return out;
 	}
 
+	static CodeError ParseForLoopVariableList(TokenIter& p, std::vector<std::string>& vars, bool& isTuple) {
+		bool mustTerminate = false;
+		isTuple = false;
+		while (true) {
+			if (p.EndReached()) {
+				return CodeError::Bad("Expected 'in'", (--p)->srcPos);
+			} else if (p->text == "in") {
+				if (vars.empty()) {
+					return CodeError::Bad("Expected a variable name", p->srcPos);
+				} else {
+					return CodeError::Good();
+				}
+			} else if (mustTerminate) {
+				return CodeError::Bad("Expected 'in'", p->srcPos);
+			} else if (p->type != Token::Type::Word) {
+				return CodeError::Bad("Expected a variable name", p->srcPos);
+			}
+			vars.push_back(p->text);
+			++p;
+
+			if (!p.EndReached() && p->text == ",") {
+				isTuple = true;
+				++p;
+			} else {
+				mustTerminate = true;
+			}
+		}
+	}
+
 	static CodeError ParseFor(const LexTree& node, Statement& out) {
 		TokenIter p(node.tokens);
 		++p;
 		out.type = Statement::Type::For;
 
-		Expression variable{};
-		if (auto error = ParseExpression(p, variable, true)) {
+		std::vector<std::string> vars;
+		bool isTuple{};
+		if (auto error = ParseForLoopVariableList(p, vars, isTuple)) {
 			return error;
-		} else if (!IsAssignableExpression(variable, out.forLoop.assignTarget)) {
-			return CodeError::Bad("Expression is not assignable", (--p)->srcPos);
-		}
-
-		if (p.EndReached()) {
-			return CodeError::Bad("Expected a 'in'", (--p)->srcPos);
-		} else if (p->text != "in") {
-			return CodeError::Bad("Expected a 'in'", p->srcPos);
 		}
 		++p;
+
+		if (!isTuple) {
+			out.forLoop.assignTarget.type = AssignType::Direct;
+			out.forLoop.assignTarget.direct = vars[0];
+		} else {
+			out.forLoop.assignTarget.type = AssignType::Pack;
+			for (auto& var : vars) {
+				AssignTarget elem{};
+				elem.type = AssignType::Direct;
+				elem.direct = std::move(var);
+				out.forLoop.assignTarget.pack.push_back(std::move(elem));
+			}
+		}
 
 		if (auto error = ParseExpression(p, out.expr)) {
 			return error;

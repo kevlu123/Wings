@@ -79,6 +79,7 @@ extern "C" {
 
                 switch (obj->type) {
                 case WObj::Type::List:
+                case WObj::Type::Tuple:
                     inUse.insert(
                         inUse.end(),
                         obj->v.begin(),
