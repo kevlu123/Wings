@@ -17,6 +17,8 @@ namespace wings {
 		std::vector<std::string> localCaptures;
 		std::vector<std::string> variables;
 		RcPtr<std::vector<Instruction>> instructions;
+		std::optional<std::string> listArgs;
+		std::optional<std::string> kwArgs;
 	};
 
 	struct ClassInstruction {
@@ -31,6 +33,10 @@ namespace wings {
 
 	struct MemberAccessInstruction {
 		std::string memberName;
+	};
+
+	struct KwargInstruction {
+		std::string kwarg;
 	};
 
 	struct JumpInstruction {
@@ -77,6 +83,7 @@ namespace wings {
 			Unpack,
 			UnpackMapForMapCreation,
 			UnpackMapForCall,
+			PushKwarg,
 
 			Operation,
 			Pop,
@@ -90,6 +97,7 @@ namespace wings {
 
 		std::unique_ptr<DirectAssignInstruction> directAssign;
 		std::unique_ptr<MemberAccessInstruction> memberAccess;
+		std::unique_ptr<KwargInstruction> kwarg;
 		std::unique_ptr<LiteralInstruction> literal;
 		std::unique_ptr<VariableLoadInstruction> variable;
 		std::unique_ptr<DefInstruction> def;

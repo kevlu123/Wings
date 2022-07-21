@@ -220,15 +220,39 @@ namespace wings {
 
 	CodeError ParseParameterList(TokenIter& p, std::vector<Parameter>& out) {
 		out.clear();
+		Parameter::Type type = Parameter::Type::Named;
 		while (true) {
 			if (p.EndReached()) {
 				return CodeError::Good();
+			} else if (p->text == "*") {
+				if (type == Parameter::Type::ListArgs) {
+					return CodeError::Bad("Only 1 variadic arguments parameter is allowed", p->srcPos);
+				} else if (type == Parameter::Type::Kwargs) {
+					return CodeError::Bad("Keyword arguments parameter must appear last", p->srcPos);
+				}
+				type = Parameter::Type::ListArgs;
+				++p;
+			} else if (p->text == "**") {
+				if (type == Parameter::Type::Kwargs) {
+					return CodeError::Bad("Only 1 keyword arguments parameter is allowed", p->srcPos);
+				}
+				type = Parameter::Type::Kwargs;
+				++p;
 			} else if (p->type != Token::Type::Word) {
 				return CodeError::Good();
+			} else {
+				if (type != Parameter::Type::Named) {
+					return CodeError::Bad("Regular parameters must appear first", p->srcPos);
+				}
+			}
+
+			if (p.EndReached()) {
+				return CodeError::Bad("Expected a parameter name", (--p)->srcPos);
+			} else if (p->type != Token::Type::Word) {
+				return CodeError::Bad("Expected a parameter name", p->srcPos);
 			}
 
 			std::string parameterName = p->text;
-			std::optional<Expression> defaultValue;
 
 			// Check for duplicate parameters
 			if (std::find_if(out.begin(), out.end(), [&](const Parameter& p) {
@@ -238,11 +262,15 @@ namespace wings {
 			}
 			++p;
 
+			std::optional<Expression> defaultValue;
 			if (p.EndReached()) {
-				out.push_back(Parameter{ parameterName });
+				out.push_back(Parameter{ parameterName, std::nullopt, type });
 				return CodeError::Good();
 			} else if (p->text == "=") {
 				// Default value
+				if (type != Parameter::Type::Named) {
+					return CodeError::Bad("Only regular parameters can have a default argument", p->srcPos);
+				}
 				++p;
 				Expression expr{};
 				if (auto error = ParseExpression(p, expr)) {
@@ -258,7 +286,7 @@ namespace wings {
 				);
 			}
 
-			out.push_back(Parameter{ std::move(parameterName), std::move(defaultValue) });
+			out.push_back(Parameter{ std::move(parameterName), std::move(defaultValue), type });
 
 			if (p.EndReached()) {
 				return CodeError::Good();

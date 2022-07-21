@@ -29,7 +29,7 @@ static std::string WObjToString(const WObj* val, std::unordered_set<const WObj*>
 		return s;
 	}
 	case WObj::Type::String:
-		return val->s;
+		return seen.empty() ? val->s : ("'" + val->s + "'");
 	case WObj::Type::Func:
 		return "<function at " + PtrToString(val) + ">";
 	case WObj::Type::Userdata:

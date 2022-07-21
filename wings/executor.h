@@ -19,6 +19,8 @@ namespace wings {
 		std::vector<std::string> localVariables;
 		std::vector<std::string> parameterNames;
 		std::vector<WObj*> defaultParameterValues;
+		std::optional<std::string> listArgs;
+		std::optional<std::string> kwArgs;
 		std::unordered_map<std::string, RcPtr<WObj*>> captures;
 		RcPtr<std::vector<std::string>> originalSource;
 	};

@@ -232,8 +232,9 @@ namespace wings {
 		}
 	}
 
-	CodeError ParseExpressionList(TokenIter& p, const std::string& terminate, std::vector<Expression>& out, bool allowMapUnpack, bool* seenComma) {
+	CodeError ParseExpressionList(TokenIter& p, const std::string& terminate, std::vector<Expression>& out, bool isFnCall, bool* seenComma) {
 		bool mustTerminate = false;
+		bool seenKwarg = false;
 		if (seenComma) *seenComma = false;
 		while (true) {
 			// Check for terminating token
@@ -250,23 +251,59 @@ namespace wings {
 			if (p->text == "*") {
 				unpackType = Operation::Unpack;
 				++p;
-			} else if (allowMapUnpack && p->text == "**") {
+			} else if (isFnCall && p->text == "**") {
 				unpackType = Operation::UnpackMapForCall;
 				++p;
 			}
+
+			std::optional<std::string> keyword;
+			Expression expr{};
+
+			// Try kwarg
+			TokenIter rewind = p;
+			if (!p.EndReached() && p->type == Token::Type::Word && unpackType == Operation{}) {
+				keyword = p->text;
+				++p;
+				if (p.EndReached() || p->text != "=") {
+					p = rewind;
+					keyword.reset();
+				} else {
+					++p;
+					if (auto error = ParseExpression(p, expr)) {
+						return error;
+					}
+				}
+			}
+
+			if (keyword.has_value() || unpackType == Operation::UnpackMapForCall) {
+				seenKwarg = true;
+			} else if (seenKwarg) {
+				return CodeError::Bad("Keyword arguments must appear last", rewind->srcPos);
+			}
 			
 			// Get expression
-			Expression expr{};
-			if (auto error = ParseExpression(p, expr)) {
-				return error;
-			} else if (unpackType != Operation{}) {
-				Expression tmp = std::move(expr);
-				expr = {};
-				expr.srcPos = tmp.srcPos;
-				expr.operation = unpackType;
-				expr.children.push_back(std::move(tmp));
+			if (!keyword.has_value()) {
+				if (auto error = ParseExpression(p, expr)) {
+					return error;
+				}
 			}
-			out.push_back(std::move(expr));
+
+			if (keyword.has_value()) {
+				Expression kw{};
+				kw.srcPos = expr.srcPos;
+				kw.operation = Operation::Kwarg;
+				kw.variableName = std::move(keyword.value());
+				kw.children.push_back(std::move(expr));
+				out.push_back(std::move(kw));
+			} else if (unpackType != Operation{}) {
+				Expression unpack{};
+				unpack.srcPos = expr.srcPos;
+				unpack.operation = unpackType;
+				unpack.children.push_back(std::move(expr));
+				out.push_back(std::move(unpack));
+			} else {
+				out.push_back(std::move(expr));
+			}
 
 			// Check for comma
 			if (!p.EndReached() && p->text == ",") {

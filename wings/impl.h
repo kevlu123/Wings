@@ -109,6 +109,18 @@ namespace wings {
     size_t Guid();
     bool InitLibrary(WContext* context);
     std::string WObjTypeToString(WObj::Type t);
+
+    struct WObjRef {
+        WObjRef() : obj(nullptr) {}
+        explicit WObjRef(WObj* obj) : obj(obj) { if (obj) WProtectObject(obj); }
+        explicit WObjRef(WObjRef&& other) noexcept : obj(other.obj) { other.obj = nullptr; }
+        WObjRef& operator=(WObjRef&& other) noexcept { obj = other.obj; other.obj = nullptr; return *this; }
+        WObjRef(const WObjRef&) = delete;
+        WObjRef& operator=(const WObjRef&) = delete;
+        ~WObjRef() { if (obj) WUnprotectObject(obj); }
+    private:
+        WObj* obj;
+    };
 }
 
 #define WASSERT(assertion) do { if (!(assertion)) std::abort(); } while (0)

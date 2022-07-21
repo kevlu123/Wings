@@ -259,6 +259,23 @@ namespace wings {
 			case Operation::Function:
 				CompileFunction(expression, instructions);
 				return;
+			case Operation::Kwarg: {
+				Instruction load{};
+				load.srcPos = expression.srcPos;
+				load.type = Instruction::Type::Literal;
+				load.literal = std::make_unique<LiteralInstruction>();
+				*load.literal = expression.variableName;
+				instructions.push_back(std::move(load));
+
+				Instruction push{};
+				push.srcPos = expression.srcPos;
+				push.type = Instruction::Type::PushKwarg;
+				push.kwarg = std::make_unique<KwargInstruction>();
+				instructions.push_back(std::move(push));
+
+				compileChildExpressions();
+				return;
+			}
 			default: {
 				Instruction argFrame{};
 				argFrame.srcPos = expression.srcPos;
@@ -421,10 +438,19 @@ namespace wings {
 			node.def.globalCaptures.begin(),
 			node.def.globalCaptures.end()
 			);
-		def.def->defaultParameterCount = defaultParamCount;
-		def.def->parameters = std::move(node.def.parameters);
 		def.def->instructions = MakeRcPtr<std::vector<Instruction>>();
 		def.def->prettyName = node.def.name;
+		def.def->defaultParameterCount = defaultParamCount;
+		auto& params = def.def->parameters;
+		params = std::move(node.def.parameters);
+		if (!params.empty() && params.back().type == Parameter::Type::Kwargs) {
+			def.def->kwArgs = std::move(params.back().name);
+			params.pop_back();
+		}
+		if (!params.empty() && params.back().type == Parameter::Type::ListArgs) {
+			def.def->listArgs = std::move(params.back().name);
+			params.pop_back();
+		}
 		CompileBody(node.def.body, *def.def->instructions);
 		instructions.push_back(std::move(def));
 	}

@@ -23,19 +23,88 @@ namespace wings {
 		}
 
 		// Initialize parameters
-		if ((size_t)argc > def->parameterNames.size() || (size_t)argc < def->parameterNames.size() - def->defaultParameterValues.size()) {
-			std::string msg = "function takes " +
-				std::to_string(def->parameterNames.size()) +
-				" argument(s) but " +
-				std::to_string(argc) +
-				(argc == 1 ? " was given" : " were given");
+
+		// Set kwargs
+		WObj* newKwargs = nullptr;
+		if (def->kwArgs.has_value()) {
+			newKwargs = WCreateDictionary(context);
+			if (newKwargs == nullptr)
+				return nullptr;
+			executor.variables.insert({ def->kwArgs.value(), MakeRcPtr<WObj*>(newKwargs)});
+		}
+
+		std::vector<bool> assignedParams(def->parameterNames.size());
+		for (const auto& [k, value] : kwargs->m) {
+			const char* key = WGetString(k);
+			bool found = false;
+			for (size_t i = 0; i < def->parameterNames.size(); i++) {
+				if (def->parameterNames[i] == key) {
+					executor.variables.insert({ key, MakeRcPtr<WObj*>(value) });
+					assignedParams[i] = true;
+					found = true;
+					break;
+				}
+			}
+
+			if (!found) {
+				if (newKwargs == nullptr) {
+					//WRaiseError(context, );
+					return nullptr;
+				}
+				newKwargs->m.insert({ k, value });
+			}
+		}
+
+		// Set positional args
+		WObj* listArgs = nullptr;
+		if (def->listArgs.has_value()) {
+			listArgs = WCreateTuple(context, nullptr, 0);
+			if (listArgs == nullptr)
+				return nullptr;
+			executor.variables.insert({ def->listArgs.value(), MakeRcPtr<WObj*>(listArgs) });
+		}
+
+		for (int i = 0; i < argc; i++) {
+			if (i < def->parameterNames.size()) {
+				if (assignedParams[i]) {
+					//WRaiseError(context, );
+					return nullptr;
+				}
+				executor.variables.insert({ def->parameterNames[i], MakeRcPtr<WObj*>(args[i]) });
+				assignedParams[i] = true;
+			} else {
+				if (listArgs == nullptr) {
+					//WRaiseError(context, );
+					return nullptr;
+				}
+				listArgs->v.push_back(args[i]);
+			}
+		}
+		
+		// Set default args
+		size_t defaultableArgsStart = def->parameterNames.size() - def->defaultParameterValues.size();
+		for (size_t i = 0; i < def->defaultParameterValues.size(); i++) {
+			size_t index = defaultableArgsStart + i;
+			if (!assignedParams[index]) {
+				executor.variables.insert({ def->parameterNames[index], MakeRcPtr<WObj*>(def->defaultParameterValues[i]) });
+				assignedParams[index] = true;
+			}
+		}
+
+		// Check for unassigned arguments
+		std::string unassigned;
+		for (size_t i = 0; i < def->parameterNames.size(); i++)
+			if (!assignedParams[i])
+				unassigned += std::to_string(i + 1) + ", ";
+		if (!unassigned.empty()) {
+			unassigned.pop_back();
+			unassigned.pop_back();
+			std::string msg = "Function " +
+				def->prettyName + "()"
+				+ " missing parameter(s) "
+				+ unassigned;
 			WRaiseError(context, msg.c_str());
 			return nullptr;
-		}
-		for (size_t i = 0; i < def->parameterNames.size(); i++) {
-			size_t defaultParameterIndex = i + def->defaultParameterValues.size() - def->parameterNames.size();
-			WObj* value = ((int)i < argc) ? args[i] : def->defaultParameterValues[defaultParameterIndex];
-			executor.variables.insert({ def->parameterNames[i], MakeRcPtr<WObj*>(value) });
 		}
 
 		return executor.Run(args, argc, kwargs);
@@ -237,6 +306,8 @@ namespace wings {
 				WProtectObject(value);
 				def->defaultParameterValues.push_back(value);
 			}
+			def->listArgs = instr.def->listArgs;
+			def->kwArgs = instr.def->kwArgs;
 
 			for (const auto& capture : instr.def->localCaptures) {
 				if (variables.contains(capture)) {
@@ -468,6 +539,9 @@ namespace wings {
 			}
 			break;
 		}
+		case Instruction::Type::PushKwarg:
+			kwargsStack.top().push_back(PopStack());
+			break;
 		case Instruction::Type::And: {
 			WObj* arg1 = WTruthy(PopStack());
 			if (arg1 == nullptr) {

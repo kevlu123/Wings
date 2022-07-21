@@ -86,7 +86,8 @@ extern "C" {
                     );
                     break;
                 case WObj::Type::Map:
-                    for (const auto& [_, value] : obj->m) {
+                    for (const auto& [key, value] : obj->m) {
+                        inUse.push_back(key);
                         inUse.push_back(value);
                     }
                     break;

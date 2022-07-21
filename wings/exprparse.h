@@ -27,6 +27,7 @@ namespace wings {
 		Dot,
 		Function,
 		Unpack, UnpackMapForMapCreation, UnpackMapForCall,
+		Kwarg,
 	};
 
 	enum class AssignType {
@@ -94,6 +95,7 @@ namespace wings {
 	struct Parameter {
 		std::string name;
 		std::optional<Expression> defaultValue;
+		enum class Type { Named, ListArgs, Kwargs } type = Type::Named;
 	};
 
 	struct TokenIter {
@@ -111,7 +113,7 @@ namespace wings {
 	};
 
 	CodeError ParseExpression(TokenIter& p, Expression& out, bool disableInOp = false);
-	CodeError ParseExpressionList(TokenIter& p, const std::string& terminate, std::vector<Expression>& out, bool allowMapUnpack = false, bool* seenComma = nullptr);
+	CodeError ParseExpressionList(TokenIter& p, const std::string& terminate, std::vector<Expression>& out, bool isFnCall = false, bool* seenComma = nullptr);
 	bool IsAssignableExpression(const Expression& expr, AssignTarget& target, bool onlyDirectOrPack = false);
 
 }
