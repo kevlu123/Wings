@@ -18,7 +18,7 @@ namespace wings {
 		{ Operation::Add,	 "__add__"      },
 		{ Operation::Sub,	 "__sub__"      },
 		{ Operation::Mul,	 "__mul__"      },
-		{ Operation::Div,	 "__div__"      },
+		{ Operation::Div,	 "__truediv__"  },
 		{ Operation::IDiv,	 "__floordiv__" },
 		{ Operation::Mod,	 "__mod__"      },
 		{ Operation::Pow,	 "__pow__"      },
@@ -35,6 +35,34 @@ namespace wings {
 		{ Operation::BitXor, "__xor__"      },
 		{ Operation::ShiftL, "__lshift__"   },
 		{ Operation::ShiftR, "__rshift__"   },
+
+		{ Operation::AddAssign, "__iadd__"       },
+		{ Operation::SubAssign, "__isub__"       },
+		{ Operation::MulAssign, "__imul__"       },
+		{ Operation::DivAssign, "__itruediv__"   },
+		{ Operation::IDivAssign, "__ifloordiv__" },
+		{ Operation::ModAssign, "__imod__"       },
+		{ Operation::PowAssign, "__ipow__"       },
+		{ Operation::AndAssign, "__iand__"      },
+		{ Operation::OrAssign, "__ior__"         },
+		{ Operation::XorAssign, "__ixor__"       },
+		{ Operation::ShiftLAssign, "__ilshift__" },
+		{ Operation::ShiftRAssign, "__irshift__" },
+	};
+
+	static const std::unordered_set<Operation> COMPOUND_OPS = {
+		Operation::AddAssign,
+		Operation::SubAssign,
+		Operation::MulAssign,
+		Operation::PowAssign,
+		Operation::DivAssign,
+		Operation::IDivAssign,
+		Operation::ModAssign,
+		Operation::ShiftLAssign,
+		Operation::ShiftRAssign,
+		Operation::OrAssign,
+		Operation::AndAssign,
+		Operation::XorAssign,
 	};
 
 	static void CompileInlineIfElse(const Expression& expression, std::vector<Instruction>& instructions) {
@@ -67,24 +95,25 @@ namespace wings {
 		instructions[trueJumpIndex].jump->location = instructions.size();
 	}
 
-	static void CompileExpression(const Expression& expression, std::vector<Instruction>& instructions) {
-		auto compileChildExpressions = [&] {
-			for (size_t i = 0; i < expression.children.size(); i++)
-				CompileExpression(expression.children[i], instructions);
-		};
+	static void CompileAssignment(
+		const AssignTarget& assignTarget,
+		const Expression& assignee,
+		const Expression& value,
+		const SourcePosition& srcPos,
+		std::vector<Instruction>& instructions) {
 
 		Instruction instr{};
-		instr.srcPos = expression.srcPos;
+		instr.srcPos = srcPos;
 
-		switch (expression.assignTarget.type) {
+		switch (assignTarget.type) {
 		case AssignType::Direct:
 		case AssignType::Pack:
 			// <assign>
 			//		<assignee>
 			//		<expr>
-			CompileExpression(expression.children[1], instructions);
+			CompileExpression(value, instructions);
 			instr.directAssign = std::make_unique<DirectAssignInstruction>();
-			instr.directAssign->assignTarget = expression.assignTarget;
+			instr.directAssign->assignTarget = assignTarget;
 			instr.type = Instruction::Type::DirectAssign;
 			break;
 		case AssignType::Index: {
@@ -94,21 +123,21 @@ namespace wings {
 			//			<index>
 			//		<expr>
 			Instruction argFrame{};
-			argFrame.srcPos = expression.srcPos;
+			argFrame.srcPos = srcPos;
 			argFrame.type = Instruction::Type::PushArgFrame;
 			instructions.push_back(std::move(argFrame));
 
-			CompileExpression(expression.children[0].children[0], instructions);
+			CompileExpression(assignee.children[0], instructions);
 
 			Instruction dot{};
-			dot.srcPos = expression.srcPos;
+			dot.srcPos = srcPos;
 			dot.type = Instruction::Type::Dot;
-			dot.memberAccess = std::make_unique<MemberAccessInstruction>();
-			dot.memberAccess->memberName = "__setitem__";
+			dot.string = std::make_unique<StringArgInstruction>();
+			dot.string->string = "__setitem__";
 			instructions.push_back(std::move(dot));
 
-			CompileExpression(expression.children[0].children[1], instructions);
-			CompileExpression(expression.children[1], instructions);
+			CompileExpression(assignee.children[1], instructions);
+			CompileExpression(value, instructions);
 
 			instr.type = Instruction::Type::Call;
 			break;
@@ -118,188 +147,206 @@ namespace wings {
 			//		<assignee>
 			//			<var>
 			//		<expr>
-			CompileExpression(expression.children[0].children[0], instructions);
-			CompileExpression(expression.children[1], instructions);
-			instr.memberAccess = std::make_unique<MemberAccessInstruction>();
-			instr.memberAccess->memberName = expression.children[0].variableName;
+			CompileExpression(assignee.children[0], instructions);
+			CompileExpression(value, instructions);
+			instr.string = std::make_unique<StringArgInstruction>();
+			instr.string->string = assignee.variableName;
 			instr.type = Instruction::Type::MemberAssign;
-			break;
-		case AssignType::None:
-			switch (expression.operation) {
-			case Operation::Literal:
-				instr.literal = std::make_unique<LiteralInstruction>();
-				switch (expression.literalValue.type) {
-				case LiteralValue::Type::Null: *instr.literal = nullptr; break;
-				case LiteralValue::Type::Bool: *instr.literal = expression.literalValue.b; break;
-				case LiteralValue::Type::Int: *instr.literal = expression.literalValue.i; break;
-				case LiteralValue::Type::Float: *instr.literal = expression.literalValue.f; break;
-				case LiteralValue::Type::String: *instr.literal = expression.literalValue.s; break;
-				default: WUNREACHABLE();
-				}
-				instr.type = Instruction::Type::Literal;
-				break;
-			case Operation::Tuple:
-			case Operation::List:
-			case Operation::Map: {
-				Instruction argFrame{};
-				argFrame.srcPos = expression.srcPos;
-				argFrame.type = Instruction::Type::PushArgFrame;
-				instructions.push_back(std::move(argFrame));
-
-				compileChildExpressions();
-
-				switch (expression.operation) {
-				case Operation::Tuple: instr.type = Instruction::Type::Tuple; break;
-				case Operation::List: instr.type = Instruction::Type::List; break;
-				case Operation::Map: instr.type = Instruction::Type::Map; break;
-				default: WUNREACHABLE();
-				}
-				break;
-			}
-			case Operation::Variable:
-				instr.variable = std::make_unique<VariableLoadInstruction>();
-				instr.variable->variableName = expression.variableName;
-				instr.type = Instruction::Type::Variable;
-				break;
-			case Operation::Dot:
-				compileChildExpressions();
-				instr.memberAccess = std::make_unique<MemberAccessInstruction>();
-				instr.memberAccess->memberName = expression.variableName;
-				instr.type = Instruction::Type::Dot;
-				break;
-			case Operation::Call: {
-				Instruction pushArgFrame{};
-				pushArgFrame.srcPos = expression.srcPos;
-				pushArgFrame.type = Instruction::Type::PushArgFrame;
-				instructions.push_back(std::move(pushArgFrame));
-
-				compileChildExpressions();
-				instr.type = Instruction::Type::Call;
-				break;
-			}
-			case Operation::And:
-				CompileExpression(expression.children[0], instructions);
-				CompileExpression(expression.children[1], instructions);
-				instr.type = Instruction::Type::And;
-				break;
-			case Operation::Or:
-				CompileExpression(expression.children[0], instructions);
-				CompileExpression(expression.children[1], instructions);
-				instr.type = Instruction::Type::Or;
-				break;
-			case Operation::Not:
-				CompileExpression(expression.children[0], instructions);
-				instr.type = Instruction::Type::Not;
-				break;
-			case Operation::In:
-				CompileExpression(expression.children[0], instructions);
-				CompileExpression(expression.children[1], instructions);
-				instr.type = Instruction::Type::NotIn;
-				break;
-			case Operation::NotIn:
-				CompileExpression(expression.children[0], instructions);
-				CompileExpression(expression.children[1], instructions);
-				instr.type = Instruction::Type::NotIn;
-				break;
-			case Operation::IfElse:
-				CompileInlineIfElse(expression, instructions);
-				return;
-			case Operation::Unpack:
-				compileChildExpressions();
-				instr.type = Instruction::Type::Unpack;
-				break;
-			case Operation::UnpackMapForMapCreation:
-				compileChildExpressions();
-				instr.type = Instruction::Type::UnpackMapForMapCreation;
-				break;
-			case Operation::UnpackMapForCall:
-				compileChildExpressions();
-				instr.type = Instruction::Type::UnpackMapForCall;
-				break;
-			case Operation::Slice: {
-				// var.__getitem__(slice(...))
-				Instruction argFrame{};
-				argFrame.srcPos = expression.srcPos;
-				argFrame.type = Instruction::Type::PushArgFrame;
-				instructions.push_back(std::move(argFrame));
-
-				CompileExpression(expression.children[0], instructions);
-
-				Instruction dot{};
-				dot.srcPos = expression.srcPos;
-				dot.type = Instruction::Type::Dot;
-				dot.memberAccess = std::make_unique<MemberAccessInstruction>();
-				dot.memberAccess->memberName = "__getitem__";
-				instructions.push_back(std::move(dot));
-
-				argFrame = {};
-				argFrame.srcPos = expression.srcPos;
-				argFrame.type = Instruction::Type::PushArgFrame;
-				instructions.push_back(std::move(argFrame));
-
-				Instruction sliceClass{};
-				sliceClass.srcPos = expression.srcPos;
-				sliceClass.type = Instruction::Type::SliceClass;
-				instructions.push_back(std::move(sliceClass));
-
-				for (size_t i = 1; i < expression.children.size(); i++)
-					CompileExpression(expression.children[i], instructions);
-
-				Instruction instantiateSlice{};
-				instantiateSlice.type = Instruction::Type::Call;
-				instructions.push_back(std::move(instantiateSlice));
-
-				instr.type = Instruction::Type::Call;
-				break;
-			}
-			case Operation::ListComprehension:
-				compileChildExpressions();
-				instr.type = Instruction::Type::ListComprehension;
-				break;
-			case Operation::Function:
-				CompileFunction(expression, instructions);
-				return;
-			case Operation::Kwarg: {
-				Instruction load{};
-				load.srcPos = expression.srcPos;
-				load.type = Instruction::Type::Literal;
-				load.literal = std::make_unique<LiteralInstruction>();
-				*load.literal = expression.variableName;
-				instructions.push_back(std::move(load));
-
-				Instruction push{};
-				push.srcPos = expression.srcPos;
-				push.type = Instruction::Type::PushKwarg;
-				push.kwarg = std::make_unique<KwargInstruction>();
-				instructions.push_back(std::move(push));
-
-				compileChildExpressions();
-				return;
-			}
-			default: {
-				Instruction argFrame{};
-				argFrame.srcPos = expression.srcPos;
-				argFrame.type = Instruction::Type::PushArgFrame;
-				instructions.push_back(std::move(argFrame));
-
-				CompileExpression(expression.children[0], instructions);
-
-				Instruction dot{};
-				dot.srcPos = expression.srcPos;
-				dot.type = Instruction::Type::Dot;
-				dot.memberAccess = std::make_unique<MemberAccessInstruction>();
-				dot.memberAccess->memberName = OP_METHODS.at(expression.operation);
-				instructions.push_back(std::move(dot));
-
-				for (size_t i = 1; i < expression.children.size(); i++)
-					CompileExpression(expression.children[i], instructions);
-
-				instr.type = Instruction::Type::Call;
-			}
-			} // End of inner switch
 			break;
 		default:
 			WUNREACHABLE();
+		}
+
+		instructions.push_back(std::move(instr));
+	}
+
+	static void CompileExpression(const Expression& expression, std::vector<Instruction>& instructions) {
+		if (expression.operation == Operation::Assign) {
+			CompileAssignment(expression.assignTarget, expression.children[0], expression.children[1], expression.srcPos, instructions);
+			return;
+		}
+
+		auto compileChildExpressions = [&] {
+			for (size_t i = 0; i < expression.children.size(); i++)
+				CompileExpression(expression.children[i], instructions);
+		};
+
+		Instruction instr{};
+		instr.srcPos = expression.srcPos;
+
+		switch (expression.operation) {
+		case Operation::Literal:
+			instr.literal = std::make_unique<LiteralInstruction>();
+			switch (expression.literalValue.type) {
+			case LiteralValue::Type::Null: *instr.literal = nullptr; break;
+			case LiteralValue::Type::Bool: *instr.literal = expression.literalValue.b; break;
+			case LiteralValue::Type::Int: *instr.literal = expression.literalValue.i; break;
+			case LiteralValue::Type::Float: *instr.literal = expression.literalValue.f; break;
+			case LiteralValue::Type::String: *instr.literal = expression.literalValue.s; break;
+			default: WUNREACHABLE();
+			}
+			instr.type = Instruction::Type::Literal;
+			break;
+		case Operation::Tuple:
+		case Operation::List:
+		case Operation::Map: {
+			Instruction argFrame{};
+			argFrame.srcPos = expression.srcPos;
+			argFrame.type = Instruction::Type::PushArgFrame;
+			instructions.push_back(std::move(argFrame));
+
+			compileChildExpressions();
+
+			switch (expression.operation) {
+			case Operation::Tuple: instr.type = Instruction::Type::Tuple; break;
+			case Operation::List: instr.type = Instruction::Type::List; break;
+			case Operation::Map: instr.type = Instruction::Type::Map; break;
+			default: WUNREACHABLE();
+			}
+			break;
+		}
+		case Operation::Variable:
+			instr.string = std::make_unique<StringArgInstruction>();
+			instr.string->string = expression.variableName;
+			instr.type = Instruction::Type::Variable;
+			break;
+		case Operation::Dot:
+			compileChildExpressions();
+			instr.string = std::make_unique<StringArgInstruction>();
+			instr.string->string = expression.variableName;
+			instr.type = Instruction::Type::Dot;
+			break;
+		case Operation::Call: {
+			Instruction pushArgFrame{};
+			pushArgFrame.srcPos = expression.srcPos;
+			pushArgFrame.type = Instruction::Type::PushArgFrame;
+			instructions.push_back(std::move(pushArgFrame));
+
+			compileChildExpressions();
+			instr.type = Instruction::Type::Call;
+			break;
+		}
+		case Operation::And:
+			CompileExpression(expression.children[0], instructions);
+			CompileExpression(expression.children[1], instructions);
+			instr.type = Instruction::Type::And;
+			break;
+		case Operation::Or:
+			CompileExpression(expression.children[0], instructions);
+			CompileExpression(expression.children[1], instructions);
+			instr.type = Instruction::Type::Or;
+			break;
+		case Operation::Not:
+			CompileExpression(expression.children[0], instructions);
+			instr.type = Instruction::Type::Not;
+			break;
+		case Operation::In:
+			CompileExpression(expression.children[0], instructions);
+			CompileExpression(expression.children[1], instructions);
+			instr.type = Instruction::Type::NotIn;
+			break;
+		case Operation::NotIn:
+			CompileExpression(expression.children[0], instructions);
+			CompileExpression(expression.children[1], instructions);
+			instr.type = Instruction::Type::NotIn;
+			break;
+		case Operation::IfElse:
+			CompileInlineIfElse(expression, instructions);
+			return;
+		case Operation::Unpack:
+			compileChildExpressions();
+			instr.type = Instruction::Type::Unpack;
+			break;
+		case Operation::UnpackMapForMapCreation:
+			compileChildExpressions();
+			instr.type = Instruction::Type::UnpackMapForMapCreation;
+			break;
+		case Operation::UnpackMapForCall:
+			compileChildExpressions();
+			instr.type = Instruction::Type::UnpackMapForCall;
+			break;
+		case Operation::Slice: {
+			// var.__getitem__(slice(...))
+			Instruction argFrame{};
+			argFrame.srcPos = expression.srcPos;
+			argFrame.type = Instruction::Type::PushArgFrame;
+			instructions.push_back(std::move(argFrame));
+
+			CompileExpression(expression.children[0], instructions);
+
+			Instruction dot{};
+			dot.srcPos = expression.srcPos;
+			dot.type = Instruction::Type::Dot;
+			dot.string = std::make_unique<StringArgInstruction>();
+			dot.string->string = "__getitem__";
+			instructions.push_back(std::move(dot));
+
+			argFrame = {};
+			argFrame.srcPos = expression.srcPos;
+			argFrame.type = Instruction::Type::PushArgFrame;
+			instructions.push_back(std::move(argFrame));
+
+			Instruction sliceClass{};
+			sliceClass.srcPos = expression.srcPos;
+			sliceClass.type = Instruction::Type::SliceClass;
+			instructions.push_back(std::move(sliceClass));
+
+			for (size_t i = 1; i < expression.children.size(); i++)
+				CompileExpression(expression.children[i], instructions);
+
+			Instruction instantiateSlice{};
+			instantiateSlice.type = Instruction::Type::Call;
+			instructions.push_back(std::move(instantiateSlice));
+
+			instr.type = Instruction::Type::Call;
+			break;
+		}
+		case Operation::ListComprehension:
+			compileChildExpressions();
+			instr.type = Instruction::Type::ListComprehension;
+			break;
+		case Operation::Function:
+			CompileFunction(expression, instructions);
+			return;
+		case Operation::Kwarg: {
+			Instruction load{};
+			load.srcPos = expression.srcPos;
+			load.type = Instruction::Type::Literal;
+			load.literal = std::make_unique<LiteralInstruction>();
+			*load.literal = expression.variableName;
+			instructions.push_back(std::move(load));
+
+			Instruction push{};
+			push.srcPos = expression.srcPos;
+			push.type = Instruction::Type::PushKwarg;
+			instructions.push_back(std::move(push));
+
+			compileChildExpressions();
+			return;
+		}
+		case Operation::CompoundAssignment:
+			CompileAssignment(expression.assignTarget, expression.children[0].children[0], expression.children[0], expression.srcPos, instructions);
+			return;
+		default: {
+			Instruction argFrame{};
+			argFrame.srcPos = expression.srcPos;
+			argFrame.type = Instruction::Type::PushArgFrame;
+			instructions.push_back(std::move(argFrame));
+
+			CompileExpression(expression.children[0], instructions);
+
+			Instruction dot{};
+			dot.srcPos = expression.srcPos;
+			dot.type = Instruction::Type::Dot;
+			dot.string = std::make_unique<StringArgInstruction>();
+			dot.string->string = OP_METHODS.at(expression.operation);
+			instructions.push_back(std::move(dot));
+
+			for (size_t i = 1; i < expression.children.size(); i++)
+				CompileExpression(expression.children[i], instructions);
+
+			instr.type = Instruction::Type::Call;
+		}
 		}
 
 		instructions.push_back(std::move(instr));

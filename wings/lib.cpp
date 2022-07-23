@@ -441,6 +441,11 @@ namespace wings {
 			}
 		}
 
+		static WObj* Object_AddAssign(WObj** argv, int argc, WObj* kwargs, WContext* context) {
+			EXPECT_ARG_COUNT(2);
+			return WCallMethod(argv[0], "__add__", &argv[1], 1);
+		}
+
 		static WObj* Null_Bool(WObj** argv, int argc, WObj* kwargs, WContext* context) {
 			EXPECT_ARG_COUNT(1);
 			EXPECT_ARG_TYPE_NULL(0);
@@ -1226,6 +1231,7 @@ namespace wings {
 		CheckOperation(RegisterStatelessMethod<attrlib::Object_Str>(context, context->builtinClasses.object->c, "__str__", "object.__str__"));
 		CheckOperation(RegisterStatelessMethod<attrlib::Object_Eq>(context, context->builtinClasses.object->c, "__eq__", "object.__eq__"));
 		CheckOperation(RegisterStatelessMethod<attrlib::Object_Ne>(context, context->builtinClasses.object->c, "__ne__", "object.__ne__"));
+		CheckOperation(RegisterStatelessMethod<attrlib::Object_AddAssign>(context, context->builtinClasses.object->c, "__iadd__", "object.__iadd__"));
 
 		CheckOperation(RegisterStatelessMethod<attrlib::Null_Bool>(context, context->builtinClasses.null->c, "__nonzero__", "NoneType.__nonzero__"));
 		CheckOperation(RegisterStatelessMethod<attrlib::Null_Eq>(context, context->builtinClasses.null->c, "__eq__", "NoneType.__eq__"));
@@ -1247,7 +1253,7 @@ namespace wings {
 		CheckOperation(RegisterStatelessMethod<attrlib::Int_Add>(context, context->builtinClasses._int->c, "__add__", "int.__add__"));
 		CheckOperation(RegisterStatelessMethod<attrlib::Int_Sub>(context, context->builtinClasses._int->c, "__sub__", "int.__sub__"));
 		CheckOperation(RegisterStatelessMethod<attrlib::Int_Mul>(context, context->builtinClasses._int->c, "__mul__", "int.__mul__"));
-		CheckOperation(RegisterStatelessMethod<attrlib::Int_Div>(context, context->builtinClasses._int->c, "__div__", "int.__div__"));
+		CheckOperation(RegisterStatelessMethod<attrlib::Int_Div>(context, context->builtinClasses._int->c, "__truediv__", "int.__truediv__"));
 		CheckOperation(RegisterStatelessMethod<attrlib::Int_FloorDiv>(context, context->builtinClasses._int->c, "__floordiv__", "int.__floordiv__"));
 		CheckOperation(RegisterStatelessMethod<attrlib::Int_Mod>(context, context->builtinClasses._int->c, "__mod__", "int.__mod__"));
 		CheckOperation(RegisterStatelessMethod<attrlib::Int_Pow>(context, context->builtinClasses._int->c, "__pow__", "int.__pow__"));
@@ -1266,7 +1272,7 @@ namespace wings {
 		CheckOperation(RegisterStatelessMethod<attrlib::Float_Add>(context, context->builtinClasses._float->c, "__add__", "float.__add__"));
 		CheckOperation(RegisterStatelessMethod<attrlib::Float_Sub>(context, context->builtinClasses._float->c, "__sub__", "float.__sub__"));
 		CheckOperation(RegisterStatelessMethod<attrlib::Float_Mul>(context, context->builtinClasses._float->c, "__mul__", "float.__mul__"));
-		CheckOperation(RegisterStatelessMethod<attrlib::Float_Div>(context, context->builtinClasses._float->c, "__div__", "float.__div__"));
+		CheckOperation(RegisterStatelessMethod<attrlib::Float_Div>(context, context->builtinClasses._float->c, "__truediv__", "float.__truediv__"));
 		CheckOperation(RegisterStatelessMethod<attrlib::Float_FloorDiv>(context, context->builtinClasses._float->c, "__floordiv__", "float.__floordiv__"));
 		CheckOperation(RegisterStatelessMethod<attrlib::Float_Mod>(context, context->builtinClasses._float->c, "__mod__", "float.__mod__"));
 		CheckOperation(RegisterStatelessMethod<attrlib::Float_Pow>(context, context->builtinClasses._float->c, "__pow__", "float.__pow__"));

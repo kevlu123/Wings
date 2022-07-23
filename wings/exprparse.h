@@ -23,11 +23,12 @@ namespace wings {
 		DivAssign, IDivAssign, ModAssign, PowAssign,
 		AndAssign, OrAssign, XorAssign,
 		ShiftLAssign, ShiftRAssign,
-		Incr, Decr,
 		Dot,
 		Function,
 		Unpack, UnpackMapForMapCreation, UnpackMapForCall,
 		Kwarg,
+
+		CompoundAssignment,
 	};
 
 	enum class AssignType {

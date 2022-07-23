@@ -72,7 +72,6 @@ struct TraceFrame {
 struct WContext {
     WConfig config{};
 
-    bool lockGc = false;
     size_t lastObjectCountAfterGC = 0;
     std::deque<std::unique_ptr<WObj>> mem;
     std::unordered_multiset<const WObj*> protectedObjects;

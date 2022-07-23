@@ -38,10 +38,6 @@ extern "C" {
     void WCollectGarbage(WContext* context) {
         WASSERT(context);
 
-        if (context->lockGc) {
-            return;
-        }
-
         std::deque<const WObj*> inUse(context->protectedObjects.begin(), context->protectedObjects.end());
         for (auto& var : context->globals) {
             inUse.push_back(*var.second);

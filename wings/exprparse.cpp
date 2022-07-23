@@ -47,14 +47,14 @@ namespace wings {
 		return index >= tokens->size();
 	}
 
-	const std::vector<std::string> RESERVED = {
+	static const std::vector<std::string> RESERVED = {
 		"def", "if", "while", "for", "in", "return",
 		"True", "False", "None",
 		"break", "continue", "pass", "else", "elif",
 		"or", "and", "not", "global", "nonlocal",
 	};
 
-	const std::unordered_map<std::string, Operation> BINARY_OP_STRINGS = {
+	static const std::unordered_map<std::string, Operation> BINARY_OP_STRINGS = {
 		{ "+",  Operation::Add },
 		{ "-",  Operation::Sub },
 		{ "*",  Operation::Mul },
@@ -95,14 +95,14 @@ namespace wings {
 		{ ".", Operation::Dot },
 	};
 
-	const std::unordered_map<std::string, Operation> PREFIX_UNARY_OP_STRINGS = {
+	static const std::unordered_map<std::string, Operation> PREFIX_UNARY_OP_STRINGS = {
 		{ "+", Operation::Pos },
 		{ "-", Operation::Neg },
 		{ "~", Operation::BitNot },
 		{ "not", Operation::Not },
 	};
 
-	const std::unordered_set<Operation> BINARY_OPS = {
+	static const std::unordered_set<Operation> BINARY_OPS = {
 		Operation::Add,
 		Operation::Sub,
 		Operation::Mul,
@@ -142,7 +142,7 @@ namespace wings {
 		Operation::XorAssign,
 	};
 
-	const std::unordered_set<Operation> BINARY_RIGHT_ASSOCIATIVE_OPS = {
+	static const std::unordered_set<Operation> BINARY_RIGHT_ASSOCIATIVE_OPS = {
 		Operation::Assign,
 		Operation::AddAssign,
 		Operation::SubAssign,
@@ -158,17 +158,15 @@ namespace wings {
 		Operation::XorAssign,
 	};
 
-	const std::unordered_set<Operation> PREFIX_UNARY_OPS = {
+	static const std::unordered_set<Operation> PREFIX_UNARY_OPS = {
 		Operation::Pos,
 		Operation::Neg,
 		Operation::Not,
 		Operation::BitNot,
-		Operation::Incr,
-		Operation::Decr,
 	};
 
-	const std::vector<std::vector<Operation>> PRECEDENCE = {
-		{ Operation::Call, Operation::Index, Operation::Slice, Operation::Incr, Operation::Decr, Operation::Dot },
+	static const std::vector<std::vector<Operation>> PRECEDENCE = {
+		{ Operation::Call, Operation::Index, Operation::Slice, Operation::Dot },
 		{ Operation::Pow },
 		{ Operation::Pos, Operation::Neg, Operation::BitNot },
 		{ Operation::Mul, Operation::Div, Operation::IDiv, Operation::Mod },
@@ -326,9 +324,20 @@ namespace wings {
 			if (!IsAssignableExpression(arg, out.assignTarget)) {
 				return CodeError::Bad("Expression is not assignable", (--p)->srcPos);
 			}
+			Expression one{};
+			one.srcPos = out.srcPos;
+			one.operation = Operation::Literal;
+			one.literalValue.type = LiteralValue::Type::Int;
+			one.literalValue.i = 1;
 
-			out.operation = p->text == "++" ? Operation::Incr : Operation::Decr;
-			out.children.push_back(std::move(arg));
+			Expression calc{};
+			calc.srcPos = out.srcPos;
+			calc.operation = p->text == "++" ? Operation::AddAssign : Operation::SubAssign;
+			calc.children.push_back(std::move(arg));
+			calc.children.push_back(std::move(one));
+
+			out.operation = Operation::CompoundAssignment;
+			out.children.push_back(std::move(calc));
 			++p;
 		} else if (p->text == "(") {
 			// Consume opening bracket
@@ -813,9 +822,22 @@ namespace wings {
 			if (auto error = ParseExpression(p, rhs)) {
 				return error;
 			}
-			out.operation = op;
-			out.children.push_back(std::move(lhs));
-			out.children.push_back(std::move(rhs));
+
+			if (op != Operation::Assign) {
+				// Compound assignment
+				Expression calc{};
+				calc.srcPos = out.srcPos;
+				calc.operation = op;
+				calc.children.push_back(std::move(lhs));
+				calc.children.push_back(std::move(rhs));
+
+				out.operation = Operation::CompoundAssignment;
+				out.children.push_back(std::move(calc));
+			} else {
+				out.operation = op;
+				out.children.push_back(std::move(lhs));
+				out.children.push_back(std::move(rhs));
+			}
 			return CodeError::Good();
 		} else {
 			Expression rhs{};

@@ -429,10 +429,10 @@ namespace wings {
 			}
 			break;
 		case Instruction::Type::Variable:
-			if (WObj* value = GetVariable(instr.variable->variableName)) {
+			if (WObj* value = GetVariable(instr.string->string)) {
 				PushStack(value);
 			} else {
-				std::string msg = "The name '" + instr.variable->variableName + "' is not defined";
+				std::string msg = "The name '" + instr.string->string + "' is not defined";
 				WRaiseError(context, msg.c_str());
 				exitValue = nullptr;
 			}
@@ -448,7 +448,7 @@ namespace wings {
 		case Instruction::Type::MemberAssign: {
 			WObj* value = PopStack();
 			WObj* obj = PopStack();
-			WSetAttribute(obj, instr.memberAccess->memberName.c_str(), value);
+			WSetAttribute(obj, instr.string->string.c_str(), value);
 			PushStack(value);
 			break;
 		}
@@ -482,11 +482,11 @@ namespace wings {
 		}
 		case Instruction::Type::Dot: {
 			WObj* obj = PopStack();
-			if (WObj* attr = WGetAttribute(obj, instr.memberAccess->memberName.c_str())) {
+			if (WObj* attr = WGetAttribute(obj, instr.string->string.c_str())) {
 				PushStack(attr);
 			} else {
 				std::string msg = "Object of type " + WObjTypeToString(obj->type) +
-					" has no attribute " + instr.memberAccess->memberName;
+					" has no attribute " + instr.string->string;
 				WRaiseError(context, msg.c_str());
 				exitValue = nullptr;
 			}

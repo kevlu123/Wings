@@ -27,16 +27,8 @@ namespace wings {
 
 	using LiteralInstruction = std::variant<std::nullptr_t, bool, wint, wfloat, std::string>;
 
-	struct VariableLoadInstruction {
-		std::string variableName;
-	};
-
-	struct MemberAccessInstruction {
-		std::string memberName;
-	};
-
-	struct KwargInstruction {
-		std::string kwarg;
+	struct StringArgInstruction {
+		std::string string;
 	};
 
 	struct JumpInstruction {
@@ -96,10 +88,8 @@ namespace wings {
 		} type{};
 
 		std::unique_ptr<DirectAssignInstruction> directAssign;
-		std::unique_ptr<MemberAccessInstruction> memberAccess;
-		std::unique_ptr<KwargInstruction> kwarg;
 		std::unique_ptr<LiteralInstruction> literal;
-		std::unique_ptr<VariableLoadInstruction> variable;
+		std::unique_ptr<StringArgInstruction> string;
 		std::unique_ptr<DefInstruction> def;
 		std::unique_ptr<ClassInstruction> _class;
 		std::unique_ptr<JumpInstruction> jump;
