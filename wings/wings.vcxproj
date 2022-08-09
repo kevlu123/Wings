@@ -145,7 +145,6 @@
   <ItemGroup>
     <ClCompile Include="attributetable.cpp" />
     <ClCompile Include="compile.cpp" />
-    <ClCompile Include="error.cpp" />
     <ClCompile Include="executor.cpp" />
     <ClCompile Include="exprparse.cpp" />
     <ClCompile Include="gc.cpp" />
@@ -153,7 +152,7 @@
     <ClCompile Include="lib.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="parse.cpp" />
-    <ClCompile Include="testing.cpp" />
+    <ClCompile Include="tests.cpp" />
     <ClCompile Include="wdict.cpp" />
     <ClCompile Include="wings.cpp" />
     <ClCompile Include="wobj.cpp" />
@@ -161,7 +160,6 @@
   <ItemGroup>
     <ClInclude Include="attributetable.h" />
     <ClInclude Include="compile.h" />
-    <ClInclude Include="error.h" />
     <ClInclude Include="executor.h" />
     <ClInclude Include="exprparse.h" />
     <ClInclude Include="gc.h" />

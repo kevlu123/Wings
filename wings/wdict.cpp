@@ -6,19 +6,23 @@ namespace wings {
         auto doHash = []<typename T>(const T & val) { return std::hash<T>()(val); };
         auto rotate = [](size_t x, size_t shift) { return (x << shift) | (x >> (sizeof(size_t) - shift)); };
 
-        switch (obj->type) {
-        case WObj::Type::Null:     return doHash(nullptr);
-        case WObj::Type::Bool:     return doHash(obj->b);
-        case WObj::Type::Int:      return doHash(obj->i);
-        case WObj::Type::Float:    return doHash(obj->f);
-        case WObj::Type::String:   return doHash(obj->s);
-        case WObj::Type::Tuple: {
+        if (WIsNoneType(obj)) {
+            return doHash(nullptr);
+        } else if (WIsBool(obj)) {
+            return doHash(WGetBool(obj));
+        } else if (WIsInt(obj)) {
+            return doHash(WGetInt(obj));
+        } else if (WIsIntOrFloat(obj)) {
+            return doHash(WGetFloat(obj));
+        } else if (WIsString(obj)) {
+            return doHash(obj->Get<std::string>());
+        } else if (WIsTuple(obj)) {
             size_t h = 0;
-            for (size_t i = 0; i < obj->v.size(); i++)
-                h ^= rotate(doHash(obj->v[i]), i);
+            for (size_t i = 0; i < obj->Get<std::vector<WObj*>>().size(); i++)
+                h ^= rotate(doHash(obj->Get<std::vector<WObj*>>()[i]), i);
             return h;
-        }
-        default: WUNREACHABLE();
+        } else {
+            WUNREACHABLE();
         }
 	}
 
@@ -26,17 +30,18 @@ namespace wings {
         if (lhs->type != rhs->type)
             return false;
 
-        switch (lhs->type) {
-        case WObj::Type::Null:   return true;
-        case WObj::Type::Bool:   return lhs->b == rhs->b;
-        case WObj::Type::Int:    return lhs->i == rhs->i;
-        case WObj::Type::Float:  return lhs->f == rhs->f;
-        case WObj::Type::String: return lhs->s == rhs->s;
-        case WObj::Type::List:
-        case WObj::Type::Map:
-        case WObj::Type::Func:
-        case WObj::Type::Userdata: return lhs == rhs;
-        default: WUNREACHABLE();
+        if (WIsNoneType(lhs)) {
+            return true;
+        } else if (WIsBool(lhs)) {
+            return WGetBool(lhs) == WGetBool(rhs);
+        } else if (WIsInt(lhs)) {
+            return WGetInt(lhs) == WGetInt(rhs);
+        } else if (WIsIntOrFloat(lhs)) {
+            return WGetFloat(lhs) == WGetFloat(rhs);
+        } else if (WIsString(lhs)) {
+            return lhs->Get<std::string>() == rhs->Get<std::string>();
+        } else {
+            return lhs == rhs;
         }
     }
 }

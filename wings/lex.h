@@ -2,7 +2,7 @@
 #include <vector>
 #include <string>
 #include "wings.h"
-#include "error.h"
+#include "impl.h"
 
 namespace wings {
 

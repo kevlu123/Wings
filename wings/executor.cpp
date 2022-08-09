@@ -34,24 +34,26 @@ namespace wings {
 		}
 
 		std::vector<bool> assignedParams(def->parameterNames.size());
-		for (const auto& [k, value] : kwargs->m) {
-			const char* key = WGetString(k);
-			bool found = false;
-			for (size_t i = 0; i < def->parameterNames.size(); i++) {
-				if (def->parameterNames[i] == key) {
-					executor.variables.insert({ key, MakeRcPtr<WObj*>(value) });
-					assignedParams[i] = true;
-					found = true;
-					break;
+		if (kwargs) {
+			for (const auto& [k, value] : kwargs->Get<wings::WDict>()) {
+				const char* key = WGetString(k);
+				bool found = false;
+				for (size_t i = 0; i < def->parameterNames.size(); i++) {
+					if (def->parameterNames[i] == key) {
+						executor.variables.insert({ key, MakeRcPtr<WObj*>(value) });
+						assignedParams[i] = true;
+						found = true;
+						break;
+					}
 				}
-			}
 
-			if (!found) {
-				if (newKwargs == nullptr) {
-					//WRaiseError(context, );
-					return nullptr;
+				if (!found) {
+					if (newKwargs == nullptr) {
+						//WRaiseException(context, );
+						return nullptr;
+					}
+					newKwargs->Get<wings::WDict>().insert({ k, value });
 				}
-				newKwargs->m.insert({ k, value });
 			}
 		}
 
@@ -67,17 +69,17 @@ namespace wings {
 		for (int i = 0; i < argc; i++) {
 			if (i < def->parameterNames.size()) {
 				if (assignedParams[i]) {
-					//WRaiseError(context, );
+					//WRaiseException(context, );
 					return nullptr;
 				}
 				executor.variables.insert({ def->parameterNames[i], MakeRcPtr<WObj*>(args[i]) });
 				assignedParams[i] = true;
 			} else {
 				if (listArgs == nullptr) {
-					//WRaiseError(context, );
+					//WRaiseException(context, );
 					return nullptr;
 				}
-				listArgs->v.push_back(args[i]);
+				listArgs->Get<std::vector<WObj*>>().push_back(args[i]);
 			}
 		}
 		
@@ -103,7 +105,7 @@ namespace wings {
 				def->prettyName + "()"
 				+ " missing parameter(s) "
 				+ unassigned;
-			WRaiseError(context, msg.c_str());
+			WRaiseException(context, msg.c_str());
 			return nullptr;
 		}
 
@@ -193,7 +195,7 @@ namespace wings {
 			}
 
 			if (values.size() != target.pack.size()) {
-				WRaiseError(context, "Packed assignment argument count mismatch.");
+				WRaiseException(context, "Packed assignment argument count mismatch.");
 				unprotectValues();
 				return nullptr;
 			}
@@ -221,7 +223,7 @@ namespace wings {
 			DoInstruction(instr);
 
 			auto pushTrace = [&] {
-				context->err.trace.push_back({
+				context->trace.push_back({
 					instr.srcPos,
 					(*def->originalSource)[instr.srcPos.line],
 					def->module,
@@ -277,7 +279,7 @@ namespace wings {
 			pc = instr.jump->location - 1;
 			break;
 		case Instruction::Type::JumpIfFalse:
-			if (WObj* truthy = WTruthy(PopStack())) {
+			if (WObj* truthy = WConvertToBool(PopStack())) {
 				if (!WGetBool(truthy)) {
 					pc = instr.jump->location - 1;
 				}
@@ -323,10 +325,11 @@ namespace wings {
 			}
 			def->localVariables = instr.def->variables;
 
-			WFunc func{};
+			WFuncDesc func{};
 			func.fptr = &DefObject::Run;
 			func.userdata = def;
 			func.isMethod = instr.def->isMethod;
+			func.prettyName = instr.def->prettyName.c_str();
 			WObj* obj = WCreateFunction(context, &func);
 			if (obj == nullptr) {
 				delete def;
@@ -351,13 +354,17 @@ namespace wings {
 			for (const auto& methodName : instr._class->methodNames)
 				methodNames.push_back(methodName.c_str());
 
-			WClass wclass{};
-			wclass.methodCount = (int)methodCount;
-			wclass.methods = stackEnd - methodCount - baseCount;
-			wclass.methodNames = methodNames.data();
-			wclass.bases = stackEnd - baseCount;
-			wclass.baseCount = (int)baseCount;
-			WObj* _class = WCreateClass(context, &wclass);
+			WObj** bases = stackEnd - baseCount;
+			WObj** methods = stackEnd - methodCount - baseCount;
+
+			WObj* _class = WCreateClass(context, instr._class->prettyName.c_str(), bases, (int)baseCount);
+			if (_class == nullptr) {
+				exitValue = nullptr;
+				return;
+			}
+
+			for (size_t i = 0; i < methodCount; i++)
+				WAddAttributeToClass(_class, instr._class->methodNames[i].c_str(), methods[i]);
 
 			for (size_t i = 0; i < methodCount + baseCount; i++)
 				PopStack();
@@ -414,11 +421,11 @@ namespace wings {
 					WObj* key = start[2 * i];
 					WObj* val = start[2 * i + 1];
 					if (!WIsImmutableType(key)) {
-						WRaiseError(context, "Only an immutable type can be used as a dictionary key");
+						WRaiseException(context, "Only an immutable type can be used as a dictionary key");
 						exitValue = nullptr;
 						return;
 					}
-					li->m[key] = val;
+					li->Get<wings::WDict>()[key] = val;
 				}
 
 				for (size_t i = 0; i < argc; i++)
@@ -433,7 +440,7 @@ namespace wings {
 				PushStack(value);
 			} else {
 				std::string msg = "The name '" + instr.string->string + "' is not defined";
-				WRaiseError(context, msg.c_str());
+				WRaiseException(context, msg.c_str(), context->builtins.nameError);
 				exitValue = nullptr;
 			}
 			break;
@@ -485,9 +492,9 @@ namespace wings {
 			if (WObj* attr = WGetAttribute(obj, instr.string->string.c_str())) {
 				PushStack(attr);
 			} else {
-				std::string msg = "Object of type " + WObjTypeToString(obj->type) +
+				std::string msg = "Object of type " + WObjTypeToString(obj) +
 					" has no attribute " + instr.string->string;
-				WRaiseError(context, msg.c_str());
+				WRaiseException(context, msg.c_str());
 				exitValue = nullptr;
 			}
 			break;
@@ -509,12 +516,12 @@ namespace wings {
 		case Instruction::Type::UnpackMapForMapCreation: {
 			WObj* map = PopStack();
 			if (!WIsDictionary(map)) {
-				WRaiseError(context, "Unary '**' must be applied to a dictionary");
+				WRaiseException(context, "Unary '**' must be applied to a dictionary");
 				exitValue = nullptr;
 				return;
 			}
 
-			for (const auto& [key, value] : map->m) {
+			for (const auto& [key, value] : map->Get<wings::WDict>()) {
 				PushStack(key);
 				PushStack(value);
 			}
@@ -523,14 +530,14 @@ namespace wings {
 		case Instruction::Type::UnpackMapForCall: {
 			WObj* map = PopStack();
 			if (!WIsDictionary(map)) {
-				WRaiseError(context, "Unary '**' must be applied to a dictionary");
+				WRaiseException(context, "Unary '**' must be applied to a dictionary");
 				exitValue = nullptr;
 				return;
 			}
 
-			for (const auto& [key, value] : map->m) {
+			for (const auto& [key, value] : map->Get<wings::WDict>()) {
 				if (!WIsString(key)) {
-					WRaiseError(context, "Keywords arguments must be strings");
+					WRaiseException(context, "Keywords arguments must be strings");
 					exitValue = nullptr;
 					return;
 				}
@@ -543,7 +550,7 @@ namespace wings {
 			kwargsStack.top().push_back(PopStack());
 			break;
 		case Instruction::Type::And: {
-			WObj* arg1 = WTruthy(PopStack());
+			WObj* arg1 = WConvertToBool(PopStack());
 			if (arg1 == nullptr) {
 				exitValue = nullptr;
 				break;
@@ -559,7 +566,7 @@ namespace wings {
 				}
 			}
 
-			WObj* arg2 = WTruthy(PopStack());
+			WObj* arg2 = WConvertToBool(PopStack());
 			if (arg2 == nullptr) {
 				exitValue = nullptr;
 				break;
@@ -573,7 +580,7 @@ namespace wings {
 			break;
 		}
 		case Instruction::Type::Or: {
-			WObj* arg1 = WTruthy(PopStack());
+			WObj* arg1 = WConvertToBool(PopStack());
 			if (arg1 == nullptr) {
 				exitValue = nullptr;
 				break;
@@ -589,7 +596,7 @@ namespace wings {
 				}
 			}
 
-			WObj* arg2 = WTruthy(PopStack());
+			WObj* arg2 = WConvertToBool(PopStack());
 			if (arg2 == nullptr) {
 				exitValue = nullptr;
 				break;
@@ -603,7 +610,7 @@ namespace wings {
 			break;
 		}
 		case Instruction::Type::Not: {
-			WObj* arg = WTruthy(PopStack());
+			WObj* arg = WConvertToBool(PopStack());
 			if (arg == nullptr) {
 				exitValue = nullptr;
 				break;
@@ -706,10 +713,10 @@ namespace wings {
 			PushStack(WGetCurrentException(context));
 			break;
 		case Instruction::Type::IsInstance:
-			PushStack(context->isinstance);
+			PushStack(context->builtins.isinstance);
 			break;
 		case Instruction::Type::SliceClass:
-			PushStack(context->builtinClasses.slice);
+			PushStack(context->builtins.slice);
 			break;
 		default:
 			WUNREACHABLE();

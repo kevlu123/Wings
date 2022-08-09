@@ -4,8 +4,7 @@ namespace wings {
 
 	AttributeTable::AttributeTable() :
 		attributes(MakeRcPtr<Table>()),
-		owned(true),
-		referenced(false) {
+		owned(true) {
 	}
 
 	WObj* AttributeTable::Get(const std::string& name) const {
@@ -31,7 +30,7 @@ namespace wings {
 		return nullptr;
 	}
 
-	void AttributeTable::Set(const std::string& name, WObj* value, bool validate) {
+	void AttributeTable::Set(const std::string& name, WObj* value) {
 		if (!owned) {
 			attributes = MakeRcPtr<Table>(*attributes);
 			owned = true;
@@ -40,16 +39,14 @@ namespace wings {
 		attributes->entries[name] = value;
 	}
 
-	void AttributeTable::AddParent(AttributeTable& parent, bool validate) {
+	void AttributeTable::AddParent(AttributeTable& parent) {
 		attributes->parents.push_back(parent.attributes);
-		parent.referenced = true;
 	}
 
 	AttributeTable AttributeTable::Copy() {
 		AttributeTable copy;
 		copy.attributes = attributes;
 		copy.owned = false;
-		referenced = true;
 		return copy;
 	}
 

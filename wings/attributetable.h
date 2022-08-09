@@ -11,9 +11,9 @@ namespace wings {
 	struct AttributeTable {
 		AttributeTable();
 		WObj* Get(const std::string& name) const;
-		void Set(const std::string& name, WObj* value, bool validate = true);
+		void Set(const std::string& name, WObj* value);
 		WObj* GetFromBase(const std::string& name) const;
-		void AddParent(AttributeTable& parent, bool validate = true);
+		void AddParent(AttributeTable& parent);
 		AttributeTable Copy();
 		bool Empty() const;
 		template <class Fn> void ForEach(Fn fn) const;
@@ -28,7 +28,6 @@ namespace wings {
 
 		RcPtr<Table> attributes;
 		bool owned;
-		bool referenced;
 	};
 
 	template <class Fn>

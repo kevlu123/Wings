@@ -12,7 +12,8 @@ static void Expect(const char* code, const char* expected, size_t line) {
 
     WContext* context{};
     try {
-        if (!WCreateContext(&context))
+        context = WCreateContext();
+        if (context == nullptr)
             throw std::string(WGetErrorMessage(context));
 
         WConfig cfg{};
@@ -51,10 +52,11 @@ static void Expect(const char* code, const char* expected, size_t line) {
 static void ExpectFailure(const char* code, size_t line) {
     testsRun++;
     output.clear();
-
+    
     WContext* context{};
     try {
-        if (!WCreateContext(&context))
+        context = WCreateContext();
+        if (context == nullptr)
             throw std::string(WGetErrorMessage(context));
 
         WConfig cfg{};

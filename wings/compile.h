@@ -23,6 +23,7 @@ namespace wings {
 
 	struct ClassInstruction {
 		std::vector<std::string> methodNames;
+		std::string prettyName;
 	};
 
 	using LiteralInstruction = std::variant<std::nullptr_t, bool, wint, wfloat, std::string>;

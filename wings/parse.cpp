@@ -412,6 +412,10 @@ namespace wings {
 					writeVars.insert(child._class.name);
 					allVars.insert(child._class.name);
 					break;
+				case Statement::Type::Def:
+					writeVars.insert(child.expr.def.name);
+					allVars.insert(child.expr.def.name);
+					break;
 				case Statement::Type::Global:
 					defNode.expr.def.globalCaptures.insert(child.capture.name);
 					break;

@@ -1,7 +1,6 @@
 #pragma once
 #include "rcptr.h"
 #include "wings.h"
-#include "error.h"
 #include "attributetable.h"
 #include "wdict.h"
 #include <string>
@@ -9,105 +8,40 @@
 #include <deque>
 #include <unordered_set>
 #include <unordered_map>
+#include <array>
 #include <memory>
 #include <optional>
 #include <cstdlib> // std::abort
 
-namespace std {
-    template <> struct hash<WObj> {
-        size_t operator()(const WObj& obj) const;
-    };
-}
-
-bool operator==(const WObj& lhs, const WObj& rhs);
-bool operator!=(const WObj& lhs, const WObj& rhs);
-
 struct WContext;
-
-struct WObj {
-    enum class Type {
-        Null,
-        Bool,
-        Int,
-        Float,
-        String,
-        Tuple,
-        List,
-        Map,
-        Func,
-        Object,
-        Class,
-        Userdata,
-    } type = Type::Null;
-
-    union {
-        bool b;
-        wint i;
-        wfloat f;
-        void* u;
-        struct {
-            WObj* self;
-            WFunc fn;
-        };
-    };
-    std::string s;
-    std::vector<WObj*> v;
-    wings::WDict m;
-    wings::AttributeTable c;
-
-    std::string className;
-    wings::AttributeTable attributes;
-    WFinalizer finalizer{};
-    std::vector<WObj*> references;
-    WContext* context;
-};
-
-struct TraceFrame {
-    wings::SourcePosition srcPos;
-    std::string lineText;
-    std::string module;
-    std::string func;
-};
-
-struct WContext {
-    WConfig config{};
-
-    size_t lastObjectCountAfterGC = 0;
-    std::deque<std::unique_ptr<WObj>> mem;
-    std::unordered_multiset<const WObj*> protectedObjects;
-    std::unordered_map<std::string, wings::RcPtr<WObj*>> globals;
-    WObj* currentException = nullptr;
-
-    struct {
-        WError code{};
-        std::string message;
-        std::vector<TraceFrame> trace;
-        std::string traceMessage;
-    } err;
-
-    struct {
-        WObj* null;
-        WObj* _bool;
-        WObj* _int;
-        WObj* _float;
-        WObj* str;
-        WObj* tuple;
-        WObj* list;
-        WObj* map;
-        WObj* object;
-        WObj* func;
-        WObj* userdata;
-
-        WObj* slice;
-    } builtinClasses;
-    WObj* isinstance;
-    WObj* nullSingleton;
-};
 
 namespace wings {
     size_t Guid();
     bool InitLibrary(WContext* context);
-    std::string WObjTypeToString(WObj::Type t);
+    std::string WObjTypeToString(const WObj* obj);
+
+    struct SourcePosition {
+        size_t line = (size_t)-1;
+        size_t column = (size_t)-1;
+    };
+
+    struct CodeError {
+        bool good = true;
+        SourcePosition srcPos{};
+        std::string message;
+
+        operator bool() const;
+        std::string ToString() const;
+        static CodeError Good();
+        static CodeError Bad(std::string message, SourcePosition srcPos = {});
+    };
+
+    struct TraceFrame {
+        SourcePosition srcPos;
+        std::string lineText;
+        std::string module;
+        std::string func;
+    };
 
     struct WObjRef {
         WObjRef() : obj(nullptr) {}
@@ -120,7 +54,83 @@ namespace wings {
     private:
         WObj* obj;
     };
+
+    struct Builtins {
+        // Types
+        WObj* object;
+        WObj* noneType;
+        WObj* _bool;
+        WObj* _int;
+        WObj* _float;
+        WObj* str;
+        WObj* tuple;
+        WObj* list;
+        WObj* dict;
+        WObj* func;
+        WObj* slice;
+
+        // Exception types
+        WObj* baseException;
+        WObj* exception;
+        WObj* syntaxError;
+        WObj* typeError;
+        WObj* nameError;
+
+        // Instances
+        WObj* none;
+        WObj* memoryErrorInstance;
+        WObj* isinstance;
+
+        auto GetAll() const {
+            return std::array{
+                object, noneType, _bool, _int, _float, str, tuple, list, dict, func, slice,
+                baseException, exception, syntaxError, typeError, nameError,
+                none, memoryErrorInstance, isinstance,
+            };
+        }
+    };
 }
+
+struct WObj {
+    struct Func {
+        WObj* self;
+        WObj* (*fptr)(WObj** args, int argc, WObj* kwargs, void* userdata);
+        void* userdata;
+        bool isMethod;
+        std::string prettyName;
+    };
+
+    struct Class {
+        std::string name;
+        WObj* (*ctor)(WObj** args, int argc, WObj* kwargs, void* userdata);
+        void* userdata;
+        std::vector<WObj*> bases;
+        wings::AttributeTable instanceAttributes;
+    };
+
+    std::string type;
+    void* data;
+    template <class T> const T& Get() const { return *(const T*)data; }
+    template <class T> T& Get() { return *(T*)data; }
+
+    wings::AttributeTable attributes;
+    WFinalizer finalizer{};
+    std::vector<WObj*> references;
+    WContext* context;
+};
+
+struct WContext {
+    WConfig config{};
+    size_t lastObjectCountAfterGC = 0;
+    std::deque<std::unique_ptr<WObj>> mem;
+    std::unordered_multiset<const WObj*> protectedObjects;
+    std::unordered_map<std::string, wings::RcPtr<WObj*>> globals;
+    WObj* currentException = nullptr;
+    std::vector<WObj*> reprStack;
+    std::vector<wings::TraceFrame> trace;
+    std::string traceMessage;
+    wings::Builtins builtins{};
+};
 
 #define WASSERT(assertion) do { if (!(assertion)) std::abort(); } while (0)
 #define WUNREACHABLE() std::abort()

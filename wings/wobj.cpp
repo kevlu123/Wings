@@ -9,169 +9,141 @@ extern "C" {
 
     WObj* WCreateNoneType(WContext* context) {
         WASSERT(context);
-        return context->nullSingleton;
+        return context->builtins.none;
     }
 
     WObj* WCreateBool(WContext* context, bool value) {
         WASSERT(context);
-
-        WObj* _class = context->builtinClasses._bool;
-        WObj* instance = _class->fn.fptr(nullptr, 0, nullptr, _class->fn.userdata);
-        if (instance) {
-            instance->attributes = _class->c.Copy();
-            instance->b = value;
+        if (WObj* v = WCall(context->builtins._bool, nullptr, 0)) {
+            v->Get<bool>() = value;
+            return v;
+        } else {
+            return nullptr;
         }
-        return instance;
     }
 
     WObj* WCreateInt(WContext* context, wint value) {
         WASSERT(context);
-
-        WObj* _class = context->builtinClasses._int;
-        WObj* instance = _class->fn.fptr(nullptr, 0, nullptr, _class->fn.userdata);
-        if (instance) {
-            instance->attributes = _class->c.Copy();
-            instance->i = value;
+        if (WObj* v = WCall(context->builtins._int, nullptr, 0)) {
+            v->Get<wint>() = value;
+            return v;
+        } else {
+            return nullptr;
         }
-        return instance;
     }
 
     WObj* WCreateFloat(WContext* context, wfloat value) {
         WASSERT(context);
-
-        WObj* _class = context->builtinClasses._float;
-        WObj* instance = _class->fn.fptr(nullptr, 0, nullptr, _class->fn.userdata);
-        if (instance) {
-            instance->attributes = _class->c.Copy();
-            instance->f = value;
+        if (WObj* v = WCall(context->builtins._float, nullptr, 0)) {
+            v->Get<wfloat>() = value;
+            return v;
+        } else {
+            return nullptr;
         }
-        return instance;
     }
 
     WObj* WCreateString(WContext* context, const char* value) {
         WASSERT(context);
-
-        WObj* _class = context->builtinClasses.str;
-        WObj* instance = _class->fn.fptr(nullptr, 0, nullptr, _class->fn.userdata);
-        if (instance) {
-            instance->attributes = _class->c.Copy();
-            instance->s = value ? value : "";
+        if (WObj* v = WCall(context->builtins.str, nullptr, 0)) {
+            v->Get<std::string>() = value;
+            return v;
+        } else {
+            return nullptr;
         }
-        return instance;
     }
 
     WObj* WCreateTuple(WContext* context, WObj** argv, int argc) {
+        std::vector<WObjRef> refs;
         WASSERT(context && argc >= 0);
         if (argc > 0) {
             WASSERT(argv);
             for (int i = 0; i < argc; i++) {
-                WProtectObject(argv[i]);
+                refs.emplace_back(argv[i]);
                 WASSERT(argv[i]);
             }
         }
 
-        WObj* _class = context->builtinClasses.tuple;
-        WObj* instance = _class->fn.fptr(nullptr, 0, nullptr, _class->fn.userdata);
-        if (argc > 0)
-            instance->v.insert(instance->v.begin(), argv, argv + argc);
-        if (instance)
-            instance->attributes = _class->c.Copy();
-        for (int i = 0; i < argc; i++)
-            WUnprotectObject(argv[i]);
-        return instance;
+        if (WObj* v = WCall(context->builtins.tuple, nullptr, 0)) {
+            v->Get<std::vector<WObj*>>() = std::vector<WObj*>(argv, argv + argc);
+            return v;
+        } else {
+            return nullptr;
+        }
     }
 
     WObj* WCreateList(WContext* context, WObj** argv, int argc) {
+        std::vector<WObjRef> refs;
         WASSERT(context && argc >= 0);
         if (argc > 0) {
             WASSERT(argv);
             for (int i = 0; i < argc; i++) {
-                WProtectObject(argv[i]);
+                refs.emplace_back(argv[i]);
                 WASSERT(argv[i]);
             }
         }
 
-        WObj* _class = context->builtinClasses.list;
-        WObj* instance = _class->fn.fptr(nullptr, 0, nullptr, _class->fn.userdata);
-        if (argc > 0)
-            instance->v.insert(instance->v.begin(), argv, argv + argc);
-        if (instance)
-            instance->attributes = _class->c.Copy();
-        for (int i = 0; i < argc; i++)
-            WUnprotectObject(argv[i]);
-        return instance;
+        if (WObj* v = WCall(context->builtins.list, nullptr, 0)) {
+            v->Get<std::vector<WObj*>>() = std::vector<WObj*>(argv, argv + argc);
+            return v;
+        } else {
+            return nullptr;
+        }
     }
 
     WObj* WCreateDictionary(WContext* context, WObj** keys, WObj** values, int argc) {
+        std::vector<WObjRef> refs;
         WASSERT(context && argc >= 0);
         if (argc > 0) {
             WASSERT(keys && values);
             for (int i = 0; i < argc; i++) {
-                WProtectObject(keys[i]);
-                WProtectObject(values[i]);
+                refs.emplace_back(keys[i]);
+                refs.emplace_back(values[i]);
                 WASSERT(keys[i] && values[i] && WIsImmutableType(keys[i]));
             }
         }
 
-        WObj* _class = context->builtinClasses.map;
-        WObj* instance = _class->fn.fptr(nullptr, 0, nullptr, _class->fn.userdata);
-        for (int i = 0; i < argc; i++)
-            instance->m.insert({ keys[i], values[i] });
-        if (instance)
-            instance->attributes = _class->c.Copy();
-        for (int i = 0; i < argc; i++) {
-            WUnprotectObject(keys[i]);
-            WUnprotectObject(values[i]);
+        // Pass a dummy kwargs to prevent stack overflow from recursion
+        WObj* dummyKwargs = Alloc(context);
+        if (dummyKwargs == nullptr)
+            return nullptr;
+        dummyKwargs->type = "__map";
+        wings::WDict wd{};
+        dummyKwargs->data = &wd;
+
+        if (WObj* v = WCall(context->builtins.dict, nullptr, 0, dummyKwargs)) {
+            for (int i = 0; i < argc; i++)
+                v->Get<wings::WDict>().insert({ keys[i], values[i] });
+            return v;
+        } else {
+            return nullptr;
         }
-        return instance;
     }
 
-    WObj* WCreateObject(WContext* context) {
+    WObj* WCreateFunction(WContext* context, const WFuncDesc* value) {
         WASSERT(context);
-
-        WObj* _class = context->builtinClasses.object;
-        WObj* instance = _class->fn.fptr(nullptr, 0, nullptr, _class->fn.userdata);
-        if (instance) {
-            instance->attributes = _class->c.Copy();
+        if (WObj* v = WCall(context->builtins.func, nullptr, 0)) {
+            v->Get<WObj::Func>() = {
+                nullptr,
+                value->fptr,
+                value->userdata,
+                value->isMethod,
+                std::string(value->prettyName),
+            };
+            return v;
+        } else {
+            return nullptr;
         }
-        return instance;
     }
 
-    WObj* WCreateFunction(WContext* context, const WFunc* value) {
-        WASSERT(context && value && value->fptr);
-
-        WObj* _class = context->builtinClasses.func;
-        WObj* instance = _class->fn.fptr(nullptr, 0, nullptr, _class->fn.userdata);
-        if (instance) {
-            instance->attributes = _class->c.Copy();
-            instance->fn = *value;
-        }
-        return instance;
-    }
-
-    WObj* WCreateUserdata(WContext* context, void* value) {
-        WASSERT(context);
-
-        WObj* _class = context->builtinClasses.userdata;
-        WObj* instance = _class->fn.fptr(nullptr, 0, nullptr, _class->fn.userdata);
-        if (instance) {
-            instance->attributes = _class->c.Copy();
-            instance->u = value;
-        }
-        return instance;
-    }
-
-    WObj* WCreateClass(WContext* context, const WClass* value) {
-        WASSERT(context && value && value->methodCount >= 0 && value->baseCount >= 0);
-        if (value->methodCount) {
-            WASSERT(value->methods && value->methodNames);
-            for (int i = 0; i < value->methodCount; i++)
-                WASSERT(value->methods[i] && value->methodNames[i] && WIsFunction(value->methods[i]));
-        }
-        if (value->baseCount) {
-            WASSERT(value->bases);
-            for (int i = 0; i < value->baseCount; i++)
-                WASSERT(value->bases[i] && WIsClass(value->bases[i]));
+    WObj* WCreateClass(WContext* context, const char* name, WObj** bases, int baseCount) {
+        std::vector<WObjRef> refs;
+        WASSERT(context && name && baseCount >= 0);
+        if (baseCount > 0) {
+            WASSERT(bases);
+            for (int i = 0; i < baseCount; i++) {
+                WASSERT(bases[i] && WIsClass(bases[i]));
+                refs.emplace_back(bases[i]);
+            }
         }
 
         // Allocate class
@@ -179,233 +151,211 @@ extern "C" {
         if (_class == nullptr) {
             return nullptr;
         }
-        _class->type = WObj::Type::Class;
-        _class->className = value->prettyName ? value->prettyName : "<Class>";
-        _class->c.Set("__class__", _class);
-        _class->attributes.AddParent(context->builtinClasses.object->c);
+        refs.emplace_back(_class);
+        _class->type = "__class";
+        _class->data = new WObj::Class{ std::string(name) };
+        _class->finalizer.fptr = [](WObj* obj, void*) { delete (WObj::Class*)obj->data; };
+        _class->Get<WObj::Class>().instanceAttributes.Set("__class__", _class);
+        _class->attributes.AddParent(context->builtins.object->Get<WObj::Class>().instanceAttributes);
 
         // Set bases
-        int baseCount = value->baseCount ? value->baseCount : 1;
-        WObj** bases = value->baseCount ? value->bases : &context->builtinClasses.object;
-        for (int i = 0; i < baseCount; i++) {
-            _class->c.AddParent(bases[i]->c);
+        int actualBaseCount = baseCount ? baseCount : 1;
+        WObj** actualBases = baseCount ? bases : &context->builtins.object;
+        for (int i = 0; i < actualBaseCount; i++) {
+            _class->Get<WObj::Class>().instanceAttributes.AddParent(actualBases[i]->Get<WObj::Class>().instanceAttributes);
+            _class->Get<WObj::Class>().bases.push_back(actualBases[i]);
         }
-        if (WObj* basesTuple = WCreateTuple(context, bases, baseCount)) {
+        if (WObj* basesTuple = WCreateTuple(context, actualBases, actualBaseCount)) {
             _class->attributes.Set("__bases__", basesTuple);
         } else {
             return nullptr;
         }
 
-        // Set methods
-        bool hasInitMethod = false;
-        for (int i = 0; i < value->methodCount; i++) {
-            _class->c.Set(value->methodNames[i], value->methods[i]);
-            if (value->methodNames[i] == std::string("__init__"))
-                hasInitMethod = true;
-        }
-
-        // Set init method if it is missing
-        if (!hasInitMethod) {
-            struct State {
-                State(WContext* context, WObj* firstBase) :
-                    context(context),
-                    firstBase(firstBase) {
-                }
-                WContext* context;
-                WObj* firstBase;
-            };
-
-            WFunc init{};
-            init.prettyName = "__init__";
-            init.isMethod = true;
-            init.userdata = new State(context, bases[0]);
-            init.fptr = [](WObj** argv, int argc, WObj* kwargs, void* userdata) {
-                WContext* context = ((State*)userdata)->context;
-                WObj* firstBase = ((State*)userdata)->firstBase;
-
-                if (argc != 1) {
-                    std::string msg = "Function takes 1"
-                        " argument(s) but " +
-                        std::to_string(argc) +
-                        (argc == 1 ? " was given" : " were given");
-                    WRaiseError(context, msg.c_str());
-                    return (WObj*)nullptr;
-                }
-
-                if (WObj* init = WGetAttributeFromBase(argv[0], "__init__", firstBase)) {
-                    if (WIsFunction(init)) {
-                        WObj* ret = WCall(init, nullptr, 0);
-                        if (ret == nullptr) {
-                            return (WObj*)nullptr;
-                        } else if (!WIsNoneType(ret)) {
-                            WRaiseError(context, "__init__() returned a non NoneType type");
-                            return (WObj*)nullptr;
-                        }
-                    }
-                }
-
-                return WCreateNoneType(context);
-            };
-
-            WObj* initFn = WCreateFunction(context, &init);
-            if (initFn == nullptr) {
-                delete (State*)init.userdata;
-                return nullptr;
-            }
-            WLinkReference(initFn, bases[0]);
-
-            WFinalizer finalizer{};
-            finalizer.userdata = init.userdata;
-            finalizer.fptr = [](WObj* obj, void* userdata) { delete (State*)userdata; };
-            WSetFinalizer(initFn, &finalizer);
-
-            _class->c.Set("__init__", initFn);
+        // Set __str__()
+        WFuncDesc tostr{};
+        tostr.isMethod = true;
+        tostr.prettyName = "__str__";
+        tostr.userdata = context;
+        tostr.fptr = [](WObj** argv, int argc, WObj* kwargs, void* ud) {
+            //... Expect 1 arg
+            std::string s = "<class '" + argv[0]->Get<WObj::Class>().name + "'>";
+            return WCreateString(argv[0]->context, s.c_str());
+        };
+        if (WObj* tostrFn = WCreateFunction(context, &tostr)) {
+            WSetAttribute(_class, "__str__", tostrFn);
+        } else {
+            return nullptr;
         }
 
         // Set construction function. This function forwards to __init__().
-        WFunc constructor{};
-        constructor.userdata = _class;
-        constructor.isMethod = true;
-        constructor.prettyName = "__init__";
-        constructor.fptr = [](WObj** argv, int argc, WObj* kwargs, void* userdata) {
-            WObj* _class = (WObj*)userdata;
-            WContext* context = _class->context;
+        _class->Get<WObj::Class>().userdata = _class;
+        _class->Get<WObj::Class>().ctor = [](WObj** argv, int argc, WObj* kwargs, void* userdata) -> WObj* {
+            WObj* _classObj = (WObj*)userdata;
+            WContext* context = _classObj->context;
 
-            WObj* instance = WCreateObject(context);
+            WObj* instance = Alloc(context);
             if (instance == nullptr)
-                return (WObj*)nullptr;
+                return nullptr;
+            WObjRef ref(instance);
 
-            instance->attributes = _class->c.Copy();
+            instance->attributes = _classObj->Get<WObj::Class>().instanceAttributes.Copy();
+            instance->type = _classObj->Get<WObj::Class>().name;
 
-            if (WObj* init = _class->c.Get("__init__")) {
+            if (WObj* init = WGetAttribute(instance, "__init__")) {
                 if (WIsFunction(init)) {
-                    std::vector<WObj*> newArgv = { instance };
-                    newArgv.insert(newArgv.end(), argv, argv + argc);
-                    WObj* ret = WCall(init, newArgv.data(), argc + 1);
+                    WObj* ret = WCall(init, argv, argc, kwargs);
                     if (ret == nullptr) {
-                        return (WObj*)nullptr;
+                        return nullptr;
                     } else if (!WIsNoneType(ret)) {
-                        WRaiseError(context, "__init__() returned a non NoneType type");
-                        return (WObj*)nullptr;
+                        WRaiseException(context, "__init__() returned a non NoneType type");
+                        return nullptr;
                     }
                 }
             }
 
             return instance;
         };
-        _class->fn = constructor;
+
+        // Set init method
+        std::string initName = std::string(name) + ".__init__";
+        WFuncDesc init{};
+        init.prettyName = initName.c_str();
+        init.isMethod = true;
+        init.userdata = _class;
+        init.fptr = [](WObj** argv, int argc, WObj* kwargs, void* userdata) -> WObj* {
+            //... Expect >= 1 args
+            WObj* _class = (WObj*)userdata;
+            const auto& bases = _class->Get<WObj::Class>().bases;
+            if (bases.empty())
+                return nullptr;
+
+            if (WObj* baseInit = WGetAttributeFromBase(argv[0], "__init__", bases[0])) {
+                WObj* ret = WCall(baseInit, argv + 1, argc - 1, kwargs);
+                if (ret == nullptr) {
+                    return nullptr;
+                } else if (!WIsNoneType(ret)) {
+                    WRaiseException(argv[0]->context, "__init__() returned a non NoneType type");
+                    return nullptr;
+                }
+            }
+
+            return WCreateNoneType(argv[0]->context);
+        };
+        WObj* initFn = WCreateFunction(context, &init);
+        if (initFn == nullptr)
+            return nullptr;
+        WLinkReference(initFn, _class);
+        WAddAttributeToClass(_class, "__init__", initFn);
 
         return _class;
+    }
+    
+    void WAddAttributeToClass(WObj* _class, const char* name, WObj* attribute) {
+        WASSERT(_class && name && attribute && WIsClass(_class));
+        _class->Get<WObj::Class>().instanceAttributes.Set(name, attribute);
     }
 
     bool WIsNoneType(const WObj* obj) {
         WASSERT(obj);
-        return obj->type == WObj::Type::Null;
+        return obj->type == "__null";
     }
 
     bool WIsBool(const WObj* obj) {
         WASSERT(obj);
-        return obj->type == WObj::Type::Bool;
+        return obj->type == "__bool";
     }
 
     bool WIsInt(const WObj* obj) {
         WASSERT(obj);
-        return obj->type == WObj::Type::Int;
+        return obj->type == "__int";
     }
 
     bool WIsIntOrFloat(const WObj* obj) {
         WASSERT(obj);
-        return obj->type == WObj::Type::Int || obj->type == WObj::Type::Float;
+        return obj->type == "__int" || obj->type == "__float";
     }
 
     bool WIsString(const WObj* obj) {
         WASSERT(obj);
-        return obj->type == WObj::Type::String;
+        return obj->type == "__str";
     }
 
     bool WIsTuple(const WObj* obj) {
         WASSERT(obj);
-        return obj->type == WObj::Type::Tuple;
+        return obj->type == "__tuple";
     }
 
     bool WIsList(const WObj* obj) {
         WASSERT(obj);
-        return obj->type == WObj::Type::List;
+        return obj->type == "__list";
     }
 
     bool WIsDictionary(const WObj* obj) {
         WASSERT(obj);
-        return obj->type == WObj::Type::Map;
-    }
-
-    bool WIsObject(const WObj* obj) {
-        WASSERT(obj);
-        return obj->type == WObj::Type::Object;
+        return obj->type == "__map";
     }
 
     bool WIsClass(const WObj* obj) {
         WASSERT(obj);
-        return obj->type == WObj::Type::Class;
+        return obj->type == "__class";
     }
 
     bool WIsFunction(const WObj* obj) {
         WASSERT(obj);
-        return obj->type == WObj::Type::Func;
-    }
-
-    bool WIsUserdata(const WObj* obj) {
-        WASSERT(obj);
-        return obj->type == WObj::Type::Userdata;
+        return obj->type == "__func";
     }
 
     bool WIsImmutableType(const WObj* obj) {
         WASSERT(obj);
-        if (obj->type == WObj::Type::Tuple) {
-            for (WObj* elem : obj->v)
+        if (WIsTuple(obj)) {
+            for (WObj* elem : obj->Get<std::vector<WObj*>>())
                 if (!WIsImmutableType(elem))
                     return false;
             return true;
         } else {
-            return obj->type == WObj::Type::Null
-                || obj->type == WObj::Type::Bool
-                || obj->type == WObj::Type::Int
-                || obj->type == WObj::Type::Float
-                || obj->type == WObj::Type::String;
+            return WIsNoneType(obj)
+                || WIsBool(obj)
+                || WIsIntOrFloat(obj)
+                || WIsString(obj);
         }
     }
 
     bool WGetBool(const WObj* obj) {
         WASSERT(obj && WIsBool(obj));
-        return obj->b;
+        return obj->Get<bool>();
     }
 
     wint WGetInt(const WObj* obj) {
         WASSERT(obj && WIsInt(obj));
-        return obj->i;
+        return obj->Get<wint>();
     }
 
     wfloat WGetFloat(const WObj* obj) {
         WASSERT(obj && WIsIntOrFloat(obj));
-        switch (obj->type) {
-        case WObj::Type::Int: return (wfloat)obj->i;
-        case WObj::Type::Float: return obj->f;
-        default: WUNREACHABLE();
-        }
+        if (WIsInt(obj)) return (wfloat)obj->Get<wint>();
+        else return obj->Get<wfloat>();
     }
 
     const char* WGetString(const WObj* obj) {
         WASSERT(obj && WIsString(obj));
-        return obj->s.c_str();
+        return obj->Get<std::string>().c_str();
     }
 
-    void WGetFunction(const WObj* obj, WFunc* fn) {
+    void WGetFunction(const WObj* obj, WFuncDesc* fn) {
         WASSERT(obj && fn && WIsFunction(obj));
-        *fn = obj->fn;
+        const auto& f = obj->Get<WObj::Func>();
+        fn->fptr = f.fptr;
+        fn->userdata = f.userdata;
+        fn->isMethod = f.isMethod;
+        fn->prettyName = f.prettyName.c_str();
     }
 
-    void* WGetUserdata(const WObj* obj) {
-        WASSERT(obj && WIsUserdata(obj));
-        return obj->u;
+    void* WTryGetUserdata(const WObj* obj, const char* type) {
+        if (obj->type == std::string(type)) {
+            return obj->data;
+        } else {
+            return nullptr;
+        }
     }
 
 	void WGetFinalizer(const WObj* obj, WFinalizer* finalizer) {
@@ -421,8 +371,8 @@ extern "C" {
     WObj* WGetAttribute(WObj* obj, const char* member) {
         WASSERT(obj && member);
         WObj* mem = obj->attributes.Get(member);
-        if (mem && WIsFunction(mem) && mem->fn.isMethod) {
-            mem->self = obj;
+        if (mem && WIsFunction(mem) && mem->Get<WObj::Func>().isMethod) {
+            mem->Get<WObj::Func>().self = obj;
         }
         return mem;
     }
@@ -437,22 +387,35 @@ extern "C" {
 
         WObj* mem{};
         if (baseClass == nullptr) {
-            mem = obj->c.GetFromBase(member);
+            mem = obj->attributes.GetFromBase(member);
         } else {
-            mem = baseClass->c.Get(member);
+            mem = baseClass->Get<WObj::Class>().instanceAttributes.Get(member);
         }
 
-        if (mem && WIsFunction(mem) && mem->fn.isMethod) {
-            mem->self = obj;
+        if (mem && WIsFunction(mem) && mem->Get<WObj::Func>().isMethod) {
+            mem->Get<WObj::Func>().self = obj;
         }
         return mem;
+    }
+
+    bool WIsInstance(WObj* instance, WObj* type) {
+        WASSERT(instance && type && WIsClass(type));
+        WObj* argv[2] = { instance, type };
+        WObj* res = WCall(instance->context->builtins.isinstance, argv, 2, nullptr);
+        if (res == nullptr) {
+            // If an exception occurred, report false anyway
+            WClearCurrentException(instance->context);
+            return false;
+        } else {
+            return WGetBool(res);
+        }
     }
 
     bool WIterate(WObj* obj, void* userdata, bool(*callback)(WObj* value, void* userdata)) {
         WASSERT(obj && callback);
         WObj* iter = WCallMethod(obj, "__iter__", nullptr, 0);
         if (iter == nullptr) {
-            WRaiseError(obj->context, "Object is not iterable (does not implement the __iter__ method)");
+            WRaiseException(obj->context, "Object is not iterable (does not implement the __iter__ method)");
             return false;
         }
         WProtectObject(iter);
@@ -460,12 +423,12 @@ extern "C" {
         while (true) {
             WObj* endReached = WCallMethod(iter, "__end__", nullptr, 0);
             if (endReached == nullptr) {
-                WRaiseError(obj->context, "Iterator does not implement the __end__ method");
+                WRaiseException(obj->context, "Iterator does not implement the __end__ method");
                 WUnprotectObject(iter);
                 return false;
             }
 
-            WObj* truthy = WTruthy(endReached);
+            WObj* truthy = WConvertToBool(endReached);
             if (truthy == nullptr) {
                 WUnprotectObject(iter);
                 return false;
@@ -476,7 +439,7 @@ extern "C" {
 
             WObj* value = WCallMethod(iter, "__next__", nullptr, 0);
             if (endReached == nullptr) {
-                WRaiseError(obj->context, "Iterator does not implement the __next__ method");
+                WRaiseException(obj->context, "Iterator does not implement the __next__ method");
                 WUnprotectObject(iter);
                 return false;
             }
@@ -491,12 +454,12 @@ extern "C" {
         }
     }
 
-    WObj* WTruthy(WObj* arg) {
+    WObj* WConvertToBool(WObj* arg) {
         if (WObj* res = WCallMethod(arg, "__nonzero__", nullptr, 0)) {
             if (WIsBool(res)) {
                 return res;
             } else {
-                WRaiseError(arg->context, "__nonzero__() returned a non bool type");
+                WRaiseException(arg->context, "__nonzero__() returned a non bool type");
             }
         }
         return nullptr;
@@ -507,7 +470,7 @@ extern "C" {
             if (WIsInt(res)) {
                 return res;
             } else {
-                WRaiseError(arg->context, "__int__() returned a non int type");
+                WRaiseException(arg->context, "__int__() returned a non int type");
             }
         }
         return nullptr;
@@ -518,7 +481,7 @@ extern "C" {
             if (WIsIntOrFloat(res)) {
                 return res;
             } else {
-                WRaiseError(arg->context, "__float__() returned a non float type");
+                WRaiseException(arg->context, "__float__() returned a non float type");
             }
         }
         return nullptr;
@@ -529,7 +492,7 @@ extern "C" {
             if (WIsString(res)) {
                 return res;
             } else {
-                WRaiseError(arg->context, "__str__() returned a non str type");
+                WRaiseException(arg->context, "__str__() returned a non str type");
             }
         }
         return nullptr;
@@ -545,12 +508,12 @@ extern "C" {
 
             if (kwargsDict) {
                 if (!WIsDictionary(kwargsDict)) {
-                    WRaiseError(kwargsDict->context, "Keyword arguments must be a dictionary");
+                    WRaiseException(kwargsDict->context, "Keyword arguments must be a dictionary");
                     return nullptr;
                 }
-                for (const auto& [key, value] : kwargsDict->m) {
+                for (const auto& [key, value] : kwargsDict->Get<wings::WDict>()) {
                     if (!WIsString(key)) {
-                        WRaiseError(kwargsDict->context, "Keyword arguments dictionary must only contain string keys");
+                        WRaiseException(kwargsDict->context, "Keyword arguments dictionary must only contain string keys");
                         return nullptr;
                     }
                 }
@@ -561,28 +524,46 @@ extern "C" {
             for (int i = 0; i < argc; i++)
                 refs.emplace_back(argv[i]);
 
-            std::vector<WObj*> argsWithSelf;
-            if (callable->self) {
-                argsWithSelf.push_back(callable->self);
-                argsWithSelf.insert(argsWithSelf.end(), argv, argv + argc);
-                argv = argsWithSelf.data();
-                argc++;
+            WObj* (*fptr)(WObj**, int, WObj*, void*);
+            void* userdata = nullptr;
+            WObj* self = nullptr;
+            std::string prettyName;
+            if (WIsFunction(callable)) {
+                const auto& func = callable->Get<WObj::Func>();
+                if (func.self)
+                    self = func.self;
+                fptr = func.fptr;
+                userdata = func.userdata;
+                prettyName = func.prettyName;
+            } else {
+                fptr = callable->Get<WObj::Class>().ctor;
+                userdata = callable->Get<WObj::Class>().userdata;
             }
-            if (kwargsDict == nullptr) {
+
+            std::vector<WObj*> argsWithSelf;
+            if (self) {
+                argsWithSelf.push_back(self);
+                refs.emplace_back(self);
+            }
+            argsWithSelf.insert(argsWithSelf.end(), argv, argv + argc);
+
+            // If the dictionary (map) class doesn't exist yet then skip this
+            if (kwargsDict == nullptr && callable != callable->context->builtins.dict && callable->context->builtins.dict) {
                 kwargsDict = WCreateDictionary(callable->context);
                 if (kwargsDict == nullptr)
                     return nullptr;
             }
             refs.emplace_back(kwargsDict);
-            WObj* ret = callable->fn.fptr(argv, argc, kwargsDict, callable->fn.userdata);
 
-            if (ret == nullptr && callable->fn.fptr != &DefObject::Run) {
+            WObj* ret = fptr(argsWithSelf.data(), (int)argsWithSelf.size(), kwargsDict, userdata);
+
+            if (ret == nullptr && fptr != &DefObject::Run) {
                 // Native function failed
-                callable->context->err.trace.push_back({
+                callable->context->trace.push_back({
                     {},
                     "",
                     "<Native>",
-                    callable->fn.prettyName ? callable->fn.prettyName : "",
+                    prettyName
                     });
             }
 
@@ -602,17 +583,17 @@ extern "C" {
         WObj* method = WGetAttribute(obj, member);
         if (method == nullptr) {
             std::string msg = "Object of type " +
-                WObjTypeToString(obj->type) +
+                WObjTypeToString(obj) +
                 " has no attribute " +
                 member;
-            WRaiseError(obj->context, msg.c_str());
+            WRaiseException(obj->context, msg.c_str());
             return nullptr;
         } else {
             return WCall(method, argv, argc, kwargsDict);
         }
     }
 
-    WObj* WCallMethodFromBase(WObj* obj, const char* member, WObj** argv, int argc, WObj* baseClass) {
+    WObj* WCallMethodFromBase(WObj* obj, const char* member, WObj** argv, int argc, WObj* kwargsDict, WObj* baseClass) {
         WASSERT(obj && member);
         if (argc)
             WASSERT(argv);
@@ -622,13 +603,13 @@ extern "C" {
         WObj* method = WGetAttributeFromBase(obj, member, baseClass);
         if (method == nullptr) {
             std::string msg = "Object of type " +
-                WObjTypeToString(obj->type) +
+                WObjTypeToString(obj) +
                 " has no attribute " +
                 member;
-            WRaiseError(obj->context, msg.c_str());
+            WRaiseException(obj->context, msg.c_str());
             return nullptr;
         } else {
-            return WCall(method, argv, argc);
+            return WCall(method, argv, argc, kwargsDict);
         }
     }
 
@@ -662,7 +643,7 @@ extern "C" {
     }
 
     WObj* WDivide(WObj* lhs, WObj* rhs) {
-        return WCallMethod(lhs, "__div__", &rhs, 1);
+        return WCallMethod(lhs, "__truediv__", &rhs, 1);
     }
 
     WObj* WFloorDivide(WObj* lhs, WObj* rhs) {
@@ -682,7 +663,7 @@ extern "C" {
             if (WIsBool(res)) {
                 return res;
             } else {
-                WRaiseError(lhs->context, "__eq__() returned a non bool type");
+                WRaiseException(lhs->context, "__eq__() returned a non bool type");
             }
         }
         return nullptr;
@@ -693,7 +674,7 @@ extern "C" {
             if (WIsBool(res)) {
                 return res;
             } else {
-                WRaiseError(lhs->context, "__ne__() returned a non bool type");
+                WRaiseException(lhs->context, "__ne__() returned a non bool type");
             }
         }
         return nullptr;
@@ -704,7 +685,7 @@ extern "C" {
             if (WIsBool(res)) {
                 return res;
             } else {
-                WRaiseError(lhs->context, "__lt__() returned a non bool type");
+                WRaiseException(lhs->context, "__lt__() returned a non bool type");
             }
         }
         return nullptr;
@@ -715,7 +696,7 @@ extern "C" {
             if (WIsBool(res)) {
                 return res;
             } else {
-                WRaiseError(lhs->context, "__le__() returned a non bool type");
+                WRaiseException(lhs->context, "__le__() returned a non bool type");
             }
         }
         return nullptr;
@@ -726,7 +707,7 @@ extern "C" {
             if (WIsBool(res)) {
                 return res;
             } else {
-                WRaiseError(lhs->context, "__gt__() returned a non bool type");
+                WRaiseException(lhs->context, "__gt__() returned a non bool type");
             }
         }
         return nullptr;
@@ -737,7 +718,7 @@ extern "C" {
             if (WIsBool(res)) {
                 return res;
             } else {
-                WRaiseError(lhs->context, "__ge__() returned a non bool type");
+                WRaiseException(lhs->context, "__ge__() returned a non bool type");
             }
         }
         return nullptr;
@@ -748,7 +729,7 @@ extern "C" {
             if (WIsBool(res)) {
                 return res;
             } else {
-                WRaiseError(container->context, "__contains__() returned a non bool type");
+                WRaiseException(container->context, "__contains__() returned a non bool type");
             }
         }
         return nullptr;

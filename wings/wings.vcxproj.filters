@@ -29,9 +29,6 @@
     <ClCompile Include="parse.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="error.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="exprparse.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -47,7 +44,7 @@
     <ClCompile Include="attributetable.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="testing.cpp">
+    <ClCompile Include="tests.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="wdict.cpp">
@@ -68,9 +65,6 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="parse.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="error.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="exprparse.h">

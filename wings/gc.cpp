@@ -7,8 +7,19 @@ using namespace wings;
 namespace wings {
 
     WObj* Alloc(WContext* context) {
+        // Check allocation limits
+        if (context->mem.size() >= context->config.maxAlloc) {
+            // Too many objects. Try to free up objects
+            WCollectGarbage(context);
+            if (context->mem.size() >= context->config.maxAlloc) {
+                // If there are still too many objects then set a MemoryException
+                WRaiseExceptionObject(context, context->builtins.memoryErrorInstance);
+                return nullptr;
+            }
+        }
+
         // Check if GC should run
-        size_t threshold = (size_t)(context->config.gcRunFactor * context->lastObjectCountAfterGC);
+        size_t threshold = (size_t)((double)context->config.gcRunFactor * context->lastObjectCountAfterGC);
         if (context->mem.size() >= threshold) {
             WCollectGarbage(context);
         }
@@ -43,25 +54,7 @@ extern "C" {
             inUse.push_back(*var.second);
         }
 
-        auto builtins = {
-            context->builtinClasses.object,
-            context->builtinClasses.null,
-            context->builtinClasses._bool,
-            context->builtinClasses._int,
-            context->builtinClasses._float,
-            context->builtinClasses.str,
-            context->builtinClasses.tuple,
-            context->builtinClasses.list,
-            context->builtinClasses.map,
-            context->builtinClasses.func,
-            context->builtinClasses.userdata,
-            context->builtinClasses.slice,
-
-            context->isinstance,
-            context->nullSingleton,
-            context->currentException
-        };
-        for (auto& obj : builtins)
+        for (auto& obj : context->builtins.GetAll())
             if (obj)
                 inUse.push_back(obj);
 
@@ -73,36 +66,39 @@ extern "C" {
             if (!traversed.contains(obj)) {
                 traversed.insert(obj);
 
-                switch (obj->type) {
-                case WObj::Type::List:
-                case WObj::Type::Tuple:
+                if (WIsTuple(obj) || WIsList(obj)) {
                     inUse.insert(
                         inUse.end(),
-                        obj->v.begin(),
-                        obj->v.end()
+                        obj->Get<std::vector<WObj*>>().begin(),
+                        obj->Get<std::vector<WObj*>>().end()
                     );
-                    break;
-                case WObj::Type::Map:
-                    for (const auto& [key, value] : obj->m) {
+                } else if (WIsDictionary(obj)) {
+                    for (const auto& [key, value] : obj->Get<wings::WDict>()) {
                         inUse.push_back(key);
                         inUse.push_back(value);
                     }
-                    break;
-                case WObj::Type::Func:
-                    if (obj->self) {
-                        inUse.push_back(obj->self);
+                } else if (WIsFunction(obj)) {
+                    if (obj->Get<WObj::Func>().self) {
+                        inUse.push_back(obj->Get<WObj::Func>().self);
                     }
-                    break;
-                case WObj::Type::Class:
-                    obj->c.ForEach([&](auto& entry) {
+                } else if (WIsClass(obj)) {
+                    inUse.insert(
+                        inUse.end(),
+                        obj->Get<WObj::Class>().bases.begin(),
+                        obj->Get<WObj::Class>().bases.end()
+                    );
+                    obj->Get<WObj::Class>().instanceAttributes.ForEach([&](auto& entry) {
                         inUse.push_back(entry);
                         });
-                    break;
                 }
                 
                 obj->attributes.ForEach([&](auto& entry) {
                     inUse.push_back(entry);
                     });
+
+                for (WObj* child : obj->references) {
+                    inUse.push_back(child);
+                }
             }
         }
 

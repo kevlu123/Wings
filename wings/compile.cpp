@@ -541,6 +541,7 @@ namespace wings {
 		_class.type = Instruction::Type::Class;
 		_class._class = std::make_unique<ClassInstruction>();
 		_class._class->methodNames = node._class.methodNames;
+		_class._class->prettyName = node._class.name;
 		instructions.push_back(std::move(_class));
 
 		Instruction assign{};

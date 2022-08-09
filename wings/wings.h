@@ -11,42 +11,16 @@ typedef int32_t wint;
 typedef uint32_t wuint;
 typedef float wfloat;
 
-struct WFunc {
+struct WFuncDesc {
     WObj* (*fptr)(WObj** args, int argc, WObj* kwargs, void* userdata);
     void* userdata;
-    const char* prettyName;
     bool isMethod;
-};
-
-struct WClass {
-    WObj** methods;
-    const char** methodNames;
-    int methodCount;
-    WObj** bases;
-    int baseCount;
     const char* prettyName;
 };
 
 struct WFinalizer {
     void (*fptr)(WObj* obj, void* userdata);
     void* userdata;
-};
-
-#ifdef __cplusplus
-enum class WError {
-#else
-enum WError {
-#endif
-    // No error
-    WERROR_OK,
-    // Max WObj allocations reached
-    WERROR_MAX_ALLOC,
-    // Max recursion reached
-    WERROR_MAX_RECURSION,
-    // Error while compiling code
-    WERROR_COMPILE_FAILED,
-    // Error while executing user code
-    WERROR_RUNTIME_ERROR,
 };
 
 struct WConfig {
@@ -76,16 +50,14 @@ extern "C" {
 /**
 * Create a context (an instance of an interpreter).
 * 
-* Even when this function fails, a context is returned so that the error can
-* be retrieved. This context must be freed with WDestroyContext().
+* If the function succeeds, the returned context must be freed with WDestroyContext().
 * Call WGetErrorCode() or WGetErrorMessage() to get any errors.
 * 
-* @param context a pointer to a WContext* to retrieve the context.
 * @param config a pointer to a WConfig struct containing configuration information,
 *               or nullptr for the default configuration.
-* @return true on success, or false on failure.
+* @return a valid WContext* on success, or nullptr on failure.
 */
-WDLL_EXPORT bool WCreateContext(WContext** context, const WConfig* config WDEFAULT_ARG(nullptr));
+WDLL_EXPORT WContext* WCreateContext(const WConfig* config WDEFAULT_ARG(nullptr));
 
 /**
 * Free a context created with WCreateContext().
@@ -110,14 +82,6 @@ WDLL_EXPORT void WDestroyContext(WContext* context);
 WDLL_EXPORT WObj* WCompile(WContext* context, const char* code, const char* moduleName WDEFAULT_ARG(nullptr));
 
 /**
-* Get the current error code.
-* 
-* @param context the relevant context.
-* @return the current error code.
-*/
-WDLL_EXPORT WError WGetErrorCode(WContext* context);
-
-/**
 * Get the current error as a string.
 * 
 * @param context the relevant context.
@@ -126,11 +90,12 @@ WDLL_EXPORT WError WGetErrorCode(WContext* context);
 WDLL_EXPORT const char* WGetErrorMessage(WContext* context);
 
 /**
-* Clear the current error.
-* 
-* @param the relevant context.
+* Get the current exception.
+*
+* @param context the relevant context.
+* @return the current exception object, or nullptr if there is no exception.
 */
-WDLL_EXPORT void WClearError(WContext* context);
+WDLL_EXPORT WObj* WGetCurrentException(WContext* context);
 
 /**
 * Set a runtime error.
@@ -138,15 +103,13 @@ WDLL_EXPORT void WClearError(WContext* context);
 * @param context the relevant context.
 * @param message a null terminated ASCII string containing the error message string.
 */
-WDLL_EXPORT void WRaiseError(WContext* context, const char* message);
+WDLL_EXPORT void WRaiseException(WContext* context, const char* message WDEFAULT_ARG(nullptr), WObj* type WDEFAULT_ARG(nullptr));
+WDLL_EXPORT void WRaiseExceptionObject(WContext* context, WObj* exception);
 
-/**
-* Get the current exception.
-*
-* @param context the relevant context.
-* @return the current exception object, or nullptr if there is no exception.
-*/
-WDLL_EXPORT WObj* WGetCurrentException(WContext* context);
+WDLL_EXPORT void WRaiseArgumentCountError(WContext* context, int given, int expected);
+WDLL_EXPORT void WRaiseArgumentTypeError(WContext* context, int argIndex, const char* expected);
+WDLL_EXPORT void WRaiseAttributeError(const WObj* obj, const char* attribute);
+WDLL_EXPORT bool WIsInstance(WObj* instance, WObj* type);
 
 /**
 * Clear the current exception.
@@ -188,6 +151,7 @@ WDLL_EXPORT WObj* WGetGlobal(WContext* context, const char* name);
 * @param value the value to set the global variable to.
 */
 WDLL_EXPORT void WSetGlobal(WContext* context, const char* name, WObj* value);
+WDLL_EXPORT void WDeleteGlobal(WContext* context, const char* name);
 
 /**
 * Print a message.
@@ -361,17 +325,7 @@ WDLL_EXPORT WObj* WCreateDictionary(WContext* context, WObj** keys WDEFAULT_ARG(
 * @param value a pointer to a WFunc struct containing the function information.
 * @return the instantiated object, or nullptr on failure.
 */
-WDLL_EXPORT WObj* WCreateFunction(WContext* context, const WFunc* value);
-
-/**
-* Instantiate a class instance object.
-*
-* Call WGetErrorCode() or WGetErrorMessage() to get any errors.
-*
-* @param context the relevant context.
-* @return the instantiated object, or nullptr on failure.
-*/
-WDLL_EXPORT WObj* WCreateObject(WContext* context);
+WDLL_EXPORT WObj* WCreateFunction(WContext* context, const WFuncDesc* value);
 
 /**
 * Instantiate a class object.
@@ -382,18 +336,8 @@ WDLL_EXPORT WObj* WCreateObject(WContext* context);
 * @param value a pointer to a WClass struct containing the class information.
 * @return the instantiated object, or nullptr on failure.
 */
-WDLL_EXPORT WObj* WCreateClass(WContext* context, const WClass* value);
-
-/**
-* Instantiate a userdata object.
-*
-* Call WGetErrorCode() or WGetErrorMessage() to get any errors.
-*
-* @param context the relevant context.
-* @param value the value of the object.
-* @return the instantiated object, or nullptr on failure.
-*/
-WDLL_EXPORT WObj* WCreateUserdata(WContext* context, void* value);
+WDLL_EXPORT WObj* WCreateClass(WContext* context, const char* name, WObj** bases, int baseCount);
+WDLL_EXPORT void WAddAttributeToClass(WObj* _class, const char* name, WObj* attribute);
 
 /**
 * Check if an object is None.
@@ -468,28 +412,12 @@ WDLL_EXPORT bool WIsDictionary(const WObj* obj);
 WDLL_EXPORT bool WIsFunction(const WObj* obj);
 
 /**
-* Check if an object is a class instance.
-*
-* @param obj the object to inspect.
-* @return true if the object is a class instance, otherwise false.
-*/
-WDLL_EXPORT bool WIsObject(const WObj* obj);
-
-/**
 * Check if an object is a class.
 *
 * @param obj the object to inspect.
 * @return true if the object is a class, otherwise false.
 */
 WDLL_EXPORT bool WIsClass(const WObj* obj);
-
-/**
-* Check if an object is a userdata.
-*
-* @param obj the object to inspect.
-* @return true if the object is a userdata, otherwise false.
-*/
-WDLL_EXPORT bool WIsUserdata(const WObj* obj);
 
 /**
 * Check if an object is an immutable type.
@@ -539,15 +467,9 @@ WDLL_EXPORT const char* WGetString(const WObj* obj);
 * @param obj the object to get the value from.
 * @param fn a pointer to a WFunc struct to retrieve the function information.
 */
-WDLL_EXPORT void WGetFunction(const WObj* obj, WFunc* fn);
+WDLL_EXPORT void WGetFunction(const WObj* obj, WFuncDesc* fn);
 
-/**
-* Get the value from a userdata object.
-*
-* @param obj the object to get the value from.
-* @return the userdata value of the object.
-*/
-WDLL_EXPORT void* WGetUserdata(const WObj* obj);
+WDLL_EXPORT void* WTryGetUserdata(const WObj* obj, const char* type);
 
 /**
 * Get the finalizer of an object.
@@ -626,7 +548,7 @@ WDLL_EXPORT bool WIterate(WObj* obj, void* userdata, bool(*callback)(WObj* value
 * @param obj the object to operate on.
 * @return a boolean object, or nullptr on failure.
 */
-WDLL_EXPORT WObj* WTruthy(WObj* obj);
+WDLL_EXPORT WObj* WConvertToBool(WObj* obj);
 
 /**
 * Convert an object to an integer.
@@ -713,7 +635,7 @@ WDLL_EXPORT WObj* WCallMethod(WObj* obj, const char* member, WObj** argv, int ar
 * @param baseClass the base class to search in, or nullptr to search in all bases.
 * @return the return value of the method, or nullptr on failure.
 */
-WDLL_EXPORT WObj* WCallMethodFromBase(WObj* obj, const char* member, WObj** argv, int argc, WObj* baseClass WDEFAULT_ARG(nullptr));
+WDLL_EXPORT WObj* WCallMethodFromBase(WObj* obj, const char* member, WObj** argv, int argc, WObj* kwargsDict WDEFAULT_ARG(nullptr), WObj* baseClass WDEFAULT_ARG(nullptr));
 
 /**
 * Get at an index of an object. i.e. obj[index]
@@ -801,7 +723,7 @@ WDLL_EXPORT WObj* WMultiply(WObj* lhs, WObj* rhs);
 /**
 * Divide two objects i.e. lhs / rhs
 *
-* This requires the lhs operand to implement a __div__() method.
+* This requires the lhs operand to implement a __truediv__() method.
 * Call WGetErrorCode() or WGetErrorMessage() to get any errors.
 *
 * @param lhs the left hand operand.
