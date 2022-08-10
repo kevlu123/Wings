@@ -49,7 +49,15 @@ namespace wings {
 
 				if (!found) {
 					if (newKwargs == nullptr) {
-						//WRaiseException(context, );
+						std::string msg;
+						if (!def->prettyName.empty())
+							msg = def->prettyName + "() ";
+						msg += std::string("got an unexpected keyword argument '") + key + "'";
+						WRaiseException(
+							context,
+							msg.c_str(),
+							context->builtins.typeError
+						);
 						return nullptr;
 					}
 					newKwargs->Get<wings::WDict>().insert({ k, value });
@@ -69,14 +77,32 @@ namespace wings {
 		for (int i = 0; i < argc; i++) {
 			if (i < def->parameterNames.size()) {
 				if (assignedParams[i]) {
-					//WRaiseException(context, );
+					std::string msg;
+					if (!def->prettyName.empty())
+						msg = def->prettyName + "() ";
+					msg += "got multiple values for argument '" + def->parameterNames[i] + "'";
+					WRaiseException(
+						context,
+						msg.c_str(),
+						context->builtins.typeError
+					);
 					return nullptr;
 				}
 				executor.variables.insert({ def->parameterNames[i], MakeRcPtr<WObj*>(args[i]) });
 				assignedParams[i] = true;
 			} else {
 				if (listArgs == nullptr) {
-					//WRaiseException(context, );
+					std::string msg;
+					if (!def->prettyName.empty())
+						msg = def->prettyName + "() ";
+					msg += "takes " + std::to_string(def->parameterNames.size())
+						+ " positional argument(s) but " + std::to_string(argc)
+						+ (argc == 1 ? " was given" : " were given");
+					WRaiseException(
+						context,
+						msg.c_str(),
+						context->builtins.typeError
+					);
 					return nullptr;
 				}
 				listArgs->Get<std::vector<WObj*>>().push_back(args[i]);
@@ -105,11 +131,11 @@ namespace wings {
 				def->prettyName + "()"
 				+ " missing parameter(s) "
 				+ unassigned;
-			WRaiseException(context, msg.c_str());
+			WRaiseException(context, msg.c_str(), context->builtins.typeError);
 			return nullptr;
 		}
 
-		return executor.Run(args, argc, kwargs);
+		return executor.Run();
 	}
 
 	DefObject::~DefObject() {
@@ -195,7 +221,11 @@ namespace wings {
 			}
 
 			if (values.size() != target.pack.size()) {
-				WRaiseException(context, "Packed assignment argument count mismatch.");
+				WRaiseException(
+					context,
+					"Packed assignment argument count mismatch",
+					context->builtins.valueError
+				);
 				unprotectValues();
 				return nullptr;
 			}
@@ -214,7 +244,7 @@ namespace wings {
 		}
 	}
 
-	WObj* Executor::Run(WObj** args, int argc, WObj* kwargs) {
+	WObj* Executor::Run() {
 		for (const auto& var : variables)
 			WProtectObject(*var.second);
 
@@ -421,7 +451,11 @@ namespace wings {
 					WObj* key = start[2 * i];
 					WObj* val = start[2 * i + 1];
 					if (!WIsImmutableType(key)) {
-						WRaiseException(context, "Only an immutable type can be used as a dictionary key");
+						WRaiseException(
+							context,
+							"Only an immutable type can be used as a dictionary key",
+							context->builtins.typeError
+						);
 						exitValue = nullptr;
 						return;
 					}
@@ -494,7 +528,7 @@ namespace wings {
 			} else {
 				std::string msg = "Object of type " + WObjTypeToString(obj) +
 					" has no attribute " + instr.string->string;
-				WRaiseException(context, msg.c_str());
+				WRaiseException(context, msg.c_str(), context->builtins.attributeError);
 				exitValue = nullptr;
 			}
 			break;
@@ -516,7 +550,11 @@ namespace wings {
 		case Instruction::Type::UnpackMapForMapCreation: {
 			WObj* map = PopStack();
 			if (!WIsDictionary(map)) {
-				WRaiseException(context, "Unary '**' must be applied to a dictionary");
+				WRaiseException(
+					context,
+					"Unary '**' must be applied to a dictionary",
+					context->builtins.typeError
+				);
 				exitValue = nullptr;
 				return;
 			}
@@ -530,14 +568,22 @@ namespace wings {
 		case Instruction::Type::UnpackMapForCall: {
 			WObj* map = PopStack();
 			if (!WIsDictionary(map)) {
-				WRaiseException(context, "Unary '**' must be applied to a dictionary");
+				WRaiseException(
+					context,
+					"Unary '**' must be applied to a dictionary",
+					context->builtins.typeError
+				);
 				exitValue = nullptr;
 				return;
 			}
 
 			for (const auto& [key, value] : map->Get<wings::WDict>()) {
 				if (!WIsString(key)) {
-					WRaiseException(context, "Keywords arguments must be strings");
+					WRaiseException(
+						context,
+						"Keywords arguments must be strings",
+						context->builtins.typeError
+					);
 					exitValue = nullptr;
 					return;
 				}

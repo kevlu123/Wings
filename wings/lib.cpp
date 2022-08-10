@@ -5,6 +5,7 @@
 #include <unordered_set>
 #include <cmath>
 #include <algorithm>
+#include <queue>
 
 using namespace wings;
 
@@ -55,21 +56,35 @@ class Exception(BaseException):
 class SyntaxError(Exception):
 	pass
 
-class TypeError(Exception):
-	pass
-
 class NameError(Exception):
 	pass
 
-def isinstance(o, t):
-	def f(cls):
-		if cls == t:
-			return True
-		for base in cls.__bases__:
-			if f(base):
-				return True
-		return False
-	return f(o.__class__)
+class TypeError(Exception):
+	pass
+
+class ValueError(Exception):
+	pass
+
+class AttributeError(Exception):
+	pass
+
+class LookupError(Exception):
+	pass
+
+class IndexError(LookupError):
+	pass
+
+class KeyError(LookupError):
+	pass
+
+class ArithmeticError(Exception):
+	pass
+
+class OverflowError(ArithmeticError):
+	pass
+
+class ZeroDivisionError(ArithmeticError):
+	pass
 
 def len(x):
 	return x.__len__()
@@ -111,19 +126,31 @@ def range(start, end=None, step=None):
 	else:
 		return __Range(start, end, step)
 
-class __Slice:
-	def __init__(self, start, stop, step):
-		self.start = start
-		self.stop = stop
-		self.step = step
-
-def slice(start, stop=None, step=None):
-	if stop == None:
-		return slice(None, start, None)
-	elif step == None:
-		return slice(start, stop, None)
+def __convert_index(container, index):
+	if index < 0:
+		return len(container) + index
 	else:
-		return slice(start, stop, step)
+		return index
+
+def __convert_slice(container, index):
+	index.start = __convert_index(container, index.start) if index.start != None else 0
+	index.stop = __convert_index(container, index.stop)
+	index.step = index.step if index.start != None else 1
+
+class slice:
+	def __init__(self, start, stop=None, step=None):
+		if stop == None:
+			self.start = None
+			self.stop = start
+			self.step = None
+		elif step == None:
+			self.start = start
+			self.stop = stop
+			self.step = None
+		else:
+			self.start = start
+			self.stop = stop
+			self.step = step
 
 class __ListIter:
 	def __init__(self, li):
@@ -138,8 +165,39 @@ class __ListIter:
 	def __end__(self):
 		return self.i >= len(self.li)
 		
-set_method(list, "__iter__", lambda self: __ListIter(self))
+def __getitem__(self, index):
+	if isinstance(index, slice):
+		index = __convert_slice(index)
+		return self.__getslice(
+			index.start,
+			index.stop,
+			index.step
+		)
+	else:
+		return self.__getindex(__convert_index(self, index))
+		
+def __setitem__(self, index, value):
+	if isinstance(index, slice):
+		index = __convert_slice(index)
+		return self.__setslice(
+			index.start,
+			index.stop,
+			index.step,
+			value
+		)
+	else:
+		return self.__setindex(__convert_index(self, index), value)
+
 set_method(tuple, "__iter__", lambda self: __ListIter(self))
+set_method(list, "__iter__", lambda self: __ListIter(self))
+set_method(tuple, "__getitem__", __getitem__)
+set_method(list, "__getitem__", __getitem__)
+set_method(tuple, "__setitem__", __setitem__)
+set_method(list, "__setitem__", __setitem__)
+
+set_method = None
+__getitem__ = None
+__setitem__ = None
 )";
 
 
@@ -167,12 +225,12 @@ static void SetInvalidArgumentCountError(WContext* context, int given, int expec
 			std::to_string(given) +
 			" argument(s)";
 	}
-	WRaiseException(context, msg.c_str());
+	WRaiseException(context, msg.c_str(), context->builtins.typeError);
 }
 
-static void SetArgumentError(WContext* context, size_t paramIndex, const std::string& message) {
+static void SetArgumentError(WContext* context, size_t paramIndex, const std::string& message, WObj* exc) {
 	std::string msg = "Argument " + std::to_string(paramIndex + 1) + " " + message;
-	WRaiseException(context, msg.c_str());
+	WRaiseException(context, msg.c_str(), exc);
 }
 
 static void SetInvalidTypeError(WContext* context, WObj**argv, size_t paramIndex, const std::string& expectedType) {
@@ -180,7 +238,8 @@ static void SetInvalidTypeError(WContext* context, WObj**argv, size_t paramIndex
 		context,
 		paramIndex,
 		"expected type " + expectedType +
-		" but got " + WObjTypeToString(argv[paramIndex])
+		" but got " + WObjTypeToString(argv[paramIndex]),
+		context->builtins.typeError
 	);
 }
 
@@ -189,7 +248,8 @@ static void SetMissingAttributeError(WContext* context, WObj** argv, size_t para
 		context,
 		paramIndex,
 		" of type " + WObjTypeToString(argv[paramIndex]) +
-		" has no attribute " + attribute
+		" has no attribute " + attribute,
+		context->builtins.attributeError
 	);
 }
 
@@ -197,12 +257,13 @@ static void SetIndexOutOfRangeError(WContext* context, WObj** argv, size_t param
 	SetArgumentError(
 		context,
 		paramIndex,
-		"index out of range"
+		"index out of range",
+		context->builtins.indexError
 	);
 }
 
 static void SetDivisionByZeroError(WContext* context) {
-	WRaiseException(context, "Division by zero");
+	WRaiseException(context, "Division by zero", context->builtins.zeroDivisionError);
 }
 
 #define EXPECT_ARG_COUNT(n) do if (argc != n) { SetInvalidArgumentCountError(context, argc, n); return nullptr; } while (0)
@@ -625,7 +686,7 @@ namespace wings {
 			return WCreateInt(context, WGetInt(argv[0]) | WGetInt(argv[1]));
 		}
 
-		static WObj* iint_xor(WObj** argv, int argc, WObj* kwargs, WContext* context) {
+		static WObj* int_xor(WObj** argv, int argc, WObj* kwargs, WContext* context) {
 			EXPECT_ARG_COUNT(2);
 			EXPECT_ARG_TYPE_INT(0);
 			EXPECT_ARG_TYPE_INT(1);
@@ -645,7 +706,7 @@ namespace wings {
 
 			wint shift = WGetInt(argv[1]);
 			if (shift < 0) {
-				WRaiseException(context, "Shift cannot be negative");
+				WRaiseException(context, "Shift cannot be negative", context->builtins.valueError);
 				return nullptr;
 			}
 			shift = std::min(shift, (wint)sizeof(wint) * 8);
@@ -659,7 +720,7 @@ namespace wings {
 
 			wint shift = WGetInt(argv[1]);
 			if (shift < 0) {
-				WRaiseException(context, "Shift cannot be negative");
+				WRaiseException(context, "Shift cannot be negative", context->builtins.valueError);
 				return nullptr;
 			}
 			shift = std::min(shift, (wint)sizeof(wint) * 8);
@@ -812,9 +873,9 @@ namespace wings {
 
 				if (!isDigit(*p, base)) {
 					if (base == 2) {
-						WRaiseException(context, "Invalid binary string");
+						WRaiseException(context, "Invalid binary string", context->builtins.valueError);
 					} else {
-						WRaiseException(context, "Invalid hexadecimal string");
+						WRaiseException(context, "Invalid hexadecimal string", context->builtins.valueError);
 					}
 					return nullptr;
 				}
@@ -826,12 +887,12 @@ namespace wings {
 			}
 
 			if (value > std::numeric_limits<wuint>::max()) {
-				WRaiseException(context, "Integer string is too large");
+				WRaiseException(context, "Integer string is too large", context->builtins.overflowError);
 				return nullptr;
 			}
 
 			if (*p) {
-				WRaiseException(context, "Invalid integer string");
+				WRaiseException(context, "Invalid integer string", context->builtins.valueError);
 				return nullptr;
 			}
 
@@ -889,9 +950,9 @@ namespace wings {
 
 				if (!isDigit(*p, base) && *p != '.') {
 					if (base == 2) {
-						WRaiseException(context, "Invalid binary string");
+						WRaiseException(context, "Invalid binary string", context->builtins.valueError);
 					} else {
-						WRaiseException(context, "Invalid hexadecimal string");
+						WRaiseException(context, "Invalid hexadecimal string", context->builtins.valueError);
 					}
 					return nullptr;
 				}
@@ -911,7 +972,7 @@ namespace wings {
 			}
 
 			if (*p) {
-				WRaiseException(context, "Invalid float string");
+				WRaiseException(context, "Invalid float string", context->builtins.valueError);
 				return nullptr;
 			}
 
@@ -1121,6 +1182,18 @@ namespace wings {
 			return WCreateNoneType(context);
 		}
 
+		static WObj* isinstance(WObj** argv, int argc, WObj* kwargs, WContext* context) {
+			EXPECT_ARG_COUNT(2);
+			bool ret{};
+			if (WIsTuple(argv[1])) {
+				const auto& buf = argv[1]->Get<std::vector<WObj*>>();
+				ret = WIsInstance(argv[0], buf.data(), (int)buf.size());
+			} else {
+				ret = WIsInstance(argv[0], argv + 1, 1);
+			}
+			return WCreateBool(context, ret);
+		}
+
 		static WObj* set_method(WObj** argv, int argc, WObj* kwargs, WContext* context) {
 			// Not callable from user code
 			argv[2]->Get<WObj::Func>().isMethod = true;
@@ -1134,7 +1207,7 @@ namespace wings {
 
 	} // namespace lib
 
-	struct LibraryInitException {};
+	struct LibraryInitException : std::exception {};
 
 	using WFuncSignature = WObj * (*)(WObj**, int, WObj*, WContext*);
 
@@ -1156,7 +1229,7 @@ namespace wings {
 	}
 
 	template <WFuncSignature fn>
-	void RegisterFunction(WContext* context, const char* name) {
+	WObj* RegisterFunction(WContext* context, const char* name) {
 		WFuncDesc wfn{};
 		wfn.isMethod = true;
 		wfn.prettyName = name;
@@ -1169,6 +1242,7 @@ namespace wings {
 		if (obj == nullptr)
 			throw LibraryInitException();
 		WSetGlobal(context, name, obj);
+		return obj;
 	}
 
 	WObj* CreateClass(WContext* context, const char* name) {
@@ -1311,7 +1385,7 @@ namespace wings {
 			RegisterMethod<attrlib::int_pow>(context->builtins._int, "__pow__");
 			RegisterMethod<attrlib::int_and>(context->builtins._int, "__and__");
 			RegisterMethod<attrlib::int_or>(context->builtins._int, "__or__");
-			RegisterMethod<attrlib::iint_xor>(context->builtins._int, "__xor__");
+			RegisterMethod<attrlib::int_xor>(context->builtins._int, "__xor__");
 			RegisterMethod<attrlib::int_invert>(context->builtins._int, "__invert__");
 			RegisterMethod<attrlib::int_lshift>(context->builtins._int, "__lshift__");
 			RegisterMethod<attrlib::int_rshift>(context->builtins._int, "__rshift__");
@@ -1334,6 +1408,8 @@ namespace wings {
 
 			context->builtins.str = getGlobal("str");
 			RegisterMethod<ctors::str>(context->builtins.str, "__init__");
+			RegisterMethod<attrlib::str_int>(context->builtins.str, "__int__");
+			RegisterMethod<attrlib::str_float>(context->builtins.str, "__float__");
 
 			context->builtins.list = getGlobal("list");
 			RegisterMethod<ctors::collection<Collection::List>>(context->builtins.list, "__init__");
@@ -1348,23 +1424,38 @@ namespace wings {
 			RegisterMethod<ctors::map>(context->builtins.dict, "__init__");
 			RegisterMethod<attrlib::map_str>(context->builtins.dict, "__str__");
 
+			// Add native free functions
+			RegisterFunction<lib::print>(context, "print");
+			context->builtins.isinstance = RegisterFunction<lib::isinstance>(context, "isinstance");
+
 			// Call the rest of the non-native library code
 			WObj* builtins = WCompile(context, LIBRARY_CODE, "__builtins__");
 			if (builtins == nullptr)
 				throw LibraryInitException();
 			if (WCall(builtins, nullptr, 0) == nullptr)
 				throw LibraryInitException();
-			WDeleteGlobal(context, "set_method");
 
-			context->builtins.slice = getGlobal("__Slice");
-			context->builtins.isinstance = getGlobal("isinstance");
+			std::vector<std::string> toDelete;
+			for (const auto& [k, v] : context->globals)
+				if (WIsNoneType(*v))
+					toDelete.push_back(k);
+			for (const auto& s : toDelete)
+				WDeleteGlobal(context, s.c_str());
+
+			context->builtins.slice = getGlobal("slice");
 			context->builtins.baseException = getGlobal("BaseException");
 			context->builtins.exception = getGlobal("Exception");
 			context->builtins.syntaxError = getGlobal("SyntaxError");
-			context->builtins.typeError = getGlobal("TypeError");
 			context->builtins.nameError = getGlobal("NameError");
-			RegisterFunction<lib::print>(context, "print");
-
+			context->builtins.typeError = getGlobal("TypeError");
+			context->builtins.valueError = getGlobal("ValueError");
+			context->builtins.attributeError = getGlobal("AttributeError");
+			context->builtins.lookupError = getGlobal("LookupError");
+			context->builtins.indexError = getGlobal("IndexError");
+			context->builtins.keyError = getGlobal("KeyError");
+			context->builtins.arithmeticError = getGlobal("ArithmeticError");
+			context->builtins.overflowError = getGlobal("OverflowError");
+			context->builtins.zeroDivisionError = getGlobal("ZeroDivisionError");
 			return true;
 		} catch (LibraryInitException&) {
 			return false;

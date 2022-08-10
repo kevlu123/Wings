@@ -51,6 +51,7 @@ namespace wings {
         WObjRef(const WObjRef&) = delete;
         WObjRef& operator=(const WObjRef&) = delete;
         ~WObjRef() { if (obj) WUnprotectObject(obj); }
+        WObj* Get() const { return obj; }
     private:
         WObj* obj;
     };
@@ -73,8 +74,16 @@ namespace wings {
         WObj* baseException;
         WObj* exception;
         WObj* syntaxError;
-        WObj* typeError;
         WObj* nameError;
+        WObj* typeError;
+        WObj* valueError;
+        WObj* attributeError;
+        WObj* lookupError;
+        WObj* indexError;
+        WObj* keyError;
+        WObj* arithmeticError;
+        WObj* overflowError;
+        WObj* zeroDivisionError;
 
         // Instances
         WObj* none;
@@ -84,7 +93,9 @@ namespace wings {
         auto GetAll() const {
             return std::array{
                 object, noneType, _bool, _int, _float, str, tuple, list, dict, func, slice,
-                baseException, exception, syntaxError, typeError, nameError,
+                baseException, exception, syntaxError, nameError, typeError, valueError,
+                attributeError, lookupError, indexError, keyError, arithmeticError, overflowError,
+                zeroDivisionError,
                 none, memoryErrorInstance, isinstance,
             };
         }
@@ -109,7 +120,17 @@ struct WObj {
     };
 
     std::string type;
-    void* data;
+    union {
+        void* data;
+        bool* _bool;
+        wint* _int;
+        wfloat* _float;
+        std::string* _str;
+        std::vector<WObj*>* _list;
+        wings::WDict* _map;
+        Func* _func;
+        Class* _class;
+    };
     template <class T> const T& Get() const { return *(const T*)data; }
     template <class T> T& Get() { return *(T*)data; }
 

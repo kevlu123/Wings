@@ -84,7 +84,7 @@ extern "C" {
 
     void WRaiseExceptionObject(WContext* context, WObj* exception) {
         WASSERT(context && exception);
-        if (WIsInstance(exception, context->builtins.baseException)) {
+        if (WIsInstance(exception, &context->builtins.baseException, 1)) {
             context->currentException = exception;
         } else {
             WRaiseException(context, "exceptions must derive from BaseException", context->builtins.typeError);
@@ -104,19 +104,19 @@ extern "C" {
                 std::to_string(given) +
                 " argument(s)";
         }
-        WRaiseException(context, msg.c_str());
+        WRaiseException(context, msg.c_str(), context->builtins.typeError);
     }
 
     void WRaiseArgumentTypeError(WContext* context, int argIndex, const char* expected) {
         std::string msg = "Argument " + std::to_string(argIndex + 1)
             + " Expected type " + expected;
-        WRaiseException(context, msg.c_str());
+        WRaiseException(context, msg.c_str(), context->builtins.typeError);
     }
 
     void WRaiseAttributeError(const WObj* obj, const char* attribute) {
         std::string msg = " Object of type " + WObjTypeToString(obj) +
             " has no attribute " + attribute;
-        WRaiseException(obj->context, msg.c_str());
+        WRaiseException(obj->context, msg.c_str(), obj->context->builtins.attributeError);
     }
 
     void WGetConfig(const WContext* context, WConfig* config) {
@@ -206,7 +206,7 @@ extern "C" {
         DefObject* def = new DefObject();
         def->context = context;
         def->module = moduleName;
-        def->prettyName = "";
+        def->prettyName = "<unnamed>";
         def->originalSource = std::move(originalSource);
         auto instructions = Compile(parseResult.parseTree);
         def->instructions = MakeRcPtr<std::vector<Instruction>>(std::move(instructions));
@@ -214,7 +214,7 @@ extern "C" {
         WFuncDesc func{};
         func.fptr = &DefObject::Run;
         func.userdata = def;
-        func.prettyName = "";
+        func.prettyName = "<unnamed>";
         WObj* obj = WCreateFunction(context, &func);
         if (obj == nullptr) {
             delete def;

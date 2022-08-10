@@ -14,7 +14,7 @@ static void Expect(const char* code, const char* expected, size_t line) {
     try {
         context = WCreateContext();
         if (context == nullptr)
-            throw std::string(WGetErrorMessage(context));
+            throw std::string("Context creation failed");
 
         WConfig cfg{};
         WGetConfig(context, &cfg);
@@ -57,7 +57,7 @@ static void ExpectFailure(const char* code, size_t line) {
     try {
         context = WCreateContext();
         if (context == nullptr)
-            throw std::string(WGetErrorMessage(context));
+            throw std::string("Context creation failed");
 
         WConfig cfg{};
         WGetConfig(context, &cfg);

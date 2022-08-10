@@ -109,7 +109,7 @@ WDLL_EXPORT void WRaiseExceptionObject(WContext* context, WObj* exception);
 WDLL_EXPORT void WRaiseArgumentCountError(WContext* context, int given, int expected);
 WDLL_EXPORT void WRaiseArgumentTypeError(WContext* context, int argIndex, const char* expected);
 WDLL_EXPORT void WRaiseAttributeError(const WObj* obj, const char* attribute);
-WDLL_EXPORT bool WIsInstance(WObj* instance, WObj* type);
+WDLL_EXPORT bool WIsInstance(const WObj* instance, const WObj*const* types, int typesLen);
 
 /**
 * Clear the current exception.

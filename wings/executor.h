@@ -32,7 +32,7 @@ namespace wings {
 	};
 
 	struct Executor {
-		WObj* Run(WObj** args, int argc, WObj* kwargs);
+		WObj* Run();
 
 		void PushStack(WObj* obj);
 		WObj* PopStack();
