@@ -19,6 +19,7 @@ namespace wings {
     size_t Guid();
     bool InitLibrary(WContext* context);
     std::string WObjTypeToString(const WObj* obj);
+    void CallErrorCallback(const char* message);
 
     struct SourcePosition {
         size_t line = (size_t)-1;
@@ -153,5 +154,13 @@ struct WContext {
     wings::Builtins builtins{};
 };
 
-#define WASSERT(assertion) do { if (!(assertion)) std::abort(); } while (0)
+#define STRINGIZE_HELPER(x) STRINGIZE2_HELPER(x)
+#define STRINGIZE2_HELPER(x) #x
+#define LINE_AS_STRING STRINGIZE_HELPER(__LINE__)
+
 #define WUNREACHABLE() std::abort()
+#define WASSERT_RET(ret, assertion) do { if (!(assertion)) { wings::CallErrorCallback( \
+LINE_AS_STRING " " __FILE__ " " #assertion \
+); return ret; } } while (0)
+#define WASSERT(assertion) WASSERT_RET({}, assertion)
+#define WASSERT_VOID(assertion) WASSERT_RET(void(), assertion)

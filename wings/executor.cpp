@@ -149,7 +149,6 @@ namespace wings {
 	}
 
 	WObj* Executor::PopStack() {
-		WASSERT(!stack.empty());
 		auto obj = stack.back();
 		stack.pop_back();
 		WUnprotectObject(obj);
@@ -157,7 +156,6 @@ namespace wings {
 	}
 
 	WObj* Executor::PeekStack() {
-		WASSERT(!stack.empty());
 		return stack.back();
 	}
 

@@ -46,7 +46,7 @@ extern "C" {
 	WObj* WCreateString(WContext* context, const char* value) {
 		WASSERT(context);
 		if (WObj* v = WCall(context->builtins.str, nullptr, 0)) {
-			v->Get<std::string>() = value;
+			v->Get<std::string>() = value ? value : "";
 			return v;
 		} else {
 			return nullptr;
@@ -121,7 +121,7 @@ extern "C" {
 	}
 
 	WObj* WCreateFunction(WContext* context, const WFuncDesc* value) {
-		WASSERT(context);
+		WASSERT(context && value);
 		if (WObj* v = WCall(context->builtins.func, nullptr, 0)) {
 			v->Get<WObj::Func>() = {
 				nullptr,
@@ -260,7 +260,7 @@ extern "C" {
 	}
 	
 	void WAddAttributeToClass(WObj* _class, const char* name, WObj* attribute) {
-		WASSERT(_class && name && attribute && WIsClass(_class));
+		WASSERT_VOID(_class && name && attribute && WIsClass(_class));
 		_class->Get<WObj::Class>().instanceAttributes.Set(name, attribute);
 	}
 
@@ -351,7 +351,7 @@ extern "C" {
 	}
 
 	void WGetFunction(const WObj* obj, WFuncDesc* fn) {
-		WASSERT(obj && fn && WIsFunction(obj));
+		WASSERT_VOID(obj && fn && WIsFunction(obj));
 		const auto& f = obj->Get<WObj::Func>();
 		fn->fptr = f.fptr;
 		fn->userdata = f.userdata;
@@ -360,6 +360,7 @@ extern "C" {
 	}
 
 	void* WTryGetUserdata(const WObj* obj, const char* type) {
+		WASSERT(obj && type);
 		if (obj->type == std::string(type)) {
 			return obj->data;
 		} else {
@@ -368,12 +369,12 @@ extern "C" {
 	}
 
 	void WGetFinalizer(const WObj* obj, WFinalizer* finalizer) {
-		WASSERT(obj && finalizer);
+		WASSERT_VOID(obj && finalizer);
 		*finalizer = obj->finalizer;
 	}
 
 	void WSetFinalizer(WObj* obj, const WFinalizer* finalizer) {
-		WASSERT(obj && finalizer);
+		WASSERT_VOID(obj && finalizer);
 		obj->finalizer = *finalizer;
 	}
 
@@ -387,7 +388,7 @@ extern "C" {
 	}
 
 	void WSetAttribute(WObj* obj, const char* member, WObj* value) {
-		WASSERT(obj && member && value);
+		WASSERT_VOID(obj && member && value);
 		obj->attributes.Set(member, value);
 	}
 
@@ -487,6 +488,7 @@ extern "C" {
 	}
 
 	WObj* WConvertToBool(WObj* arg) {
+		WASSERT(arg);
 		if (WObj* res = WCallMethod(arg, "__nonzero__", nullptr, 0)) {
 			if (WIsBool(res)) {
 				return res;
@@ -502,6 +504,7 @@ extern "C" {
 	}
 
 	WObj* WConvertToInt(WObj* arg) {
+		WASSERT(arg);
 		if (WObj* res = WCallMethod(arg, "__int__", nullptr, 0)) {
 			if (WIsInt(res)) {
 				return res;
@@ -517,6 +520,7 @@ extern "C" {
 	}
 
 	WObj* WConvertToFloat(WObj* arg) {
+		WASSERT(arg);
 		if (WObj* res = WCallMethod(arg, "__float__", nullptr, 0)) {
 			if (WIsIntOrFloat(res)) {
 				return res;
@@ -532,6 +536,7 @@ extern "C" {
 	}
 
 	WObj* WConvertToString(WObj* arg) {
+		WASSERT(arg);
 		if (WObj* res = WCallMethod(arg, "__str__", nullptr, 0)) {
 			if (WIsString(res)) {
 				return res;
@@ -670,51 +675,63 @@ extern "C" {
 	}
 
 	WObj* WGetIndex(WObj* obj, WObj* index) {
+		WASSERT(obj && index);
 		return WCallMethod(obj, "__getitem__", &index, 1);
 	}
 
 	WObj* WSetIndex(WObj* obj, WObj* index, WObj* value) {
+		WASSERT(obj && index && value);
 		WObj* argv[2] = { index, value };
 		return WCallMethod(obj, "__setitem__", argv, 2);
 	}
 
 	WObj* WPositive(WObj* arg) {
+		WASSERT(arg);
 		return WCallMethod(arg, "__pos__", nullptr, 0);
 	}
 
 	WObj* WNegative(WObj* arg) {
+		WASSERT(arg);
 		return WCallMethod(arg, "__neg__", nullptr, 0);
 	}
 
 	WObj* WAdd(WObj* lhs, WObj* rhs) {
+		WASSERT(lhs && rhs);
 		return WCallMethod(lhs, "__add__", &rhs, 1);
 	}
 
 	WObj* WSubtract(WObj* lhs, WObj* rhs) {
+		WASSERT(lhs && rhs);
 		return WCallMethod(lhs, "__sub__", &rhs, 1);
 	}
 
 	WObj* WMultiply(WObj* lhs, WObj* rhs) {
+		WASSERT(lhs && rhs);
 		return WCallMethod(lhs, "__mul__", &rhs, 1);
 	}
 
 	WObj* WDivide(WObj* lhs, WObj* rhs) {
+		WASSERT(lhs && rhs);
 		return WCallMethod(lhs, "__truediv__", &rhs, 1);
 	}
 
 	WObj* WFloorDivide(WObj* lhs, WObj* rhs) {
+		WASSERT(lhs && rhs);
 		return WCallMethod(lhs, "__floordiv__", &rhs, 1);
 	}
 
 	WObj* WModulo(WObj* lhs, WObj* rhs) {
+		WASSERT(lhs && rhs);
 		return WCallMethod(lhs, "__mod__", &rhs, 1);
 	}
 
 	WObj* WPower(WObj* lhs, WObj* rhs) {
+		WASSERT(lhs && rhs);
 		return WCallMethod(lhs, "__pow__", &rhs, 1);
 	}
 
 	WObj* WEquals(WObj* lhs, WObj* rhs) {
+		WASSERT(lhs && rhs);
 		if (WObj* res = WCallMethod(lhs, "__eq__", &rhs, 1)) {
 			if (WIsBool(res)) {
 				return res;
@@ -730,6 +747,7 @@ extern "C" {
 	}
 
 	WObj* WNotEquals(WObj* lhs, WObj* rhs) {
+		WASSERT(lhs && rhs);
 		if (WObj* res = WCallMethod(lhs, "__ne__", &rhs, 1)) {
 			if (WIsBool(res)) {
 				return res;
@@ -745,6 +763,7 @@ extern "C" {
 	}
 
 	WObj* WLessThan(WObj* lhs, WObj* rhs) {
+		WASSERT(lhs && rhs);
 		if (WObj* res = WCallMethod(lhs, "__lt__", &rhs, 1)) {
 			if (WIsBool(res)) {
 				return res;
@@ -760,6 +779,7 @@ extern "C" {
 	}
 
 	WObj* WLessThanOrEqual(WObj* lhs, WObj* rhs) {
+		WASSERT(lhs && rhs);
 		if (WObj* res = WCallMethod(lhs, "__le__", &rhs, 1)) {
 			if (WIsBool(res)) {
 				return res;
@@ -775,6 +795,7 @@ extern "C" {
 	}
 
 	WObj* WGreaterThan(WObj* lhs, WObj* rhs) {
+		WASSERT(lhs && rhs);
 		if (WObj* res = WCallMethod(lhs, "__gt__", &rhs, 1)) {
 			if (WIsBool(res)) {
 				return res;
@@ -790,6 +811,7 @@ extern "C" {
 	}
 
 	WObj* WGreaterThanOrEqual(WObj* lhs, WObj* rhs) {
+		WASSERT(lhs && rhs);
 		if (WObj* res = WCallMethod(lhs, "__ge__", &rhs, 1)) {
 			if (WIsBool(res)) {
 				return res;
@@ -805,6 +827,7 @@ extern "C" {
 	}
 
 	WObj* WIn(WObj* container, WObj* obj) {
+		WASSERT(container && obj);
 		if (WObj* res = WCallMethod(container, "__contains__", &obj, 1)) {
 			if (WIsBool(res)) {
 				return res;
@@ -820,6 +843,7 @@ extern "C" {
 	}
 
 	WObj* WNotIn(WObj* container, WObj* obj) {
+		WASSERT(container && obj);
 		if (WObj* inOp = WIn(container, obj)) {
 			return WCreateBool(container->context, !WGetBool(inOp));
 		} else {
@@ -828,26 +852,32 @@ extern "C" {
 	}
 
 	WObj* WBitAnd(WObj* lhs, WObj* rhs) {
+		WASSERT(lhs && rhs);
 		return WCallMethod(lhs, "__and__", &rhs, 1);
 	}
 
 	WObj* WBitOr(WObj* lhs, WObj* rhs) {
+		WASSERT(lhs && rhs);
 		return WCallMethod(lhs, "__or__", &rhs, 1);
 	}
 
 	WObj* WBitNot(WObj* arg) {
+		WASSERT(arg);
 		return WCallMethod(arg, "__invert__", nullptr, 0);
 	}
 
 	WObj* WBitXor(WObj* lhs, WObj* rhs) {
+		WASSERT(lhs && rhs);
 		return WCallMethod(lhs, "__xor__", &rhs, 1);
 	}
 
 	WObj* WShiftLeft(WObj* lhs, WObj* rhs) {
+		WASSERT(lhs && rhs);
 		return WCallMethod(lhs, "__lshift__", &rhs, 1);
 	}
 
 	WObj* WShiftRight(WObj* lhs, WObj* rhs) {
+		WASSERT(lhs && rhs);
 		return WCallMethod(lhs, "__rshift__", &rhs, 1);
 	}
 

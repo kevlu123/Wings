@@ -31,6 +31,8 @@ struct WConfig {
     void (*print)(const char* message, int len);
 };
 
+typedef void(*WErrorCallback)(const char* message, void* userdata);
+
 #ifdef _WIN32
 #define WDLL_EXPORT __declspec(dllexport)
 #else
@@ -80,6 +82,8 @@ WDLL_EXPORT void WDestroyContext(WContext* context);
 * @return the compiled function object, or nullptr on failure. Call WCall() to execute the function object.
 */
 WDLL_EXPORT WObj* WCompile(WContext* context, const char* code, const char* moduleName WDEFAULT_ARG(nullptr));
+
+WDLL_EXPORT void WSetErrorCallback(WErrorCallback callback, void* userdata);
 
 /**
 * Get the current error as a string.

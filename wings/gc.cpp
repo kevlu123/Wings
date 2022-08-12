@@ -47,7 +47,7 @@ namespace wings {
 extern "C" {
 
     void WCollectGarbage(WContext* context) {
-        WASSERT(context);
+        WASSERT_VOID(context);
 
         std::deque<const WObj*> inUse(context->protectedObjects.begin(), context->protectedObjects.end());
         for (auto& var : context->globals) {
@@ -121,29 +121,29 @@ extern "C" {
     }
 
     void WProtectObject(const WObj* obj) {
-        WASSERT(obj);
+        WASSERT_VOID(obj);
         obj->context->protectedObjects.insert(obj);
     }
 
     void WUnprotectObject(const WObj* obj) {
-        WASSERT(obj);
+        WASSERT_VOID(obj);
         auto it = obj->context->protectedObjects.find(obj);
-        WASSERT(it != obj->context->protectedObjects.end());
+        WASSERT_VOID(it != obj->context->protectedObjects.end());
         obj->context->protectedObjects.erase(it);
     }
 
     void WLinkReference(WObj* parent, WObj* child) {
-        WASSERT(parent && child);
+        WASSERT_VOID(parent && child);
         parent->references.push_back(child);
     }
     void WUnlinkReference(WObj* parent, WObj* child) {
-        WASSERT(parent && child);
+        WASSERT_VOID(parent && child);
         auto it = std::find(
             parent->references.begin(),
             parent->references.end(),
             child
         );
-        WASSERT(it != parent->references.end());
+        WASSERT_VOID(it != parent->references.end());
         parent->references.erase(it);
     }
 

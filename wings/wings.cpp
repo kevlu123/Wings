@@ -7,11 +7,17 @@
 #include <sstream>
 #include <algorithm>
 #include <atomic>
+#include <mutex>
 
 using namespace wings;
 
+static WErrorCallback errorCallback;
+static void* errorCallbackUserdata;
+static std::mutex errorCallbackMutex;
+
 extern "C" {
     const char* WGetErrorMessage(WContext* context) {
+        WASSERT(context);
         std::stringstream ss;
         ss << "Traceback (most recent call first):\n";
 
@@ -58,16 +64,18 @@ extern "C" {
     }
 
     WObj* WGetCurrentException(WContext* context) {
+        WASSERT(context);
         return context->currentException;
     }
 
     void WClearCurrentException(WContext* context) {
+        WASSERT_VOID(context);
         context->currentException = nullptr;
         context->trace.clear();
     }
 
     void WRaiseException(WContext* context, const char* message, WObj* type) {
-        WASSERT(context);
+        WASSERT_VOID(context);
         type = type ? type : context->builtins.exception;
 
         WObj* msg = WCreateString(context, message);
@@ -83,7 +91,7 @@ extern "C" {
     }
 
     void WRaiseExceptionObject(WContext* context, WObj* exception) {
-        WASSERT(context && exception);
+        WASSERT_VOID(context && exception);
         if (WIsInstance(exception, &context->builtins.baseException, 1)) {
             context->currentException = exception;
         } else {
@@ -92,6 +100,7 @@ extern "C" {
     }
     
     void WRaiseArgumentCountError(WContext* context, int given, int expected) {
+        WASSERT_VOID(context && given >= 0 && expected >= -1);
         std::string msg;
         if (expected != -1) {
             msg = "Function takes " +
@@ -108,29 +117,31 @@ extern "C" {
     }
 
     void WRaiseArgumentTypeError(WContext* context, int argIndex, const char* expected) {
+		WASSERT_VOID(context && argIndex >= 0 && expected);
         std::string msg = "Argument " + std::to_string(argIndex + 1)
             + " Expected type " + expected;
         WRaiseException(context, msg.c_str(), context->builtins.typeError);
     }
 
     void WRaiseAttributeError(const WObj* obj, const char* attribute) {
+        WASSERT_VOID(obj && attribute);
         std::string msg = " Object of type " + WObjTypeToString(obj) +
             " has no attribute " + attribute;
         WRaiseException(obj->context, msg.c_str(), obj->context->builtins.attributeError);
     }
 
     void WGetConfig(const WContext* context, WConfig* config) {
-        WASSERT(context && config);
+        WASSERT_VOID(context && config);
         *config = context->config;
     }
 
     void WSetConfig(WContext* context, const WConfig* config) {
-        WASSERT(context);
+        WASSERT_VOID(context);
         if (config) {
-            WASSERT(config->maxAlloc >= 0);
-            WASSERT(config->maxRecursion >= 0);
-            WASSERT(config->maxCollectionSize >= 0);
-            WASSERT(config->gcRunFactor >= 1.0f);
+            WASSERT_VOID(config->maxAlloc >= 0);
+            WASSERT_VOID(config->maxRecursion >= 0);
+            WASSERT_VOID(config->maxCollectionSize >= 0);
+            WASSERT_VOID(config->gcRunFactor >= 1.0f);
             context->config = *config;
         } else {
             context->config.maxAlloc = 100'000;
@@ -159,14 +170,21 @@ extern "C" {
     }
 
     void WPrint(const WContext* context, const char* message, int len) {
-        WASSERT(context && message);
+        WASSERT_VOID(context && message);
         if (context->config.print) {
             context->config.print(message, len);
         }
     }
 
     void WPrintString(const WContext* context, const char* message) {
+        WASSERT_VOID(context && message);
         WPrint(context, message, (int)std::strlen(message));
+    }
+
+    void WSetErrorCallback(WErrorCallback callback, void* userdata) {
+        std::scoped_lock lock(errorCallbackMutex);
+        errorCallback = callback;
+        errorCallbackUserdata = userdata;
     }
 
     WObj* WCompile(WContext* context, const char* code, const char* moduleName) {
@@ -230,6 +248,7 @@ extern "C" {
     }
 
     WObj* WGetGlobal(WContext* context, const char* name) {
+        WASSERT(context && name);
         auto it = context->globals.find(std::string(name));
         if (it == context->globals.end()) {
             return nullptr;
@@ -239,6 +258,7 @@ extern "C" {
     }
 
     void WSetGlobal(WContext* context, const char* name, WObj* value) {
+        WASSERT_VOID(context && name && value);
         auto it = context->globals.find(std::string(name));
         if (it != context->globals.end()) {
             *it->second = value;
@@ -248,6 +268,7 @@ extern "C" {
     }
 
     void WDeleteGlobal(WContext* context, const char* name) {
+        WASSERT_VOID(context && name);
         auto it = context->globals.find(std::string(name));
         if (it != context->globals.end()) {
             context->globals.erase(it);
@@ -257,6 +278,19 @@ extern "C" {
 } // extern "C"
 
 namespace wings {
+
+    void CallErrorCallback(const char* message) {
+        errorCallbackMutex.lock();
+        auto cb = errorCallback;
+        auto ud = errorCallbackUserdata;
+        errorCallbackMutex.unlock();
+
+        if (cb) {
+            cb(message, ud);
+        } else {
+            std::abort();
+        }
+    }
 
     size_t Guid() {
         static std::atomic_size_t i = 0;
