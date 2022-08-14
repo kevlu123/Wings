@@ -15,7 +15,7 @@ namespace wings {
 		Add, Sub, Mul, Div, IDiv, Mod, Pow,
 		Eq, Ne, Lt, Le, Gt, Ge,
 		And, Or, Not,
-		In, NotIn,
+		In, NotIn, Is, IsNot,
 		BitAnd, BitOr, BitNot, BitXor,
 		ShiftL, ShiftR,
 		IfElse,

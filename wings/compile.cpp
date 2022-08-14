@@ -250,6 +250,16 @@ namespace wings {
 			CompileExpression(expression.children[1], instructions);
 			instr.type = Instruction::Type::NotIn;
 			break;
+		case Operation::Is:
+			CompileExpression(expression.children[0], instructions);
+			CompileExpression(expression.children[1], instructions);
+			instr.type = Instruction::Type::Is;
+			break;
+		case Operation::IsNot:
+			CompileExpression(expression.children[0], instructions);
+			CompileExpression(expression.children[1], instructions);
+			instr.type = Instruction::Type::IsNot;
+			break;
 		case Operation::IfElse:
 			CompileInlineIfElse(expression, instructions);
 			return;

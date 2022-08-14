@@ -77,6 +77,7 @@ namespace wings {
 		{ ">>", Operation::ShiftR },
 		{ "in", Operation::In },
 		{ "not", Operation::NotIn },
+		{ "is", Operation::Is },
 
 		{ "=",  Operation::Assign },
 		{ ":=",  Operation::Assign },
@@ -125,6 +126,8 @@ namespace wings {
 		Operation::ShiftR,
 		Operation::In,
 		Operation::NotIn,
+		Operation::Is,
+		Operation::IsNot,
 		Operation::Dot,
 
 		Operation::Assign,
@@ -177,7 +180,7 @@ namespace wings {
 		{ Operation::BitOr },
 		{
 			Operation::Eq, Operation::Ne, Operation::Lt, Operation::Le, Operation::Gt,
-			Operation::Ge, Operation::In, Operation::NotIn
+			Operation::Ge, Operation::In, Operation::NotIn, Operation::Is, Operation::IsNot,
 		},
 		{ Operation::Not },
 		{ Operation::And },
@@ -795,7 +798,6 @@ namespace wings {
 			return CodeError::Good();
 		} else if (op == Operation::NotIn) {
 			// 'not in' is a special case since it contains 2 tokens
-			out.srcPos = p->srcPos;
 			++p;
 			if (p.EndReached()) {
 				return CodeError::Bad("Expected a 'in'", (--p)->srcPos);
@@ -808,9 +810,14 @@ namespace wings {
 		}
 		++p;
 
+		if (op == Operation::Is && !p.EndReached() && p->text == "not") {
+			op = Operation::IsNot;
+			++p;
+		}
+
 		if (p.EndReached()) {
 			return CodeError::Bad("Expected an expression", (--p)->srcPos);
-		}
+		}		
 		out.srcPos = p->srcPos;
 		if (BINARY_RIGHT_ASSOCIATIVE_OPS.contains(op)) {
 			// Binary operation is an assignment operation only if it is right associative

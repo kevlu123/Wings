@@ -685,6 +685,12 @@ namespace wings {
 			}
 			break;
 		}
+		case Instruction::Type::Is:
+			PushStack(WCreateBool(context, PopStack() == PopStack()));
+			break;
+		case Instruction::Type::IsNot:
+			PushStack(WCreateBool(context, PopStack() != PopStack()));
+			break;
 		case Instruction::Type::ListComprehension: {
 			WObj* expr = stack[stack.size() - 3];
 			WObj* assign = stack[stack.size() - 2];

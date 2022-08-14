@@ -85,6 +85,8 @@ namespace wings {
 			Not,
 			In,
 			NotIn,
+			Is,
+			IsNot,
 			ListComprehension,
 		} type{};
 
