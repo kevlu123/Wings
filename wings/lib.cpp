@@ -198,6 +198,10 @@ set_method(list, "__setitem__", __setitem__)
 set_method = None
 __getitem__ = None
 __setitem__ = None
+
+# Cause these values to be cached
+True
+False
 )";
 
 
@@ -269,7 +273,7 @@ static void SetDivisionByZeroError(WContext* context) {
 #define EXPECT_ARG_COUNT(n) do if (argc != n) { SetInvalidArgumentCountError(context, argc, n); return nullptr; } while (0)
 #define EXPECT_ARG_COUNT_BETWEEN(min, max) do if (argc < min && argc > max) { SetInvalidArgumentCountError(context, argc); return nullptr; } while (0)
 #define EXPECT_ARG_TYPE(index, check, expect) do if (!(check)(argv[index])) { SetInvalidTypeError(context, argv, index, expect); return nullptr; } while (0)
-#define EXPECT_ARG_TYPE_NULL(index) EXPECT_ARG_TYPE(index, WIsNoneType, "NoneType");
+#define EXPECT_ARG_TYPE_NULL(index) EXPECT_ARG_TYPE(index, WIsNone, "NoneType");
 #define EXPECT_ARG_TYPE_BOOL(index) EXPECT_ARG_TYPE(index, WIsBool, "bool");
 #define EXPECT_ARG_TYPE_INT(index) EXPECT_ARG_TYPE(index, WIsInt, "int");
 #define EXPECT_ARG_TYPE_FLOAT(index) EXPECT_ARG_TYPE(index, [](const WObj* v) { return WIsIntOrFloat(v) && !WIsInt(v); }, "int or float");
@@ -305,7 +309,7 @@ namespace wings {
 			argv[0]->data = new bool(v);
 			argv[0]->finalizer.fptr = [](WObj* obj, void*) { delete (bool*)obj->data; };
 
-			return WCreateNoneType(context);
+			return WCreateNone(context);
 		}
 
 		static WObj* _int(WObj** argv, int argc, WObj* kwargs, WContext* context) {
@@ -329,7 +333,7 @@ namespace wings {
 			argv[0]->data = new wint(v);
 			argv[0]->finalizer.fptr = [](WObj* obj, void*) { delete (wint*)obj->data; };
 
-			return WCreateNoneType(context);
+			return WCreateNone(context);
 		}
 
 		static WObj* _float(WObj** argv, int argc, WObj* kwargs, WContext* context) {
@@ -353,7 +357,7 @@ namespace wings {
 			argv[0]->data = new wfloat(v);
 			argv[0]->finalizer.fptr = [](WObj* obj, void*) { delete (wfloat*)obj->data; };
 
-			return WCreateNoneType(context);
+			return WCreateNone(context);
 		}
 
 		static WObj* str(WObj** argv, int argc, WObj* kwargs, WContext* context) {
@@ -375,7 +379,7 @@ namespace wings {
 			argv[0]->data = new std::string(std::move(v));
 			argv[0]->finalizer.fptr = [](WObj* obj, void*) { delete (std::string*)obj->data; };
 
-			return WCreateNoneType(context);
+			return WCreateNone(context);
 		}
 
 		template <Collection collection_t>
@@ -411,7 +415,7 @@ namespace wings {
 			argv[0]->data = new std::vector<WObj*>(std::move(s.v));
 			argv[0]->finalizer.fptr = [](WObj* obj, void*) { delete (std::vector<WObj*>*)obj->data; };
 
-			return WCreateNoneType(context);
+			return WCreateNone(context);
 		}
 
 		static WObj* map(WObj** argv, int argc, WObj* kwargs, WContext* context) {
@@ -425,7 +429,7 @@ namespace wings {
 			argv[0]->data = new wings::WDict();
 			argv[0]->finalizer.fptr = [](WObj* obj, void*) { delete (wings::WDict*)obj->data; };
 
-			return WCreateNoneType(context);
+			return WCreateNone(context);
 		}
 
 		static WObj* func(WObj** argv, int argc, WObj* kwargs, void* ud) {
@@ -437,7 +441,7 @@ namespace wings {
 			argv[0]->finalizer.fptr = [](WObj* obj, void*) { delete (WObj::Func*)obj->data; };
 
 			return nullptr;
-			//return WCreateNoneType(context);
+			//return WCreateNone(context);
 		}
 	} // namespace ctors
 
@@ -476,13 +480,13 @@ namespace wings {
 		static WObj* null_nonzero(WObj** argv, int argc, WObj* kwargs, WContext* context) {
 			EXPECT_ARG_COUNT(1);
 			EXPECT_ARG_TYPE_NULL(0);
-			return WCreateNoneType(context);
+			return WCreateNone(context);
 		}
 
 		static WObj* null_eq(WObj** argv, int argc, WObj* kwargs, WContext* context) {
 			EXPECT_ARG_COUNT(2);
 			EXPECT_ARG_TYPE_NULL(0);
-			return WCreateBool(context, WIsNoneType(argv[1]));
+			return WCreateBool(context, WIsNone(argv[1]));
 		}
 
 		static WObj* bool_nonzero(WObj** argv, int argc, WObj* kwargs, WContext* context) {
@@ -1071,7 +1075,7 @@ namespace wings {
 			}
 
 			argv[0]->Get<std::vector<WObj*>>()[i] = argv[2];
-			return WCreateNoneType(context);
+			return WCreateNone(context);
 		}
 
 		static WObj* list_insertindex(WObj** argv, int argc, WObj* kwargs, WContext* context) {
@@ -1087,7 +1091,7 @@ namespace wings {
 
 			auto& buf = argv[0]->Get<std::vector<WObj*>>();
 			buf.insert(buf.begin() + i, argv[2]);
-			return WCreateNoneType(context);
+			return WCreateNone(context);
 		}
 
 		static WObj* list_removeindex(WObj** argv, int argc, WObj* kwargs, WContext* context) {
@@ -1103,7 +1107,7 @@ namespace wings {
 
 			auto& buf = argv[0]->Get<std::vector<WObj*>>();
 			buf.erase(buf.begin() + i);
-			return WCreateNoneType(context);
+			return WCreateNone(context);
 		}
 
 		template <Collection collection>
@@ -1179,7 +1183,7 @@ namespace wings {
 			}
 			text += '\n';
 			WPrint(context, text.c_str(), (int)text.size());
-			return WCreateNoneType(context);
+			return WCreateNone(context);
 		}
 
 		static WObj* isinstance(WObj** argv, int argc, WObj* kwargs, WContext* context) {
@@ -1187,9 +1191,9 @@ namespace wings {
 			bool ret{};
 			if (WIsTuple(argv[1])) {
 				const auto& buf = argv[1]->Get<std::vector<WObj*>>();
-				ret = WIsInstance(argv[0], buf.data(), (int)buf.size());
+				ret = WIsInstance(argv[0], buf.data(), (int)buf.size()) != nullptr;
 			} else {
-				ret = WIsInstance(argv[0], argv + 1, 1);
+				ret = WIsInstance(argv[0], argv + 1, 1) != nullptr;
 			}
 			return WCreateBool(context, ret);
 		}
@@ -1202,7 +1206,7 @@ namespace wings {
 			} else {
 				WSetAttribute(argv[0], argv[1]->Get<std::string>().c_str(), argv[2]);
 			}
-			return WCreateNoneType(context);
+			return WCreateNone(context);
 		}
 
 	} // namespace lib
@@ -1252,7 +1256,7 @@ namespace wings {
 		return _class;
 	}
 
-	bool InitLibrary(WContext* context) {
+	void InitLibrary(WContext* context) {
 		try {
 			auto getGlobal = [&](const char* name) {
 				if (WObj* v = WGetGlobal(context, name)) {
@@ -1437,7 +1441,7 @@ namespace wings {
 
 			std::vector<std::string> toDelete;
 			for (const auto& [k, v] : context->globals)
-				if (WIsNoneType(*v))
+				if (WIsNone(*v))
 					toDelete.push_back(k);
 			for (const auto& s : toDelete)
 				WDeleteGlobal(context, s.c_str());
@@ -1456,9 +1460,8 @@ namespace wings {
 			context->builtins.arithmeticError = getGlobal("ArithmeticError");
 			context->builtins.overflowError = getGlobal("OverflowError");
 			context->builtins.zeroDivisionError = getGlobal("ZeroDivisionError");
-			return true;
 		} catch (LibraryInitException&) {
-			return false;
+			std::abort(); // Internal error
 		}
 	}
 } // namespace wings

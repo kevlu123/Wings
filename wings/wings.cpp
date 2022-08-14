@@ -5,6 +5,7 @@
 #include <iostream>
 #include <memory>
 #include <sstream>
+#include <string_view>
 #include <algorithm>
 #include <atomic>
 #include <mutex>
@@ -26,7 +27,7 @@ extern "C" {
             bool written = false;
 
             if (!frame.module.empty()) {
-                ss << "Module " << frame.module;
+                ss << "Tag " << frame.module;
                 written = true;
             }
 
@@ -125,14 +126,14 @@ extern "C" {
 
     void WRaiseAttributeError(const WObj* obj, const char* attribute) {
         WASSERT_VOID(obj && attribute);
-        std::string msg = " Object of type " + WObjTypeToString(obj) +
-            " has no attribute " + attribute;
+        std::string msg = "'" + WObjTypeToString(obj) +
+            "' object has no attribute '" + attribute + "'";
         WRaiseException(obj->context, msg.c_str(), obj->context->builtins.attributeError);
     }
 
-    void WGetConfig(const WContext* context, WConfig* config) {
-        WASSERT_VOID(context && config);
-        *config = context->config;
+    void WGetConfig(const WContext* context, WConfig* out) {
+        WASSERT_VOID(context && out);
+        *out = context->config;
     }
 
     void WSetConfig(WContext* context, const WConfig* config) {
@@ -148,31 +149,35 @@ extern "C" {
             context->config.maxRecursion = 100;
             context->config.maxCollectionSize = 1'000'000'000;
             context->config.gcRunFactor = 2.0f;
-            context->config.print = [](const char* message, int len) { std::cout << std::string(message, (size_t)len); };
+            context->config.print = [](const char* message, int len, void*) {
+                std::cout << std::string_view(message, (size_t)len);
+            };
         }
     }
 
     WContext* WCreateContext(const WConfig* config) {
-        std::unique_ptr<WContext> context = std::make_unique<WContext>();
-        WSetConfig(context.get(), config);
-        if (InitLibrary(context.get())) {
-            return context.release();
-        } else {
-            return nullptr;
-        }
+        WContext* context = new WContext();
+
+        // Initialise the library without restriction
+        WSetConfig(context, nullptr);
+        InitLibrary(context);
+		
+        // Apply possibly restrictive config now
+        WSetConfig(context, config);
+		
+        return context;
     }
 
     void WDestroyContext(WContext* context) {
-        if (context) {
-            DestroyAllObjects(context);
-            delete context;
-        }
+        WASSERT_VOID(context);
+        DestroyAllObjects(context);
+        delete context;
     }
 
     void WPrint(const WContext* context, const char* message, int len) {
         WASSERT_VOID(context && message);
         if (context->config.print) {
-            context->config.print(message, len);
+            context->config.print(len ? message : "", len, context->config.printUserdata);
         }
     }
 
@@ -187,10 +192,10 @@ extern "C" {
         errorCallbackUserdata = userdata;
     }
 
-    WObj* WCompile(WContext* context, const char* code, const char* moduleName) {
+    WObj* WCompile(WContext* context, const char* code, const char* tag) {
         WASSERT(context && code);
 
-        moduleName = moduleName ? moduleName : "<unnamed>";
+        const char* moduleName = tag ? tag : "<unnamed>";
 
         auto lexResult = Lex(code);
         auto originalSource = MakeRcPtr<std::vector<std::string>>(lexResult.originalSource);
@@ -239,7 +244,7 @@ extern "C" {
             return nullptr;
         }
 
-        WFinalizer finalizer{};
+        WFinalizerDesc finalizer{};
         finalizer.fptr = [](WObj* obj, void* userdata) { delete (DefObject*)userdata; };
         finalizer.userdata = def;
         WSetFinalizer(obj, &finalizer);
@@ -298,7 +303,7 @@ namespace wings {
     }
 
     std::string WObjTypeToString(const WObj* obj) {
-        if (WIsNoneType(obj)) {
+        if (WIsNone(obj)) {
             return "NoneType";
         } else if (WIsBool(obj)) {
             return "bool";

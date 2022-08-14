@@ -17,7 +17,7 @@ struct WContext;
 
 namespace wings {
     size_t Guid();
-    bool InitLibrary(WContext* context);
+    void InitLibrary(WContext* context);
     std::string WObjTypeToString(const WObj* obj);
     void CallErrorCallback(const char* message);
 
@@ -88,6 +88,8 @@ namespace wings {
 
         // Instances
         WObj* none;
+        WObj* _true;
+        WObj* _false;
         WObj* memoryErrorInstance;
         WObj* isinstance;
 
@@ -97,7 +99,7 @@ namespace wings {
                 baseException, exception, syntaxError, nameError, typeError, valueError,
                 attributeError, lookupError, indexError, keyError, arithmeticError, overflowError,
                 zeroDivisionError,
-                none, memoryErrorInstance, isinstance,
+                none, _true, _false, memoryErrorInstance, isinstance,
             };
         }
     };
@@ -136,7 +138,7 @@ struct WObj {
     template <class T> T& Get() { return *(T*)data; }
 
     wings::AttributeTable attributes;
-    WFinalizer finalizer{};
+    WFinalizerDesc finalizer{};
     std::vector<WObj*> references;
     WContext* context;
 };

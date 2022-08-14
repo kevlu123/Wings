@@ -18,7 +18,7 @@ static void Expect(const char* code, const char* expected, size_t line) {
 
         WConfig cfg{};
         WGetConfig(context, &cfg);
-        cfg.print = [](const char* message, int len) {
+        cfg.print = [](const char* message, int len, void*) {
             output += std::string(message, len);
         };
         WSetConfig(context, &cfg);
@@ -61,7 +61,7 @@ static void ExpectFailure(const char* code, size_t line) {
 
         WConfig cfg{};
         WGetConfig(context, &cfg);
-        cfg.print = [](const char* message, int len) {
+        cfg.print = [](const char* message, int len, void*) {
             output += std::string(message, len);
         };
         WSetConfig(context, &cfg);

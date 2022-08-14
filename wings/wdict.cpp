@@ -6,7 +6,7 @@ namespace wings {
         auto doHash = []<typename T>(const T & val) { return std::hash<T>()(val); };
         auto rotate = [](size_t x, size_t shift) { return (x << shift) | (x >> (sizeof(size_t) - shift)); };
 
-        if (WIsNoneType(obj)) {
+        if (WIsNone(obj)) {
             return doHash(nullptr);
         } else if (WIsBool(obj)) {
             return doHash(WGetBool(obj));
@@ -30,7 +30,7 @@ namespace wings {
         if (lhs->type != rhs->type)
             return false;
 
-        if (WIsNoneType(lhs)) {
+        if (WIsNone(lhs)) {
             return true;
         } else if (WIsBool(lhs)) {
             return WGetBool(lhs) == WGetBool(rhs);

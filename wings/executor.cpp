@@ -13,7 +13,7 @@ namespace wings {
 
 		// Create local variables
 		for (const auto& localVar : def->localVariables) {
-			WObj* null = WCreateNoneType(def->context);
+			WObj* null = WCreateNone(def->context);
 			executor.variables.insert({ localVar, MakeRcPtr<WObj*>(null) });
 		}
 
@@ -22,7 +22,7 @@ namespace wings {
 			executor.variables.insert(capture);
 		}
 
-		// Initialize parameters
+		// Initialise parameters
 
 		// Set kwargs
 		WObj* newKwargs = nullptr;
@@ -297,7 +297,7 @@ namespace wings {
 		if (exitValue.has_value()) {
 			return exitValue.value();
 		} else {
-			return WCreateNoneType(context);
+			return WCreateNone(context);
 		}
 	}
 
@@ -344,7 +344,7 @@ namespace wings {
 					def->captures.insert({ capture, variables[capture] });
 				} else {
 					if (!context->globals.contains(capture))
-						WSetGlobal(context, capture.c_str(), WCreateNoneType(context));
+						WSetGlobal(context, capture.c_str(), WCreateNone(context));
 					def->captures.insert({ capture, context->globals.at(capture) });
 				}
 			}
@@ -365,7 +365,7 @@ namespace wings {
 				return;
 			}
 
-			WFinalizer finalizer{};
+			WFinalizerDesc finalizer{};
 			finalizer.fptr = [](WObj* obj, void* userdata) { delete (DefObject*)userdata; };
 			finalizer.userdata = def;
 			WSetFinalizer(obj, &finalizer);
@@ -407,7 +407,7 @@ namespace wings {
 		case Instruction::Type::Literal: {
 			WObj* value{};
 			if (auto* n = std::get_if<std::nullptr_t>(instr.literal.get())) {
-				value = WCreateNoneType(context);
+				value = WCreateNone(context);
 			} else if (auto* b = std::get_if<bool>(instr.literal.get())) {
 				value = WCreateBool(context, *b);
 			} else if (auto* i = std::get_if<wint>(instr.literal.get())) {
@@ -524,9 +524,7 @@ namespace wings {
 			if (WObj* attr = WGetAttribute(obj, instr.string->string.c_str())) {
 				PushStack(attr);
 			} else {
-				std::string msg = "Object of type " + WObjTypeToString(obj) +
-					" has no attribute " + instr.string->string;
-				WRaiseException(context, msg.c_str(), context->builtins.attributeError);
+				WRaiseAttributeError(obj, instr.string->string.c_str());
 				exitValue = nullptr;
 			}
 			break;

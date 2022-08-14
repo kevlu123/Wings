@@ -8,15 +8,20 @@ using namespace wings;
 
 extern "C" {
 
-	WObj* WCreateNoneType(WContext* context) {
+	WObj* WCreateNone(WContext* context) {
 		WASSERT(context);
 		return context->builtins.none;
 	}
 
 	WObj* WCreateBool(WContext* context, bool value) {
 		WASSERT(context);
-		if (WObj* v = WCall(context->builtins._bool, nullptr, 0)) {
+		if (value && context->builtins._true) {
+			return context->builtins._true;
+		} else if (!value && context->builtins._false) {
+			return context->builtins._false;
+		} else if (WObj* v = WCall(context->builtins._bool, nullptr, 0)) {
 			v->Get<bool>() = value;
+			(value ? context->builtins._true : context->builtins._false) = v;
 			return v;
 		} else {
 			return nullptr;
@@ -207,7 +212,7 @@ extern "C" {
 					WObj* ret = WCall(init, argv, argc, kwargs);
 					if (ret == nullptr) {
 						return nullptr;
-					} else if (!WIsNoneType(ret)) {
+					} else if (!WIsNone(ret)) {
 						WRaiseException(
 							context,
 							"__init__() returned a non NoneType type",
@@ -238,7 +243,7 @@ extern "C" {
 				WObj* ret = WCall(baseInit, argv + 1, argc - 1, kwargs);
 				if (ret == nullptr) {
 					return nullptr;
-				} else if (!WIsNoneType(ret)) {
+				} else if (!WIsNone(ret)) {
 					WRaiseException(
 						argv[0]->context,
 						"__init__() returned a non NoneType type",
@@ -248,7 +253,7 @@ extern "C" {
 				}
 			}
 
-			return WCreateNoneType(argv[0]->context);
+			return WCreateNone(argv[0]->context);
 		};
 		WObj* initFn = WCreateFunction(context, &init);
 		if (initFn == nullptr)
@@ -259,19 +264,20 @@ extern "C" {
 		return _class;
 	}
 	
-	void WAddAttributeToClass(WObj* _class, const char* name, WObj* attribute) {
-		WASSERT_VOID(_class && name && attribute && WIsClass(_class));
-		_class->Get<WObj::Class>().instanceAttributes.Set(name, attribute);
+	void WAddAttributeToClass(WObj* class_, const char* attribute, WObj* value) {
+		WASSERT_VOID(class_ && attribute && value && WIsClass(class_));
+		class_->Get<WObj::Class>().instanceAttributes.Set(attribute, value);
 	}
 
-	bool WIsNoneType(const WObj* obj) {
+	bool WIsNone(const WObj* obj) {
 		WASSERT(obj);
-		return obj->type == "__null";
+		return obj == obj->context->builtins.none;
 	}
 
 	bool WIsBool(const WObj* obj) {
 		WASSERT(obj);
-		return obj->type == "__bool";
+		return obj == obj->context->builtins._true
+			|| obj == obj->context->builtins._false;
 	}
 
 	bool WIsInt(const WObj* obj) {
@@ -322,7 +328,7 @@ extern "C" {
 					return false;
 			return true;
 		} else {
-			return WIsNoneType(obj)
+			return WIsNone(obj)
 				|| WIsBool(obj)
 				|| WIsIntOrFloat(obj)
 				|| WIsString(obj);
@@ -350,30 +356,27 @@ extern "C" {
 		return obj->Get<std::string>().c_str();
 	}
 
-	void WGetFunction(const WObj* obj, WFuncDesc* fn) {
-		WASSERT_VOID(obj && fn && WIsFunction(obj));
-		const auto& f = obj->Get<WObj::Func>();
-		fn->fptr = f.fptr;
-		fn->userdata = f.userdata;
-		fn->isMethod = f.isMethod;
-		fn->prettyName = f.prettyName.c_str();
+	void WSetUserdata(WObj* obj, void* userdata) {
+		WASSERT_VOID(obj);
+		obj->data = userdata;
 	}
 
-	void* WTryGetUserdata(const WObj* obj, const char* type) {
+	bool WTryGetUserdata(const WObj* obj, const char* type, void** out) {
 		WASSERT(obj && type);
 		if (obj->type == std::string(type)) {
-			return obj->data;
+			*out = obj->data;
+			return true;
 		} else {
-			return nullptr;
+			return false;
 		}
 	}
 
-	void WGetFinalizer(const WObj* obj, WFinalizer* finalizer) {
-		WASSERT_VOID(obj && finalizer);
-		*finalizer = obj->finalizer;
+	void WGetFinalizer(const WObj* obj, WFinalizerDesc* out) {
+		WASSERT_VOID(obj && out);
+		*out = obj->finalizer;
 	}
 
-	void WSetFinalizer(WObj* obj, const WFinalizer* finalizer) {
+	void WSetFinalizer(WObj* obj, const WFinalizerDesc* finalizer) {
 		WASSERT_VOID(obj && finalizer);
 		obj->finalizer = *finalizer;
 	}
@@ -408,7 +411,7 @@ extern "C" {
 		return mem;
 	}
 
-	bool WIsInstance(const WObj* instance, const WObj*const* types, int typesLen) {
+	WObj* WIsInstance(const WObj* instance, WObj*const* types, int typesLen) {
 		WASSERT(instance && typesLen >= 0 && (types || typesLen == 0));
 		for (int i = 0; i < typesLen; i++)
 			WASSERT(types[i] && WIsClass(types[i]));
@@ -416,7 +419,7 @@ extern "C" {
 		// Cannot use WGetAttribute here because instance is a const pointer
 		WObj* _class = instance->attributes.Get("__class__");
 		if (_class == nullptr)
-			return false;
+			return nullptr;
 		WObjRef ref(_class);
 
 		std::queue<WObjRef> toCheck;
@@ -424,8 +427,9 @@ extern "C" {
 
 		while (!toCheck.empty()) {
 			auto end = types + typesLen;
-			if (std::find(types, end, toCheck.front().Get()) != end)
-				return true;
+			auto it = std::find(types, end, toCheck.front().Get());
+			if (it != end)
+				return *it;
 
 			WObj* bases = WGetAttribute(toCheck.front().Get(), "__bases__");
 			if (bases && WIsTuple(bases))
@@ -434,10 +438,10 @@ extern "C" {
 
 			toCheck.pop();
 		}
-		return false;
+		return nullptr;
 	}
 
-	bool WIterate(WObj* obj, void* userdata, bool(*callback)(WObj* value, void* userdata)) {
+	bool WIterate(WObj* obj, void* userdata, WIterationCallback callback) {
 		WASSERT(obj && callback);
 		WObj* iter = WCallMethod(obj, "__iter__", nullptr, 0);
 		if (iter == nullptr) {
