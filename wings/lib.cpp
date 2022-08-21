@@ -9,91 +9,10 @@
 
 using namespace wings;
 
-static const char* const BOOTSTRAP_CODE = R"(
-class bool:
-	def __str__(self):
-		return "True" if self else "False"
-
-class int:
-	pass
-
-class float:
-	pass
-
-class str:
-	def __str__(self):
-		return self
-
-class list:
-	pass
-
-class dict:
-	pass
-)";
-
 static const char* const LIBRARY_CODE = R"(
-def __str__(self):
-	return "None"
-set_method(None, "__str__", __str__)
-
-def __nonzero__(self):
-	return False
-set_method(None, "__nonzero__", __nonzero__)
-
 def append(self, x):
 	self.__insertindex(len(self), x)
 set_method(list, "append", append)
-
-class BaseException:
-	def __init__(self, message=""):
-		self.message = message
-	def __str__(self):
-		return self.message
-
-class Exception(BaseException):
-	pass
-
-class SyntaxError(Exception):
-	pass
-
-class NameError(Exception):
-	pass
-
-class TypeError(Exception):
-	pass
-
-class ValueError(Exception):
-	pass
-
-class AttributeError(Exception):
-	pass
-
-class LookupError(Exception):
-	pass
-
-class IndexError(LookupError):
-	pass
-
-class KeyError(LookupError):
-	pass
-
-class ArithmeticError(Exception):
-	pass
-
-class OverflowError(ArithmeticError):
-	pass
-
-class ZeroDivisionError(ArithmeticError):
-	pass
-
-def len(x):
-	return x.__len__()
-
-def repr(x):
-	return x.__repr__()
-
-def next(x):
-	return x.__next__()
 
 class __Range:
 	def __init__(self, start, end, step):
@@ -118,7 +37,7 @@ class __RangeIter:
 		else:
 			return self.cur <= self.end
 
-def range(start, end=None, step=None):
+class range(start, end=None, step=None):
 	if end == None:
 		return __Range(0, start, 1)
 	elif step == None:
@@ -371,9 +290,22 @@ namespace wings {
 			return nullptr;
 			//return WCreateNone(context);
 		}
+
+		static WObj* BaseException(WObj** argv, int argc, WObj* kwargs, WContext* context) {
+			EXPECT_ARG_COUNT_BETWEEN(1, 2);
+			if (argc == 2) {
+				WSetAttribute(argv[0], "message", argv[1]);
+				return WCreateNone(context);
+			} else if (WObj* msg = WCreateString(context)) {
+				WSetAttribute(argv[0], "message", msg);
+				return WCreateNone(context);
+			} else {
+				return nullptr;
+			}
+		}
 	} // namespace ctors
 
-	namespace attrlib {
+	namespace methods {
 
 		static WObj* object_pos(WObj** argv, int argc, WObj* kwargs, WContext* context) {
 			EXPECT_ARG_COUNT(1);
@@ -405,10 +337,71 @@ namespace wings {
 			return WCallMethod(argv[0], "__add__", &argv[1], 1);
 		}
 
+		static WObj* object_isub(WObj** argv, int argc, WObj* kwargs, WContext* context) {
+			EXPECT_ARG_COUNT(2);
+			return WCallMethod(argv[0], "__sub__", &argv[1], 1);
+		}
+
+		static WObj* object_imul(WObj** argv, int argc, WObj* kwargs, WContext* context) {
+			EXPECT_ARG_COUNT(2);
+			return WCallMethod(argv[0], "__mul__", &argv[1], 1);
+		}
+
+		static WObj* object_itruediv(WObj** argv, int argc, WObj* kwargs, WContext* context) {
+			EXPECT_ARG_COUNT(2);
+			return WCallMethod(argv[0], "__truediv__", &argv[1], 1);
+		}
+
+		static WObj* object_ifloordiv(WObj** argv, int argc, WObj* kwargs, WContext* context) {
+			EXPECT_ARG_COUNT(2);
+			return WCallMethod(argv[0], "__floordiv__", &argv[1], 1);
+		}
+
+		static WObj* object_imod(WObj** argv, int argc, WObj* kwargs, WContext* context) {
+			EXPECT_ARG_COUNT(2);
+			return WCallMethod(argv[0], "__mod__", &argv[1], 1);
+		}
+
+		static WObj* object_ipow(WObj** argv, int argc, WObj* kwargs, WContext* context) {
+			EXPECT_ARG_COUNT(2);
+			return WCallMethod(argv[0], "__pow__", &argv[1], 1);
+		}
+
+		static WObj* object_iand(WObj** argv, int argc, WObj* kwargs, WContext* context) {
+			EXPECT_ARG_COUNT(2);
+			return WCallMethod(argv[0], "__and__", &argv[1], 1);
+		}
+
+		static WObj* object_ior(WObj** argv, int argc, WObj* kwargs, WContext* context) {
+			EXPECT_ARG_COUNT(2);
+			return WCallMethod(argv[0], "__or__", &argv[1], 1);
+		}
+
+		static WObj* object_ixor(WObj** argv, int argc, WObj* kwargs, WContext* context) {
+			EXPECT_ARG_COUNT(2);
+			return WCallMethod(argv[0], "__xor__", &argv[1], 1);
+		}
+
+		static WObj* object_ilshift(WObj** argv, int argc, WObj* kwargs, WContext* context) {
+			EXPECT_ARG_COUNT(2);
+			return WCallMethod(argv[0], "__lshift__", &argv[1], 1);
+		}
+
+		static WObj* object_irshift(WObj** argv, int argc, WObj* kwargs, WContext* context) {
+			EXPECT_ARG_COUNT(2);
+			return WCallMethod(argv[0], "__rshift__", &argv[1], 1);
+		}
+
 		static WObj* null_nonzero(WObj** argv, int argc, WObj* kwargs, WContext* context) {
 			EXPECT_ARG_COUNT(1);
 			EXPECT_ARG_TYPE_NULL(0);
 			return WCreateNone(context);
+		}
+
+		static WObj* null_str(WObj** argv, int argc, WObj* kwargs, WContext* context) {
+			EXPECT_ARG_COUNT(1);
+			EXPECT_ARG_TYPE_NULL(0);
+			return WCreateString(context, "None");
 		}
 
 		static WObj* null_eq(WObj** argv, int argc, WObj* kwargs, WContext* context) {
@@ -433,6 +426,12 @@ namespace wings {
 			EXPECT_ARG_COUNT(1);
 			EXPECT_ARG_TYPE_BOOL(0);
 			return WCreateFloat(context, WGetBool(argv[0]) ? (wfloat)1 : (wfloat)0);
+		}
+
+		static WObj* bool_str(WObj** argv, int argc, WObj* kwargs, WContext* context) {
+			EXPECT_ARG_COUNT(1);
+			EXPECT_ARG_TYPE_BOOL(0);
+			return WCreateString(context, WGetBool(argv[0]) ? "True" : "False");
 		}
 
 		static WObj* bool_eq(WObj** argv, int argc, WObj* kwargs, WContext* context) {
@@ -911,6 +910,12 @@ namespace wings {
 			return WCreateFloat(context, fvalue);
 		}
 
+		static WObj* str_str(WObj** argv, int argc, WObj* kwargs, WContext* context) {
+			EXPECT_ARG_COUNT(1);
+			EXPECT_ARG_TYPE_STRING(0);
+			return argv[0];
+		}
+
 		static WObj* str_eq(WObj** argv, int argc, WObj* kwargs, WContext* context) {
 			EXPECT_ARG_COUNT(2);
 			EXPECT_ARG_TYPE_STRING(0);
@@ -1092,7 +1097,7 @@ namespace wings {
 			return WCreateString(context, s.c_str());
 		}
 
-	} // namespace attrlib
+	} // namespace methods
 
 	namespace lib {
 
@@ -1126,15 +1131,24 @@ namespace wings {
 			return WCreateBool(context, ret);
 		}
 
-		static WObj* set_method(WObj** argv, int argc, WObj* kwargs, WContext* context) {
-			// Not callable from user code
-			argv[2]->Get<WObj::Func>().isMethod = true;
-			if (WIsClass(argv[0])) {
-				argv[0]->Get<WObj::Class>().instanceAttributes.Set(argv[1]->Get<std::string>(), argv[2]);
-			} else {
-				WSetAttribute(argv[0], argv[1]->Get<std::string>().c_str(), argv[2]);
-			}
-			return WCreateNone(context);
+		static WObj* len(WObj** argv, int argc, WObj* kwargs, WContext* context) {
+			EXPECT_ARG_COUNT(1);
+			return WCallMethod(argv[0], "__len__", nullptr, 0);
+		}
+
+		static WObj* repr(WObj** argv, int argc, WObj* kwargs, WContext* context) {
+			EXPECT_ARG_COUNT(1);
+			return WCallMethod(argv[0], "__repr__", nullptr, 0);
+		}
+
+		static WObj* next(WObj** argv, int argc, WObj* kwargs, WContext* context) {
+			EXPECT_ARG_COUNT(1);
+			return WCallMethod(argv[0], "__next__", nullptr, 0);
+		}
+
+		static WObj* iter(WObj** argv, int argc, WObj* kwargs, WContext* context) {
+			EXPECT_ARG_COUNT(1);
+			return WCallMethod(argv[0], "__iter__", nullptr, 0);
 		}
 
 	} // namespace lib
@@ -1157,7 +1171,11 @@ namespace wings {
 		if (method == nullptr)
 			throw LibraryInitException();
 
-		WAddAttributeToClass(_class, name, method);
+		if (WIsClass(_class)) {
+			WAddAttributeToClass(_class, name, method);
+		} else {
+			WSetAttribute(_class, name, method);
+		}
 	}
 
 	template <WFuncSignature fn>
@@ -1187,11 +1205,17 @@ namespace wings {
 	void InitLibrary(WContext* context) {
 		try {
 			auto getGlobal = [&](const char* name) {
-				if (WObj* v = WGetGlobal(context, name)) {
+				if (WObj* v = WGetGlobal(context, name))
 					return v;
-				} else {
-					throw LibraryInitException();
+				throw LibraryInitException();
+			};
+
+			auto createClass = [&](const char* name, WObj* base = nullptr) {
+				if (WObj* v = WCreateClass(context, name, &base, base ? 1 : 0)) {
+					WSetGlobal(context, name, v);
+					return v;
 				}
+				throw LibraryInitException();
 			};
 
 			// Create object class
@@ -1223,7 +1247,7 @@ namespace wings {
 				ctors::func(&fn, 1, kwargs, nullptr);
 				return fn;
 			};
-			RegisterMethod<attrlib::func_str>(context->builtins.func, "__str__");
+			RegisterMethod<methods::func_str>(context->builtins.func, "__str__");
 
 			// Create tuple class
 			context->builtins.tuple = Alloc(context);
@@ -1242,9 +1266,9 @@ namespace wings {
 			};
 			WSetGlobal(context, "tuple", context->builtins.tuple);
 			RegisterMethod<ctors::collection<Collection::Tuple>>(context->builtins.tuple, "__init__");
-			RegisterMethod<attrlib::collection_str<Collection::Tuple>>(context->builtins.tuple, "__str__");
-			RegisterMethod<attrlib::collection_getindex<Collection::Tuple>>(context->builtins.tuple, "__getitem__");
-			RegisterMethod<attrlib::collection_len<Collection::Tuple>>(context->builtins.tuple, "__len__");
+			RegisterMethod<methods::collection_str<Collection::Tuple>>(context->builtins.tuple, "__str__");
+			RegisterMethod<methods::collection_getindex<Collection::Tuple>>(context->builtins.tuple, "__getitem__");
+			RegisterMethod<methods::collection_len<Collection::Tuple>>(context->builtins.tuple, "__len__");
 
 			// Create NoneType class
 			context->builtins.none = Alloc(context);
@@ -1263,7 +1287,10 @@ namespace wings {
 			context->builtins.none->type = "__null";
 			WSetAttribute(context->builtins.none, "__class__", context->builtins.none);
 			context->builtins.none->attributes.AddParent(context->builtins.object->Get<WObj::Class>().instanceAttributes);
+			RegisterMethod<methods::null_nonzero>(context->builtins.none, "__nonzero__");
+			RegisterMethod<methods::null_str>(context->builtins.none, "__str__");
 
+			// Add __bases__ tuple to the classes created before
 			WObj* emptyTuple = WCreateTuple(context, nullptr, 0);
 			if (emptyTuple == nullptr)
 				throw LibraryInitException();
@@ -1272,122 +1299,117 @@ namespace wings {
 			WSetAttribute(context->builtins.func, "__bases__", emptyTuple);
 			WSetAttribute(context->builtins.tuple, "__bases__", emptyTuple);
 
-			// Register object methods
-			RegisterMethod<attrlib::object_pos>(context->builtins.object, "__pos__");
-			RegisterMethod<attrlib::object_str>(context->builtins.object, "__str__");
-			RegisterMethod<attrlib::object_eq>(context->builtins.object, "__eq__");
-			RegisterMethod<attrlib::object_ne>(context->builtins.object, "__ne__");
-			RegisterMethod<attrlib::object_iadd>(context->builtins.object, "__iadd__");
+			// Add methods
+			RegisterMethod<methods::object_pos>(context->builtins.object, "__pos__");
+			RegisterMethod<methods::object_str>(context->builtins.object, "__str__");
+			RegisterMethod<methods::object_eq>(context->builtins.object, "__eq__");
+			RegisterMethod<methods::object_ne>(context->builtins.object, "__ne__");
+			RegisterMethod<methods::object_iadd>(context->builtins.object, "__iadd__");
+			RegisterMethod<methods::object_isub>(context->builtins.object, "__isub__");
+			RegisterMethod<methods::object_imul>(context->builtins.object, "__imul__");
+			RegisterMethod<methods::object_itruediv>(context->builtins.object, "__itruediv__");
+			RegisterMethod<methods::object_ifloordiv>(context->builtins.object, "__ifloordiv__");
+			RegisterMethod<methods::object_imod>(context->builtins.object, "__imod__");
+			RegisterMethod<methods::object_ipow>(context->builtins.object, "__ipow__");
+			RegisterMethod<methods::object_iand>(context->builtins.object, "__iand__");
+			RegisterMethod<methods::object_ior>(context->builtins.object, "__ior__");
+			RegisterMethod<methods::object_ixor>(context->builtins.object, "__ixor__");
+			RegisterMethod<methods::object_ilshift>(context->builtins.object, "__ilshift__");
+			RegisterMethod<methods::object_irshift>(context->builtins.object, "__irshift__");
 
-			// Call bootstrap code
-			RegisterFunction<lib::set_method>(context, "set_method");
-			WObj* bootstrap = WCompile(context, BOOTSTRAP_CODE, "__builtins__");
-			if (bootstrap == nullptr)
-				throw LibraryInitException();
-			if (WCall(bootstrap, nullptr, 0) == nullptr)
-				throw LibraryInitException();
-
-			// Add native methods to builtin classes
-
-			context->builtins._bool = getGlobal("bool");
+			context->builtins._bool = createClass("bool");
 			RegisterMethod<ctors::_bool>(context->builtins._bool, "__init__");
-			RegisterMethod<attrlib::bool_nonzero>(context->builtins._bool, "__nonzero__");
-			RegisterMethod<attrlib::bool_int>(context->builtins._bool, "__int__");
-			RegisterMethod<attrlib::bool_float>(context->builtins._bool, "__float__");
-			RegisterMethod<attrlib::bool_eq>(context->builtins._bool, "__eq__");
+			RegisterMethod<methods::bool_nonzero>(context->builtins._bool, "__nonzero__");
+			RegisterMethod<methods::bool_int>(context->builtins._bool, "__int__");
+			RegisterMethod<methods::bool_float>(context->builtins._bool, "__float__");
+			RegisterMethod<methods::bool_str>(context->builtins._bool, "__str__");
+			RegisterMethod<methods::bool_eq>(context->builtins._bool, "__eq__");
 
-			context->builtins._int = getGlobal("int");
+			context->builtins._int = createClass("int");
 			RegisterMethod<ctors::_int>(context->builtins._int, "__init__");
-			RegisterMethod<attrlib::int_nonzero>(context->builtins._int, "__nonzero__");
-			RegisterMethod<attrlib::int_int>(context->builtins._int, "__int__");
-			RegisterMethod<attrlib::int_float>(context->builtins._int, "__float__");
-			RegisterMethod<attrlib::int_str>(context->builtins._int, "__str__");
-			RegisterMethod<attrlib::int_eq>(context->builtins._int, "__eq__");
-			RegisterMethod<attrlib::int_gt>(context->builtins._int, "__gt__");
-			RegisterMethod<attrlib::int_ge>(context->builtins._int, "__ge__");
-			RegisterMethod<attrlib::int_lt>(context->builtins._int, "__lt__");
-			RegisterMethod<attrlib::int_le>(context->builtins._int, "__le__");
-			RegisterMethod<attrlib::int_neg>(context->builtins._int, "__neg__");
-			RegisterMethod<attrlib::int_add>(context->builtins._int, "__add__");
-			RegisterMethod<attrlib::int_sub>(context->builtins._int, "__sub__");
-			RegisterMethod<attrlib::int_mul>(context->builtins._int, "__mul__");
-			RegisterMethod<attrlib::int_truediv>(context->builtins._int, "__truediv__");
-			RegisterMethod<attrlib::int_floordiv>(context->builtins._int, "__floordiv__");
-			RegisterMethod<attrlib::int_mod>(context->builtins._int, "__mod__");
-			RegisterMethod<attrlib::int_pow>(context->builtins._int, "__pow__");
-			RegisterMethod<attrlib::int_and>(context->builtins._int, "__and__");
-			RegisterMethod<attrlib::int_or>(context->builtins._int, "__or__");
-			RegisterMethod<attrlib::int_xor>(context->builtins._int, "__xor__");
-			RegisterMethod<attrlib::int_invert>(context->builtins._int, "__invert__");
-			RegisterMethod<attrlib::int_lshift>(context->builtins._int, "__lshift__");
-			RegisterMethod<attrlib::int_rshift>(context->builtins._int, "__rshift__");
+			RegisterMethod<methods::int_nonzero>(context->builtins._int, "__nonzero__");
+			RegisterMethod<methods::int_int>(context->builtins._int, "__int__");
+			RegisterMethod<methods::int_float>(context->builtins._int, "__float__");
+			RegisterMethod<methods::int_str>(context->builtins._int, "__str__");
+			RegisterMethod<methods::int_eq>(context->builtins._int, "__eq__");
+			RegisterMethod<methods::int_gt>(context->builtins._int, "__gt__");
+			RegisterMethod<methods::int_ge>(context->builtins._int, "__ge__");
+			RegisterMethod<methods::int_lt>(context->builtins._int, "__lt__");
+			RegisterMethod<methods::int_le>(context->builtins._int, "__le__");
+			RegisterMethod<methods::int_neg>(context->builtins._int, "__neg__");
+			RegisterMethod<methods::int_add>(context->builtins._int, "__add__");
+			RegisterMethod<methods::int_sub>(context->builtins._int, "__sub__");
+			RegisterMethod<methods::int_mul>(context->builtins._int, "__mul__");
+			RegisterMethod<methods::int_truediv>(context->builtins._int, "__truediv__");
+			RegisterMethod<methods::int_floordiv>(context->builtins._int, "__floordiv__");
+			RegisterMethod<methods::int_mod>(context->builtins._int, "__mod__");
+			RegisterMethod<methods::int_pow>(context->builtins._int, "__pow__");
+			RegisterMethod<methods::int_and>(context->builtins._int, "__and__");
+			RegisterMethod<methods::int_or>(context->builtins._int, "__or__");
+			RegisterMethod<methods::int_xor>(context->builtins._int, "__xor__");
+			RegisterMethod<methods::int_invert>(context->builtins._int, "__invert__");
+			RegisterMethod<methods::int_lshift>(context->builtins._int, "__lshift__");
+			RegisterMethod<methods::int_rshift>(context->builtins._int, "__rshift__");
 
-			context->builtins._float = getGlobal("float");
+			context->builtins._float = createClass("float");
 			RegisterMethod<ctors::_float>(context->builtins._float, "__init__");
-			RegisterMethod<attrlib::float_nonzero>(context->builtins._float, "__nonzero__");
-			RegisterMethod<attrlib::float_int>(context->builtins._float, "__int__");
-			RegisterMethod<attrlib::float_float>(context->builtins._float, "__float__");
-			RegisterMethod<attrlib::float_str>(context->builtins._float, "__str__");
-			RegisterMethod<attrlib::float_eq>(context->builtins._float, "__eq__");
-			RegisterMethod<attrlib::float_neg>(context->builtins._float, "__neg__");
-			RegisterMethod<attrlib::float_add>(context->builtins._float, "__add__");
-			RegisterMethod<attrlib::float_sub>(context->builtins._float, "__sub__");
-			RegisterMethod<attrlib::float_mul>(context->builtins._float, "__mul__");
-			RegisterMethod<attrlib::float_truediv>(context->builtins._float, "__truediv__");
-			RegisterMethod<attrlib::float_floordiv>(context->builtins._float, "__floordiv__");
-			RegisterMethod<attrlib::float_mod>(context->builtins._float, "__mod__");
-			RegisterMethod<attrlib::float_pow>(context->builtins._float, "__pow__");
+			RegisterMethod<methods::float_nonzero>(context->builtins._float, "__nonzero__");
+			RegisterMethod<methods::float_int>(context->builtins._float, "__int__");
+			RegisterMethod<methods::float_float>(context->builtins._float, "__float__");
+			RegisterMethod<methods::float_str>(context->builtins._float, "__str__");
+			RegisterMethod<methods::float_eq>(context->builtins._float, "__eq__");
+			RegisterMethod<methods::float_neg>(context->builtins._float, "__neg__");
+			RegisterMethod<methods::float_add>(context->builtins._float, "__add__");
+			RegisterMethod<methods::float_sub>(context->builtins._float, "__sub__");
+			RegisterMethod<methods::float_mul>(context->builtins._float, "__mul__");
+			RegisterMethod<methods::float_truediv>(context->builtins._float, "__truediv__");
+			RegisterMethod<methods::float_floordiv>(context->builtins._float, "__floordiv__");
+			RegisterMethod<methods::float_mod>(context->builtins._float, "__mod__");
+			RegisterMethod<methods::float_pow>(context->builtins._float, "__pow__");
 
-			context->builtins.str = getGlobal("str");
+			context->builtins.str = createClass("str");
 			RegisterMethod<ctors::str>(context->builtins.str, "__init__");
-			RegisterMethod<attrlib::str_int>(context->builtins.str, "__int__");
-			RegisterMethod<attrlib::str_float>(context->builtins.str, "__float__");
+			RegisterMethod<methods::str_int>(context->builtins.str, "__int__");
+			RegisterMethod<methods::str_float>(context->builtins.str, "__float__");
+			RegisterMethod<methods::str_str>(context->builtins.str, "__str__");
 
-			context->builtins.list = getGlobal("list");
+			context->builtins.list = createClass("list");
 			RegisterMethod<ctors::collection<Collection::List>>(context->builtins.list, "__init__");
-			RegisterMethod<attrlib::collection_str<Collection::List>>(context->builtins.list, "__str__");
-			RegisterMethod<attrlib::collection_getindex<Collection::List>>(context->builtins.list, "__getindex");
-			RegisterMethod<attrlib::list_setindex>(context->builtins.list, "__setindex");
-			RegisterMethod<attrlib::collection_len<Collection::List>>(context->builtins.list, "__len__");
-			RegisterMethod<attrlib::list_insertindex>(context->builtins.list, "__insertindex");
-			RegisterMethod<attrlib::list_removeindex>(context->builtins.list, "__removeindex");
+			RegisterMethod<methods::collection_str<Collection::List>>(context->builtins.list, "__str__");
+			RegisterMethod<methods::collection_getindex<Collection::List>>(context->builtins.list, "__getindex");
+			RegisterMethod<methods::list_setindex>(context->builtins.list, "__setindex");
+			RegisterMethod<methods::collection_len<Collection::List>>(context->builtins.list, "__len__");
+			RegisterMethod<methods::list_insertindex>(context->builtins.list, "__insertindex");
+			RegisterMethod<methods::list_removeindex>(context->builtins.list, "__removeindex");
 
-			context->builtins.dict = getGlobal("dict");
+			context->builtins.dict = createClass("dict");
 			RegisterMethod<ctors::map>(context->builtins.dict, "__init__");
-			RegisterMethod<attrlib::map_str>(context->builtins.dict, "__str__");
+			RegisterMethod<methods::map_str>(context->builtins.dict, "__str__");
 
-			// Add native free functions
+			// Add free functions
 			RegisterFunction<lib::print>(context, "print");
 			context->builtins.isinstance = RegisterFunction<lib::isinstance>(context, "isinstance");
+			RegisterFunction<lib::len>(context, "len");
+			RegisterFunction<lib::repr>(context, "repr");
+			RegisterFunction<lib::next>(context, "next");
+			RegisterFunction<lib::iter>(context, "iter");
 
-			// Call the rest of the non-native library code
-			WObj* builtins = WCompile(context, LIBRARY_CODE, "__builtins__");
-			if (builtins == nullptr)
-				throw LibraryInitException();
-			if (WCall(builtins, nullptr, 0) == nullptr)
-				throw LibraryInitException();
+			// Create exception classes
+			context->builtins.baseException = createClass("BaseException");
+			RegisterMethod<ctors::BaseException>(context->builtins.baseException, "__init__");
+			context->builtins.exception = createClass("Exception", context->builtins.baseException);
+			context->builtins.syntaxError = createClass("SyntaxError", context->builtins.exception);
+			context->builtins.nameError = createClass("NameError", context->builtins.exception);
+			context->builtins.typeError = createClass("TypeError", context->builtins.exception);
+			context->builtins.valueError = createClass("ValueError", context->builtins.exception);
+			context->builtins.attributeError = createClass("AttributeError", context->builtins.exception);
+			context->builtins.lookupError = createClass("LookupError", context->builtins.exception);
+			context->builtins.indexError = createClass("IndexError", context->builtins.lookupError);
+			context->builtins.keyError = createClass("KeyError", context->builtins.lookupError);
+			context->builtins.arithmeticError = createClass("ArithmeticError", context->builtins.exception);
+			context->builtins.overflowError = createClass("OverflowError", context->builtins.arithmeticError);
+			context->builtins.zeroDivisionError = createClass("ZeroDivisionError", context->builtins.arithmeticError);
 
-			std::vector<std::string> toDelete;
-			for (const auto& [k, v] : context->globals)
-				if (WIsNone(*v))
-					toDelete.push_back(k);
-			for (const auto& s : toDelete)
-				WDeleteGlobal(context, s.c_str());
-
-			context->builtins.slice = getGlobal("slice");
-			context->builtins.baseException = getGlobal("BaseException");
-			context->builtins.exception = getGlobal("Exception");
-			context->builtins.syntaxError = getGlobal("SyntaxError");
-			context->builtins.nameError = getGlobal("NameError");
-			context->builtins.typeError = getGlobal("TypeError");
-			context->builtins.valueError = getGlobal("ValueError");
-			context->builtins.attributeError = getGlobal("AttributeError");
-			context->builtins.lookupError = getGlobal("LookupError");
-			context->builtins.indexError = getGlobal("IndexError");
-			context->builtins.keyError = getGlobal("KeyError");
-			context->builtins.arithmeticError = getGlobal("ArithmeticError");
-			context->builtins.overflowError = getGlobal("OverflowError");
-			context->builtins.zeroDivisionError = getGlobal("ZeroDivisionError");
 		} catch (LibraryInitException&) {
 			std::abort(); // Internal error
 		}
