@@ -185,6 +185,16 @@ WDLL_EXPORT void WRaiseAttributeError(const WObj* obj, const char* attribute);
 WDLL_EXPORT void WRaiseZeroDivisionError(WContext* context);
 
 /**
+* Raise a StopIteration to terminate iteration.
+*
+* Remarks:
+* If an exception is already set, the old exception will be overwritten.
+*
+* @param context The relevant context.
+*/
+WDLL_EXPORT void WRaiseStopIteration(WContext* context);
+
+/**
 * Check if an object's class derives from any of the specified classes.
 * 
 * @param instance The object to be checked.
@@ -671,7 +681,8 @@ WDLL_EXPORT WObj* WGetAttributeFromBase(WObj* obj, const char* member, WObj* bas
 * Remarks:
 * This requires the iterable object to implement a __iter__() method
 * which returns an iterator. The iterator must implement a __next__() method
-* to advance the iterator and a __end__() method to indicate termination.
+* to advance the iterator and yield a value. When the iterator is exhausted,
+* it should raise a StopIteration exception.
 * Call WGetCurrentException() or WGetErrorMessage() to get error information.
 * 
 * @param obj The object to iterate over.

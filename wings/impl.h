@@ -96,6 +96,7 @@ namespace wings {
         WObj* arithmeticError;
         WObj* overflowError;
         WObj* zeroDivisionError;
+        WObj* stopIteration;
 
         // Instances
         WObj* none;
@@ -109,7 +110,7 @@ namespace wings {
                 object, noneType, _bool, _int, _float, str, tuple, list, dict, func, slice,
                 baseException, exception, syntaxError, nameError, typeError, valueError,
                 attributeError, lookupError, indexError, keyError, arithmeticError, overflowError,
-                zeroDivisionError,
+                zeroDivisionError, stopIteration,
                 none, _true, _false, memoryErrorInstance, isinstance,
             };
         }

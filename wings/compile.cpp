@@ -305,6 +305,7 @@ namespace wings {
 				CompileExpression(expression.children[i], instructions);
 
 			Instruction instantiateSlice{};
+			instantiateSlice.srcPos = expression.srcPos;
 			instantiateSlice.type = Instruction::Type::Call;
 			instructions.push_back(std::move(instantiateSlice));
 

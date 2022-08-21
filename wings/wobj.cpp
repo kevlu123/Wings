@@ -444,51 +444,23 @@ extern "C" {
 
 	bool WIterate(WObj* obj, void* userdata, WIterationCallback callback) {
 		WASSERT(obj && callback);
+		WContext* context = obj->context;
 		WObj* iter = WCallMethod(obj, "__iter__", nullptr, 0);
-		if (iter == nullptr) {
-			WRaiseException(
-				obj->context,
-				"Object is not iterable (does not implement the __iter__ method)",
-				obj->context->builtins.typeError
-			);
+		WObjRef ref(iter);
+		if (iter == nullptr)
 			return false;
-		}
-		WProtectObject(iter);
 
 		while (true) {
-			WObj* endReached = WCallMethod(iter, "__end__", nullptr, 0);
-			if (endReached == nullptr) {
-				WRaiseException(
-					obj->context,
-					"Iterator does not implement the __end__ method",
-					obj->context->builtins.typeError
-				);
-				WUnprotectObject(iter);
-				return false;
-			}
-
-			WObj* truthy = WConvertToBool(endReached);
-			if (truthy == nullptr) {
-				WUnprotectObject(iter);
-				return false;
-			} else if (WGetBool(truthy)) {
-				WUnprotectObject(iter);
+			WObj* exc = WGetCurrentException(context);
+			if (exc && WIsInstance(exc, &context->builtins.stopIteration, 1)) {
+				WClearCurrentException(context);
 				return true;
 			}
 
-			WObj* value = WCallMethod(iter, "__next__", nullptr, 0);
-			if (value == nullptr) {
-				WUnprotectObject(iter);
+			WObj* yielded = WCallMethod(iter, "__next__", nullptr, 0);
+			WObjRef ref2(yielded);
+			if (!callback(yielded, userdata))
 				return false;
-			}
-
-			WProtectObject(value);
-			if (!callback(value, userdata)) {
-				WUnprotectObject(value);
-				WUnprotectObject(iter);
-				return false;
-			}
-			WUnprotectObject(value);
 		}
 	}
 

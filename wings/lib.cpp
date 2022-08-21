@@ -10,52 +10,46 @@
 using namespace wings;
 
 static const char* const LIBRARY_CODE = R"(
-def append(self, x):
-	self.__insertindex(len(self), x)
-set_method(list, "append", append)
-
-class __Range:
-	def __init__(self, start, end, step):
-		self.start = start
-		self.end = end
-		self.step = step
-	def __iter__(self):
-		return __RangeIter(self.start, self.end, self.step)
-
 class __RangeIter:
-	def __init__(self, start, end, step):
+	def __init__(self, start, stop, step):
 		self.cur = start
-		self.end = end
+		self.stop = stop
 		self.step = step
+
 	def __next__(self):
 		cur = self.cur
-		self.cur = self.cur + self.step
-		return cur
-	def __end__(self):
 		if self.step > 0:
-			return self.cur >= self.end
+			if cur >= self.stop:
+				raise StopIteration
 		else:
-			return self.cur <= self.end
+			if cur <= self.stop:
+				raise StopIteration
+		self.cur = cur + self.step
+		return cur
 
-class range(start, end=None, step=None):
-	if end == None:
-		return __Range(0, start, 1)
-	elif step == None:
-		return __Range(start, end, 1)
-	else:
-		return __Range(start, end, step)
-
-def __convert_index(container, index):
-	if index < 0:
-		return len(container) + index
-	else:
-		return index
-
-def __convert_slice(container, index):
-	index.start = __convert_index(container, index.start) if index.start != None else 0
-	index.stop = __convert_index(container, index.stop)
-	index.step = index.step if index.start != None else 1
-
+class range:
+	def __init__(self, start, stop=None, step=None):
+		if stop == None:
+			self.start = None
+			self.stop = start
+			self.step = None
+		elif step == None:
+			self.start = start
+			self.stop = stop
+			self.step = None
+		else:
+			self.start = start
+			self.stop = stop
+			self.step = step
+		self.current = 0 if self.start is None else self.start
+	
+	def __iter__(self):
+		return __RangeIter(
+			0 if self.start is None else self.start,
+			self.stop,
+			1 if self.step is None else self.step
+		)
+		
 class slice:
 	def __init__(self, start, stop=None, step=None):
 		if stop == None:
@@ -71,56 +65,6 @@ class slice:
 			self.stop = stop
 			self.step = step
 
-class __ListIter:
-	def __init__(self, li):
-		self.li = li
-		self.i = 0
-
-	def __next__(self):
-		v = self.li[self.i]
-		self.i = self.i + 1
-		return v
-
-	def __end__(self):
-		return self.i >= len(self.li)
-		
-def __getitem__(self, index):
-	if isinstance(index, slice):
-		index = __convert_slice(index)
-		return self.__getslice(
-			index.start,
-			index.stop,
-			index.step
-		)
-	else:
-		return self.__getindex(__convert_index(self, index))
-		
-def __setitem__(self, index, value):
-	if isinstance(index, slice):
-		index = __convert_slice(index)
-		return self.__setslice(
-			index.start,
-			index.stop,
-			index.step,
-			value
-		)
-	else:
-		return self.__setindex(__convert_index(self, index), value)
-
-set_method(tuple, "__iter__", lambda self: __ListIter(self))
-set_method(list, "__iter__", lambda self: __ListIter(self))
-set_method(tuple, "__getitem__", __getitem__)
-set_method(list, "__getitem__", __getitem__)
-set_method(tuple, "__setitem__", __setitem__)
-set_method(list, "__setitem__", __setitem__)
-
-set_method = None
-__getitem__ = None
-__setitem__ = None
-
-# Cause these values to be cached
-True
-False
 )";
 
 
@@ -1409,6 +1353,16 @@ namespace wings {
 			context->builtins.arithmeticError = createClass("ArithmeticError", context->builtins.exception);
 			context->builtins.overflowError = createClass("OverflowError", context->builtins.arithmeticError);
 			context->builtins.zeroDivisionError = createClass("ZeroDivisionError", context->builtins.arithmeticError);
+			context->builtins.stopIteration = createClass("StopIteration", context->builtins.exception);
+
+			// Initialize the rest with a script
+			WObj* lib = WCompile(context, LIBRARY_CODE, "__builtins__");
+			if (lib == nullptr)
+				throw LibraryInitException();
+			if (WCall(lib, nullptr, 0) == nullptr)
+				throw LibraryInitException();
+
+			context->builtins.slice = getGlobal("slice");
 
 		} catch (LibraryInitException&) {
 			std::abort(); // Internal error

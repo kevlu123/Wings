@@ -100,13 +100,6 @@ namespace wings {
 	static Statement TransformForToWhile(Statement forLoop) {
 		// __VarXXX = expression.__iter__()
 		std::string rangeVarName = "__For" + std::to_string(Guid());
-		auto rangeVar = [&] {
-			Expression rangeVar{};
-			rangeVar.srcPos = forLoop.expr.srcPos;
-			rangeVar.operation = Operation::Variable;
-			rangeVar.variableName = rangeVarName;
-			return rangeVar;
-		};
 
 		Expression loadIter{};
 		loadIter.srcPos = forLoop.expr.srcPos;
@@ -118,42 +111,64 @@ namespace wings {
 		callIter.srcPos = forLoop.expr.srcPos;
 		callIter.operation = Operation::Call;
 		callIter.children.push_back(std::move(loadIter));
-
+		
 		Statement rangeEval{};
+		rangeEval.srcPos = forLoop.expr.srcPos;
 		rangeEval.type = Statement::Type::Expr;
 		rangeEval.expr.operation = Operation::Assign;
+		rangeEval.expr.srcPos = forLoop.expr.srcPos;
 		rangeEval.expr.assignTarget.type = AssignType::Direct;
 		rangeEval.expr.assignTarget.direct = rangeVarName;
 		rangeEval.expr.children.push_back({}); // Dummy
 		rangeEval.expr.children.push_back(std::move(callIter));
 
-		// while not __VarXXX.__end__():
-		Expression loadEndCheck{};
-		loadEndCheck.srcPos = forLoop.expr.srcPos;
-		loadEndCheck.operation = Operation::Dot;
-		loadEndCheck.variableName = "__end__";
-		loadEndCheck.children.push_back(rangeVar());
-
-		Expression callEndCheck{};
-		callEndCheck.srcPos = forLoop.expr.srcPos;
-		callEndCheck.operation = Operation::Call;
-		callEndCheck.children.push_back(std::move(loadEndCheck));
-
+		// while True:
 		Expression condition{};
 		condition.srcPos = forLoop.expr.srcPos;
-		condition.operation = Operation::Not;
-		condition.children.push_back(std::move(callEndCheck));
+		condition.operation = Operation::Literal;
+		condition.literalValue.type = LiteralValue::Type::Bool;
+		condition.literalValue.b = true;
 
 		Statement wh{};
+		wh.srcPos = forLoop.expr.srcPos;
 		wh.type = Statement::Type::While;
 		wh.expr = std::move(condition);
 
+		// Try:
+		//		block
+		// Except:
+		//		break
+		Statement brk{};
+		brk.srcPos = forLoop.expr.srcPos;
+		brk.type = Statement::Type::Break;
+
+		Expression stopIter{};
+		stopIter.srcPos = forLoop.expr.srcPos;
+		stopIter.operation = Operation::Variable;
+		stopIter.variableName = "StopIteration";
+
+		Statement except{};
+		except.srcPos = forLoop.expr.srcPos;
+		except.type = Statement::Type::Except;
+		except.exceptBlock.exceptType = std::move(stopIter);
+		except.body.push_back(std::move(brk));
+
+		Statement tryExcept{};
+		tryExcept.srcPos = forLoop.expr.srcPos;
+		tryExcept.type = Statement::Type::Try;
+		tryExcept.tryBlock.exceptClauses.push_back(std::move(except));
+
 		// vars = __VarXXX.__next__()
+		Expression rangeVar{};
+		rangeVar.srcPos = forLoop.expr.srcPos;
+		rangeVar.operation = Operation::Variable;
+		rangeVar.variableName = rangeVarName;
+
 		Expression loadNext{};
 		loadNext.srcPos = forLoop.expr.srcPos;
 		loadNext.operation = Operation::Dot;
 		loadNext.variableName = "__next__";
-		loadNext.children.push_back(rangeVar());
+		loadNext.children.push_back(std::move(rangeVar));
 
 		Expression callNext{};
 		callNext.srcPos = forLoop.expr.srcPos;
@@ -168,15 +183,19 @@ namespace wings {
 		iterAssign.children.push_back(std::move(callNext));
 
 		Statement iterAssignStat{};
+		iterAssignStat.srcPos = forLoop.expr.srcPos;
 		iterAssignStat.type = Statement::Type::Expr;
 		iterAssignStat.expr = std::move(iterAssign);
-		wh.body.push_back(std::move(iterAssignStat));
+		tryExcept.body.push_back(std::move(iterAssignStat));
 
 		// Transfer body over
 		for (auto& child : forLoop.body)
-			wh.body.push_back(std::move(child));
+			tryExcept.body.push_back(std::move(child));
+
+		wh.body.push_back(std::move(tryExcept));
 
 		Statement out{};
+		out.srcPos = forLoop.expr.srcPos;
 		out.type = Statement::Type::Composite;
 		out.body.push_back(std::move(rangeEval));
 		out.body.push_back(std::move(wh));
