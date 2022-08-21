@@ -140,6 +140,11 @@ extern "C" {
         WRaiseException(obj->context, msg.c_str(), obj->context->builtins.attributeError);
     }
 
+    void WRaiseZeroDivisionError(WContext* context) {
+        WASSERT_VOID(context);
+        WRaiseException(context, "division by zero", context->builtins.zeroDivisionError);
+    }
+
     void WGetConfig(const WContext* context, WConfig* out) {
         WASSERT_VOID(context && out);
         *out = context->config;

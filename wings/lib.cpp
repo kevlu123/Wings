@@ -216,63 +216,9 @@ static std::string PtrToString(const void* p) {
 	return ss.str();
 }
 
-static void SetInvalidArgumentCountError(WContext* context, int given, int expected = -1) {
-	std::string msg;
-	if (expected != -1) {
-		msg = "Function takes " +
-			std::to_string(expected) +
-			" argument(s) but " +
-			std::to_string(given) +
-			(given == 1 ? " was given" : " were given");
-	} else {
-		msg = "function does not take " +
-			std::to_string(given) +
-			" argument(s)";
-	}
-	WRaiseException(context, msg.c_str(), context->builtins.typeError);
-}
-
-static void SetArgumentError(WContext* context, size_t paramIndex, const std::string& message, WObj* exc) {
-	std::string msg = "Argument " + std::to_string(paramIndex + 1) + " " + message;
-	WRaiseException(context, msg.c_str(), exc);
-}
-
-static void SetInvalidTypeError(WContext* context, WObj**argv, size_t paramIndex, const std::string& expectedType) {
-	SetArgumentError(
-		context,
-		paramIndex,
-		"expected type " + expectedType +
-		" but got " + WObjTypeToString(argv[paramIndex]),
-		context->builtins.typeError
-	);
-}
-
-static void SetMissingAttributeError(WContext* context, WObj** argv, size_t paramIndex, const std::string& attribute) {
-	SetArgumentError(
-		context,
-		paramIndex,
-		" of type " + WObjTypeToString(argv[paramIndex]) +
-		" has no attribute " + attribute,
-		context->builtins.attributeError
-	);
-}
-
-static void SetIndexOutOfRangeError(WContext* context, WObj** argv, size_t paramIndex) {
-	SetArgumentError(
-		context,
-		paramIndex,
-		"index out of range",
-		context->builtins.indexError
-	);
-}
-
-static void SetDivisionByZeroError(WContext* context) {
-	WRaiseException(context, "Division by zero", context->builtins.zeroDivisionError);
-}
-
-#define EXPECT_ARG_COUNT(n) do if (argc != n) { SetInvalidArgumentCountError(context, argc, n); return nullptr; } while (0)
-#define EXPECT_ARG_COUNT_BETWEEN(min, max) do if (argc < min && argc > max) { SetInvalidArgumentCountError(context, argc); return nullptr; } while (0)
-#define EXPECT_ARG_TYPE(index, check, expect) do if (!(check)(argv[index])) { SetInvalidTypeError(context, argv, index, expect); return nullptr; } while (0)
+#define EXPECT_ARG_COUNT(n) do if (argc != n) { WRaiseArgumentCountError(context, argc, n); return nullptr; } while (0)
+#define EXPECT_ARG_COUNT_BETWEEN(min, max) do if (argc < min || argc > max) { WRaiseArgumentCountError(context, argc, -1); return nullptr; } while (0)
+#define EXPECT_ARG_TYPE(index, check, expect) do if (!(check)(argv[index])) { WRaiseArgumentTypeError(context, index, expect); return nullptr; } while (0)
 #define EXPECT_ARG_TYPE_NULL(index) EXPECT_ARG_TYPE(index, WIsNone, "NoneType");
 #define EXPECT_ARG_TYPE_BOOL(index) EXPECT_ARG_TYPE(index, WIsBool, "bool");
 #define EXPECT_ARG_TYPE_INT(index) EXPECT_ARG_TYPE(index, WIsInt, "int");
@@ -289,10 +235,7 @@ namespace wings {
 	namespace ctors {
 
 		static WObj* _bool(WObj** argv, int argc, WObj* kwargs, WContext* context) {
-			if (argc == 0 || argc > 2) {
-				SetInvalidArgumentCountError(context, argc);
-				return nullptr;
-			}
+			EXPECT_ARG_COUNT_BETWEEN(1, 2);
 
 			bool v{};
 			if (argc == 1) {
@@ -313,10 +256,7 @@ namespace wings {
 		}
 
 		static WObj* _int(WObj** argv, int argc, WObj* kwargs, WContext* context) {
-			if (argc == 0 || argc > 2) {
-				SetInvalidArgumentCountError(context, argc);
-				return nullptr;
-			}
+			EXPECT_ARG_COUNT_BETWEEN(1, 2);
 
 			wint v{};
 			if (argc == 1) {
@@ -337,10 +277,7 @@ namespace wings {
 		}
 
 		static WObj* _float(WObj** argv, int argc, WObj* kwargs, WContext* context) {
-			if (argc == 0 || argc > 2) {
-				SetInvalidArgumentCountError(context, argc);
-				return nullptr;
-			}
+			EXPECT_ARG_COUNT_BETWEEN(1, 2);
 
 			wfloat v{};
 			if (argc == 1) {
@@ -361,10 +298,7 @@ namespace wings {
 		}
 
 		static WObj* str(WObj** argv, int argc, WObj* kwargs, WContext* context) {
-			if (argc == 0 || argc > 2) {
-				SetInvalidArgumentCountError(context, argc);
-				return nullptr;
-			}
+			EXPECT_ARG_COUNT_BETWEEN(1, 2);
 
 			std::string v{};
 			if (argc == 2) {
@@ -384,10 +318,7 @@ namespace wings {
 
 		template <Collection collection_t>
 		static WObj* collection(WObj** argv, int argc, WObj* kwargs, WContext* context) {
-			if (argc == 0 || argc > 2) {
-				SetInvalidArgumentCountError(context, argc);
-				return nullptr;
-			}
+			EXPECT_ARG_COUNT_BETWEEN(1, 2);
 
 			struct State {
 				std::vector<WObj*> v;
@@ -419,10 +350,7 @@ namespace wings {
 		}
 
 		static WObj* map(WObj** argv, int argc, WObj* kwargs, WContext* context) {
-			if (argc == 0 || argc > 2) {
-				SetInvalidArgumentCountError(context, argc);
-				return nullptr;
-			}
+			EXPECT_ARG_COUNT_BETWEEN(1, 2);
 
 			argv[0]->attributes = context->builtins.dict->Get<WObj::Class>().instanceAttributes.Copy();
 			argv[0]->type = "__map";
@@ -625,7 +553,7 @@ namespace wings {
 			EXPECT_ARG_TYPE_INT_OR_FLOAT(0);
 
 			if (WGetFloat(argv[1]) == 0) {
-				SetDivisionByZeroError(context);
+				WRaiseZeroDivisionError(context);
 				return nullptr;
 			}
 			return WCreateFloat(context, WGetFloat(argv[0]) / WGetFloat(argv[1]));
@@ -637,7 +565,7 @@ namespace wings {
 			EXPECT_ARG_TYPE_INT_OR_FLOAT(1);
 
 			if (WGetFloat(argv[1]) == 0) {
-				SetDivisionByZeroError(context);
+				WRaiseZeroDivisionError(context);
 				return nullptr;
 			}
 
@@ -654,7 +582,7 @@ namespace wings {
 			EXPECT_ARG_TYPE_INT_OR_FLOAT(1);
 
 			if (WGetFloat(argv[1]) == 0) {
-				SetDivisionByZeroError(context);
+				WRaiseZeroDivisionError(context);
 				return nullptr;
 			}
 

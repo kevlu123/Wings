@@ -169,10 +169,20 @@ WDLL_EXPORT void WRaiseArgumentTypeError(WContext* context, int argIndex, const 
 * Remarks:
 * If an exception is already set, the old exception will be overwritten.
 *
-* @param context The relevant context.
+* @param obj The object that does not have the attribute.
 * @param attribute A null terminated ASCII string containing the attribute.
 */
 WDLL_EXPORT void WRaiseAttributeError(const WObj* obj, const char* attribute);
+
+/**
+* Raise a ZeroDivisionError.
+*
+* Remarks:
+* If an exception is already set, the old exception will be overwritten.
+*
+* @param context The relevant context.
+*/
+WDLL_EXPORT void WRaiseZeroDivisionError(WContext* context);
 
 /**
 * Check if an object's class derives from any of the specified classes.
