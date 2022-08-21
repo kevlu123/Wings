@@ -246,18 +246,18 @@ namespace wings {
 		for (const auto& var : variables)
 			WProtectObject(*var.second);
 
+		auto& frame = context->currentTrace.back();
+		frame.tag = def->tag;
+		frame.func = def->prettyName;
+
 		for (pc = 0; pc < def->instructions->size(); pc++) {
 			const auto& instr = (*def->instructions)[pc];
-			DoInstruction(instr);
+			
+			auto& frame = context->currentTrace.back();
+			frame.lineText = (*def->originalSource)[instr.srcPos.line];
+			frame.srcPos = instr.srcPos;
 
-			auto pushTrace = [&] {
-				context->trace.push_back({
-					instr.srcPos,
-					(*def->originalSource)[instr.srcPos.line],
-					def->module,
-					def->prettyName
-					});
-			};
+			DoInstruction(instr);
 
 			if (!exitValue.has_value())
 				continue;
@@ -266,17 +266,10 @@ namespace wings {
 			if (exitValue.value() != nullptr)
 				break;
 
-			// Some non-exception error
-			if (WGetCurrentException(context) == nullptr) {
-				pushTrace();
-				break;
-			}
-
 			// New exception thrown
 			ClearStack();
 			if (tryFrames.empty()) {
 				// No handlers. Propagate to next function.
-				pushTrace();
 				break;
 			} else if (tryFrames.top().isHandlingException) {
 				// Was already handling an exception. Jump to finally.
@@ -324,7 +317,7 @@ namespace wings {
 		case Instruction::Type::Def: {
 			DefObject* def = new DefObject();
 			def->context = context;
-			def->module = this->def->module;
+			def->tag = this->def->tag;
 			def->prettyName = instr.def->prettyName;
 			def->instructions = instr.def->instructions;
 			def->originalSource = this->def->originalSource;

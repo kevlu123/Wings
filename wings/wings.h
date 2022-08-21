@@ -21,6 +21,7 @@ struct WFuncDesc {
     WFunction fptr;
     void* userdata;
     bool isMethod;
+    const char* tag;
     const char* prettyName;
 };
 

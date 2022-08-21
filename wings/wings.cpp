@@ -19,15 +19,20 @@ static std::mutex errorCallbackMutex;
 extern "C" {
     const char* WGetErrorMessage(WContext* context) {
         WASSERT(context);
+		
+        if (context->currentException == nullptr) {
+            return (context->traceMessage = "Ok").c_str();
+        }
+
         std::stringstream ss;
         ss << "Traceback (most recent call first):\n";
 
-        for (const auto& frame : context->trace) {
+        for (const auto& frame : context->exceptionTrace) {
             ss << "  ";
             bool written = false;
 
-            if (!frame.module.empty()) {
-                ss << "Tag " << frame.module;
+            if (frame.tag != DEFAULT_TAG_NAME) {
+                ss << "Tag " << frame.tag;
                 written = true;
             }
 
@@ -37,7 +42,7 @@ extern "C" {
                 written = true;
             }
 
-            if (!frame.func.empty()) {
+            if (frame.func != DEFAULT_FUNC_NAME) {
                 if (written) ss << ", ";
                 ss << "Function " << frame.func << "()";
             }
@@ -72,7 +77,8 @@ extern "C" {
     void WClearCurrentException(WContext* context) {
         WASSERT_VOID(context);
         context->currentException = nullptr;
-        context->trace.clear();
+        context->exceptionTrace.clear();
+        context->traceMessage.clear();
     }
 
     void WRaiseException(WContext* context, const char* message, WObj* type) {
@@ -95,6 +101,9 @@ extern "C" {
         WASSERT_VOID(context && exception);
         if (WIsInstance(exception, &context->builtins.baseException, 1)) {
             context->currentException = exception;
+            context->exceptionTrace.clear();
+            for (const auto& frame : context->currentTrace)
+                context->exceptionTrace.push_back(frame.ToOwned());
         } else {
             WRaiseException(context, "exceptions must derive from BaseException", context->builtins.typeError);
         }
@@ -195,17 +204,18 @@ extern "C" {
     WObj* WCompile(WContext* context, const char* code, const char* tag) {
         WASSERT(context && code);
 
-        const char* moduleName = tag ? tag : "<unnamed>";
+        if (tag == nullptr)
+            tag = DEFAULT_TAG_NAME;
 
         auto lexResult = Lex(code);
         auto originalSource = MakeRcPtr<std::vector<std::string>>(lexResult.originalSource);
 
         auto raiseException = [&](const CodeError& error) {
-            context->trace.push_back(TraceFrame{
+            context->currentTrace.push_back(TraceFrame{
                 error.srcPos,
-                originalSource->operator[](error.srcPos.line),
-                std::string(moduleName),
-                std::string()
+                (*originalSource)[error.srcPos.line],
+                tag,
+                tag
                 });
 
             WRaiseException(
@@ -225,11 +235,11 @@ extern "C" {
             raiseException(parseResult.error);
             return nullptr;
         }
-
+		
         DefObject* def = new DefObject();
         def->context = context;
-        def->module = moduleName;
-        def->prettyName = "<unnamed>";
+        def->tag = tag;
+        def->prettyName = DEFAULT_FUNC_NAME;
         def->originalSource = std::move(originalSource);
         auto instructions = Compile(parseResult.parseTree);
         def->instructions = MakeRcPtr<std::vector<Instruction>>(std::move(instructions));
@@ -237,7 +247,7 @@ extern "C" {
         WFuncDesc func{};
         func.fptr = &DefObject::Run;
         func.userdata = def;
-        func.prettyName = "<unnamed>";
+        func.prettyName = DEFAULT_FUNC_NAME;
         WObj* obj = WCreateFunction(context, &func);
         if (obj == nullptr) {
             delete def;

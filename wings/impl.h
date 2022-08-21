@@ -4,6 +4,7 @@
 #include "attributetable.h"
 #include "wdict.h"
 #include <string>
+#include <string_view>
 #include <vector>
 #include <deque>
 #include <unordered_set>
@@ -37,11 +38,21 @@ namespace wings {
         static CodeError Bad(std::string message, SourcePosition srcPos = {});
     };
 
-    struct TraceFrame {
+    struct OwnedTraceFrame {
         SourcePosition srcPos;
         std::string lineText;
-        std::string module;
+        std::string tag;
         std::string func;
+    };
+
+    struct TraceFrame {
+        SourcePosition srcPos;
+        std::string_view lineText;
+        std::string_view tag;
+        std::string_view func;
+        OwnedTraceFrame ToOwned() const {
+			return { srcPos, lineText.data(), tag.data(), func.data() };
+        }
     };
 
     struct WObjRef {
@@ -103,6 +114,9 @@ namespace wings {
             };
         }
     };
+
+    constexpr const char* DEFAULT_TAG_NAME = "<unnamed>";
+    constexpr const char* DEFAULT_FUNC_NAME = "<unnamed>";
 }
 
 struct WObj {
@@ -111,6 +125,7 @@ struct WObj {
         WObj* (*fptr)(WObj** args, int argc, WObj* kwargs, void* userdata);
         void* userdata;
         bool isMethod;
+        std::string tag;
         std::string prettyName;
     };
 
@@ -151,7 +166,8 @@ struct WContext {
     std::unordered_map<std::string, wings::RcPtr<WObj*>> globals;
     WObj* currentException = nullptr;
     std::vector<WObj*> reprStack;
-    std::vector<wings::TraceFrame> trace;
+    std::vector<wings::TraceFrame> currentTrace;
+    std::vector<wings::OwnedTraceFrame> exceptionTrace;
     std::string traceMessage;
     wings::Builtins builtins{};
 };

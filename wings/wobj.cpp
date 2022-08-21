@@ -133,7 +133,8 @@ extern "C" {
 				value->fptr,
 				value->userdata,
 				value->isMethod,
-				std::string(value->prettyName),
+				std::string(value->tag ? value->tag : DEFAULT_TAG_NAME),
+				std::string(value->prettyName ? value->prettyName : DEFAULT_FUNC_NAME)
 			};
 			return v;
 		} else {
@@ -600,9 +601,17 @@ extern "C" {
 				fptr = func.fptr;
 				userdata = func.userdata;
 				prettyName = func.prettyName;
+
+				callable->context->currentTrace.push_back(TraceFrame{
+					{},
+					"",
+					func.tag,
+					prettyName
+					});
 			} else {
 				fptr = callable->Get<WObj::Class>().ctor;
 				userdata = callable->Get<WObj::Class>().userdata;
+				prettyName = callable->Get<WObj::Class>().name;
 			}
 
 			std::vector<WObj*> argsWithSelf;
@@ -620,16 +629,11 @@ extern "C" {
 			}
 			refs.emplace_back(kwargsDict);
 
+
 			WObj* ret = fptr(argsWithSelf.data(), (int)argsWithSelf.size(), kwargsDict, userdata);
 
-			if (ret == nullptr && fptr != &DefObject::Run) {
-				// Native function failed
-				callable->context->trace.push_back({
-					{},
-					"",
-					"<Native>",
-					prettyName
-					});
+			if (WIsFunction(callable)) {
+				callable->context->currentTrace.pop_back();
 			}
 
 			return ret;

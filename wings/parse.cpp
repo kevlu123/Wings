@@ -445,6 +445,7 @@ namespace wings {
 		++p;
 
 		Expression fn{};
+		fn.srcPos = node.tokens[0].srcPos;
 		fn.operation = Operation::Function;
 
 		if (p.EndReached()) {
@@ -526,6 +527,7 @@ namespace wings {
 			if (auto error = ParseDef(method, stat)) {
 				return error;
 			}
+			stat.srcPos = method.tokens[0].srcPos;
 			out._class.methodNames.push_back(stat.expr.def.name);
 			out.body.push_back(std::move(stat));
 		}
@@ -946,6 +948,7 @@ namespace wings {
 				// Transform elif into an else and if statement
 				stat.type = Statement::Type::If;
 				elseClause = Statement{};
+				elseClause.value().srcPos = stat.srcPos;
 				elseClause.value().type = Statement::Type::Else;
 				elseClause.value().body.push_back(std::move(stat));
 				out.erase(out.begin() + i);
