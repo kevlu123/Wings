@@ -494,11 +494,53 @@ finally:
 );
 }
 
+static void TestStringMethods() {
+    T("print('abc'.capitalize())", "Abc");
+    T("print('AbC'.casefold())", "abc");
+    T("print('AbC'.lower())", "abc");
+    T("print('AbC'.upper())", "ABC");
+    T("print('AbC'.center(6, '-'))", "-AbC--");
+    T("print('baaaa '.count('aa'))", "2");
+    T("print('abc'.endswith('bc'))", "True");
+    T("print('abc'.endswith('ab'))", "False");
+    T("print('abc'.startswith('ab'))", "True");
+    T("print('abc'.startswith('bc'))", "False");
+
+    T("print('{},{}'.format(1, 2))", "1,2");
+    T("print('{1},{0}'.format(1, 2))", "2,1");
+    F("print('{0},{}'.format(1))");
+    F("print('{1}'.format(1))");
+	
+    T("print('abc'.find('c'))", "2");
+    T("print('abc'.find('d'))", "-1");
+    T("print('abc'.find('c', 0, -1))", "-1");
+    T("print('abc'.find('a', -1))", "-1");
+    T("print('abc'.index('c'))", "2");
+    F("print('abc'.index('c', 0, -1))");
+
+    T("print('abcd01'.isalnum())", "True");
+    T("print('abc!01'.isalnum())", "False");
+    T("print('abcasa'.isalpha())", "True");
+    T("print('abcv01'.isalpha())", "False");
+    T("print('023413'.isdecimal())", "True");
+    T("print('023a13'.isdecimal())", "False");
+    T("print('a_23a1'.isidentifier())", "True");
+    T("print('4_23a1'.isidentifier())", "False");
+    T("print('4_2 a1'.isidentifier())", "False");
+    T("print('9d98sf'.islower())", "True");
+    T("print('93A09f'.islower())", "False");
+    T("print('9D98SF'.isupper())", "True");
+    T("print('93A09f'.isupper())", "False");
+    T("print('      '.isspace())", "True");
+    T("print('  s   '.isspace())", "False");
+}
+
 void RunTests() {
     TestPrint();
     TestConditional();
     TestWhile();
     TestExceptions();
+    TestStringMethods();
 
     std::cout << testsPassed << "/" << testsRun << " tests passed." << std::endl << std::endl;
 }

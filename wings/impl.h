@@ -81,6 +81,7 @@ namespace wings {
         WObj* dict;
         WObj* func;
         WObj* slice;
+        WObj* defaultIter;
 
         // Exception types
         WObj* baseException;
@@ -107,7 +108,7 @@ namespace wings {
 
         auto GetAll() const {
             return std::array{
-                object, noneType, _bool, _int, _float, str, tuple, list, dict, func, slice,
+                object, noneType, _bool, _int, _float, str, tuple, list, dict, func, slice, defaultIter,
                 baseException, exception, syntaxError, nameError, typeError, valueError,
                 attributeError, lookupError, indexError, keyError, arithmeticError, overflowError,
                 zeroDivisionError, stopIteration,

@@ -4,18 +4,30 @@
 #include <sstream>
 #include <unordered_set>
 #include <cmath>
+#include <bit>
 #include <algorithm>
 #include <queue>
 
 using namespace wings;
 
 static const char* const LIBRARY_CODE = R"(
+class __DefaultIter:
+	def __init__(self, iterable):
+		self.iterable = iterable
+		self.i = 0
+	def __next__(self):
+		try:
+			val = self.iterable[self.i]
+		except IndexError:
+			raise StopIteration
+		self.i += 1
+		return val
+
 class __RangeIter:
 	def __init__(self, start, stop, step):
 		self.cur = start
 		self.stop = stop
 		self.step = step
-
 	def __next__(self):
 		cur = self.cur
 		if self.step > 0:
@@ -42,7 +54,6 @@ class range:
 			self.stop = stop
 			self.step = step
 		self.current = 0 if self.start is None else self.start
-	
 	def __iter__(self):
 		return __RangeIter(
 			0 if self.start is None else self.start,
@@ -79,7 +90,24 @@ static std::string PtrToString(const void* p) {
 	return ss.str();
 }
 
+static bool ConvertIndex(WObj* container, WObj* index, size_t& out) {
+	WObj* len = WLen(container);
+	if (len == nullptr)
+		return false;
+
+	wint length = WGetInt(len);
+	wint i = WGetInt(index);
+
+	if (i < 0) {
+		out = (size_t)(length + i);
+	} else {
+		out = (size_t)i;
+	}
+	return true;
+}
+
 #define EXPECT_ARG_COUNT(n) do if (argc != n) { WRaiseArgumentCountError(context, argc, n); return nullptr; } while (0)
+#define EXPECT_ARG_COUNT_AT_LEAST(n) do if (argc < n) { WRaiseArgumentCountError(context, argc, n); return nullptr; } while (0)
 #define EXPECT_ARG_COUNT_BETWEEN(min, max) do if (argc < min || argc > max) { WRaiseArgumentCountError(context, argc, -1); return nullptr; } while (0)
 #define EXPECT_ARG_TYPE(index, check, expect) do if (!(check)(argv[index])) { WRaiseArgumentTypeError(context, index, expect); return nullptr; } while (0)
 #define EXPECT_ARG_TYPE_NULL(index) EXPECT_ARG_TYPE(index, WIsNone, "NoneType");
@@ -269,11 +297,50 @@ namespace wings {
 
 		static WObj* object_ne(WObj** argv, int argc, WObj* kwargs, WContext* context) {
 			EXPECT_ARG_COUNT(2);
-			if (WObj* eq = WEquals(argv[0], argv[1])) {
-				return WCreateBool(context, !WGetBool(eq));
-			} else {
+			WObj* eq = WEquals(argv[0], argv[1]);
+			if (eq == nullptr)
 				return nullptr;
-			}
+			return WCreateBool(context, !WGetBool(eq));
+		}
+
+		static WObj* object_le(WObj** argv, int argc, WObj* kwargs, WContext* context) {
+			EXPECT_ARG_COUNT(2);
+			WObj* lt = WLessThan(argv[0], argv[1]);
+			if (lt == nullptr)
+				return nullptr;
+			if (WGetBool(lt))
+				return WCreateBool(context, true);			
+			return WEquals(argv[0], argv[1]);
+		}
+
+		static WObj* object_ge(WObj** argv, int argc, WObj* kwargs, WContext* context) {
+			EXPECT_ARG_COUNT(2);
+			WObj* lt = WLessThan(argv[0], argv[1]);
+			if (lt == nullptr)
+				return nullptr;
+			if (WGetBool(lt))
+				return WCreateBool(context, false);
+			return WEquals(argv[0], argv[1]);
+		}
+
+		static WObj* object_gt(WObj** argv, int argc, WObj* kwargs, WContext* context) {
+			EXPECT_ARG_COUNT(2);
+			WObj* lt = WLessThan(argv[0], argv[1]);
+			if (lt == nullptr)
+				return nullptr;
+			if (WGetBool(lt))
+				return WCreateBool(context, false);
+
+			WObj* eq = WEquals(argv[0], argv[1]);
+			if (eq == nullptr)
+				return nullptr;
+			return WCreateBool(context, !WGetBool(eq));
+		}
+
+		static WObj* object_hash(WObj** argv, int argc, WObj* kwargs, WContext* context) {
+			EXPECT_ARG_COUNT(1);
+			wint hash = (wint)std::hash<WObj*>()(argv[0]);
+			return WCreateInt(context, hash);
 		}
 
 		static WObj* object_iadd(WObj** argv, int argc, WObj* kwargs, WContext* context) {
@@ -336,6 +403,11 @@ namespace wings {
 			return WCallMethod(argv[0], "__rshift__", &argv[1], 1);
 		}
 
+		static WObj* object_iter(WObj** argv, int argc, WObj* kwargs, WContext* context) {
+			EXPECT_ARG_COUNT(1);
+			return WCall(context->builtins.defaultIter, argv, 1);
+		}
+
 		static WObj* null_nonzero(WObj** argv, int argc, WObj* kwargs, WContext* context) {
 			EXPECT_ARG_COUNT(1);
 			EXPECT_ARG_TYPE_NULL(0);
@@ -346,12 +418,6 @@ namespace wings {
 			EXPECT_ARG_COUNT(1);
 			EXPECT_ARG_TYPE_NULL(0);
 			return WCreateString(context, "None");
-		}
-
-		static WObj* null_eq(WObj** argv, int argc, WObj* kwargs, WContext* context) {
-			EXPECT_ARG_COUNT(2);
-			EXPECT_ARG_TYPE_NULL(0);
-			return WCreateBool(context, WIsNone(argv[1]));
 		}
 
 		static WObj* bool_nonzero(WObj** argv, int argc, WObj* kwargs, WContext* context) {
@@ -384,6 +450,13 @@ namespace wings {
 			return WCreateBool(context, WIsBool(argv[1]) && WGetBool(argv[0]) == WGetBool(argv[1]));
 		}
 
+		static WObj* bool_hash(WObj** argv, int argc, WObj* kwargs, WContext* context) {
+			EXPECT_ARG_COUNT(1);
+			EXPECT_ARG_TYPE_BOOL(0);
+			wint hash = (wint)std::hash<bool>()(WGetBool(argv[0]));
+			return WCreateInt(context, hash);
+		}
+
 		static WObj* int_nonzero(WObj** argv, int argc, WObj* kwargs, WContext* context) {
 			EXPECT_ARG_COUNT(1);
 			EXPECT_ARG_TYPE_INT(0);
@@ -414,20 +487,6 @@ namespace wings {
 			return WCreateBool(context, WIsInt(argv[1]) && WGetInt(argv[0]) == WGetInt(argv[1]));
 		}
 
-		static WObj* int_gt(WObj** argv, int argc, WObj* kwargs, WContext* context) {
-			EXPECT_ARG_COUNT(2);
-			EXPECT_ARG_TYPE_INT(0);
-			EXPECT_ARG_TYPE_INT_OR_FLOAT(1);
-			return WCreateBool(context, WGetFloat(argv[0]) > WGetFloat(argv[1]));
-		}
-
-		static WObj* int_ge(WObj** argv, int argc, WObj* kwargs, WContext* context) {
-			EXPECT_ARG_COUNT(2);
-			EXPECT_ARG_TYPE_INT(0);
-			EXPECT_ARG_TYPE_INT_OR_FLOAT(1);
-			return WCreateBool(context, WGetFloat(argv[0]) >= WGetFloat(argv[1]));
-		}
-
 		static WObj* int_lt(WObj** argv, int argc, WObj* kwargs, WContext* context) {
 			EXPECT_ARG_COUNT(2);
 			EXPECT_ARG_TYPE_INT(0);
@@ -435,11 +494,11 @@ namespace wings {
 			return WCreateBool(context, WGetFloat(argv[0]) < WGetFloat(argv[1]));
 		}
 
-		static WObj* int_le(WObj** argv, int argc, WObj* kwargs, WContext* context) {
-			EXPECT_ARG_COUNT(2);
+		static WObj* int_hash(WObj** argv, int argc, WObj* kwargs, WContext* context) {
+			EXPECT_ARG_COUNT(1);
 			EXPECT_ARG_TYPE_INT(0);
-			EXPECT_ARG_TYPE_INT_OR_FLOAT(1);
-			return WCreateBool(context, WGetFloat(argv[0]) <= WGetFloat(argv[1]));
+			wint hash = (wint)std::hash<wint>()(WGetInt(argv[0]));
+			return WCreateInt(context, hash);
 		}
 
 		static WObj* int_neg(WObj** argv, int argc, WObj* kwargs, WContext* context) {
@@ -602,6 +661,22 @@ namespace wings {
 			return WCreateInt(context, WGetInt(argv[0]) >> shift);
 		}
 
+		static WObj* int_bit_length(WObj** argv, int argc, WObj* kwargs, WContext* context) {
+			EXPECT_ARG_COUNT(1);
+			EXPECT_ARG_TYPE_INT(0);
+
+			wuint n = (wuint)WGetInt(argv[0]);
+			return WCreateInt(context, (wint)std::bit_width(n));
+		}
+
+		static WObj* int_bit_count(WObj** argv, int argc, WObj* kwargs, WContext* context) {
+			EXPECT_ARG_COUNT(1);
+			EXPECT_ARG_TYPE_INT(0);
+
+			wuint n = (wuint)WGetInt(argv[0]);
+			return WCreateInt(context, (wint)std::popcount(n));
+		}
+
 		static WObj* float_nonzero(WObj** argv, int argc, WObj* kwargs, WContext* context) {
 			EXPECT_ARG_COUNT(1);
 			EXPECT_ARG_TYPE_INT_OR_FLOAT(0);
@@ -634,6 +709,20 @@ namespace wings {
 			EXPECT_ARG_COUNT(2);
 			EXPECT_ARG_TYPE_INT_OR_FLOAT(0);
 			return WCreateBool(context, WIsIntOrFloat(argv[1]) && WGetFloat(argv[0]) == WGetFloat(argv[1]));
+		}
+
+		static WObj* float_lt(WObj** argv, int argc, WObj* kwargs, WContext* context) {
+			EXPECT_ARG_COUNT(2);
+			EXPECT_ARG_TYPE_INT_OR_FLOAT(0);
+			EXPECT_ARG_TYPE_INT_OR_FLOAT(1);
+			return WCreateBool(context, WGetFloat(argv[0]) < WGetFloat(argv[1]));
+		}
+
+		static WObj* float_hash(WObj** argv, int argc, WObj* kwargs, WContext* context) {
+			EXPECT_ARG_COUNT(1);
+			EXPECT_ARG_TYPE_FLOAT(0);
+			wint hash = (wint)std::hash<wfloat>()(WGetFloat(argv[0]));
+			return WCreateInt(context, hash);
 		}
 
 		static WObj* float_neg(WObj** argv, int argc, WObj* kwargs, WContext* context) {
@@ -689,6 +778,14 @@ namespace wings {
 			EXPECT_ARG_TYPE_INT_OR_FLOAT(0);
 			EXPECT_ARG_TYPE_INT_OR_FLOAT(1);
 			return WCreateFloat(context, std::pow(WGetFloat(argv[0]), WGetFloat(argv[1])));
+		}
+
+		static WObj* float_is_integer(WObj** argv, int argc, WObj* kwargs, WContext* context) {
+			EXPECT_ARG_COUNT(1);
+			EXPECT_ARG_TYPE_FLOAT(0);
+
+			wfloat f = WGetFloat(argv[0]);
+			return WCreateBool(context, std::floor(f) == f);
 		}
 
 		static WObj* str_nonzero(WObj** argv, int argc, WObj* kwargs, WContext* context) {
@@ -860,10 +957,39 @@ namespace wings {
 			return argv[0];
 		}
 
+		static WObj* str_len(WObj** argv, int argc, WObj* kwargs, WContext* context) {
+			EXPECT_ARG_COUNT(1);
+			EXPECT_ARG_TYPE_STRING(0);
+			return WCreateInt(context, (wint)argv[0]->Get<std::string>().size());
+		}
+
 		static WObj* str_eq(WObj** argv, int argc, WObj* kwargs, WContext* context) {
 			EXPECT_ARG_COUNT(2);
 			EXPECT_ARG_TYPE_STRING(0);
 			return WCreateBool(context, WIsString(argv[1]) && std::strcmp(WGetString(argv[0]), WGetString(argv[1])) == 0);
+		}
+
+		static WObj* str_lt(WObj** argv, int argc, WObj* kwargs, WContext* context) {
+			EXPECT_ARG_COUNT(2);
+			EXPECT_ARG_TYPE_STRING(0);
+			EXPECT_ARG_TYPE_STRING(1);
+			return WCreateBool(context, std::strcmp(WGetString(argv[0]), WGetString(argv[1])) < 0);
+		}
+
+		static WObj* str_hash(WObj** argv, int argc, WObj* kwargs, WContext* context) {
+			EXPECT_ARG_COUNT(1);
+			EXPECT_ARG_TYPE_STRING(0);
+			wint hash = (wint)std::hash<std::string_view>()(WGetString(argv[0]));
+			return WCreateInt(context, hash);
+		}
+
+		static WObj* str_add(WObj** argv, int argc, WObj* kwargs, WContext* context) {
+			EXPECT_ARG_COUNT(2);
+			EXPECT_ARG_TYPE_STRING(0);
+			EXPECT_ARG_TYPE_STRING(1);
+			std::string s = WGetString(argv[0]);
+			s += WGetString(argv[1]);
+			return WCreateString(context, s.c_str());
 		}
 
 		static WObj* str_mul(WObj** argv, int argc, WObj* kwargs, WContext* context) {
@@ -871,9 +997,11 @@ namespace wings {
 			EXPECT_ARG_TYPE_STRING(0);
 			EXPECT_ARG_TYPE_INT(1);
 			wint multiplier = WGetInt(argv[1]);
+			std::string_view arg = WGetString(argv[0]);
 			std::string s;
+			s.reserve(arg.size() * (size_t)multiplier);
 			for (wint i = 0; i < multiplier; i++)
-				s += WGetString(argv[0]);
+				s += arg;
 			return WCreateString(context, s.c_str());
 		}
 
@@ -882,6 +1010,306 @@ namespace wings {
 			EXPECT_ARG_TYPE_STRING(0);
 			EXPECT_ARG_TYPE_STRING(1);
 			return WCreateBool(context, std::strstr(WGetString(argv[0]), WGetString(argv[1])));
+		}
+
+		static WObj* str_getitem(WObj** argv, int argc, WObj* kwargs, WContext* context) {
+			EXPECT_ARG_COUNT(2);
+			EXPECT_ARG_TYPE_STRING(0);
+
+			if (WIsInt(argv[1])) {
+				size_t index;
+				if (!ConvertIndex(argv[0], argv[1], index))
+					return nullptr;
+
+				std::string_view s = WGetString(argv[0]);
+				if (index >= s.size()) {
+					WRaiseException(context, "index out of range", context->builtins.indexError);
+					return nullptr;
+				}
+
+				char buf[2] = { s[index], '\0' };
+				return WCreateString(context, buf);
+			} else if (WIsInstance(argv[1], &context->builtins.slice, 1)) {
+				std::abort();
+			} else {
+				WRaiseArgumentTypeError(context, 1, "int or slice");
+				return nullptr;
+			}
+		}
+
+		static WObj* str_capitalize(WObj** argv, int argc, WObj* kwargs, WContext* context) {
+			EXPECT_ARG_COUNT(1);
+			EXPECT_ARG_TYPE_STRING(0);
+			std::string s = WGetString(argv[0]);
+			if (!s.empty())
+				s[0] = (char)std::toupper(s[0]);
+			return WCreateString(context, s.c_str());
+		}
+
+		static WObj* str_lower(WObj** argv, int argc, WObj* kwargs, WContext* context) {
+			EXPECT_ARG_COUNT(1);
+			EXPECT_ARG_TYPE_STRING(0);
+
+			std::string s = WGetString(argv[0]);
+			std::transform(s.begin(), s.end(), s.begin(), std::tolower);
+			return WCreateString(context, s.c_str());
+		}
+
+		static WObj* str_upper(WObj** argv, int argc, WObj* kwargs, WContext* context) {
+			EXPECT_ARG_COUNT(1);
+			EXPECT_ARG_TYPE_STRING(0);
+
+			std::string s = WGetString(argv[0]);
+			std::transform(s.begin(), s.end(), s.begin(), std::toupper);
+			return WCreateString(context, s.c_str());
+		}
+
+		static WObj* str_casefold(WObj** argv, int argc, WObj* kwargs, WContext* context) {
+			return str_lower(argv, argc, kwargs, context);
+		}
+
+		static WObj* str_center(WObj** argv, int argc, WObj* kwargs, WContext* context) {
+			EXPECT_ARG_COUNT_BETWEEN(2, 3);
+			EXPECT_ARG_TYPE_STRING(0);
+			EXPECT_ARG_TYPE_INT(1);
+			if (argc >= 3) EXPECT_ARG_TYPE_STRING(2);
+			
+			const char* fill = argc == 3 ? WGetString(argv[2]) : " ";
+			if (std::strlen(fill) != 1) {
+				WRaiseException(context, "The fill character must be exactly one character long", context->builtins.typeError);
+				return nullptr;
+			}
+
+			std::string s = WGetString(argv[0]);
+			wint desiredLen = WGetInt(argv[1]);
+			while (true) {
+				if ((wint)s.size() >= desiredLen)
+					break;
+				s.push_back(fill[0]);
+				if ((wint)s.size() >= desiredLen)
+					break;
+				s.insert(s.begin(), fill[0]);
+			}
+
+			return WCreateString(context, s.c_str());
+		}
+
+		static WObj* str_count(WObj** argv, int argc, WObj* kwargs, WContext* context) {
+			EXPECT_ARG_COUNT(2);
+			EXPECT_ARG_TYPE_STRING(0);
+			EXPECT_ARG_TYPE_STRING(1);
+			
+			std::string_view s = WGetString(argv[0]);
+			std::string_view search = WGetString(argv[1]);			
+			wint count = 0;
+			size_t pos = 0;
+			while ((pos = s.find(search, pos)) != std::string_view::npos) {
+				count++;
+				pos += search.size();
+			}
+
+			return WCreateInt(context, count);
+		}
+
+		static WObj* str_format(WObj** argv, int argc, WObj* kwargs, WContext* context) {
+			EXPECT_ARG_COUNT_AT_LEAST(1);
+			EXPECT_ARG_TYPE_STRING(0);
+			
+			const char* fmt = WGetString(argv[0]);
+			enum class Mode { Null, Auto, Manual } mode = Mode::Null;
+			size_t autoIndex = 0;
+			std::string s;
+			for (auto p = fmt; *p; ++p) {
+				if (*p != '{') {
+					s += *p;
+					continue;
+				}
+
+				size_t index = 0;
+				bool useAutoIndexing = true;
+				++p;
+				while (*p != '}') {
+					if (*p >= '0' && *p <= '9') {
+						index = 10 * index + ((size_t)*p - '0');
+						useAutoIndexing = false;
+						++p;
+					} else {
+						WRaiseException(context, "Invalid format string", context->builtins.valueError);
+						return nullptr;
+					}
+				}
+
+				if (useAutoIndexing) {
+					if (mode == Mode::Manual) {
+						WRaiseException(
+							context,
+							"cannot switch from automatic field numbering to manual field specification",
+							context->builtins.valueError);
+						return nullptr;
+					}
+					mode = Mode::Auto;
+					index = autoIndex;
+					autoIndex++;
+				} else {
+					if (mode == Mode::Auto) {
+						WRaiseException(
+							context,
+							"cannot switch from automatic field numbering to manual field specification",
+							context->builtins.valueError);
+						return nullptr;
+					}
+					mode = Mode::Manual;
+				}
+
+				if ((int)index >= argc - 1) {
+					WRaiseException(context, "Replacement index out of range", context->builtins.indexError);
+					return nullptr;
+				}
+
+				WObj* item = WConvertToString(argv[index + 1]);
+				if (item == nullptr)
+					return nullptr;
+				s += WGetString(item);
+			}
+
+			return WCreateString(context, s.c_str());
+		}
+
+		static WObj* str_startswith(WObj** argv, int argc, WObj* kwargs, WContext* context) {
+			EXPECT_ARG_COUNT(2);
+			EXPECT_ARG_TYPE_STRING(0);
+			EXPECT_ARG_TYPE_STRING(1);
+
+			std::string_view s = WGetString(argv[0]);
+			std::string_view end = WGetString(argv[1]);
+			return WCreateBool(context, s.starts_with(end));
+		}
+
+		static WObj* str_endswith(WObj** argv, int argc, WObj* kwargs, WContext* context) {
+			EXPECT_ARG_COUNT(2);
+			EXPECT_ARG_TYPE_STRING(0);
+			EXPECT_ARG_TYPE_STRING(1);
+
+			std::string_view s = WGetString(argv[0]);
+			std::string_view end = WGetString(argv[1]);
+			return WCreateBool(context, s.ends_with(end));
+		}
+
+		static WObj* str_find(WObj** argv, int argc, WObj* kwargs, WContext* context) {
+			EXPECT_ARG_COUNT_BETWEEN(2, 4);
+			EXPECT_ARG_TYPE_STRING(0);
+			EXPECT_ARG_TYPE_STRING(1);
+			
+			size_t start = 0;
+			if (argc >= 3) {
+				EXPECT_ARG_TYPE_INT(2);
+				if (!ConvertIndex(argv[0], argv[2], start))
+					return nullptr;
+			}
+
+			size_t end = 0;
+			if (argc >= 4) {
+				EXPECT_ARG_TYPE_INT(3);
+				if (!ConvertIndex(argv[0], argv[3], end))
+					return nullptr;
+			} else {
+				WObj* len = WLen(argv[0]);
+				if (len == nullptr)
+					return nullptr;
+				end = (size_t)WGetInt(len);
+			}
+			
+			std::string_view s = WGetString(argv[0]);
+			std::string_view find = WGetString(argv[1]);
+			size_t location = s.substr(start, end - start).find(find);
+			if (location == std::string_view::npos) {
+				return WCreateInt(context, -1);
+			} else {
+				return WCreateInt(context, (wint)location);
+			}
+		}
+
+		static WObj* str_index(WObj** argv, int argc, WObj* kwargs, WContext* context) {
+			WObj* location = str_find(argv, argc, kwargs, context);
+			if (location == nullptr)
+				return nullptr;
+			
+			if (WGetInt(location) == -1) {
+				WRaiseException(context, "substring not found", context->builtins.valueError);
+				return nullptr;
+			} else {
+				return location;
+			}
+		}
+
+		template <auto F>
+		static WObj* str_isx(WObj** argv, int argc, WObj* kwargs, WContext* context) {
+			EXPECT_ARG_COUNT(1);
+			EXPECT_ARG_TYPE_STRING(0);
+
+			std::string_view s = WGetString(argv[0]);
+			return WCreateBool(context, std::all_of(s.begin(), s.end(), F));
+		}
+
+		static WObj* str_isalnum(WObj** argv, int argc, WObj* kwargs, WContext* context) {
+			constexpr auto f = [](char c) { return ('a' <= c && c <= 'z') || ('A' <= c && c <= 'Z') || ('0' <= c && c <= '9'); };
+			return str_isx<f>(argv, argc, kwargs, context);
+		}
+
+		static WObj* str_isalpha(WObj** argv, int argc, WObj* kwargs, WContext* context) {
+			constexpr auto f = [](char c) { return ('a' <= c && c <= 'z') || ('A' <= c && c <= 'Z'); };
+			return str_isx<f>(argv, argc, kwargs, context);
+		}
+
+		static WObj* str_isascii(WObj** argv, int argc, WObj* kwargs, WContext* context) {
+			constexpr auto f = [](char c) { return c < 128; };
+			return str_isx<f>(argv, argc, kwargs, context);
+		}
+
+		static WObj* str_isdigit(WObj** argv, int argc, WObj* kwargs, WContext* context) {
+			constexpr auto f = [](char c) { return '0' <= c && c <= '9'; };
+			return str_isx<f>(argv, argc, kwargs, context);
+		}
+
+		static WObj* str_isdecimal(WObj** argv, int argc, WObj* kwargs, WContext* context) {
+			return str_isdigit(argv, argc, kwargs, context);
+		}
+
+		static WObj* str_isnumeric(WObj** argv, int argc, WObj* kwargs, WContext* context) {
+			return str_isdigit(argv, argc, kwargs, context);
+		}
+
+		static WObj* str_isprintable(WObj** argv, int argc, WObj* kwargs, WContext* context) {
+			constexpr auto f = [](char c) { return c == '\t' || c == '\n' || c == '\r' || (c >= 32 && c <= 127); };
+			return str_isx<f>(argv, argc, kwargs, context);
+		}
+
+		static WObj* str_isspace(WObj** argv, int argc, WObj* kwargs, WContext* context) {
+			constexpr auto f = [](char c) {
+				return c == ' ' || c == '\t' || c == '\n' || c == '\r'
+					|| c == '\v' || c == '\f';
+			};
+			return str_isx<f>(argv, argc, kwargs, context);
+		}
+
+		static WObj* str_isupper(WObj** argv, int argc, WObj* kwargs, WContext* context) {
+			constexpr auto f = [](char c) { return !('a' <= c && c <= 'z'); };
+			return str_isx<f>(argv, argc, kwargs, context);
+		}
+
+		static WObj* str_islower(WObj** argv, int argc, WObj* kwargs, WContext* context) {
+			constexpr auto f = [](char c) { return !('A' <= c && c <= 'Z'); };
+			return str_isx<f>(argv, argc, kwargs, context);
+		}
+
+		static WObj* str_isidentifier(WObj** argv, int argc, WObj* kwargs, WContext* context) {
+			EXPECT_ARG_COUNT(1);
+			EXPECT_ARG_TYPE_STRING(0);
+
+			std::string_view s = WGetString(argv[0]);
+			constexpr auto f = [](char c) { return ('a' <= c && c <= 'z') || ('A' <= c && c <= 'Z') || ('0' <= c && c <= '9') || c == '_'; };
+			bool allAlphaNum = std::all_of(s.begin(), s.end(), f);
+			return WCreateBool(context, allAlphaNum && (s.empty() || s[0] < '0' || s[0] > '9'));
 		}
 
 		template <Collection collection>
@@ -1248,6 +1676,9 @@ namespace wings {
 			RegisterMethod<methods::object_str>(context->builtins.object, "__str__");
 			RegisterMethod<methods::object_eq>(context->builtins.object, "__eq__");
 			RegisterMethod<methods::object_ne>(context->builtins.object, "__ne__");
+			RegisterMethod<methods::object_le>(context->builtins.object, "__le__");
+			RegisterMethod<methods::object_gt>(context->builtins.object, "__gt__");
+			RegisterMethod<methods::object_ge>(context->builtins.object, "__ge__");
 			RegisterMethod<methods::object_iadd>(context->builtins.object, "__iadd__");
 			RegisterMethod<methods::object_isub>(context->builtins.object, "__isub__");
 			RegisterMethod<methods::object_imul>(context->builtins.object, "__imul__");
@@ -1260,6 +1691,8 @@ namespace wings {
 			RegisterMethod<methods::object_ixor>(context->builtins.object, "__ixor__");
 			RegisterMethod<methods::object_ilshift>(context->builtins.object, "__ilshift__");
 			RegisterMethod<methods::object_irshift>(context->builtins.object, "__irshift__");
+			RegisterMethod<methods::object_hash>(context->builtins.object, "__hash__");
+			RegisterMethod<methods::object_iter>(context->builtins.object, "__iter__");
 
 			context->builtins._bool = createClass("bool");
 			RegisterMethod<ctors::_bool>(context->builtins._bool, "__init__");
@@ -1268,6 +1701,7 @@ namespace wings {
 			RegisterMethod<methods::bool_float>(context->builtins._bool, "__float__");
 			RegisterMethod<methods::bool_str>(context->builtins._bool, "__str__");
 			RegisterMethod<methods::bool_eq>(context->builtins._bool, "__eq__");
+			RegisterMethod<methods::bool_hash>(context->builtins._bool, "__hash__");
 
 			context->builtins._int = createClass("int");
 			RegisterMethod<ctors::_int>(context->builtins._int, "__init__");
@@ -1275,11 +1709,6 @@ namespace wings {
 			RegisterMethod<methods::int_int>(context->builtins._int, "__int__");
 			RegisterMethod<methods::int_float>(context->builtins._int, "__float__");
 			RegisterMethod<methods::int_str>(context->builtins._int, "__str__");
-			RegisterMethod<methods::int_eq>(context->builtins._int, "__eq__");
-			RegisterMethod<methods::int_gt>(context->builtins._int, "__gt__");
-			RegisterMethod<methods::int_ge>(context->builtins._int, "__ge__");
-			RegisterMethod<methods::int_lt>(context->builtins._int, "__lt__");
-			RegisterMethod<methods::int_le>(context->builtins._int, "__le__");
 			RegisterMethod<methods::int_neg>(context->builtins._int, "__neg__");
 			RegisterMethod<methods::int_add>(context->builtins._int, "__add__");
 			RegisterMethod<methods::int_sub>(context->builtins._int, "__sub__");
@@ -1294,6 +1723,11 @@ namespace wings {
 			RegisterMethod<methods::int_invert>(context->builtins._int, "__invert__");
 			RegisterMethod<methods::int_lshift>(context->builtins._int, "__lshift__");
 			RegisterMethod<methods::int_rshift>(context->builtins._int, "__rshift__");
+			RegisterMethod<methods::int_lt>(context->builtins._int, "__lt__");
+			RegisterMethod<methods::int_eq>(context->builtins._int, "__eq__");
+			RegisterMethod<methods::int_hash>(context->builtins._int, "__hash__");
+			RegisterMethod<methods::int_bit_length>(context->builtins._int, "bit_length");
+			RegisterMethod<methods::int_bit_count>(context->builtins._int, "bit_count");
 
 			context->builtins._float = createClass("float");
 			RegisterMethod<ctors::_float>(context->builtins._float, "__init__");
@@ -1310,12 +1744,62 @@ namespace wings {
 			RegisterMethod<methods::float_floordiv>(context->builtins._float, "__floordiv__");
 			RegisterMethod<methods::float_mod>(context->builtins._float, "__mod__");
 			RegisterMethod<methods::float_pow>(context->builtins._float, "__pow__");
+			RegisterMethod<methods::float_lt>(context->builtins._float, "__lt__");
+			RegisterMethod<methods::float_eq>(context->builtins._float, "__eq__");
+			RegisterMethod<methods::float_hash>(context->builtins._float, "__hash__");
+			RegisterMethod<methods::float_is_integer>(context->builtins._float, "is_integer");
 
 			context->builtins.str = createClass("str");
 			RegisterMethod<ctors::str>(context->builtins.str, "__init__");
+			RegisterMethod<methods::str_nonzero>(context->builtins.str, "__nonzero__");
 			RegisterMethod<methods::str_int>(context->builtins.str, "__int__");
 			RegisterMethod<methods::str_float>(context->builtins.str, "__float__");
 			RegisterMethod<methods::str_str>(context->builtins.str, "__str__");
+			RegisterMethod<methods::str_len>(context->builtins.str, "__len__");
+			RegisterMethod<methods::str_add>(context->builtins.str, "__add__");
+			RegisterMethod<methods::str_mul>(context->builtins.str, "__mul__");
+			RegisterMethod<methods::str_getitem>(context->builtins.str, "__getitem__");
+			//RegisterMethod<methods::str_setitem>(context->builtins.str, "__setitem__");
+			RegisterMethod<methods::str_contains>(context->builtins.str, "__contains__");
+			RegisterMethod<methods::str_lt>(context->builtins.str, "__lt__");
+			RegisterMethod<methods::str_eq>(context->builtins.str, "__eq__");
+			RegisterMethod<methods::str_hash>(context->builtins.str, "__hash__");
+			RegisterMethod<methods::str_capitalize>(context->builtins.str, "capitalize");
+			RegisterMethod<methods::str_casefold>(context->builtins.str, "casefold");
+			RegisterMethod<methods::str_lower>(context->builtins.str, "lower");
+			RegisterMethod<methods::str_upper>(context->builtins.str, "upper");
+			RegisterMethod<methods::str_center>(context->builtins.str, "center");
+			RegisterMethod<methods::str_count>(context->builtins.str, "count");
+			RegisterMethod<methods::str_format>(context->builtins.str, "format");
+			RegisterMethod<methods::str_find>(context->builtins.str, "find");
+			RegisterMethod<methods::str_index>(context->builtins.str, "index");
+			RegisterMethod<methods::str_startswith>(context->builtins.str, "startswith");
+			RegisterMethod<methods::str_endswith>(context->builtins.str, "endswith");
+			RegisterMethod<methods::str_isalnum>(context->builtins.str, "isalnum");
+			RegisterMethod<methods::str_isalpha>(context->builtins.str, "isalpha");
+			RegisterMethod<methods::str_isascii>(context->builtins.str, "isascii");
+			RegisterMethod<methods::str_isdecimal>(context->builtins.str, "isdecimal");
+			RegisterMethod<methods::str_isdigit>(context->builtins.str, "isdigit");
+			RegisterMethod<methods::str_isidentifier>(context->builtins.str, "isidentifier");
+			RegisterMethod<methods::str_islower>(context->builtins.str, "islower");
+			RegisterMethod<methods::str_isupper>(context->builtins.str, "isupper");
+			RegisterMethod<methods::str_isnumeric>(context->builtins.str, "isnumeric");
+			RegisterMethod<methods::str_isprintable>(context->builtins.str, "isprintable");
+			RegisterMethod<methods::str_isspace>(context->builtins.str, "isspace");
+			//RegisterMethod<methods::str_istitle>(context->builtins.str, "istitle");
+			//RegisterMethod<methods::str_join>(context->builtins.str, "join");
+			//RegisterMethod<methods::str_ljust>(context->builtins.str, "ljust");
+			//RegisterMethod<methods::str_lstrip>(context->builtins.str, "lstrip");
+			//RegisterMethod<methods::str_replace>(context->builtins.str, "replace");
+			//RegisterMethod<methods::str_rfind>(context->builtins.str, "rfind");
+			//RegisterMethod<methods::str_rindex>(context->builtins.str, "rindex");
+			//RegisterMethod<methods::str_rjust>(context->builtins.str, "rjust");
+			//RegisterMethod<methods::str_rstrip>(context->builtins.str, "rstrip");
+			//RegisterMethod<methods::str_split>(context->builtins.str, "split");
+			//RegisterMethod<methods::str_splitlines>(context->builtins.str, "splitlines");
+			//RegisterMethod<methods::str_swapcase>(context->builtins.str, "swapcase");
+			//RegisterMethod<methods::str_title>(context->builtins.str, "title");
+			//RegisterMethod<methods::str_zfill>(context->builtins.str, "zfill");
 
 			context->builtins.list = createClass("list");
 			RegisterMethod<ctors::collection<Collection::List>>(context->builtins.list, "__init__");
@@ -1363,6 +1847,7 @@ namespace wings {
 				throw LibraryInitException();
 
 			context->builtins.slice = getGlobal("slice");
+			context->builtins.defaultIter = getGlobal("__DefaultIter");
 
 		} catch (LibraryInitException&) {
 			std::abort(); // Internal error

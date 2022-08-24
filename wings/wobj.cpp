@@ -445,22 +445,27 @@ extern "C" {
 	bool WIterate(WObj* obj, void* userdata, WIterationCallback callback) {
 		WASSERT(obj && callback);
 		WContext* context = obj->context;
+
 		WObj* iter = WCallMethod(obj, "__iter__", nullptr, 0);
-		WObjRef ref(iter);
 		if (iter == nullptr)
 			return false;
+		WObjRef iterRef(iter);
 
 		while (true) {
-			WObj* exc = WGetCurrentException(context);
-			if (exc && WIsInstance(exc, &context->builtins.stopIteration, 1)) {
-				WClearCurrentException(context);
-				return true;
-			}
-
 			WObj* yielded = WCallMethod(iter, "__next__", nullptr, 0);
-			WObjRef ref2(yielded);
-			if (!callback(yielded, userdata))
-				return false;
+			WObjRef yieldedRef(yielded);
+			if (yielded)
+				callback(yielded, userdata);
+
+			WObj* exc = WGetCurrentException(context);
+			if (exc) {
+				if (WIsInstance(exc, &context->builtins.stopIteration, 1)) {
+					WClearCurrentException(context);
+					return true;
+				} else {
+					return false;
+				}
+			}
 		}
 	}
 
@@ -800,6 +805,22 @@ extern "C" {
 					lhs->context,
 					"__ge__() returned a non bool type",
 					lhs->context->builtins.typeError
+				);
+			}
+		}
+		return nullptr;
+	}
+
+	WObj* WLen(WObj* obj) {
+		WASSERT(obj);
+		if (WObj* res = WCallMethod(obj, "__len__", nullptr, 0)) {
+			if (WIsInt(res)) {
+				return res;
+			} else {
+				WRaiseException(
+					obj->context,
+					"__len__() returned a non int type",
+					obj->context->builtins.typeError
 				);
 			}
 		}
