@@ -4,8 +4,6 @@
 #include <algorithm>
 #include <queue>
 
-using namespace wings;
-
 extern "C" {
 
 	WObj* WCreateNone(WContext* context) {
@@ -59,7 +57,7 @@ extern "C" {
 	}
 
 	WObj* WCreateTuple(WContext* context, WObj** argv, int argc) {
-		std::vector<WObjRef> refs;
+		std::vector<wings::WObjRef> refs;
 		WASSERT(context && argc >= 0);
 		if (argc > 0) {
 			WASSERT(argv);
@@ -78,7 +76,7 @@ extern "C" {
 	}
 
 	WObj* WCreateList(WContext* context, WObj** argv, int argc) {
-		std::vector<WObjRef> refs;
+		std::vector<wings::WObjRef> refs;
 		WASSERT(context && argc >= 0);
 		if (argc > 0) {
 			WASSERT(argv);
@@ -97,7 +95,7 @@ extern "C" {
 	}
 
 	WObj* WCreateDictionary(WContext* context, WObj** keys, WObj** values, int argc) {
-		std::vector<WObjRef> refs;
+		std::vector<wings::WObjRef> refs;
 		WASSERT(context && argc >= 0);
 		if (argc > 0) {
 			WASSERT(keys && values);
@@ -109,7 +107,7 @@ extern "C" {
 		}
 
 		// Pass a dummy kwargs to prevent stack overflow from recursion
-		WObj* dummyKwargs = Alloc(context);
+		WObj* dummyKwargs = wings::Alloc(context);
 		if (dummyKwargs == nullptr)
 			return nullptr;
 		dummyKwargs->type = "__map";
@@ -133,8 +131,8 @@ extern "C" {
 				value->fptr,
 				value->userdata,
 				value->isMethod,
-				std::string(value->tag ? value->tag : DEFAULT_TAG_NAME),
-				std::string(value->prettyName ? value->prettyName : DEFAULT_FUNC_NAME)
+				std::string(value->tag ? value->tag : wings::DEFAULT_TAG_NAME),
+				std::string(value->prettyName ? value->prettyName : wings::DEFAULT_FUNC_NAME)
 			};
 			return v;
 		} else {
@@ -143,7 +141,7 @@ extern "C" {
 	}
 
 	WObj* WCreateClass(WContext* context, const char* name, WObj** bases, int baseCount) {
-		std::vector<WObjRef> refs;
+		std::vector<wings::WObjRef> refs;
 		WASSERT(context && name && baseCount >= 0);
 		if (baseCount > 0) {
 			WASSERT(bases);
@@ -154,7 +152,7 @@ extern "C" {
 		}
 
 		// Allocate class
-		WObj* _class = Alloc(context);
+		WObj* _class = wings::Alloc(context);
 		if (_class == nullptr) {
 			return nullptr;
 		}
@@ -200,25 +198,21 @@ extern "C" {
 			WObj* _classObj = (WObj*)userdata;
 			WContext* context = _classObj->context;
 
-			WObj* instance = Alloc(context);
+			WObj* instance = wings::Alloc(context);
 			if (instance == nullptr)
 				return nullptr;
-			WObjRef ref(instance);
+			wings::WObjRef ref(instance);
 
 			instance->attributes = _classObj->Get<WObj::Class>().instanceAttributes.Copy();
 			instance->type = _classObj->Get<WObj::Class>().name;
 
-			if (WObj* init = WGetAttribute(instance, "__init__")) {
+			if (WObj* init = WHasAttribute(instance, "__init__")) {
 				if (WIsFunction(init)) {
 					WObj* ret = WCall(init, argv, argc, kwargs);
 					if (ret == nullptr) {
 						return nullptr;
 					} else if (!WIsNone(ret)) {
-						WRaiseException(
-							context,
-							"__init__() returned a non NoneType type",
-							context->builtins.typeError
-						);
+						WRaiseTypeError(context, "__init__() returned a non NoneType type");
 						return nullptr;
 					}
 				}
@@ -245,11 +239,7 @@ extern "C" {
 				if (ret == nullptr) {
 					return nullptr;
 				} else if (!WIsNone(ret)) {
-					WRaiseException(
-						argv[0]->context,
-						"__init__() returned a non NoneType type",
-						argv[0]->context->builtins.typeError
-					);
+					WRaiseTypeError(argv[0]->context, "__init__() returned a non NoneType type");
 					return nullptr;
 				}
 			}
@@ -382,10 +372,21 @@ extern "C" {
 		obj->finalizer = *finalizer;
 	}
 
-	WObj* WGetAttribute(WObj* obj, const char* member) {
+	WObj* WHasAttribute(WObj* obj, const char* member) {
 		WASSERT(obj && member);
 		WObj* mem = obj->attributes.Get(member);
 		if (mem && WIsFunction(mem) && mem->Get<WObj::Func>().isMethod) {
+			mem->Get<WObj::Func>().self = obj;
+		}
+		return mem;
+	}
+
+	WObj* WGetAttribute(WObj* obj, const char* member) {
+		WASSERT(obj && member);
+		WObj* mem = obj->attributes.Get(member);
+		if (mem == nullptr) {
+			WRaiseAttributeError(obj, member);
+		} else if (WIsFunction(mem) && mem->Get<WObj::Func>().isMethod) {
 			mem->Get<WObj::Func>().self = obj;
 		}
 		return mem;
@@ -417,13 +418,13 @@ extern "C" {
 		for (int i = 0; i < typesLen; i++)
 			WASSERT(types[i] && WIsClass(types[i]));
 
-		// Cannot use WGetAttribute here because instance is a const pointer
+		// Cannot use WHasAttribute here because instance is a const pointer
 		WObj* _class = instance->attributes.Get("__class__");
 		if (_class == nullptr)
 			return nullptr;
-		WObjRef ref(_class);
+		wings::WObjRef ref(_class);
 
-		std::queue<WObjRef> toCheck;
+		std::queue<wings::WObjRef> toCheck;
 		toCheck.emplace(_class);
 
 		while (!toCheck.empty()) {
@@ -432,7 +433,7 @@ extern "C" {
 			if (it != end)
 				return *it;
 
-			WObj* bases = WGetAttribute(toCheck.front().Get(), "__bases__");
+			WObj* bases = WHasAttribute(toCheck.front().Get(), "__bases__");
 			if (bases && WIsTuple(bases))
 				for (WObj* base : bases->Get<std::vector<WObj*>>())
 					toCheck.emplace(base);
@@ -449,11 +450,11 @@ extern "C" {
 		WObj* iter = WCallMethod(obj, "__iter__", nullptr, 0);
 		if (iter == nullptr)
 			return false;
-		WObjRef iterRef(iter);
+		wings::WObjRef iterRef(iter);
 
 		while (true) {
 			WObj* yielded = WCallMethod(iter, "__next__", nullptr, 0);
-			WObjRef yieldedRef(yielded);
+			wings::WObjRef yieldedRef(yielded);
 			if (yielded)
 				callback(yielded, userdata);
 
@@ -475,11 +476,7 @@ extern "C" {
 			if (WIsBool(res)) {
 				return res;
 			} else {
-				WRaiseException(
-					arg->context,
-					"__nonzero__() returned a non bool type",
-					arg->context->builtins.typeError
-				);
+				WRaiseTypeError(arg->context, "__nonzero__() returned a non bool type");
 			}
 		}
 		return nullptr;
@@ -491,11 +488,7 @@ extern "C" {
 			if (WIsInt(res)) {
 				return res;
 			} else {
-				WRaiseException(
-					arg->context,
-					"__int__() returned a non int type",
-					arg->context->builtins.typeError
-				);
+				WRaiseTypeError(arg->context, "__int__() returned a non int type");
 			}
 		}
 		return nullptr;
@@ -507,11 +500,7 @@ extern "C" {
 			if (WIsIntOrFloat(res)) {
 				return res;
 			} else {
-				WRaiseException(
-					arg->context,
-					"__float__() returned a non float type",
-					arg->context->builtins.typeError
-				);
+				WRaiseTypeError(arg->context, "__float__() returned a non float type");
 			}
 		}
 		return nullptr;
@@ -523,11 +512,7 @@ extern "C" {
 			if (WIsString(res)) {
 				return res;
 			} else {
-				WRaiseException(
-					arg->context,
-					"__str__() returned a non str type",
-					arg->context->builtins.typeError
-				);
+				WRaiseTypeError(arg->context, "__str__() returned a non str type");
 			}
 		}
 		return nullptr;
@@ -543,26 +528,18 @@ extern "C" {
 
 			if (kwargsDict) {
 				if (!WIsDictionary(kwargsDict)) {
-					WRaiseException(
-						kwargsDict->context,
-						"Keyword arguments must be a dictionary",
-						kwargsDict->context->builtins.typeError
-					);
+					WRaiseTypeError(kwargsDict->context, "Keyword arguments must be a dictionary");
 					return nullptr;
 				}
 				for (const auto& [key, value] : kwargsDict->Get<wings::WDict>()) {
 					if (!WIsString(key)) {
-						WRaiseException(
-							kwargsDict->context,
-							"Keyword arguments dictionary must only contain string keys",
-							kwargsDict->context->builtins.typeError
-						);
+						WRaiseTypeError(kwargsDict->context, "Keyword arguments dictionary must only contain string keys");
 						return nullptr;
 					}
 				}
 			}
 
-			std::vector<WObjRef> refs;
+			std::vector<wings::WObjRef> refs;
 			refs.emplace_back(callable);
 			for (int i = 0; i < argc; i++)
 				refs.emplace_back(argv[i]);
@@ -579,7 +556,7 @@ extern "C" {
 				userdata = func.userdata;
 				prettyName = func.prettyName;
 
-				callable->context->currentTrace.push_back(TraceFrame{
+				callable->context->currentTrace.push_back(wings::TraceFrame{
 					{},
 					"",
 					func.tag,
@@ -626,16 +603,10 @@ extern "C" {
 		for (int i = 0; i < argc; i++)
 			WASSERT(argv[i]);
 
-		WObj* method = WGetAttribute(obj, member);
-		if (method == nullptr) {
-			std::string msg = "Object of type " +
-				WObjTypeToString(obj) +
-				" has no attribute " +
-				member;
-			WRaiseException(obj->context, msg.c_str(), obj->context->builtins.attributeError);
-			return nullptr;
-		} else {
+		if (WObj* method = WGetAttribute(obj, member)) {
 			return WCall(method, argv, argc, kwargsDict);
+		} else {
+			return nullptr;
 		}
 	}
 
@@ -646,16 +617,11 @@ extern "C" {
 		for (int i = 0; i < argc; i++)
 			WASSERT(argv[i]);
 
-		WObj* method = WGetAttributeFromBase(obj, member, baseClass);
-		if (method == nullptr) {
-			std::string msg = "Object of type " +
-				WObjTypeToString(obj) +
-				" has no attribute " +
-				member;
-			WRaiseException(obj->context, msg.c_str(), obj->context->builtins.attributeError);
-			return nullptr;
-		} else {
+		if (WObj* method = WGetAttributeFromBase(obj, member, baseClass)) {
 			return WCall(method, argv, argc, kwargsDict);
+		} else {
+			WRaiseAttributeError(obj, member);
+			return nullptr;
 		}
 	}
 
@@ -721,11 +687,7 @@ extern "C" {
 			if (WIsBool(res)) {
 				return res;
 			} else {
-				WRaiseException(
-					lhs->context,
-					"__eq__() returned a non bool type",
-					lhs->context->builtins.typeError
-				);
+				WRaiseTypeError(lhs->context, "__eq__() returned a non bool type");
 			}
 		}
 		return nullptr;
@@ -737,11 +699,7 @@ extern "C" {
 			if (WIsBool(res)) {
 				return res;
 			} else {
-				WRaiseException(
-					lhs->context,
-					"__ne__() returned a non bool type",
-					lhs->context->builtins.typeError
-				);
+				WRaiseTypeError(lhs->context, "__ne__() returned a non bool type");
 			}
 		}
 		return nullptr;
@@ -753,11 +711,7 @@ extern "C" {
 			if (WIsBool(res)) {
 				return res;
 			} else {
-				WRaiseException(
-					lhs->context,
-					"__lt__() returned a non bool type",
-					lhs->context->builtins.typeError
-				);
+				WRaiseTypeError(lhs->context, "__lt__() returned a non bool type");
 			}
 		}
 		return nullptr;
@@ -769,11 +723,7 @@ extern "C" {
 			if (WIsBool(res)) {
 				return res;
 			} else {
-				WRaiseException(
-					lhs->context,
-					"__le__() returned a non bool type",
-					lhs->context->builtins.typeError
-				);
+				WRaiseTypeError(lhs->context, "__le__() returned a non bool type");
 			}
 		}
 		return nullptr;
@@ -785,11 +735,7 @@ extern "C" {
 			if (WIsBool(res)) {
 				return res;
 			} else {
-				WRaiseException(
-					lhs->context,
-					"__gt__() returned a non bool type",
-					lhs->context->builtins.typeError
-				);
+				WRaiseTypeError(lhs->context, "__gt__() returned a non bool type");
 			}
 		}
 		return nullptr;
@@ -801,11 +747,7 @@ extern "C" {
 			if (WIsBool(res)) {
 				return res;
 			} else {
-				WRaiseException(
-					lhs->context,
-					"__ge__() returned a non bool type",
-					lhs->context->builtins.typeError
-				);
+				WRaiseTypeError(lhs->context, "__ge__() returned a non bool type");
 			}
 		}
 		return nullptr;
@@ -817,11 +759,7 @@ extern "C" {
 			if (WIsInt(res)) {
 				return res;
 			} else {
-				WRaiseException(
-					obj->context,
-					"__len__() returned a non int type",
-					obj->context->builtins.typeError
-				);
+				WRaiseTypeError(obj->context, "__len__() returned a non int type");
 			}
 		}
 		return nullptr;
@@ -833,11 +771,7 @@ extern "C" {
 			if (WIsBool(res)) {
 				return res;
 			} else {
-				WRaiseException(
-					container->context,
-					"__contains__() returned a non bool type",
-					container->context->builtins.typeError
-				);
+				WRaiseTypeError(container->context, "__contains__() returned a non bool type");
 			}
 		}
 		return nullptr;

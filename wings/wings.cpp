@@ -4,152 +4,15 @@
 #include "compile.h"
 #include <iostream>
 #include <memory>
-#include <sstream>
 #include <string_view>
-#include <algorithm>
 #include <atomic>
 #include <mutex>
-
-using namespace wings;
 
 static WErrorCallback errorCallback;
 static void* errorCallbackUserdata;
 static std::mutex errorCallbackMutex;
 
 extern "C" {
-    const char* WGetErrorMessage(WContext* context) {
-        WASSERT(context);
-		
-        if (context->currentException == nullptr) {
-            return (context->traceMessage = "Ok").c_str();
-        }
-
-        std::stringstream ss;
-        ss << "Traceback (most recent call first):\n";
-
-        for (const auto& frame : context->exceptionTrace) {
-            ss << "  ";
-            bool written = false;
-
-            if (frame.tag != DEFAULT_TAG_NAME) {
-                ss << "Tag " << frame.tag;
-                written = true;
-            }
-
-            if (frame.srcPos.line != (size_t)-1) {
-                if (written) ss << ", ";
-                ss << "Line " << (frame.srcPos.line + 1);
-                written = true;
-            }
-
-            if (frame.func != DEFAULT_FUNC_NAME) {
-                if (written) ss << ", ";
-                ss << "Function " << frame.func << "()";
-            }
-
-            ss << "\n";
-
-            if (!frame.lineText.empty()) {
-                std::string lineText = frame.lineText;
-                std::replace(lineText.begin(), lineText.end(), '\t', ' ');
-
-                size_t skip = lineText.find_first_not_of(' ');
-                ss << "    " << (lineText.c_str() + skip) << "\n";
-                ss << std::string(frame.srcPos.column + 4 - skip, ' ') << "^\n";
-            }
-        }
-
-        ss << context->currentException->type;
-        if (WObj* msg = WGetAttribute(context->currentException, "message"))
-            if (WIsString(msg))
-                ss << ": " << WGetString(msg);
-        ss << "\n";
-
-        context->traceMessage = ss.str();
-        return context->traceMessage.c_str();
-    }
-
-    WObj* WGetCurrentException(WContext* context) {
-        WASSERT(context);
-        return context->currentException;
-    }
-
-    void WClearCurrentException(WContext* context) {
-        WASSERT_VOID(context);
-        context->currentException = nullptr;
-        context->exceptionTrace.clear();
-        context->traceMessage.clear();
-    }
-
-    void WRaiseException(WContext* context, const char* message, WObj* type) {
-        WASSERT_VOID(context);
-        type = type ? type : context->builtins.exception;
-
-        WObj* msg = WCreateString(context, message);
-        if (msg == nullptr) {
-            return;
-        }
-
-        // If exception creation was successful then set the exception.
-        // Otherwise the exception will already be set by some other code.
-        if (WObj* exceptionObject = WCall(type, &msg, 1)) {
-            WRaiseExceptionObject(context, exceptionObject);
-        }
-    }
-
-    void WRaiseExceptionObject(WContext* context, WObj* exception) {
-        WASSERT_VOID(context && exception);
-        if (WIsInstance(exception, &context->builtins.baseException, 1)) {
-            context->currentException = exception;
-            context->exceptionTrace.clear();
-            for (const auto& frame : context->currentTrace)
-                context->exceptionTrace.push_back(frame.ToOwned());
-        } else {
-            WRaiseException(context, "exceptions must derive from BaseException", context->builtins.typeError);
-        }
-    }
-    
-    void WRaiseArgumentCountError(WContext* context, int given, int expected) {
-        WASSERT_VOID(context && given >= 0 && expected >= -1);
-        std::string msg;
-        if (expected != -1) {
-            msg = "Function takes " +
-                std::to_string(expected) +
-                " argument(s) but " +
-                std::to_string(given) +
-                (given == 1 ? " was given" : " were given");
-        } else {
-            msg = "function does not take " +
-                std::to_string(given) +
-                " argument(s)";
-        }
-        WRaiseException(context, msg.c_str(), context->builtins.typeError);
-    }
-
-    void WRaiseArgumentTypeError(WContext* context, int argIndex, const char* expected) {
-		WASSERT_VOID(context && argIndex >= 0 && expected);
-        std::string msg = "Argument " + std::to_string(argIndex + 1)
-            + " Expected type " + expected;
-        WRaiseException(context, msg.c_str(), context->builtins.typeError);
-    }
-
-    void WRaiseAttributeError(const WObj* obj, const char* attribute) {
-        WASSERT_VOID(obj && attribute);
-        std::string msg = "'" + WObjTypeToString(obj) +
-            "' object has no attribute '" + attribute + "'";
-        WRaiseException(obj->context, msg.c_str(), obj->context->builtins.attributeError);
-    }
-
-    void WRaiseZeroDivisionError(WContext* context) {
-        WASSERT_VOID(context);
-        WRaiseException(context, "division by zero", context->builtins.zeroDivisionError);
-    }
-
-    void WRaiseStopIteration(WContext* context) {
-        WASSERT_VOID(context);
-        WRaiseException(context, nullptr, context->builtins.stopIteration);
-    }
-
     void WGetConfig(const WContext* context, WConfig* out) {
         WASSERT_VOID(context && out);
         *out = context->config;
@@ -179,7 +42,7 @@ extern "C" {
 
         // Initialise the library without restriction
         WSetConfig(context, nullptr);
-        InitLibrary(context);
+        wings::InitLibrary(context);
 		
         // Apply possibly restrictive config now
         WSetConfig(context, config);
@@ -189,7 +52,7 @@ extern "C" {
 
     void WDestroyContext(WContext* context) {
         WASSERT_VOID(context);
-        DestroyAllObjects(context);
+        wings::DestroyAllObjects(context);
         delete context;
     }
 
@@ -215,13 +78,13 @@ extern "C" {
         WASSERT(context && code);
 
         if (tag == nullptr)
-            tag = DEFAULT_TAG_NAME;
+            tag = wings::DEFAULT_TAG_NAME;
 
-        auto lexResult = Lex(code);
-        auto originalSource = MakeRcPtr<std::vector<std::string>>(lexResult.originalSource);
+        auto lexResult = wings::Lex(code);
+        auto originalSource = wings::MakeRcPtr<std::vector<std::string>>(lexResult.originalSource);
 
-        auto raiseException = [&](const CodeError& error) {
-            context->currentTrace.push_back(TraceFrame{
+        auto raiseException = [&](const wings::CodeError& error) {
+            context->currentTrace.push_back(wings::TraceFrame{
                 error.srcPos,
                 (*originalSource)[error.srcPos.line],
                 tag,
@@ -246,18 +109,18 @@ extern "C" {
             return nullptr;
         }
 		
-        DefObject* def = new DefObject();
+        auto* def = new wings::DefObject();
         def->context = context;
         def->tag = tag;
-        def->prettyName = DEFAULT_FUNC_NAME;
+        def->prettyName = wings::DEFAULT_FUNC_NAME;
         def->originalSource = std::move(originalSource);
         auto instructions = Compile(parseResult.parseTree);
-        def->instructions = MakeRcPtr<std::vector<Instruction>>(std::move(instructions));
+        def->instructions = MakeRcPtr<std::vector<wings::Instruction>>(std::move(instructions));
 
         WFuncDesc func{};
-        func.fptr = &DefObject::Run;
+        func.fptr = &wings::DefObject::Run;
         func.userdata = def;
-        func.prettyName = DEFAULT_FUNC_NAME;
+        func.prettyName = wings::DEFAULT_FUNC_NAME;
         WObj* obj = WCreateFunction(context, &func);
         if (obj == nullptr) {
             delete def;
@@ -265,7 +128,7 @@ extern "C" {
         }
 
         WFinalizerDesc finalizer{};
-        finalizer.fptr = [](WObj* obj, void* userdata) { delete (DefObject*)userdata; };
+        finalizer.fptr = [](WObj* obj, void* userdata) { delete (wings::DefObject*)userdata; };
         finalizer.userdata = def;
         WSetFinalizer(obj, &finalizer);
 
@@ -288,7 +151,7 @@ extern "C" {
         if (it != context->globals.end()) {
             *it->second = value;
         } else {
-            context->globals.insert({ std::string(name), MakeRcPtr<WObj*>(value) });
+            context->globals.insert({ std::string(name), wings::MakeRcPtr<WObj*>(value) });
         }
     }
 

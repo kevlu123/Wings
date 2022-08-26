@@ -2,8 +2,6 @@
 #include <deque>
 #include <unordered_set>
 
-using namespace wings;
-
 namespace wings {
 
     WObj* Alloc(WContext* context) {

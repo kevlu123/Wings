@@ -7,8 +7,7 @@
 #include <bit>
 #include <algorithm>
 #include <queue>
-
-using namespace wings;
+#include <optional>
 
 static const char* const LIBRARY_CODE = R"(
 class __DefaultIter:
@@ -41,15 +40,29 @@ class __RangeIter:
 
 class range:
 	def __init__(self, start, stop=None, step=None):
+		if step == 0:
+			raise ValueError("step cannot be 0")
 		if stop == None:
+			if not isinstance(start, int):
+				raise TypeError("stop must be an integer")
 			self.start = None
 			self.stop = start
 			self.step = None
 		elif step == None:
+			if not isinstance(start, int):
+				raise TypeError("start must be an integer")
+			elif not isinstance(stop, int):
+				raise TypeError("start must be an integer")
 			self.start = start
 			self.stop = stop
 			self.step = None
 		else:
+			if not isinstance(start, int):
+				raise TypeError("start must be an integer")
+			elif not isinstance(stop, int):
+				raise TypeError("start must be an integer")
+			elif not isinstance(step, int):
+				raise TypeError("step must be an integer")
 			self.start = start
 			self.stop = stop
 			self.step = step
@@ -90,12 +103,12 @@ static std::string PtrToString(const void* p) {
 	return ss.str();
 }
 
-static bool ConvertIndex(WObj* container, WObj* index, size_t& out) {
+static bool ConvertIndex(WObj* container, WObj* index, size_t& out, std::optional<wint>& size) {
 	WObj* len = WLen(container);
 	if (len == nullptr)
 		return false;
 
-	wint length = WGetInt(len);
+	wint length = size.has_value() ? size.value() : WGetInt(len);
 	wint i = WGetInt(index);
 
 	if (i < 0) {
@@ -104,6 +117,11 @@ static bool ConvertIndex(WObj* container, WObj* index, size_t& out) {
 		out = (size_t)i;
 	}
 	return true;
+}
+
+static bool ConvertIndex(WObj* container, WObj* index, size_t& out) {
+	std::optional<wint> size;
+	return ConvertIndex(container, index, out, size);
 }
 
 #define EXPECT_ARG_COUNT(n) do if (argc != n) { WRaiseArgumentCountError(context, argc, n); return nullptr; } while (0)
@@ -640,7 +658,7 @@ namespace wings {
 
 			wint shift = WGetInt(argv[1]);
 			if (shift < 0) {
-				WRaiseException(context, "Shift cannot be negative", context->builtins.valueError);
+				WRaiseValueError(context, "Shift cannot be negative");
 				return nullptr;
 			}
 			shift = std::min(shift, (wint)sizeof(wint) * 8);
@@ -654,7 +672,7 @@ namespace wings {
 
 			wint shift = WGetInt(argv[1]);
 			if (shift < 0) {
-				WRaiseException(context, "Shift cannot be negative", context->builtins.valueError);
+				WRaiseValueError(context, "Shift cannot be negative");
 				return nullptr;
 			}
 			shift = std::min(shift, (wint)sizeof(wint) * 8);
@@ -845,9 +863,9 @@ namespace wings {
 
 				if (!isDigit(*p, base)) {
 					if (base == 2) {
-						WRaiseException(context, "Invalid binary string", context->builtins.valueError);
+						WRaiseValueError(context, "Invalid binary string");
 					} else {
-						WRaiseException(context, "Invalid hexadecimal string", context->builtins.valueError);
+						WRaiseValueError(context, "Invalid hexadecimal string");
 					}
 					return nullptr;
 				}
@@ -864,7 +882,7 @@ namespace wings {
 			}
 
 			if (*p) {
-				WRaiseException(context, "Invalid integer string", context->builtins.valueError);
+				WRaiseValueError(context, "Invalid integer string");
 				return nullptr;
 			}
 
@@ -922,9 +940,9 @@ namespace wings {
 
 				if (!isDigit(*p, base) && *p != '.') {
 					if (base == 2) {
-						WRaiseException(context, "Invalid binary string", context->builtins.valueError);
+						WRaiseValueError(context, "Invalid binary string");
 					} else {
-						WRaiseException(context, "Invalid hexadecimal string", context->builtins.valueError);
+						WRaiseValueError(context, "Invalid hexadecimal string");
 					}
 					return nullptr;
 				}
@@ -944,7 +962,7 @@ namespace wings {
 			}
 
 			if (*p) {
-				WRaiseException(context, "Invalid float string", context->builtins.valueError);
+				WRaiseValueError(context, "Invalid float string");
 				return nullptr;
 			}
 
@@ -1023,7 +1041,7 @@ namespace wings {
 
 				std::string_view s = WGetString(argv[0]);
 				if (index >= s.size()) {
-					WRaiseException(context, "index out of range", context->builtins.indexError);
+					WRaiseIndexError(context);
 					return nullptr;
 				}
 
@@ -1076,7 +1094,7 @@ namespace wings {
 			
 			const char* fill = argc == 3 ? WGetString(argv[2]) : " ";
 			if (std::strlen(fill) != 1) {
-				WRaiseException(context, "The fill character must be exactly one character long", context->builtins.typeError);
+				WRaiseTypeError(context, "The fill character must be exactly one character long");
 				return nullptr;
 			}
 
@@ -1134,17 +1152,17 @@ namespace wings {
 						useAutoIndexing = false;
 						++p;
 					} else {
-						WRaiseException(context, "Invalid format string", context->builtins.valueError);
+						WRaiseValueError(context, "Invalid format string");
 						return nullptr;
 					}
 				}
 
 				if (useAutoIndexing) {
 					if (mode == Mode::Manual) {
-						WRaiseException(
+						WRaiseValueError(
 							context,
-							"cannot switch from automatic field numbering to manual field specification",
-							context->builtins.valueError);
+							"cannot switch from automatic field numbering to manual field specification"
+						);
 						return nullptr;
 					}
 					mode = Mode::Auto;
@@ -1152,17 +1170,17 @@ namespace wings {
 					autoIndex++;
 				} else {
 					if (mode == Mode::Auto) {
-						WRaiseException(
+						WRaiseValueError(
 							context,
-							"cannot switch from automatic field numbering to manual field specification",
-							context->builtins.valueError);
+							"cannot switch from automatic field numbering to manual field specification"
+						);
 						return nullptr;
 					}
 					mode = Mode::Manual;
 				}
 
 				if ((int)index >= argc - 1) {
-					WRaiseException(context, "Replacement index out of range", context->builtins.indexError);
+					WRaiseIndexError(context);
 					return nullptr;
 				}
 
@@ -1201,16 +1219,17 @@ namespace wings {
 			EXPECT_ARG_TYPE_STRING(1);
 			
 			size_t start = 0;
+			std::optional<wint> size;
 			if (argc >= 3) {
 				EXPECT_ARG_TYPE_INT(2);
-				if (!ConvertIndex(argv[0], argv[2], start))
+				if (!ConvertIndex(argv[0], argv[2], start, size))
 					return nullptr;
 			}
 
 			size_t end = 0;
 			if (argc >= 4) {
 				EXPECT_ARG_TYPE_INT(3);
-				if (!ConvertIndex(argv[0], argv[3], end))
+				if (!ConvertIndex(argv[0], argv[3], end, size))
 					return nullptr;
 			} else {
 				WObj* len = WLen(argv[0]);
@@ -1235,7 +1254,7 @@ namespace wings {
 				return nullptr;
 			
 			if (WGetInt(location) == -1) {
-				WRaiseException(context, "substring not found", context->builtins.valueError);
+				WRaiseValueError(context, "substring not found");
 				return nullptr;
 			} else {
 				return location;

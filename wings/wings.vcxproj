@@ -145,6 +145,7 @@
   <ItemGroup>
     <ClCompile Include="attributetable.cpp" />
     <ClCompile Include="compile.cpp" />
+    <ClCompile Include="exception.cpp" />
     <ClCompile Include="executor.cpp" />
     <ClCompile Include="exprparse.cpp" />
     <ClCompile Include="gc.cpp" />

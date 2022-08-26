@@ -53,11 +53,7 @@ namespace wings {
 						if (!def->prettyName.empty())
 							msg = def->prettyName + "() ";
 						msg += std::string("got an unexpected keyword argument '") + key + "'";
-						WRaiseException(
-							context,
-							msg.c_str(),
-							context->builtins.typeError
-						);
+						WRaiseTypeError(context, msg.c_str());
 						return nullptr;
 					}
 					newKwargs->Get<wings::WDict>().insert({ k, value });
@@ -81,11 +77,7 @@ namespace wings {
 					if (!def->prettyName.empty())
 						msg = def->prettyName + "() ";
 					msg += "got multiple values for argument '" + def->parameterNames[i] + "'";
-					WRaiseException(
-						context,
-						msg.c_str(),
-						context->builtins.typeError
-					);
+					WRaiseTypeError(context, msg.c_str());
 					return nullptr;
 				}
 				executor.variables.insert({ def->parameterNames[i], MakeRcPtr<WObj*>(args[i]) });
@@ -98,11 +90,7 @@ namespace wings {
 					msg += "takes " + std::to_string(def->parameterNames.size())
 						+ " positional argument(s) but " + std::to_string(argc)
 						+ (argc == 1 ? " was given" : " were given");
-					WRaiseException(
-						context,
-						msg.c_str(),
-						context->builtins.typeError
-					);
+					WRaiseTypeError(context, msg.c_str());
 					return nullptr;
 				}
 				listArgs->Get<std::vector<WObj*>>().push_back(args[i]);
@@ -131,7 +119,7 @@ namespace wings {
 				def->prettyName + "()"
 				+ " missing parameter(s) "
 				+ unassigned;
-			WRaiseException(context, msg.c_str(), context->builtins.typeError);
+			WRaiseTypeError(context, msg.c_str());
 			return nullptr;
 		}
 
@@ -219,11 +207,7 @@ namespace wings {
 			}
 
 			if (values.size() != target.pack.size()) {
-				WRaiseException(
-					context,
-					"Packed assignment argument count mismatch",
-					context->builtins.valueError
-				);
+				WRaiseValueError(context, "Packed assignment argument count mismatch");
 				unprotectValues();
 				return nullptr;
 			}
@@ -442,11 +426,7 @@ namespace wings {
 					WObj* key = start[2 * i];
 					WObj* val = start[2 * i + 1];
 					if (!WIsImmutableType(key)) {
-						WRaiseException(
-							context,
-							"Only an immutable type can be used as a dictionary key",
-							context->builtins.typeError
-						);
+						WRaiseTypeError(context, "Only an immutable type can be used as a dictionary key");
 						exitValue = nullptr;
 						return;
 					}
@@ -464,8 +444,7 @@ namespace wings {
 			if (WObj* value = GetVariable(instr.string->string)) {
 				PushStack(value);
 			} else {
-				std::string msg = "The name '" + instr.string->string + "' is not defined";
-				WRaiseException(context, msg.c_str(), context->builtins.nameError);
+				WRaiseNameError(context, instr.string->string.c_str());
 				exitValue = nullptr;
 			}
 			break;
@@ -517,7 +496,6 @@ namespace wings {
 			if (WObj* attr = WGetAttribute(obj, instr.string->string.c_str())) {
 				PushStack(attr);
 			} else {
-				WRaiseAttributeError(obj, instr.string->string.c_str());
 				exitValue = nullptr;
 			}
 			break;
@@ -539,11 +517,7 @@ namespace wings {
 		case Instruction::Type::UnpackMapForMapCreation: {
 			WObj* map = PopStack();
 			if (!WIsDictionary(map)) {
-				WRaiseException(
-					context,
-					"Unary '**' must be applied to a dictionary",
-					context->builtins.typeError
-				);
+				WRaiseTypeError(context, "Unary '**' must be applied to a dictionary");
 				exitValue = nullptr;
 				return;
 			}
@@ -557,22 +531,14 @@ namespace wings {
 		case Instruction::Type::UnpackMapForCall: {
 			WObj* map = PopStack();
 			if (!WIsDictionary(map)) {
-				WRaiseException(
-					context,
-					"Unary '**' must be applied to a dictionary",
-					context->builtins.typeError
-				);
+				WRaiseTypeError(context, "Unary '**' must be applied to a dictionary");
 				exitValue = nullptr;
 				return;
 			}
 
 			for (const auto& [key, value] : map->Get<wings::WDict>()) {
 				if (!WIsString(key)) {
-					WRaiseException(
-						context,
-						"Keywords arguments must be strings",
-						context->builtins.typeError
-					);
+					WRaiseTypeError(context, "Keywords must be strings");
 					exitValue = nullptr;
 					return;
 				}

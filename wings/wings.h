@@ -185,6 +185,16 @@ WDLL_EXPORT void WRaiseAttributeError(const WObj* obj, const char* attribute);
 WDLL_EXPORT void WRaiseZeroDivisionError(WContext* context);
 
 /**
+* Raise a IndexError.
+*
+* Remarks:
+* If an exception is already set, the old exception will be overwritten.
+*
+* @param context The relevant context.
+*/
+WDLL_EXPORT void WRaiseIndexError(WContext* context);
+
+/**
 * Raise a StopIteration to terminate iteration.
 *
 * Remarks:
@@ -193,6 +203,41 @@ WDLL_EXPORT void WRaiseZeroDivisionError(WContext* context);
 * @param context The relevant context.
 */
 WDLL_EXPORT void WRaiseStopIteration(WContext* context);
+
+/**
+* Raise a TypeError.
+*
+* Remarks:
+* If an exception is already set, the old exception will be overwritten.
+*
+* @param context The relevant context.
+* @param message A null terminated ASCII string containing the exception message,
+*                or nullptr for an empty string.
+*/
+WDLL_EXPORT void WRaiseTypeError(WContext* context, const char* message WDEFAULT_ARG(nullptr));
+
+/**
+* Raise a ValueError.
+*
+* Remarks:
+* If an exception is already set, the old exception will be overwritten.
+*
+* @param context The relevant context.
+* @param message A null terminated ASCII string containing the exception message,
+*                or nullptr for an empty string.
+*/
+WDLL_EXPORT void WRaiseValueError(WContext* context, const char* message WDEFAULT_ARG(nullptr));
+
+/**
+* Raise a NameError.
+*
+* Remarks:
+* If an exception is already set, the old exception will be overwritten.
+*
+* @param context The relevant context.
+* @param name A null terminated ASCII string containing the name that was not found.
+*/
+WDLL_EXPORT void WRaiseNameError(WContext* context, const char* name);
 
 /**
 * Check if an object's class derives from any of the specified classes.
@@ -644,7 +689,17 @@ WDLL_EXPORT void WGetFinalizer(const WObj* obj, WFinalizerDesc* finalizer);
 WDLL_EXPORT void WSetFinalizer(WObj* obj, const WFinalizerDesc* finalizer);
 
 /**
+* Check if an object contains an attribute.
+*
+* @param obj The object to get the attribute from.
+* @param member A null terminated ASCII string containing the attribute name to get.
+* @return The attribute value, or nullptr if the attribute does not exist.
+*/
+WDLL_EXPORT WObj* WHasAttribute(WObj* obj, const char* member);
+
+/**
 * Get an attribute of an object.
+* If the attribute does not exist, an AttributeError is raised.
 * 
 * @param obj The object to get the attribute from.
 * @param member A null terminated ASCII string containing the attribute name to get.
