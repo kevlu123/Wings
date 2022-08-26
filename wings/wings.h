@@ -18,25 +18,25 @@ typedef void (*WErrorCallback)(const char* message, void* userdata);
 typedef bool (*WIterationCallback)(WObj* obj, void* userdata);
 
 struct WFuncDesc {
-    WFunction fptr;
-    void* userdata;
-    bool isMethod;
-    const char* tag;
-    const char* prettyName;
+	WFunction fptr;
+	void* userdata;
+	bool isMethod;
+	const char* tag;
+	const char* prettyName;
 };
 
 struct WFinalizerDesc {
-    WFinalizer fptr;
-    void* userdata;
+	WFinalizer fptr;
+	void* userdata;
 };
 
 struct WConfig {
-    int maxAlloc;
-    int maxRecursion;
-    int maxCollectionSize;
-    float gcRunFactor;
-    WPrintFunction print;
-    void* printUserdata;
+	int maxAlloc;
+	int maxRecursion;
+	int maxCollectionSize;
+	float gcRunFactor;
+	WPrintFunction print;
+	void* printUserdata;
 };
 
 #if defined(_WIN32) && defined(_WINDLL)
