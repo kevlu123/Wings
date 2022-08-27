@@ -368,7 +368,7 @@ namespace wings {
 			for (size_t i = 0; i < std::size(indices); i++) {
 				if (p.EndReached()) {
 					return CodeError::Bad("Expected an expression", (--p)->srcPos);
-				} else if (p->text != ":") {
+				} else if (p->text != ":" && (p->text != "]" || i == 0)) {
 					indices[i].emplace();
 					if (auto error = ParseExpression(p, indices[i].value())) {
 						return error;
@@ -381,7 +381,7 @@ namespace wings {
 				} else if (p->text == "]") {
 					++p;
 					break;
-				} else if (p->text != ":") {
+				} else if (p->text != ":" || i == std::size(indices) - 1) {
 					return CodeError::Bad("Expected a ']'", p->srcPos);
 				}
 				isSlice = true;

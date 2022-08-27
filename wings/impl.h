@@ -164,7 +164,7 @@ struct WContext {
 	WConfig config{};
 	size_t lastObjectCountAfterGC = 0;
 	std::deque<std::unique_ptr<WObj>> mem;
-	std::unordered_multiset<const WObj*> protectedObjects;
+	std::unordered_map<const WObj*, size_t> protectedObjects;
 	std::unordered_map<std::string, wings::RcPtr<WObj*>> globals;
 	WObj* currentException = nullptr;
 	std::vector<WObj*> reprStack;

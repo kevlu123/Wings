@@ -535,12 +535,33 @@ static void TestStringMethods() {
 	T("print('  s   '.isspace())", "False");
 }
 
+void TestSlices() {
+	T("print('12345'[:])", "12345");
+	T("print('12345'[3:5])", "45");
+	T("print('12345'[::])", "12345");
+	T("print('12345'[1:-1])", "234");
+	T("print('12345'[2:4])", "34");
+	T("print('12345'[::2])", "135");
+	T("print('12345'[4:2])", "");
+	T("print('12345'[4:2:-1])", "54");
+	T("print('12345'[-1::])", "5");
+	T("print('12345'[::-2])", "531");
+	T("print('12345'[::3])", "14");
+
+	T("print('12345'[5:])", "");
+	T("print('12345'[-6:])", "12345");
+
+	F("print('12345'[])");
+	F("print('12345'[:::])");
+}
+
 void RunTests() {
 	TestPrint();
 	TestConditional();
 	TestWhile();
 	TestExceptions();
 	TestStringMethods();
+	TestSlices();
 
 	std::cout << testsPassed << "/" << testsRun << " tests passed." << std::endl << std::endl;
 }

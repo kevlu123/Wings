@@ -40,22 +40,22 @@ class __RangeIter:
 
 class range:
 	def __init__(self, start, stop=None, step=None):
-		if step == 0:
+		if step is 0:
 			raise ValueError("step cannot be 0")
 		if stop == None:
 			if not isinstance(start, int):
 				raise TypeError("stop must be an integer")
-			self.start = None
+			self.start = 0
 			self.stop = start
-			self.step = None
-		elif step == None:
+			self.step = 1
+		elif step is None:
 			if not isinstance(start, int):
 				raise TypeError("start must be an integer")
 			elif not isinstance(stop, int):
 				raise TypeError("start must be an integer")
 			self.start = start
 			self.stop = stop
-			self.step = None
+			self.step = 1
 		else:
 			if not isinstance(start, int):
 				raise TypeError("start must be an integer")
@@ -66,21 +66,16 @@ class range:
 			self.start = start
 			self.stop = stop
 			self.step = step
-		self.current = 0 if self.start is None else self.start
 	def __iter__(self):
-		return __RangeIter(
-			0 if self.start is None else self.start,
-			self.stop,
-			1 if self.step is None else self.step
-		)
+		return __RangeIter(self.start, self.stop, self.step)
 		
 class slice:
 	def __init__(self, start, stop=None, step=None):
-		if stop == None:
+		if stop is None and step is None:
 			self.start = None
 			self.stop = start
 			self.step = None
-		elif step == None:
+		elif step is None:
 			self.start = start
 			self.stop = stop
 			self.step = None
@@ -103,25 +98,122 @@ static std::string PtrToString(const void* p) {
 	return ss.str();
 }
 
-static bool ConvertIndex(WObj* container, WObj* index, size_t& out, std::optional<wint>& size) {
+static bool ParseIndex(WObj* container, WObj* index, wint& out, std::optional<wint>& size) {
 	WObj* len = WLen(container);
 	if (len == nullptr)
 		return false;
+
+	if (!WIsInt(index)) {
+		WRaiseTypeError(container->context, "index must be an integer");
+		return false;
+	}
 
 	wint length = size.has_value() ? size.value() : WGetInt(len);
 	wint i = WGetInt(index);
 
 	if (i < 0) {
-		out = (size_t)(length + i);
+		out = length + i;
 	} else {
-		out = (size_t)i;
+		out = i;
 	}
 	return true;
 }
 
-static bool ConvertIndex(WObj* container, WObj* index, size_t& out) {
+static bool ParseIndex(WObj* container, WObj* index, wint& out) {
 	std::optional<wint> size;
-	return ConvertIndex(container, index, out, size);
+	return ParseIndex(container, index, out, size);
+}
+
+template <class F>
+static bool IterateRange(wint start, wint stop, wint step, F f) {
+	WASSERT(step);
+	if (step > 0) {
+		for (wint i = (wint)start; i < (wint)stop; i += step)
+			if (!f(i))
+				return false;
+	} else {
+		for (wint i = (wint)start; i > (wint)stop; i += step)
+			if (!f(i))
+				return false;
+	}
+	return true;
+}
+
+static bool ParseSlice(WObj* container, WObj* slice, wint& start, wint& stop, wint& step) {
+	std::optional<wint> size;
+	std::vector<wings::WObjRef> refs;
+	refs.emplace_back(container);
+	refs.emplace_back(slice);
+
+	WObj* stepAttr = WGetAttribute(slice, "step");
+	refs.emplace_back(stepAttr);
+	if (stepAttr == nullptr) {
+		return false;
+	} else if (WIsNone(stepAttr)) {
+		step = 1;
+	} else if (!WIsInt(stepAttr)) {
+		WRaiseTypeError(slice->context, "slice step attribute must be an integer");
+		return false;
+	} else if ((step = WGetInt(stepAttr)) == 0) {
+		WRaiseValueError(slice->context, "slice step cannot be 0");
+		return false;
+	}
+
+	WObj* startAttr = WGetAttribute(slice, "start");
+	refs.emplace_back(startAttr);
+	bool hasStart = true;
+	if (startAttr == nullptr) {
+		return false;
+	} else if (WIsNone(startAttr)) {
+		hasStart = false;
+	} else if (!ParseIndex(container, startAttr, start, size)) {
+		return false;
+	}
+
+	WObj* stopAttr = WGetAttribute(slice, "stop");
+	refs.emplace_back(stopAttr);
+	bool hasStop = true;
+	if (stopAttr == nullptr) {
+		return false;
+	} else if (WIsNone(stopAttr)) {
+		hasStop = false;
+	} else if (!ParseIndex(container, stopAttr, stop, size)) {
+		return false;
+	}
+
+	auto getSize = [&](wint& out) {
+		if (size.has_value()) {
+			out = size.value();
+		} else {
+			WObj* len = WLen(container);
+			if (len == nullptr)
+				return false;
+			out = WGetInt(len);
+			size = out;
+		}
+		return true;
+	};
+
+	if (!hasStart) {
+		if (step < 0) {
+			if (!getSize(start))
+				return false;
+			start--;
+		} else {
+			start = 0;
+		}
+	}
+
+	if (!hasStop) {
+		if (step < 0) {
+			stop = -1;
+		} else {
+			if (!getSize(stop))
+				return false;
+		}
+	}
+
+	return true;
 }
 
 #define EXPECT_ARG_COUNT(n) do if (argc != n) { WRaiseArgumentCountError(context, argc, n); return nullptr; } while (0)
@@ -1035,12 +1127,12 @@ namespace wings {
 			EXPECT_ARG_TYPE_STRING(0);
 
 			if (WIsInt(argv[1])) {
-				size_t index;
-				if (!ConvertIndex(argv[0], argv[1], index))
+				wint index;
+				if (!ParseIndex(argv[0], argv[1], index))
 					return nullptr;
 
 				std::string_view s = WGetString(argv[0]);
-				if (index >= s.size()) {
+				if (index < 0 || index >= (wint)s.size()) {
 					WRaiseIndexError(context);
 					return nullptr;
 				}
@@ -1048,7 +1140,22 @@ namespace wings {
 				char buf[2] = { s[index], '\0' };
 				return WCreateString(context, buf);
 			} else if (WIsInstance(argv[1], &context->builtins.slice, 1)) {
-				std::abort();
+				wint start, stop, step;
+				if (!ParseSlice(argv[0], argv[1], start, stop, step))
+					return nullptr;
+				
+				std::string_view s = WGetString(argv[0]);
+				std::string sliced;
+				bool success = IterateRange(start, stop, step, [&](wint i) {
+					if (i >= 0 && i < (wint)s.size())
+						sliced.push_back(s[i]);
+					return true;
+					});
+
+				if (!success)
+					return nullptr;
+				
+				return WCreateString(context, sliced.c_str());
 			} else {
 				WRaiseArgumentTypeError(context, 1, "int or slice");
 				return nullptr;
@@ -1218,18 +1325,18 @@ namespace wings {
 			EXPECT_ARG_TYPE_STRING(0);
 			EXPECT_ARG_TYPE_STRING(1);
 			
-			size_t start = 0;
+			wint start = 0;
 			std::optional<wint> size;
 			if (argc >= 3) {
 				EXPECT_ARG_TYPE_INT(2);
-				if (!ConvertIndex(argv[0], argv[2], start, size))
+				if (!ParseIndex(argv[0], argv[2], start, size))
 					return nullptr;
 			}
 
-			size_t end = 0;
+			wint end = 0;
 			if (argc >= 4) {
 				EXPECT_ARG_TYPE_INT(3);
-				if (!ConvertIndex(argv[0], argv[3], end, size))
+				if (!ParseIndex(argv[0], argv[3], end, size))
 					return nullptr;
 			} else {
 				WObj* len = WLen(argv[0]);
@@ -1240,7 +1347,16 @@ namespace wings {
 			
 			std::string_view s = WGetString(argv[0]);
 			std::string_view find = WGetString(argv[1]);
-			size_t location = s.substr(start, end - start).find(find);
+			
+			wint substrSize = end - start;
+			size_t location;
+			if (substrSize < 0) {
+				location = std::string_view::npos;
+			} else {
+				start = std::clamp(start, 0, (wint)s.size());
+				location = s.substr(start, (size_t)substrSize).find(find);
+			}
+			
 			if (location == std::string_view::npos) {
 				return WCreateInt(context, -1);
 			} else {

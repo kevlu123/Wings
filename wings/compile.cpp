@@ -291,23 +291,13 @@ namespace wings {
 			dot.string->string = "__getitem__";
 			instructions.push_back(std::move(dot));
 
-			argFrame = {};
-			argFrame.srcPos = expression.srcPos;
-			argFrame.type = Instruction::Type::PushArgFrame;
-			instructions.push_back(std::move(argFrame));
-
-			Instruction sliceClass{};
-			sliceClass.srcPos = expression.srcPos;
-			sliceClass.type = Instruction::Type::SliceClass;
-			instructions.push_back(std::move(sliceClass));
-
 			for (size_t i = 1; i < expression.children.size(); i++)
 				CompileExpression(expression.children[i], instructions);
-
-			Instruction instantiateSlice{};
-			instantiateSlice.srcPos = expression.srcPos;
-			instantiateSlice.type = Instruction::Type::Call;
-			instructions.push_back(std::move(instantiateSlice));
+			
+			Instruction slice{};
+			slice.srcPos = expression.srcPos;
+			slice.type = Instruction::Type::Slice;
+			instructions.push_back(std::move(slice));
 
 			instr.type = Instruction::Type::Call;
 			break;

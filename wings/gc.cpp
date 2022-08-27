@@ -47,11 +47,11 @@ extern "C" {
 	void WCollectGarbage(WContext* context) {
 		WASSERT_VOID(context);
 
-		std::deque<const WObj*> inUse(context->protectedObjects.begin(), context->protectedObjects.end());
-		for (auto& var : context->globals) {
+		std::deque<const WObj*> inUse;
+		for (const auto& [obj, _] : context->protectedObjects)
+			inUse.push_back(obj);
+		for (auto& var : context->globals)
 			inUse.push_back(*var.second);
-		}
-
 		for (auto& obj : context->builtins.GetAll())
 			if (obj)
 				inUse.push_back(obj);
@@ -120,14 +120,19 @@ extern "C" {
 
 	void WProtectObject(const WObj* obj) {
 		WASSERT_VOID(obj);
-		obj->context->protectedObjects.insert(obj);
+		size_t& refCount = obj->context->protectedObjects[obj];
+		refCount++;
 	}
 
 	void WUnprotectObject(const WObj* obj) {
 		WASSERT_VOID(obj);
 		auto it = obj->context->protectedObjects.find(obj);
 		WASSERT_VOID(it != obj->context->protectedObjects.end());
-		obj->context->protectedObjects.erase(it);
+		if (it->second == 1) {
+			obj->context->protectedObjects.erase(it);
+		} else {
+			it->second--;
+		}
 	}
 
 	void WLinkReference(WObj* parent, WObj* child) {

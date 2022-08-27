@@ -189,37 +189,29 @@ namespace wings {
 			SetVariable(target.direct, value);
 			return value;
 		case AssignType::Pack: {
-			std::vector<WObj*> values;
+			std::vector<WObjRef> values;
 			auto f = [](WObj* value, void* userdata) {
 				WProtectObject(value);
-				((std::vector<WObj*>*)userdata)->push_back(value);
+				((std::vector<WObjRef>*)userdata)->emplace_back(value);
 				return true;
 			};
 
-			auto unprotectValues = [&] {
-				for (WObj* v : values)
-					WUnprotectObject(v);
-			};
-
-			if (!WIterate(value, &values, f)) {
-				unprotectValues();
+			if (!WIterate(value, &values, f))
 				return nullptr;
-			}
 
 			if (values.size() != target.pack.size()) {
 				WRaiseValueError(context, "Packed assignment argument count mismatch");
-				unprotectValues();
 				return nullptr;
 			}
 
 			for (size_t i = 0; i < values.size(); i++)
-				if (!DirectAssign(target.pack[i], values[i])) {
-					unprotectValues();
+				if (!DirectAssign(target.pack[i], values[i].Get()))
 					return nullptr;
-				}
 
-			unprotectValues();
-			return WCreateTuple(context, values.data(), (int)values.size());
+			std::vector<WObj*> buf;
+			for (const auto& v : values)
+				buf.push_back(v.Get());
+			return WCreateTuple(context, buf.data(), (int)buf.size());
 		}
 		default:
 			WUNREACHABLE();
@@ -722,9 +714,22 @@ namespace wings {
 		case Instruction::Type::IsInstance:
 			PushStack(context->builtins.isinstance);
 			break;
-		case Instruction::Type::SliceClass:
-			PushStack(context->builtins.slice);
+		case Instruction::Type::Slice: {
+			WObj* slice = WCall(context->builtins.slice, &context->builtins.none, 1);
+			if (slice == nullptr) {
+				exitValue = nullptr;
+				break;
+			}
+
+			WObj* step = PopStack();
+			WObj* stop = PopStack();
+			WObj* start = PopStack();
+			WSetAttribute(slice, "step", step);
+			WSetAttribute(slice, "stop", stop);
+			WSetAttribute(slice, "start", start);
+			PushStack(slice);
 			break;
+		}
 		default:
 			WUNREACHABLE();
 		}
