@@ -518,6 +518,18 @@ extern "C" {
 		return nullptr;
 	}
 
+	WObj* WRepr(WObj* arg) {
+		WASSERT(arg);
+		if (WObj* res = WCallMethod(arg, "__repr__", nullptr, 0)) {
+			if (WIsString(res)) {
+				return res;
+			} else {
+				WRaiseTypeError(arg->context, "__repr__() returned a non str type");
+			}
+		}
+		return nullptr;
+	}
+
 	WObj* WCall(WObj* callable, WObj** argv, int argc, WObj* kwargsDict) {
 		WASSERT(callable && argc >= 0 && (argc == 0 || argv));
 		if (WIsFunction(callable) || WIsClass(callable)) {

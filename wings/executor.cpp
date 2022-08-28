@@ -652,7 +652,7 @@ namespace wings {
 				exitValue = nullptr;
 				return;
 			}
-			WProtectObject(list);
+			WObjRef ref(list);
 
 			struct State {
 				WObj* expr;
@@ -670,10 +670,10 @@ namespace wings {
 				if (entry == nullptr)
 					return false;
 
-				return (bool)WCallMethod(state.list, "append", &entry, 1);
+				state.list->Get<std::vector<WObj*>>().push_back(entry);
+				return true;
 				});
 
-			WUnprotectObject(list);
 			for (int i = 0; i < 3; i++)
 				PopStack();
 

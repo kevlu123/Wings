@@ -12,7 +12,10 @@
 #include <array>
 #include <memory>
 #include <optional>
+#include <type_traits>
 #include <cstdlib> // std::abort
+
+using wuint = std::make_unsigned_t<wint>;
 
 struct WContext;
 

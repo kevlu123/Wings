@@ -7,9 +7,8 @@
 
 struct WContext;
 struct WObj;
-typedef int32_t wint;
-typedef uint32_t wuint;
-typedef float wfloat;
+typedef int64_t wint;
+typedef double wfloat;
 
 typedef WObj* (*WFunction)(WObj** args, int argc, WObj* kwargs, void* userdata);
 typedef void (*WFinalizer)(WObj* obj, void* userdata);
@@ -800,6 +799,19 @@ WDLL_EXPORT WObj* WConvertToFloat(WObj* obj);
 * @return A string object, or nullptr on failure.
 */
 WDLL_EXPORT WObj* WConvertToString(WObj* obj);
+
+/**
+* Convert an object to a string representation.
+*
+* Remarks:
+* This requires the object to implement a __repr__() method and
+* that this method returns an string type.
+* Call WGetCurrentException() or WGetErrorMessage() to get error information.
+*
+* @param obj The object to operate on.
+* @return A string object, or nullptr on failure.
+*/
+WDLL_EXPORT WObj* WRepr(WObj* obj);
 
 /**
 * Call a callable object.
