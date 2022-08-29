@@ -47,7 +47,7 @@ extern "C" {
         }
 
         ss << context->currentException->type;
-        if (WObj* msg = WHasAttribute(context->currentException, "message"))
+        if (WObj* msg = WHasAttribute(context->currentException, "_message"))
             if (WIsString(msg))
                 ss << ": " << WGetString(msg);
         ss << "\n";
@@ -135,6 +135,16 @@ extern "C" {
     void WRaiseIndexError(WContext* context) {
         WASSERT_VOID(context);
         WRaiseException(context, "index out of range", context->builtins.indexError);
+    }
+
+    void WRaiseKeyError(WContext* context, WObj* key) {
+        WASSERT_VOID(context && key);
+
+        std::string s = "<exception str() failed>";
+        if (WObj* repr = WRepr(key))
+            s = WGetString(repr);
+
+        WRaiseException(context, s.c_str(), context->builtins.keyError);
     }
 
     void WRaiseOverflowError(WContext* context) {

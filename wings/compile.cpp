@@ -243,7 +243,7 @@ namespace wings {
 		case Operation::In:
 			CompileExpression(expression.children[0], instructions);
 			CompileExpression(expression.children[1], instructions);
-			instr.type = Instruction::Type::NotIn;
+			instr.type = Instruction::Type::In;
 			break;
 		case Operation::NotIn:
 			CompileExpression(expression.children[0], instructions);

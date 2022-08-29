@@ -617,8 +617,8 @@ namespace wings {
 			break;
 		}
 		case Instruction::Type::In: {
-			WObj* obj = PopStack();
 			WObj* container = PopStack();
+			WObj* obj = PopStack();
 			if (WObj* value = WIn(container, obj)) {
 				PushStack(value);
 			} else {
@@ -627,8 +627,8 @@ namespace wings {
 			break;
 		}
 		case Instruction::Type::NotIn: {
-			WObj* obj = PopStack();
 			WObj* container = PopStack();
+			WObj* obj = PopStack();
 			if (WObj* value = WNotIn(container, obj)) {
 				PushStack(value);
 			} else {

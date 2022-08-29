@@ -194,6 +194,16 @@ WDLL_EXPORT void WRaiseZeroDivisionError(WContext* context);
 WDLL_EXPORT void WRaiseIndexError(WContext* context);
 
 /**
+* Raise a KeyError.
+*
+* Remarks:
+* If an exception is already set, the old exception will be overwritten.
+*
+* @param context The relevant context.
+*/
+WDLL_EXPORT void WRaiseKeyError(WContext* context, WObj* key);
+
+/**
 * Raise a StopIteration to terminate iteration.
 *
 * Remarks:
@@ -866,6 +876,21 @@ WDLL_EXPORT WObj* WCallMethod(WObj* obj, const char* member, WObj** argv, int ar
 * @return The return value of the method, or nullptr on failure.
 */
 WDLL_EXPORT WObj* WCallMethodFromBase(WObj* obj, const char* member, WObj** argv, int argc, WObj* kwargsDict WDEFAULT_ARG(nullptr), WObj* baseClass WDEFAULT_ARG(nullptr));
+
+/**
+* Get the values from a **kwargs parameter.
+*
+* @param kwargs The kwargs parameter value. This must be a dictionary.
+* @param keys A pointer to an array of null terminated ASCII strings containing
+* 			  the keys to find.
+* @param count The number of keys given in the keys array. This must be a positive number.
+* @param out A pointer to an array to receive the values. The values are given
+*			 in the same order as given to the keys parameter. For keys that
+*			 were not found, nullptr is set instead of the dictionary value.
+* @param out The object at the specified index, or nullptr if it is not found.
+* @return False if an exception was raised due to an allocation failure, otherwise false.
+*/
+WDLL_EXPORT bool WParseKwargs(WObj* kwargs, const char*const* keys, int count, WObj** out);
 
 /**
 * Get at an index of an object. i.e. obj[index]

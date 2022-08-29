@@ -637,6 +637,26 @@ extern "C" {
 		}
 	}
 
+	bool WParseKwargs(WObj* kwargs, const char* const* keys, int count, WObj** out) {
+		WASSERT(kwargs && keys && out && count > 0 && WIsDictionary(kwargs));
+		
+		wings::WObjRef ref(kwargs);
+		auto& buf = kwargs->Get<wings::WDict>();
+		for (int i = 0; i < count; i++) {
+			WObj* key = WCreateString(kwargs->context, keys[i]);
+			if (key == nullptr)
+				return false;
+
+			auto it = buf.find(key);
+			if (it == buf.end()) {
+				out[i] = nullptr;
+			} else {
+				out[i] = it->second;
+			}
+		}
+		return true;
+	}
+
 	WObj* WGetIndex(WObj* obj, WObj* index) {
 		WASSERT(obj && index);
 		return WCallMethod(obj, "__getitem__", &index, 1);

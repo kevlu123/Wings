@@ -278,6 +278,60 @@ static bool IsSpace(char c) {
 		|| c == '\v' || c == '\f';
 };
 
+static bool MergeSort(WObj** data, size_t len, WObj* key) {
+	if (len == 1)
+		return true;
+
+	WObj** left = data;
+	size_t leftSize = len / 2;
+	WObj** right = data + leftSize;
+	size_t rightSize = len - leftSize;
+	if (!MergeSort(left, leftSize, key))
+		return false;
+	if (!MergeSort(right, rightSize, key))
+		return false;
+
+	std::vector<WObj*> buf(len);
+	size_t a = 0;
+	size_t b = 0;
+	for (size_t i = 0; i < len; i++) {
+		if (a == leftSize) {
+			// No more elements on the left
+			buf[i] = right[b];
+			b++;
+		} else if (b == rightSize) {
+			// No more elements on the right
+			buf[i] = left[a];
+			a++;
+		} else {
+			WObj* leftMapped = key ? WCall(key, &left[a], 1) : left[a];
+			if (leftMapped == nullptr)
+				return false;
+			WObj* rightMapped = key ? WCall(key, &right[b], 1) : right[b];
+			if (rightMapped == nullptr)
+				return false;
+
+			WObj* gt = WLessThan(rightMapped, leftMapped);
+			if (gt == nullptr)
+				return false;
+
+			if (WGetBool(gt)) {
+				// right < left
+				buf[i] = right[b];
+				b++;
+			} else {
+				// right >= left
+				buf[i] = left[a];
+				a++;
+			}
+		}
+	}
+	
+	for (size_t i = 0; i < len; i++)
+		data[i] = buf[i];
+	return true;
+}
+
 #define EXPECT_ARG_COUNT(n) do if (argc != n) { WRaiseArgumentCountError(context, argc, n); return nullptr; } while (0)
 #define EXPECT_ARG_COUNT_AT_LEAST(n) do if (argc < n) { WRaiseArgumentCountError(context, argc, n); return nullptr; } while (0)
 #define EXPECT_ARG_COUNT_BETWEEN(min, max) do if (argc < min || argc > max) { WRaiseArgumentCountError(context, argc, -1); return nullptr; } while (0)
@@ -438,10 +492,10 @@ namespace wings {
 		static WObj* BaseException(WObj** argv, int argc, WObj* kwargs, WContext* context) {
 			EXPECT_ARG_COUNT_BETWEEN(1, 2);
 			if (argc == 2) {
-				WSetAttribute(argv[0], "message", argv[1]);
+				WSetAttribute(argv[0], "_message", argv[1]);
 				return WCreateNone(context);
 			} else if (WObj* msg = WCreateString(context)) {
-				WSetAttribute(argv[0], "message", msg);
+				WSetAttribute(argv[0], "_message", msg);
 				return WCreateNone(context);
 			} else {
 				return nullptr;
@@ -634,6 +688,12 @@ namespace wings {
 			return WCreateInt(context, hash);
 		}
 
+		static WObj* bool_abs(WObj** argv, int argc, WObj* kwargs, WContext* context) {
+			EXPECT_ARG_COUNT(1);
+			EXPECT_ARG_TYPE_BOOL(0);
+			return WCreateInt(context, WGetBool(argv[0]) ? 1 : 0);
+		}
+
 		static WObj* int_nonzero(WObj** argv, int argc, WObj* kwargs, WContext* context) {
 			EXPECT_ARG_COUNT(1);
 			EXPECT_ARG_TYPE_INT(0);
@@ -676,6 +736,12 @@ namespace wings {
 			EXPECT_ARG_TYPE_INT(0);
 			wint hash = (wint)std::hash<wint>()(WGetInt(argv[0]));
 			return WCreateInt(context, hash);
+		}
+
+		static WObj* int_abs(WObj** argv, int argc, WObj* kwargs, WContext* context) {
+			EXPECT_ARG_COUNT(1);
+			EXPECT_ARG_TYPE_INT(0);
+			return WCreateInt(context, std::abs(WGetInt(argv[0])));
 		}
 
 		static WObj* int_neg(WObj** argv, int argc, WObj* kwargs, WContext* context) {
@@ -900,6 +966,12 @@ namespace wings {
 			EXPECT_ARG_TYPE_FLOAT(0);
 			wint hash = (wint)std::hash<wfloat>()(WGetFloat(argv[0]));
 			return WCreateInt(context, hash);
+		}
+
+		static WObj* float_abs(WObj** argv, int argc, WObj* kwargs, WContext* context) {
+			EXPECT_ARG_COUNT(1);
+			EXPECT_ARG_TYPE_FLOAT(0);
+			return WCreateFloat(context, std::abs(WGetFloat(argv[0])));
 		}
 
 		static WObj* float_neg(WObj** argv, int argc, WObj* kwargs, WContext* context) {
@@ -1797,69 +1869,103 @@ namespace wings {
 		}
 
 		template <Collection collection>
-		static WObj* collection_getindex(WObj** argv, int argc, WObj* kwargs, WContext* context) {
-			EXPECT_ARG_COUNT(2);
-			EXPECT_ARG_TYPE_INT(1);
+		static WObj* collection_nonzero(WObj** argv, int argc, WObj* kwargs, WContext* context) {
+			EXPECT_ARG_COUNT(1);
 			if constexpr (collection == Collection::List) {
 				EXPECT_ARG_TYPE_LIST(0);
 			} else {
 				EXPECT_ARG_TYPE_TUPLE(0);
 			}
 
-			wint i = argv[1]->Get<wint>();
-			if (i < 0 || i >= (wint)argv[0]->Get<std::vector<WObj*>>().size()) {
-				//... Index out of range exception
-				WUNREACHABLE();
-			}
-
-			return argv[0]->Get<std::vector<WObj*>>()[i];
+			return WCreateBool(context, !argv[0]->Get<std::vector<WObj*>>().empty());
 		}
 
-		static WObj* list_setindex(WObj** argv, int argc, WObj* kwargs, WContext* context) {
-			EXPECT_ARG_COUNT(3);
-			EXPECT_ARG_TYPE_LIST(0);
-			EXPECT_ARG_TYPE_INT(1);
-
-			wint i = argv[1]->Get<wint>();
-			if (i < 0 || i >= (wint)argv[0]->Get<std::vector<WObj*>>().size()) {
-				//... Index out of range exception
-				WUNREACHABLE();
-			}
-
-			argv[0]->Get<std::vector<WObj*>>()[i] = argv[2];
-			return WCreateNone(context);
-		}
-
-		static WObj* list_insertindex(WObj** argv, int argc, WObj* kwargs, WContext* context) {
-			EXPECT_ARG_COUNT(3);
-			EXPECT_ARG_TYPE_LIST(0);
-			EXPECT_ARG_TYPE_INT(1);
-
-			wint i = argv[1]->Get<wint>();
-			if (i < 0 || i > (wint)argv[0]->Get<std::vector<WObj*>>().size()) {
-				//... Index out of range exception
-				WUNREACHABLE();
-			}
-
-			auto& buf = argv[0]->Get<std::vector<WObj*>>();
-			buf.insert(buf.begin() + i, argv[2]);
-			return WCreateNone(context);
-		}
-
-		static WObj* list_removeindex(WObj** argv, int argc, WObj* kwargs, WContext* context) {
+		template <Collection collection>
+		static WObj* collection_lt(WObj** argv, int argc, WObj* kwargs, WContext* context) {
 			EXPECT_ARG_COUNT(2);
-			EXPECT_ARG_TYPE_LIST(0);
-			EXPECT_ARG_TYPE_INT(1);
+			if constexpr (collection == Collection::List) {
+				EXPECT_ARG_TYPE_LIST(0);
+				EXPECT_ARG_TYPE_LIST(1);
+			} else {
+				EXPECT_ARG_TYPE_TUPLE(0);
+				EXPECT_ARG_TYPE_TUPLE(1);
+			}
 
-			wint i = argv[1]->Get<wint>();
-			if (i < 0 || i >= (wint)argv[0]->Get<std::vector<WObj*>>().size()) {
-				//... Index out of range exception
-				WUNREACHABLE();
+			auto& buf1 = argv[0]->Get<std::vector<WObj*>>();
+			auto& buf2 = argv[1]->Get<std::vector<WObj*>>();
+
+			size_t minSize = buf1.size() < buf2.size() ? buf1.size() : buf2.size();
+
+			for (size_t i = 0; i < minSize; i++) {
+				WObj* lt = WLessThan(buf1[i], buf2[i]);
+				if (lt == nullptr)
+					return nullptr;
+
+				if (WGetBool(lt))
+					return lt;
+
+				WObj* gt = WLessThan(buf1[i], buf2[i]);
+				if (gt == nullptr)
+					return nullptr;
+
+				if (WGetBool(gt))
+					return WCreateBool(context, false);
+			}
+
+			return WCreateBool(context, buf1.size() < buf2.size());
+		}
+
+		template <Collection collection>
+		static WObj* collection_eq(WObj** argv, int argc, WObj* kwargs, WContext* context) {
+			EXPECT_ARG_COUNT(2);
+			if constexpr (collection == Collection::List) {
+				EXPECT_ARG_TYPE_LIST(0);
+				if (!WIsInstance(argv[1], &context->builtins.list, 1))
+					return WCreateBool(context, false);
+			} else {
+				EXPECT_ARG_TYPE_TUPLE(0);
+				if (!WIsInstance(argv[1], &context->builtins.tuple, 1))
+					return WCreateBool(context, false);
+			}
+
+			auto& buf1 = argv[0]->Get<std::vector<WObj*>>();
+			auto& buf2 = argv[1]->Get<std::vector<WObj*>>();
+
+			if (buf1.size() != buf2.size())
+				return WCreateBool(context, false);
+
+			for (size_t i = 0; i < buf1.size(); i++) {
+				if (WObj* eq = WEquals(buf1[i], buf2[i])) {
+					if (!WGetBool(eq))
+						return eq;
+				} else {
+					return nullptr;
+				}
+			}
+
+			return WCreateBool(context, true);
+		}
+
+		template <Collection collection>
+		static WObj* collection_contains(WObj** argv, int argc, WObj* kwargs, WContext* context) {
+			EXPECT_ARG_COUNT(2);
+			if constexpr (collection == Collection::List) {
+				EXPECT_ARG_TYPE_LIST(0);
+			} else {
+				EXPECT_ARG_TYPE_TUPLE(0);
 			}
 
 			auto& buf = argv[0]->Get<std::vector<WObj*>>();
-			buf.erase(buf.begin() + i);
-			return WCreateNone(context);
+			for (size_t i = 0; i < buf.size(); i++) {
+				if (WObj* eq = WEquals(buf[i], argv[1])) {
+					if (WGetBool(eq))
+						return eq;
+				} else {
+					return nullptr;
+				}
+			}
+
+			return WCreateBool(context, false);
 		}
 
 		template <Collection collection>
@@ -1874,6 +1980,205 @@ namespace wings {
 			return WCreateInt(context, (wint)argv[0]->Get<std::vector<WObj*>>().size());
 		}
 
+		template <Collection collection>
+		static WObj* collection_count(WObj** argv, int argc, WObj* kwargs, WContext* context) {
+			EXPECT_ARG_COUNT(2);
+			if constexpr (collection == Collection::List) {
+				EXPECT_ARG_TYPE_LIST(0);
+			} else {
+				EXPECT_ARG_TYPE_TUPLE(0);
+			}
+
+			auto& buf = argv[0]->Get<std::vector<WObj*>>();
+			wint count = 0;
+			for (size_t i = 0; i < buf.size(); i++) {
+				WObj* eq = WEquals(argv[1], buf[i]);
+				if (eq == nullptr)
+					return nullptr;
+				if (WGetBool(eq))
+					count++;
+			}
+
+			return WCreateInt(context, count);
+		}
+
+		template <Collection collection>
+		static WObj* collection_index(WObj** argv, int argc, WObj* kwargs, WContext* context) {
+			EXPECT_ARG_COUNT(2);
+			if constexpr (collection == Collection::List) {
+				EXPECT_ARG_TYPE_LIST(0);
+			} else {
+				EXPECT_ARG_TYPE_TUPLE(0);
+			}
+
+			auto& buf = argv[0]->Get<std::vector<WObj*>>();
+			for (size_t i = 0; i < buf.size(); i++) {
+				WObj* eq = WEquals(argv[1], buf[i]);
+				if (eq == nullptr)
+					return nullptr;
+				if (WGetBool(eq))
+					return WCreateInt(context, (wint)i);
+			}
+
+			WRaiseValueError(context, "Value was not found");
+			return nullptr;
+		}
+
+		template <Collection collection>
+		static WObj* collection_getitem(WObj** argv, int argc, WObj* kwargs, WContext* context) {
+			EXPECT_ARG_COUNT(2);
+			if constexpr (collection == Collection::List) {
+				EXPECT_ARG_TYPE_LIST(0);
+			} else {
+				EXPECT_ARG_TYPE_TUPLE(0);
+			}
+
+			if (WIsInt(argv[1])) {
+				wint index;
+				if (!ParseIndex(argv[0], argv[1], index))
+					return nullptr;
+
+				auto& buf = argv[0]->Get<std::vector<WObj*>>();
+				if (index < 0 || index >= (wint)buf.size()) {
+					WRaiseIndexError(context);
+					return nullptr;
+				}
+
+				return buf[index];
+			} else if (WIsInstance(argv[1], &context->builtins.slice, 1)) {
+				wint start, stop, step;
+				if (!ParseSlice(argv[0], argv[1], start, stop, step))
+					return nullptr;
+
+				auto& buf = argv[0]->Get<std::vector<WObj*>>();
+				std::vector<WObj*> sliced;
+				bool success = IterateRange(start, stop, step, [&](wint i) {
+					if (i >= 0 && i < (wint)buf.size())
+						sliced.push_back(buf[i]);
+					return true;
+					});
+
+				if (!success)
+					return nullptr;
+
+				if constexpr (collection == Collection::List) {
+					return WCreateList(context, sliced.data(), (int)sliced.size());
+				} else {
+					return WCreateTuple(context, sliced.data(), (int)sliced.size());
+				}
+			} else {
+				WRaiseArgumentTypeError(context, 1, "int or slice");
+				return nullptr;
+			}
+		}
+
+		static WObj* list_setitem(WObj** argv, int argc, WObj* kwargs, WContext* context) {
+			EXPECT_ARG_COUNT(3);
+			EXPECT_ARG_TYPE_LIST(0);
+			EXPECT_ARG_TYPE_INT(1);
+			
+			wint index;
+			if (!ParseIndex(argv[0], argv[1], index))
+				return nullptr;
+
+			auto& buf = argv[0]->Get<std::vector<WObj*>>();
+			if (index < 0 || index >= (wint)buf.size()) {
+				WRaiseIndexError(context);
+				return nullptr;
+			}
+
+			buf[index] = argv[2];
+			return WCreateNone(context);
+		}
+		
+		static WObj* list_append(WObj** argv, int argc, WObj* kwargs, WContext* context) {
+			EXPECT_ARG_COUNT(2);
+			EXPECT_ARG_TYPE_LIST(0);
+
+			argv[0]->Get<std::vector<WObj*>>().push_back(argv[1]);
+			return WCreateNone(context);
+		}
+
+		static WObj* list_clear(WObj** argv, int argc, WObj* kwargs, WContext* context) {
+			EXPECT_ARG_COUNT(1);
+			EXPECT_ARG_TYPE_LIST(0);
+
+			argv[0]->Get<std::vector<WObj*>>().clear();
+			return WCreateNone(context);
+		}
+
+		static WObj* list_copy(WObj** argv, int argc, WObj* kwargs, WContext* context) {
+			EXPECT_ARG_COUNT(1);
+			EXPECT_ARG_TYPE_LIST(0);
+
+			auto& buf = argv[0]->Get<std::vector<WObj*>>();
+			return WCreateList(context, buf.data(), !buf.size());
+		}
+
+		static WObj* list_extend(WObj** argv, int argc, WObj* kwargs, WContext* context) {
+			EXPECT_ARG_COUNT(2);
+			EXPECT_ARG_TYPE_LIST(0);
+
+			auto& buf = argv[0]->Get<std::vector<WObj*>>();
+
+			if (argv[0] == argv[1]) {
+				// Double the list instead of going into an infinite loop
+				buf.insert(buf.end(), buf.begin(), buf.end());
+			} else {
+				bool success = WIterate(argv[1], &buf, [](WObj* value, void* ud) {
+					std::vector<WObj*>& buf = *(std::vector<WObj*>*)ud;
+					buf.push_back(value);
+					return true;
+					});
+				if (!success)
+					return nullptr;
+			}
+			
+			return WCreateNone(context);
+		}
+
+		static WObj* list_sort(WObj** argv, int argc, WObj* kwargs, WContext* context) {
+			EXPECT_ARG_COUNT(1);
+			EXPECT_ARG_TYPE_LIST(0);
+
+			WObj* kw[2]{};
+			const char* keys[2] = { "reverse", "key" };
+			if (!WParseKwargs(kwargs, keys, 2, kw))
+				return nullptr;
+
+			bool reverse = false;
+			if (kw[0] != nullptr) {
+				WObj* reverseValue = WConvertToBool(kw[0]);
+				if (reverseValue == nullptr)
+					return nullptr;
+				reverse = WGetBool(reverseValue);
+			}
+
+			std::vector<WObj*> buf = argv[0]->Get<std::vector<WObj*>>();
+			std::vector<WObjRef> refs;
+			for (WObj* v : buf)
+				refs.emplace_back(v);
+
+			if (!MergeSort(buf.data(), buf.size(), kw[1]))
+				return nullptr;
+
+			if (reverse)
+				std::reverse(buf.begin(), buf.end());
+			
+			argv[0]->Get<std::vector<WObj*>>() = std::move(buf);
+
+			return WCreateNone(context);
+		}
+
+		static WObj* list_reverse(WObj** argv, int argc, WObj* kwargs, WContext* context) {
+			EXPECT_ARG_COUNT(1);
+			EXPECT_ARG_TYPE_LIST(0);
+
+			auto& buf = argv[0]->Get<std::vector<WObj*>>();
+			std::reverse(buf.begin(), buf.end());
+			return WCreateNone(context);
+		}
+
 		static WObj* map_str(WObj** argv, int argc, WObj* kwargs, WContext* context) {
 			EXPECT_ARG_COUNT(1);
 			EXPECT_ARG_TYPE_MAP(0);
@@ -1886,12 +2191,12 @@ namespace wings {
 				const auto& buf = argv[0]->Get<wings::WDict>();
 				std::string s = "{";
 				for (const auto& [key, val] : buf) {
-					WObj* k = WConvertToString(key);
+					WObj* k = WRepr(key);
 					if (k == nullptr) {
 						context->reprStack.pop_back();
 						return nullptr;
 					}
-					WObj* v = WConvertToString(val);
+					WObj* v = WRepr(val);
 					if (k == nullptr) {
 						context->reprStack.pop_back();
 						return nullptr;
@@ -1909,11 +2214,36 @@ namespace wings {
 			}
 		}
 
+		static WObj* map_contains(WObj** argv, int argc, WObj* kwargs, WContext* context) {
+			EXPECT_ARG_COUNT(2);
+			EXPECT_ARG_TYPE_MAP(0);
+			return WCreateBool(context, argv[0]->Get<WDict>().contains(argv[1]));
+		}
+
+		static WObj* map_getitem(WObj** argv, int argc, WObj* kwargs, WContext* context) {
+			EXPECT_ARG_COUNT(2);
+			EXPECT_ARG_TYPE_MAP(0);
+
+			auto& buf = argv[0]->Get<WDict>();
+			WDict::iterator it;
+			if (!WIsImmutableType(argv[1]) || (it = buf.find(argv[1])) == buf.end()) {
+				WRaiseKeyError(context, argv[1]);
+				return nullptr;
+			}
+
+			return it->second;
+		}
+
 		static WObj* func_str(WObj** argv, int argc, WObj* kwargs, WContext* context) {
 			EXPECT_ARG_COUNT(1);
 			EXPECT_ARG_TYPE_FUNC(0);
 			std::string s = "<function at " + PtrToString(argv[0]) + ">";
 			return WCreateString(context, s.c_str());
+		}
+
+		static WObj* BaseException_str(WObj** argv, int argc, WObj* kwargs, WContext* context) {
+			EXPECT_ARG_COUNT(1);
+			return WGetAttribute(argv[0], "_message");
 		}
 
 	} // namespace methods
@@ -1968,6 +2298,11 @@ namespace wings {
 		static WObj* iter(WObj** argv, int argc, WObj* kwargs, WContext* context) {
 			EXPECT_ARG_COUNT(1);
 			return WCallMethod(argv[0], "__iter__", nullptr, 0);
+		}
+
+		static WObj* abs(WObj** argv, int argc, WObj* kwargs, WContext* context) {
+			EXPECT_ARG_COUNT(1);
+			return WCallMethod(argv[0], "__abs__", nullptr, 0);
 		}
 
 	} // namespace lib
@@ -2086,8 +2421,10 @@ namespace wings {
 			WSetGlobal(context, "tuple", context->builtins.tuple);
 			RegisterMethod<ctors::collection<Collection::Tuple>>(context->builtins.tuple, "__init__");
 			RegisterMethod<methods::collection_str<Collection::Tuple>>(context->builtins.tuple, "__str__");
-			RegisterMethod<methods::collection_getindex<Collection::Tuple>>(context->builtins.tuple, "__getitem__");
+			RegisterMethod<methods::collection_getitem<Collection::Tuple>>(context->builtins.tuple, "__getitem__");
 			RegisterMethod<methods::collection_len<Collection::Tuple>>(context->builtins.tuple, "__len__");
+			RegisterMethod<methods::collection_count<Collection::Tuple>>(context->builtins.tuple, "count");
+			RegisterMethod<methods::collection_index<Collection::Tuple>>(context->builtins.tuple, "index");
 
 			// Create NoneType class
 			context->builtins.none = Alloc(context);
@@ -2151,6 +2488,7 @@ namespace wings {
 			RegisterMethod<methods::bool_str>(context->builtins._bool, "__str__");
 			RegisterMethod<methods::bool_eq>(context->builtins._bool, "__eq__");
 			RegisterMethod<methods::bool_hash>(context->builtins._bool, "__hash__");
+			RegisterMethod<methods::bool_abs>(context->builtins._bool, "__abs__");
 
 			context->builtins._int = createClass("int");
 			RegisterMethod<ctors::_int>(context->builtins._int, "__init__");
@@ -2175,6 +2513,7 @@ namespace wings {
 			RegisterMethod<methods::int_lt>(context->builtins._int, "__lt__");
 			RegisterMethod<methods::int_eq>(context->builtins._int, "__eq__");
 			RegisterMethod<methods::int_hash>(context->builtins._int, "__hash__");
+			RegisterMethod<methods::int_abs>(context->builtins._int, "__abs__");
 			RegisterMethod<methods::int_bit_length>(context->builtins._int, "bit_length");
 			RegisterMethod<methods::int_bit_count>(context->builtins._int, "bit_count");
 
@@ -2184,7 +2523,6 @@ namespace wings {
 			RegisterMethod<methods::float_int>(context->builtins._float, "__int__");
 			RegisterMethod<methods::float_float>(context->builtins._float, "__float__");
 			RegisterMethod<methods::float_str>(context->builtins._float, "__str__");
-			RegisterMethod<methods::float_eq>(context->builtins._float, "__eq__");
 			RegisterMethod<methods::float_neg>(context->builtins._float, "__neg__");
 			RegisterMethod<methods::float_add>(context->builtins._float, "__add__");
 			RegisterMethod<methods::float_sub>(context->builtins._float, "__sub__");
@@ -2196,6 +2534,7 @@ namespace wings {
 			RegisterMethod<methods::float_lt>(context->builtins._float, "__lt__");
 			RegisterMethod<methods::float_eq>(context->builtins._float, "__eq__");
 			RegisterMethod<methods::float_hash>(context->builtins._float, "__hash__");
+			RegisterMethod<methods::float_abs>(context->builtins._float, "__abs__");
 			RegisterMethod<methods::float_is_integer>(context->builtins._float, "is_integer");
 
 			context->builtins.str = createClass("str");
@@ -2250,28 +2589,46 @@ namespace wings {
 
 			context->builtins.list = createClass("list");
 			RegisterMethod<ctors::collection<Collection::List>>(context->builtins.list, "__init__");
+			RegisterMethod<methods::collection_nonzero<Collection::List>>(context->builtins.list, "__nonzero__");
 			RegisterMethod<methods::collection_str<Collection::List>>(context->builtins.list, "__str__");
-			RegisterMethod<methods::collection_getindex<Collection::List>>(context->builtins.list, "__getindex");
-			RegisterMethod<methods::list_setindex>(context->builtins.list, "__setindex");
 			RegisterMethod<methods::collection_len<Collection::List>>(context->builtins.list, "__len__");
-			RegisterMethod<methods::list_insertindex>(context->builtins.list, "__insertindex");
-			RegisterMethod<methods::list_removeindex>(context->builtins.list, "__removeindex");
+			RegisterMethod<methods::collection_getitem<Collection::List>>(context->builtins.list, "__getitem__");
+			RegisterMethod<methods::list_setitem>(context->builtins.list, "__setitem__");
+			RegisterMethod<methods::collection_contains<Collection::List>>(context->builtins.list, "__contains__");
+			RegisterMethod<methods::collection_eq<Collection::List>>(context->builtins.list, "__eq__");
+			RegisterMethod<methods::collection_lt<Collection::List>>(context->builtins.list, "__lt__");
+			RegisterMethod<methods::collection_count<Collection::List>>(context->builtins.list, "count");
+			RegisterMethod<methods::collection_index<Collection::List>>(context->builtins.list, "index");
+			RegisterMethod<methods::list_append>(context->builtins.list, "append");
+			RegisterMethod<methods::list_clear>(context->builtins.list, "clear");
+			RegisterMethod<methods::list_copy>(context->builtins.list, "copy");
+			RegisterMethod<methods::list_extend>(context->builtins.list, "extend");
+			//RegisterMethod<methods::list_insert>(context->builtins.list, "insert");
+			//RegisterMethod<methods::list_pop>(context->builtins.list, "pop");
+			//RegisterMethod<methods::list_remove>(context->builtins.list, "remove");
+			RegisterMethod<methods::list_reverse>(context->builtins.list, "reverse");
+			RegisterMethod<methods::list_sort>(context->builtins.list, "sort");
 
 			context->builtins.dict = createClass("dict");
 			RegisterMethod<ctors::map>(context->builtins.dict, "__init__");
 			RegisterMethod<methods::map_str>(context->builtins.dict, "__str__");
+			RegisterMethod<methods::map_contains>(context->builtins.dict, "__contains__");
+			RegisterMethod<methods::map_getitem>(context->builtins.dict, "__getitem__");
+			//RegisterMethod<methods::map_setitem>(context->builtins.dict, "__setitem__");
 
 			// Add free functions
-			RegisterFunction<lib::print>(context, "print");
 			context->builtins.isinstance = RegisterFunction<lib::isinstance>(context, "isinstance");
+			RegisterFunction<lib::print>(context, "print");
 			RegisterFunction<lib::len>(context, "len");
 			RegisterFunction<lib::repr>(context, "repr");
 			RegisterFunction<lib::next>(context, "next");
 			RegisterFunction<lib::iter>(context, "iter");
+			RegisterFunction<lib::abs>(context, "abs");
 
 			// Create exception classes
 			context->builtins.baseException = createClass("BaseException");
 			RegisterMethod<ctors::BaseException>(context->builtins.baseException, "__init__");
+			RegisterMethod<methods::BaseException_str>(context->builtins.baseException, "__str__");
 			context->builtins.exception = createClass("Exception", context->builtins.baseException);
 			context->builtins.syntaxError = createClass("SyntaxError", context->builtins.exception);
 			context->builtins.nameError = createClass("NameError", context->builtins.exception);
