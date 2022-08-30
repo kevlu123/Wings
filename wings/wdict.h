@@ -13,5 +13,6 @@ namespace wings {
 		bool operator()(const WObj* lhs, const WObj* rhs) const;
 	};
 
-	struct WDict : public std::unordered_map<WObj*, WObj*, WObjHasher, WObjComparer> {};
+	struct WDict : public std::unordered_map<WObj*, WObj*, WObjHasher, WObjComparer> {
+	};
 }

@@ -42,7 +42,8 @@ extern "C" {
 
                 size_t skip = lineText.find_first_not_of(' ');
                 ss << "    " << (lineText.c_str() + skip) << "\n";
-                ss << std::string(frame.srcPos.column + 4 - skip, ' ') << "^\n";
+                if (skip <= frame.srcPos.column)
+                    ss << std::string(frame.srcPos.column + 4 - skip, ' ') << "^\n";
             }
         }
 

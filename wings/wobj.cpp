@@ -17,12 +17,8 @@ extern "C" {
 			return context->builtins._true;
 		} else if (!value && context->builtins._false) {
 			return context->builtins._false;
-		} else if (WObj* v = WCall(context->builtins._bool, nullptr, 0)) {
-			v->Get<bool>() = value;
-			(value ? context->builtins._true : context->builtins._false) = v;
-			return v;
 		} else {
-			return nullptr;
+			return value ? context->builtins._true : context->builtins._false;
 		}
 	}
 
@@ -181,8 +177,11 @@ extern "C" {
 		tostr.isMethod = true;
 		tostr.prettyName = "__str__";
 		tostr.userdata = context;
-		tostr.fptr = [](WObj** argv, int argc, WObj* kwargs, void* ud) {
-			//... Expect 1 arg
+		tostr.fptr = [](WObj** argv, int argc, WObj* kwargs, void* ud) -> WObj* {
+			if (argc != 1) {
+				WRaiseArgumentCountError((WContext*)ud, argc, 1);
+				return nullptr;
+			}
 			std::string s = "<class '" + argv[0]->Get<WObj::Class>().name + "'>";
 			return WCreateString(argv[0]->context, s.c_str());
 		};
@@ -228,8 +227,12 @@ extern "C" {
 		init.isMethod = true;
 		init.userdata = _class;
 		init.fptr = [](WObj** argv, int argc, WObj* kwargs, void* userdata) -> WObj* {
-			//... Expect >= 1 args
 			WObj* _class = (WObj*)userdata;
+			if (argc < 1) {
+				WRaiseArgumentCountError(_class->context, argc, -1);
+				return nullptr;
+			}
+
 			const auto& bases = _class->Get<WObj::Class>().bases;
 			if (bases.empty())
 				return nullptr;
@@ -472,62 +475,24 @@ extern "C" {
 
 	WObj* WConvertToBool(WObj* arg) {
 		WASSERT(arg);
-		if (WObj* res = WCallMethod(arg, "__nonzero__", nullptr, 0)) {
-			if (WIsBool(res)) {
-				return res;
-			} else {
-				WRaiseTypeError(arg->context, "__nonzero__() returned a non bool type");
-			}
-		}
-		return nullptr;
+		return WCall(arg->context->builtins._bool, &arg, 1);
 	}
 
 	WObj* WConvertToInt(WObj* arg) {
-		WASSERT(arg);
-		if (WObj* res = WCallMethod(arg, "__int__", nullptr, 0)) {
-			if (WIsInt(res)) {
-				return res;
-			} else {
-				WRaiseTypeError(arg->context, "__int__() returned a non int type");
-			}
-		}
-		return nullptr;
+		return WCall(arg->context->builtins._int, &arg, 1);
 	}
 
 	WObj* WConvertToFloat(WObj* arg) {
-		WASSERT(arg);
-		if (WObj* res = WCallMethod(arg, "__float__", nullptr, 0)) {
-			if (WIsIntOrFloat(res)) {
-				return res;
-			} else {
-				WRaiseTypeError(arg->context, "__float__() returned a non float type");
-			}
-		}
-		return nullptr;
+		return WCall(arg->context->builtins._float, &arg, 1);
 	}
 
 	WObj* WConvertToString(WObj* arg) {
-		WASSERT(arg);
-		if (WObj* res = WCallMethod(arg, "__str__", nullptr, 0)) {
-			if (WIsString(res)) {
-				return res;
-			} else {
-				WRaiseTypeError(arg->context, "__str__() returned a non str type");
-			}
-		}
-		return nullptr;
+		return WCall(arg->context->builtins.str, &arg, 1);
 	}
 
 	WObj* WRepr(WObj* arg) {
 		WASSERT(arg);
-		if (WObj* res = WCallMethod(arg, "__repr__", nullptr, 0)) {
-			if (WIsString(res)) {
-				return res;
-			} else {
-				WRaiseTypeError(arg->context, "__repr__() returned a non str type");
-			}
-		}
-		return nullptr;
+		return WCall(arg->context->builtins.repr, &arg, 1);
 	}
 
 	WObj* WCall(WObj* callable, WObj** argv, int argc, WObj* kwargsDict) {
@@ -594,7 +559,6 @@ extern "C" {
 					return nullptr;
 			}
 			refs.emplace_back(kwargsDict);
-
 
 			WObj* ret = fptr(argsWithSelf.data(), (int)argsWithSelf.size(), kwargsDict, userdata);
 
@@ -787,14 +751,12 @@ extern "C" {
 
 	WObj* WLen(WObj* obj) {
 		WASSERT(obj);
-		if (WObj* res = WCallMethod(obj, "__len__", nullptr, 0)) {
-			if (WIsInt(res)) {
-				return res;
-			} else {
-				WRaiseTypeError(obj->context, "__len__() returned a non int type");
-			}
-		}
-		return nullptr;
+		return WCall(obj->context->builtins.len, &obj, 1);
+	}
+
+	WObj* WHash(WObj* obj) {
+		WASSERT(obj);
+		return WCall(obj->context->builtins.hash, &obj, 1);
 	}
 
 	WObj* WIn(WObj* container, WObj* obj) {

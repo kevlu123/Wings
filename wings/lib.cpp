@@ -21,6 +21,21 @@ class __DefaultIter:
 			raise StopIteration
 		self.i += 1
 		return val
+	def __iter__(self):
+		return self
+
+class __DefaultReverseIter:
+	def __init__(self, iterable):
+		self.iterable = iterable
+		self.i = len(iterable) - 1
+	def __next__(self):
+		if self.i >= 0:
+			val = self.iterable[self.i]
+			self.i -= 1
+			return val
+		raise StopIteration
+	def __iter__(self):
+		return self
 
 class __RangeIter:
 	def __init__(self, start, stop, step):
@@ -351,37 +366,43 @@ namespace wings {
 
 	namespace ctors {
 
-		static WObj* _bool(WObj** argv, int argc, WObj* kwargs, WContext* context) {
-			EXPECT_ARG_COUNT_BETWEEN(1, 2);
+		static WObj* object(WObj** argv, int argc, WObj* kwargs, WContext* context) {
+			EXPECT_ARG_COUNT(1);
+			argv[0]->attributes = context->builtins.object->Get<WObj::Class>().instanceAttributes.Copy();
+			argv[0]->type = "__object";
+			return WCreateNone(context);
+		}
 
-			bool v{};
+		static WObj* _bool(WObj** argv, int argc, WObj* kwargs, void* ud) {
+			WContext* context = (WContext*)ud;
+			EXPECT_ARG_COUNT_BETWEEN(0, 1);
+
 			if (argc == 1) {
-				v = false;
-			} else {
-				WObj* res = WConvertToBool(argv[1]);
-				if (res == nullptr)
+				WObj* res = WCallMethod(argv[0], "__nonzero__", nullptr, 0);
+				if (res == nullptr) {
 					return nullptr;
-				v = WGetBool(res);
+				} else if (!WIsBool(res)) {
+					WRaiseTypeError(context, "__nonzero__() returned a non bool type");
+					return nullptr;
+				}
+				return res;
 			}
 
-			argv[0]->attributes = context->builtins._bool->Get<WObj::Class>().instanceAttributes.Copy();
-			argv[0]->type = "__bool";
-			argv[0]->data = new bool(v);
-			argv[0]->finalizer.fptr = [](WObj* obj, void*) { delete (bool*)obj->data; };
-
-			return WCreateNone(context);
+			return context->builtins._false;
 		}
 
 		static WObj* _int(WObj** argv, int argc, WObj* kwargs, WContext* context) {
 			EXPECT_ARG_COUNT_BETWEEN(1, 2);
 
-			wint v{};
-			if (argc == 1) {
-				v = 0;
-			} else {
-				WObj* res = WConvertToInt(argv[1]);
-				if (res == nullptr)
+			wint v = 0;
+			if (argc == 2) {
+				WObj* res = WCallMethod(argv[1], "__int__", nullptr, 0);
+				if (res == nullptr) {
 					return nullptr;
+				} else if (!WIsInt(res)) {
+					WRaiseTypeError(context, "__int__() returned a non int type");
+					return nullptr;
+				}
 				v = WGetInt(res);
 			}
 
@@ -396,13 +417,15 @@ namespace wings {
 		static WObj* _float(WObj** argv, int argc, WObj* kwargs, WContext* context) {
 			EXPECT_ARG_COUNT_BETWEEN(1, 2);
 
-			wfloat v{};
-			if (argc == 1) {
-				v = 0;
-			} else {
-				WObj* res = WConvertToFloat(argv[1]);
-				if (res == nullptr)
+			wfloat v = 0;
+			if (argc == 2) {
+				WObj* res = WCallMethod(argv[1], "__float__", nullptr, 0);
+				if (res == nullptr) {
 					return nullptr;
+				} else if (!WIsIntOrFloat(res)) {
+					WRaiseTypeError(context, "__float__() returned a non float type");
+					return nullptr;
+				}
 				v = WGetFloat(res);
 			}
 
@@ -417,17 +440,20 @@ namespace wings {
 		static WObj* str(WObj** argv, int argc, WObj* kwargs, WContext* context) {
 			EXPECT_ARG_COUNT_BETWEEN(1, 2);
 
-			std::string v{};
+			const char* v = "";
 			if (argc == 2) {
-				WObj* res = WConvertToString(argv[1]);
-				if (res == nullptr)
+				WObj* res = WCallMethod(argv[1], "__str__", nullptr, 0);
+				if (res == nullptr) {
 					return nullptr;
+				} else if (!WIsString(res)) {
+					WRaiseTypeError(context, "__str__() returned a non string type");
+					return nullptr;
+				}
 				v = WGetString(res);
 			}
-
 			argv[0]->attributes = context->builtins.str->Get<WObj::Class>().instanceAttributes.Copy();
 			argv[0]->type = "__str";
-			argv[0]->data = new std::string(std::move(v));
+			argv[0]->data = new std::string(v);
 			argv[0]->finalizer.fptr = [](WObj* obj, void*) { delete (std::string*)obj->data; };
 
 			return WCreateNone(context);
@@ -480,7 +506,7 @@ namespace wings {
 		static WObj* func(WObj** argv, int argc, WObj* kwargs, void* ud) {
 			// Not callable from user code
 
-			//argv[0]->attributes = context->builtins.func->Get<WObj::Class>().instanceAttributes.Copy();
+			//argv[0]->attributes = ((WContext*)ud)->builtins.func->Get<WObj::Class>().instanceAttributes.Copy();
 			argv[0]->type = "__func";
 			argv[0]->data = new WObj::Func();
 			argv[0]->finalizer.fptr = [](WObj* obj, void*) { delete (WObj::Func*)obj->data; };
@@ -512,8 +538,13 @@ namespace wings {
 
 		static WObj* object_str(WObj** argv, int argc, WObj* kwargs, WContext* context) {
 			EXPECT_ARG_COUNT(1);
-			std::string s = "<" + WObjTypeToString(argv[0]) + " object at " + PtrToString(argv[0]) + ">";
+			std::string s = "<" + WObjTypeToString(argv[0]) + " object at 0x" + PtrToString(argv[0]) + ">";
 			return WCreateString(context, s.c_str());
+		}
+
+		static WObj* object_nonzero(WObj** argv, int argc, WObj* kwargs, WContext* context) {
+			EXPECT_ARG_COUNT(1);
+			return WCreateBool(context, true);
 		}
 
 		static WObj* object_repr(WObj** argv, int argc, WObj* kwargs, WContext* context) {
@@ -549,9 +580,7 @@ namespace wings {
 			WObj* lt = WLessThan(argv[0], argv[1]);
 			if (lt == nullptr)
 				return nullptr;
-			if (WGetBool(lt))
-				return WCreateBool(context, false);
-			return WEquals(argv[0], argv[1]);
+			return WCreateBool(context, !WGetBool(lt));
 		}
 
 		static WObj* object_gt(WObj** argv, int argc, WObj* kwargs, WContext* context) {
@@ -637,6 +666,11 @@ namespace wings {
 		static WObj* object_iter(WObj** argv, int argc, WObj* kwargs, WContext* context) {
 			EXPECT_ARG_COUNT(1);
 			return WCall(context->builtins.defaultIter, argv, 1);
+		}
+
+		static WObj* object_reversed(WObj** argv, int argc, WObj* kwargs, WContext* context) {
+			EXPECT_ARG_COUNT(1);
+			return WCall(context->builtins.defaultReverseIter, argv, 1);
 		}
 
 		static WObj* null_nonzero(WObj** argv, int argc, WObj* kwargs, WContext* context) {
@@ -2099,6 +2133,64 @@ namespace wings {
 			return WCreateNone(context);
 		}
 
+		static WObj* list_insert(WObj** argv, int argc, WObj* kwargs, WContext* context) {
+			EXPECT_ARG_COUNT(3);
+			EXPECT_ARG_TYPE_LIST(0);
+			EXPECT_ARG_TYPE_INT(1);
+
+			wint index;
+			if (!ParseIndex(argv[0], argv[1], index))
+				return nullptr;
+
+			auto& buf = argv[0]->Get<std::vector<WObj*>>();			
+			index = std::clamp(index, (wint)0, (wint)buf.size() + 1);
+			buf.insert(buf.begin() + index, argv[2]);
+			return WCreateNone(context);
+		}
+
+		static WObj* list_pop(WObj** argv, int argc, WObj* kwargs, WContext* context) {
+			EXPECT_ARG_COUNT_BETWEEN(1, 2);
+			EXPECT_ARG_TYPE_LIST(0);
+
+			auto& buf = argv[0]->Get<std::vector<WObj*>>();
+			wint index = (wint)buf.size() - 1;
+			if (argc == 2) {
+				EXPECT_ARG_TYPE_INT(1);
+				if (!ParseIndex(argv[0], argv[1], index))
+					return nullptr;
+			}
+
+			if (index < 0 || index >= (wint)buf.size()) {
+				WRaiseIndexError(context);
+				return nullptr;
+			}
+			
+			WObj* popped = buf[index];
+			buf.erase(buf.begin() + index);
+			return popped;
+		}
+
+		static WObj* list_remove(WObj** argv, int argc, WObj* kwargs, WContext* context) {
+			EXPECT_ARG_COUNT(2);
+			EXPECT_ARG_TYPE_LIST(0);
+
+			auto& buf = argv[0]->Get<std::vector<WObj*>>();
+			for (size_t i = 0; i < buf.size(); i++) {
+				WObj* eq = WEquals(argv[1], buf[i]);
+				if (eq == nullptr)
+					return nullptr;
+				
+				if (WGetBool(eq)) {
+					if (i < buf.size())
+						buf.erase(buf.begin() + i);
+					return WCreateNone(context);
+				}
+			}
+
+			WRaiseValueError(context, "Value was not found");
+			return nullptr;
+		}
+
 		static WObj* list_clear(WObj** argv, int argc, WObj* kwargs, WContext* context) {
 			EXPECT_ARG_COUNT(1);
 			EXPECT_ARG_TYPE_LIST(0);
@@ -2282,12 +2374,29 @@ namespace wings {
 
 		static WObj* len(WObj** argv, int argc, WObj* kwargs, WContext* context) {
 			EXPECT_ARG_COUNT(1);
-			return WCallMethod(argv[0], "__len__", nullptr, 0);
+			WObj* res = WCallMethod(argv[0], "__len__", nullptr, 0);
+			if (res == nullptr) {
+				return nullptr;
+			} else if (!WIsInt(res)) {
+				WRaiseTypeError(context, "__len__() returned a non int type");
+				return nullptr;
+			} else if (WGetInt(res) < 0) {
+				WRaiseValueError(context, "__len__() returned a negative number");
+				return nullptr;
+			}
+			return res;
 		}
 
 		static WObj* repr(WObj** argv, int argc, WObj* kwargs, WContext* context) {
 			EXPECT_ARG_COUNT(1);
-			return WCallMethod(argv[0], "__repr__", nullptr, 0);
+			WObj* res = WCallMethod(argv[0], "__repr__", nullptr, 0);
+			if (res == nullptr) {
+				return nullptr;
+			} else if (!WIsString(res)) {
+				WRaiseTypeError(context, "__repr__() returned a non string type");
+				return nullptr;
+			}
+			return res;
 		}
 
 		static WObj* next(WObj** argv, int argc, WObj* kwargs, WContext* context) {
@@ -2300,9 +2409,26 @@ namespace wings {
 			return WCallMethod(argv[0], "__iter__", nullptr, 0);
 		}
 
+		static WObj* reversed(WObj** argv, int argc, WObj* kwargs, WContext* context) {
+			EXPECT_ARG_COUNT(1);
+			return WCallMethod(argv[0], "__reversed__", nullptr, 0);
+		}
+
 		static WObj* abs(WObj** argv, int argc, WObj* kwargs, WContext* context) {
 			EXPECT_ARG_COUNT(1);
 			return WCallMethod(argv[0], "__abs__", nullptr, 0);
+		}
+
+		static WObj* hash(WObj** argv, int argc, WObj* kwargs, WContext* context) {
+			EXPECT_ARG_COUNT(1);
+			WObj* res = WCallMethod(argv[0], "__hash__", nullptr, 0);
+			if (res == nullptr) {
+				return nullptr;
+			} else if (!WIsInt(res)) {
+				WRaiseTypeError(context, "__hash__() returned a non int type");
+				return nullptr;
+			}
+			return res;
 		}
 
 	} // namespace lib
@@ -2381,7 +2507,14 @@ namespace wings {
 			context->builtins.object->finalizer.fptr = [](WObj* obj, void*) { delete (WObj::Class*)obj->data; };
 			context->builtins.object->Get<WObj::Class>().instanceAttributes.Set("__class__", context->builtins.object);
 			context->builtins.object->attributes.AddParent(context->builtins.object->Get<WObj::Class>().instanceAttributes);
-			context->builtins.object->Get<WObj::Class>().ctor = [](WObj**, int, WObj*, void* ud) -> WObj* { return nullptr; };
+			context->builtins.object->Get<WObj::Class>().userdata = context;
+			context->builtins.object->Get<WObj::Class>().ctor = [](WObj**, int, WObj* kwargs, void* ud) -> WObj* {
+				WObj* obj = Alloc((WContext*)ud);
+				if (obj == nullptr)
+					return nullptr;
+				ctors::object(&obj, 1, kwargs, (WContext*)ud);
+				return obj;
+			};
 			WSetGlobal(context, "object", context->builtins.object);
 
 			// Create function class
@@ -2423,6 +2556,10 @@ namespace wings {
 			RegisterMethod<methods::collection_str<Collection::Tuple>>(context->builtins.tuple, "__str__");
 			RegisterMethod<methods::collection_getitem<Collection::Tuple>>(context->builtins.tuple, "__getitem__");
 			RegisterMethod<methods::collection_len<Collection::Tuple>>(context->builtins.tuple, "__len__");
+			RegisterMethod<methods::collection_contains<Collection::Tuple>>(context->builtins.tuple, "__contains__");
+			RegisterMethod<methods::collection_eq<Collection::Tuple>>(context->builtins.tuple, "__eq__");
+			RegisterMethod<methods::collection_lt<Collection::Tuple>>(context->builtins.tuple, "__lt__");
+			RegisterMethod<methods::collection_nonzero<Collection::Tuple>>(context->builtins.tuple, "__nonzero__");
 			RegisterMethod<methods::collection_count<Collection::Tuple>>(context->builtins.tuple, "count");
 			RegisterMethod<methods::collection_index<Collection::Tuple>>(context->builtins.tuple, "index");
 
@@ -2445,7 +2582,6 @@ namespace wings {
 			context->builtins.none->attributes.AddParent(context->builtins.object->Get<WObj::Class>().instanceAttributes);
 			RegisterMethod<methods::null_nonzero>(context->builtins.none, "__nonzero__");
 			RegisterMethod<methods::null_str>(context->builtins.none, "__str__");
-			RegisterMethod<methods::null_str>(context->builtins.none, "__repr__");
 
 			// Add __bases__ tuple to the classes created before
 			WObj* emptyTuple = WCreateTuple(context, nullptr, 0);
@@ -2459,6 +2595,7 @@ namespace wings {
 			// Add methods
 			RegisterMethod<methods::object_pos>(context->builtins.object, "__pos__");
 			RegisterMethod<methods::object_str>(context->builtins.object, "__str__");
+			RegisterMethod<methods::object_nonzero>(context->builtins.object, "__nonzero__");
 			RegisterMethod<methods::object_repr>(context->builtins.object, "__repr__");
 			RegisterMethod<methods::object_eq>(context->builtins.object, "__eq__");
 			RegisterMethod<methods::object_ne>(context->builtins.object, "__ne__");
@@ -2479,9 +2616,10 @@ namespace wings {
 			RegisterMethod<methods::object_irshift>(context->builtins.object, "__irshift__");
 			RegisterMethod<methods::object_hash>(context->builtins.object, "__hash__");
 			RegisterMethod<methods::object_iter>(context->builtins.object, "__iter__");
+			RegisterMethod<methods::object_reversed>(context->builtins.object, "__reversed__");
 
 			context->builtins._bool = createClass("bool");
-			RegisterMethod<ctors::_bool>(context->builtins._bool, "__init__");
+			context->builtins._bool->Get<WObj::Class>().ctor = ctors::_bool;
 			RegisterMethod<methods::bool_nonzero>(context->builtins._bool, "__nonzero__");
 			RegisterMethod<methods::bool_int>(context->builtins._bool, "__int__");
 			RegisterMethod<methods::bool_float>(context->builtins._bool, "__float__");
@@ -2489,6 +2627,23 @@ namespace wings {
 			RegisterMethod<methods::bool_eq>(context->builtins._bool, "__eq__");
 			RegisterMethod<methods::bool_hash>(context->builtins._bool, "__hash__");
 			RegisterMethod<methods::bool_abs>(context->builtins._bool, "__abs__");
+
+			WObj* _false = Alloc(context);
+			if (_false == nullptr)
+				throw LibraryInitException();
+			_false->attributes = context->builtins._bool->Get<WObj::Class>().instanceAttributes.Copy();
+			_false->type = "__bool";
+			_false->data = new bool(false);
+			_false->finalizer.fptr = [](WObj* obj, void*) { delete (bool*)obj->data; };
+			context->builtins._false = _false;
+			WObj* _true = Alloc(context);
+			if (_true == nullptr)
+				throw LibraryInitException();
+			_true->attributes = context->builtins._bool->Get<WObj::Class>().instanceAttributes.Copy();
+			_true->type = "__bool";
+			_true->data = new bool(true);
+			_true->finalizer.fptr = [](WObj* obj, void*) { delete (bool*)obj->data; };
+			context->builtins._true = _true;
 
 			context->builtins._int = createClass("int");
 			RegisterMethod<ctors::_int>(context->builtins._int, "__init__");
@@ -2603,9 +2758,9 @@ namespace wings {
 			RegisterMethod<methods::list_clear>(context->builtins.list, "clear");
 			RegisterMethod<methods::list_copy>(context->builtins.list, "copy");
 			RegisterMethod<methods::list_extend>(context->builtins.list, "extend");
-			//RegisterMethod<methods::list_insert>(context->builtins.list, "insert");
-			//RegisterMethod<methods::list_pop>(context->builtins.list, "pop");
-			//RegisterMethod<methods::list_remove>(context->builtins.list, "remove");
+			RegisterMethod<methods::list_insert>(context->builtins.list, "insert");
+			RegisterMethod<methods::list_pop>(context->builtins.list, "pop");
+			RegisterMethod<methods::list_remove>(context->builtins.list, "remove");
 			RegisterMethod<methods::list_reverse>(context->builtins.list, "reverse");
 			RegisterMethod<methods::list_sort>(context->builtins.list, "sort");
 
@@ -2615,15 +2770,27 @@ namespace wings {
 			RegisterMethod<methods::map_contains>(context->builtins.dict, "__contains__");
 			RegisterMethod<methods::map_getitem>(context->builtins.dict, "__getitem__");
 			//RegisterMethod<methods::map_setitem>(context->builtins.dict, "__setitem__");
+			//RegisterMethod<methods::map_clear>(context->builtins.dict, "clear");
+			//RegisterMethod<methods::map_copy>(context->builtins.dict, "");
+			//RegisterMethod<methods::map_get>(context->builtins.dict, "");
+			//RegisterMethod<methods::map_items>(context->builtins.dict, "");
+			//RegisterMethod<methods::map_keys>(context->builtins.dict, "");
+			//RegisterMethod<methods::map_pop>(context->builtins.dict, "");
+			//RegisterMethod<methods::map_popitem>(context->builtins.dict, "");
+			//RegisterMethod<methods::map_setdefault>(context->builtins.dict, "");
+			//RegisterMethod<methods::map_update>(context->builtins.dict, "");
+			//RegisterMethod<methods::map_values>(context->builtins.dict, "");
 
 			// Add free functions
 			context->builtins.isinstance = RegisterFunction<lib::isinstance>(context, "isinstance");
+			context->builtins.len = RegisterFunction<lib::len>(context, "len");
+			context->builtins.repr = RegisterFunction<lib::repr>(context, "repr");
+			context->builtins.hash = RegisterFunction<lib::hash>(context, "hash");
 			RegisterFunction<lib::print>(context, "print");
-			RegisterFunction<lib::len>(context, "len");
-			RegisterFunction<lib::repr>(context, "repr");
 			RegisterFunction<lib::next>(context, "next");
 			RegisterFunction<lib::iter>(context, "iter");
 			RegisterFunction<lib::abs>(context, "abs");
+			RegisterFunction<lib::reversed>(context, "reversed");
 
 			// Create exception classes
 			context->builtins.baseException = createClass("BaseException");
@@ -2652,6 +2819,7 @@ namespace wings {
 
 			context->builtins.slice = getGlobal("slice");
 			context->builtins.defaultIter = getGlobal("__DefaultIter");
+			context->builtins.defaultReverseIter = getGlobal("__DefaultReverseIter");
 
 		} catch (LibraryInitException&) {
 			std::abort(); // Internal error

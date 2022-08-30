@@ -206,6 +206,8 @@ namespace wings {
 			return "function";
 		} else if (WIsClass(obj)) {
 			return "class";
+		} else if (obj->type == "__object") {
+			return "object";
 		} else {
 			return obj->type;
 		}

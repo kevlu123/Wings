@@ -85,6 +85,7 @@ namespace wings {
 		WObj* func;
 		WObj* slice;
 		WObj* defaultIter;
+		WObj* defaultReverseIter;
 
 		// Exception types
 		WObj* baseException;
@@ -102,20 +103,30 @@ namespace wings {
 		WObj* zeroDivisionError;
 		WObj* stopIteration;
 
+		// Functions
+		WObj* isinstance;
+		WObj* repr;
+		WObj* hash;
+		WObj* len;
+
 		// Instances
 		WObj* none;
 		WObj* _true;
 		WObj* _false;
 		WObj* memoryErrorInstance;
-		WObj* isinstance;
 
 		auto GetAll() const {
 			return std::array{
-				object, noneType, _bool, _int, _float, str, tuple, list, dict, func, slice, defaultIter,
+				object, noneType, _bool, _int, _float, str, tuple, list, dict,
+				func, slice, defaultIter, defaultReverseIter,
+				
 				baseException, exception, syntaxError, nameError, typeError, valueError,
 				attributeError, lookupError, indexError, keyError, arithmeticError, overflowError,
 				zeroDivisionError, stopIteration,
-				none, _true, _false, memoryErrorInstance, isinstance,
+
+				isinstance, repr,
+
+				none, _true, _false, memoryErrorInstance,
 			};
 		}
 	};

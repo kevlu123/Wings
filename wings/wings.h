@@ -1117,11 +1117,24 @@ WDLL_EXPORT WObj* WGreaterThan(WObj* lhs, WObj* rhs);
 WDLL_EXPORT WObj* WGreaterThanOrEqual(WObj* lhs, WObj* rhs);
 
 /**
+* Hash an object.
+*
+* Remarks:
+* This requires the object to implement a __hash__() method and
+* that this method returns an integer type.
+* Call WGetCurrentException() or WGetErrorMessage() to get error information.
+*
+* @param obj The object to hash.
+* @return The result of the operation, or nullptr on failure.
+*/
+WDLL_EXPORT WObj* WHash(WObj* obj);
+
+/**
 * Check if an object is contained within another object i.e. obj in container
 *
 * Remarks:
 * This requires the container to implement a __len__() method and
-* that this method returns an integer type.
+* that this method returns a positive integer.
 * Call WGetCurrentException() or WGetErrorMessage() to get error information.
 *
 * @param obj The object to get the length of.

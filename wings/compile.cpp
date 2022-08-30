@@ -25,7 +25,7 @@ namespace wings {
 		{ Operation::Eq,	 "__eq__"       },
 		{ Operation::Ne,	 "__ne__"       },
 		{ Operation::Lt,	 "__lt__"       },
-		{ Operation::Le,	 "__ge__"       },
+		{ Operation::Le,	 "__le__"       },
 		{ Operation::Gt,	 "__gt__"       },
 		{ Operation::Ge,	 "__ge__"       },
 		{ Operation::In,	 "__contains__" },
