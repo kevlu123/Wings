@@ -495,6 +495,20 @@ WDLL_EXPORT WObj* WCreateList(WContext* context, WObj** argv WDEFAULT_ARG(nullpt
 WDLL_EXPORT WObj* WCreateDictionary(WContext* context, WObj** keys WDEFAULT_ARG(nullptr), WObj** values WDEFAULT_ARG(nullptr), int argc WDEFAULT_ARG(0));
 
 /**
+* Instantiate a set object.
+*
+* Remarks:
+* Call WGetCurrentException() or WGetErrorMessage() to get error information.
+*
+* @param context The relevant context.
+* @param argv A pointer to an array of objects to initialise the set with.
+*             This can be nullptr if argc is 0.
+* @param argc The number of objects to initialise the set with.
+* @return The instantiated object, or nullptr on failure.
+*/
+WDLL_EXPORT WObj* WCreateSet(WContext* context, WObj** argv WDEFAULT_ARG(nullptr), int argc WDEFAULT_ARG(0));
+
+/**
 * Instantiate a function object.
 *
 * Remarks:
@@ -598,6 +612,14 @@ WDLL_EXPORT bool WIsList(const WObj* obj);
 * @return True if the object is a dictionary, otherwise false.
 */
 WDLL_EXPORT bool WIsDictionary(const WObj* obj);
+
+/**
+* Check if an object is a set.
+*
+* @param obj The object to inspect.
+* @return True if the object is a set, otherwise false.
+*/
+WDLL_EXPORT bool WIsSet(const WObj* obj);
 
 /**
 * Check if an object is a function.

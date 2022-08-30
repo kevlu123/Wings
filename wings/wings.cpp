@@ -202,6 +202,8 @@ namespace wings {
 			return "list";
 		} else if (WIsDictionary(obj)) {
 			return "dict";
+		} else if (WIsSet(obj)) {
+			return "set";
 		} else if (WIsFunction(obj)) {
 			return "function";
 		} else if (WIsClass(obj)) {

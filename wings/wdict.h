@@ -1,5 +1,6 @@
 #pragma once
 #include <unordered_map>
+#include <unordered_set>
 
 struct WObj;
 
@@ -14,5 +15,8 @@ namespace wings {
 	};
 
 	struct WDict : public std::unordered_map<WObj*, WObj*, WObjHasher, WObjComparer> {
+	};
+
+	struct WSet : public std::unordered_set<WObj*, WObjHasher, WObjComparer> {
 	};
 }

@@ -397,8 +397,14 @@ namespace wings {
 			break;
 		}
 		case Instruction::Type::Tuple:
-		case Instruction::Type::List: {
-			auto creator = instr.type == Instruction::Type::Tuple ? WCreateTuple : WCreateList;
+		case Instruction::Type::List:
+		case Instruction::Type::Set: {
+			WObj* (*creator)(WContext*, WObj**, int) = nullptr;
+			switch (instr.type) {
+			case Instruction::Type::Tuple: creator = WCreateTuple; break;
+			case Instruction::Type::List: creator = WCreateList; break;
+			case Instruction::Type::Set: creator = WCreateSet; break;
+			}
 			size_t argc = PopArgFrame();
 			WObj** argv = stack.data() + stack.size() - argc;
 			if (WObj* li = creator(context, argv, (int)argc)) {
@@ -411,7 +417,7 @@ namespace wings {
 			break;
 		}
 		case Instruction::Type::Map:
-			if (WObj* li = WCreateDictionary(context)) {
+			if (WObj* dict = WCreateDictionary(context)) {
 				size_t argc = PopArgFrame();
 				WObj** start = stack.data() + stack.size() - argc;
 				for (size_t i = 0; i < argc / 2; i++) {
@@ -422,12 +428,12 @@ namespace wings {
 						exitValue = nullptr;
 						return;
 					}
-					li->Get<wings::WDict>()[key] = val;
+					dict->Get<wings::WDict>()[key] = val;
 				}
 
 				for (size_t i = 0; i < argc; i++)
 					PopStack();
-				PushStack(li);
+				PushStack(dict);
 			} else {
 				exitValue = nullptr;
 			}

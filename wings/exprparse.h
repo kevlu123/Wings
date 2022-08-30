@@ -8,7 +8,7 @@ namespace wings {
 
 	enum class Operation {
 		Literal, Variable,
-		Tuple, List, Map,
+		Tuple, List, Map, Set,
 		ListComprehension,
 		Index, Call, Slice,
 		Pos, Neg,

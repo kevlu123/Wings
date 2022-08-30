@@ -119,6 +119,26 @@ extern "C" {
 		}
 	}
 
+	WObj* WCreateSet(WContext* context, WObj** argv, int argc) {
+		std::vector<wings::WObjRef> refs;
+		WASSERT(context && argc >= 0);
+		if (argc > 0) {
+			WASSERT(argv);
+			for (int i = 0; i < argc; i++) {
+				refs.emplace_back(argv[i]);
+				WASSERT(argv[i] && WIsImmutableType(argv[i]));
+			}
+		}
+
+		if (WObj* v = WCall(context->builtins.set, nullptr, 0, nullptr)) {
+			for (int i = 0; i < argc; i++)
+				v->Get<wings::WSet>().insert(argv[i]);
+			return v;
+		} else {
+			return nullptr;
+		}
+	}
+
 	WObj* WCreateFunction(WContext* context, const WFuncDesc* value) {
 		WASSERT(context && value);
 		if (WObj* v = WCall(context->builtins.func, nullptr, 0)) {
@@ -302,6 +322,11 @@ extern "C" {
 	bool WIsDictionary(const WObj* obj) {
 		WASSERT(obj);
 		return obj->type == "__map";
+	}
+
+	bool WIsSet(const WObj* obj) {
+		WASSERT(obj);
+		return obj->type == "__set";
 	}
 
 	bool WIsClass(const WObj* obj) {

@@ -360,6 +360,7 @@ static bool MergeSort(WObj** data, size_t len, WObj* key) {
 #define EXPECT_ARG_TYPE_LIST(index) EXPECT_ARG_TYPE(index, WIsList, "list");
 #define EXPECT_ARG_TYPE_TUPLE(index) EXPECT_ARG_TYPE(index, WIsTuple, "tuple");
 #define EXPECT_ARG_TYPE_MAP(index) EXPECT_ARG_TYPE(index, WIsDictionary, "dict");
+#define EXPECT_ARG_TYPE_SET(index) EXPECT_ARG_TYPE(index, WIsSet, "set");
 #define EXPECT_ARG_TYPE_FUNC(index) EXPECT_ARG_TYPE(index, WIsFunction, "function");
 
 namespace wings {
@@ -499,6 +500,17 @@ namespace wings {
 			argv[0]->type = "__map";
 			argv[0]->data = new wings::WDict();
 			argv[0]->finalizer.fptr = [](WObj* obj, void*) { delete (wings::WDict*)obj->data; };
+
+			return WCreateNone(context);
+		}
+
+		static WObj* set(WObj** argv, int argc, WObj* kwargs, WContext* context) {
+			EXPECT_ARG_COUNT(1);
+
+			argv[0]->attributes = context->builtins.set->Get<WObj::Class>().instanceAttributes.Copy();
+			argv[0]->type = "__set";
+			argv[0]->data = new wings::WSet();
+			argv[0]->finalizer.fptr = [](WObj* obj, void*) { delete (wings::WSet*)obj->data; };
 
 			return WCreateNone(context);
 		}
@@ -2289,7 +2301,7 @@ namespace wings {
 						return nullptr;
 					}
 					WObj* v = WRepr(val);
-					if (k == nullptr) {
+					if (v == nullptr) {
 						context->reprStack.pop_back();
 						return nullptr;
 					}
@@ -2304,6 +2316,18 @@ namespace wings {
 				}
 				return WCreateString(context, (s + "}").c_str());
 			}
+		}
+
+		static WObj* map_nonzero(WObj** argv, int argc, WObj* kwargs, WContext* context) {
+			EXPECT_ARG_COUNT(1);
+			EXPECT_ARG_TYPE_MAP(0);
+			return WCreateBool(context, !argv[0]->Get<WDict>().empty());
+		}
+
+		static WObj* map_len(WObj** argv, int argc, WObj* kwargs, WContext* context) {
+			EXPECT_ARG_COUNT(1);
+			EXPECT_ARG_TYPE_MAP(0);
+			return WCreateInt(context, (wint)argv[0]->Get<WDict>().size());
 		}
 
 		static WObj* map_contains(WObj** argv, int argc, WObj* kwargs, WContext* context) {
@@ -2324,6 +2348,47 @@ namespace wings {
 			}
 
 			return it->second;
+		}
+
+		static WObj* set_str(WObj** argv, int argc, WObj* kwargs, WContext* context) {
+			EXPECT_ARG_COUNT(1);
+			EXPECT_ARG_TYPE_SET(0);
+
+			auto it = std::find(context->reprStack.rbegin(), context->reprStack.rend(), argv[0]);
+			if (it != context->reprStack.rend()) {
+				return WCreateString(context, "{...}");
+			} else {
+				context->reprStack.push_back(argv[0]);
+				const auto& buf = argv[0]->Get<wings::WSet>();
+
+				if (buf.empty()) {
+					context->reprStack.pop_back();
+					return WCreateString(context, "set()");
+				}
+
+				std::string s = "{";
+				for (WObj* val : buf) {
+					WObj* v = WRepr(val);
+					if (v == nullptr) {
+						context->reprStack.pop_back();
+						return nullptr;
+					}
+					s += v->Get<std::string>() + ", ";
+				}
+				context->reprStack.pop_back();
+				if (!buf.empty()) {
+					s.pop_back();
+					s.pop_back();
+				}
+				return WCreateString(context, (s + "}").c_str());
+			}
+		}
+
+		static WObj* set_add(WObj** argv, int argc, WObj* kwargs, WContext* context) {
+			EXPECT_ARG_COUNT(2);
+			EXPECT_ARG_TYPE_SET(0);
+			argv[0]->Get<wings::WSet>().insert(argv[1]);
+			return WCreateNone(context);
 		}
 
 		static WObj* func_str(WObj** argv, int argc, WObj* kwargs, WContext* context) {
@@ -2766,9 +2831,12 @@ namespace wings {
 
 			context->builtins.dict = createClass("dict");
 			RegisterMethod<ctors::map>(context->builtins.dict, "__init__");
+			RegisterMethod<methods::map_nonzero>(context->builtins.dict, "__nonzero__");
 			RegisterMethod<methods::map_str>(context->builtins.dict, "__str__");
 			RegisterMethod<methods::map_contains>(context->builtins.dict, "__contains__");
 			RegisterMethod<methods::map_getitem>(context->builtins.dict, "__getitem__");
+			//RegisterMethod<methods::map_iter>(context->builtins.dict, "__iter__");
+			RegisterMethod<methods::map_len>(context->builtins.dict, "__len__");
 			//RegisterMethod<methods::map_setitem>(context->builtins.dict, "__setitem__");
 			//RegisterMethod<methods::map_clear>(context->builtins.dict, "clear");
 			//RegisterMethod<methods::map_copy>(context->builtins.dict, "");
@@ -2780,6 +2848,27 @@ namespace wings {
 			//RegisterMethod<methods::map_setdefault>(context->builtins.dict, "");
 			//RegisterMethod<methods::map_update>(context->builtins.dict, "");
 			//RegisterMethod<methods::map_values>(context->builtins.dict, "");
+
+			context->builtins.set = createClass("set");
+			RegisterMethod<ctors::set>(context->builtins.set, "__init__");
+			RegisterMethod<methods::set_str>(context->builtins.set, "__str__");
+			//RegisterMethod<methods::set_contains>(context->builtins.set, "__contains__");
+			//RegisterMethod<methods::set_iter>(context->builtins.set, "__iter__");
+			//RegisterMethod<methods::set_len>(context->builtins.set, "__len__");
+			RegisterMethod<methods::set_add>(context->builtins.set, "add");
+			//RegisterMethod<methods::set_clear>(context->builtins.set, "clear");
+			//RegisterMethod<methods::set_copy>(context->builtins.set, "copy");
+			//RegisterMethod<methods::set_difference>(context->builtins.set, "difference");
+			//RegisterMethod<methods::set_discard>(context->builtins.set, "discard");
+			//RegisterMethod<methods::set_intersection>(context->builtins.set, "intersection");
+			//RegisterMethod<methods::set_isdisjoint>(context->builtins.set, "isdisjoint");
+			//RegisterMethod<methods::set_issubset>(context->builtins.set, "issubset");
+			//RegisterMethod<methods::set_issuperset>(context->builtins.set, "issuperset");
+			//RegisterMethod<methods::set_pop>(context->builtins.set, "pop");
+			//RegisterMethod<methods::set_remove>(context->builtins.set, "remove");
+			//RegisterMethod<methods::set_symmetric_difference>(context->builtins.set, "symmetric_difference");
+			//RegisterMethod<methods::set_union>(context->builtins.set, "union");
+			//RegisterMethod<methods::set_update>(context->builtins.set, "update");
 
 			// Add free functions
 			context->builtins.isinstance = RegisterFunction<lib::isinstance>(context, "isinstance");

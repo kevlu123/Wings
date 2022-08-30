@@ -476,7 +476,7 @@ namespace wings {
 		return CodeError::Good();
 	}
 
-	static CodeError ParseListLiteral(TokenIter& p, Expression& out) {
+	static CodeError ParseList(TokenIter& p, Expression& out) {
 		out.srcPos = p->srcPos;
 		out.operation = Operation::List;
 		++p;
@@ -492,7 +492,23 @@ namespace wings {
 		return CodeError::Good();
 	}
 
-	static CodeError ParseMapLiteral(TokenIter& p, Expression& out) {
+	static CodeError ParseSet(TokenIter& p, Expression& out) {
+		out.srcPos = p->srcPos;
+		out.operation = Operation::Set;
+		++p;
+
+		if (p.EndReached()) {
+			return CodeError::Bad("Expected an expression", (--p)->srcPos);
+		} else if (auto error = ParseExpressionList(p, "}", out.children)) {
+			return error;
+		}
+
+		++p;
+
+		return CodeError::Good();
+	}
+
+	static CodeError ParseMap(TokenIter& p, Expression& out) {
 		out.srcPos = p->srcPos;
 		out.operation = Operation::Map;
 		++p;
@@ -704,12 +720,21 @@ namespace wings {
 				return error;
 			} else if (isListComprehension) {
 				// Do nothing
-			} else if (auto error = ParseListLiteral(p, out)) {
+			} else if (auto error = ParseList(p, out)) {
 				return error;
 			}
 		} else if (p->text == "{") {
-			if (auto error = ParseMapLiteral(p, out)) {
-				return error;
+			TokenIter start = p;
+			if (ParseSet(p, out)) {
+				// Not a valid set, so expect a map
+				p = start;
+				out = {};
+				if (auto error = ParseMap(p, out)) {
+					return error;
+				}
+			} else if (out.children.empty()) {
+				// Found empty set but this should actually be a dictionary
+				out.operation = Operation::Map;
 			}
 		} else if (p->text == "lambda") {
 			if (auto error = ParseLambda(p, out)) {

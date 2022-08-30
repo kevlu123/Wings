@@ -189,7 +189,8 @@ namespace wings {
 			break;
 		case Operation::Tuple:
 		case Operation::List:
-		case Operation::Map: {
+		case Operation::Map:
+		case Operation::Set: {
 			Instruction argFrame{};
 			argFrame.srcPos = expression.srcPos;
 			argFrame.type = Instruction::Type::PushArgFrame;
@@ -201,6 +202,7 @@ namespace wings {
 			case Operation::Tuple: instr.type = Instruction::Type::Tuple; break;
 			case Operation::List: instr.type = Instruction::Type::List; break;
 			case Operation::Map: instr.type = Instruction::Type::Map; break;
+			case Operation::Set: instr.type = Instruction::Type::Set; break;
 			default: WUNREACHABLE();
 			}
 			break;

@@ -48,9 +48,7 @@ namespace wings {
 	struct Instruction {
 		enum class Type {
 			Literal,
-			Tuple,
-			List,
-			Map,
+			Tuple, List, Map, Set,
 			Slice,
 			Def,
 			Class,
@@ -80,13 +78,9 @@ namespace wings {
 
 			Operation,
 			Pop,
-			And,
-			Or,
-			Not,
-			In,
-			NotIn,
-			Is,
-			IsNot,
+			And, Or, Not,
+			In, NotIn,
+			Is, IsNot,
 			ListComprehension,
 		} type{};
 
