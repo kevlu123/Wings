@@ -72,6 +72,7 @@ extern "C" {
     void WRaiseException(WContext* context, const char* message, WObj* type) {
         WASSERT_VOID(context);
         type = type ? type : context->builtins.exception;
+        wings::WObjRef ref(type);
 
         WObj* msg = WCreateString(context, message);
         if (msg == nullptr) {

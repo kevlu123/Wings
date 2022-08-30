@@ -687,13 +687,10 @@ namespace wings {
 		case Instruction::Type::Raise: {
 			WObj* expr = PopStack();
 			if (WIsClass(expr)) {
-				expr = WCall(expr, nullptr, 0);
-				if (expr == nullptr) {
-					exitValue = nullptr;
-					break;
-				}
+				WRaiseException(context, nullptr, expr);
+			} else {
+				WRaiseExceptionObject(context, expr);
 			}
-			context->currentException = expr;
 			exitValue = nullptr;
 			break;
 		}
