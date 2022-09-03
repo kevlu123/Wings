@@ -56,7 +56,12 @@ namespace wings {
 						WRaiseTypeError(context, msg.c_str());
 						return nullptr;
 					}
-					newKwargs->Get<wings::WDict>().insert({ k, value });
+
+					try {
+						newKwargs->Get<wings::WDict>()[k] = value;
+					} catch (HashException&) {
+						return nullptr;
+					}
 				}
 			}
 		}
@@ -423,12 +428,12 @@ namespace wings {
 				for (size_t i = 0; i < argc / 2; i++) {
 					WObj* key = start[2 * i];
 					WObj* val = start[2 * i + 1];
-					if (!WIsImmutableType(key)) {
-						WRaiseTypeError(context, "Only an immutable type can be used as a dictionary key");
+					try {
+						dict->Get<wings::WDict>()[key] = val;
+					} catch (HashException&) {
 						exitValue = nullptr;
 						return;
 					}
-					dict->Get<wings::WDict>()[key] = val;
 				}
 
 				for (size_t i = 0; i < argc; i++)

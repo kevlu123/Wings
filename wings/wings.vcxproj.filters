@@ -47,9 +47,6 @@
     <ClCompile Include="tests.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="wdict.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="exception.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -85,7 +82,7 @@
     <ClInclude Include="attributetable.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="wdict.h">
+    <ClInclude Include="hash.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

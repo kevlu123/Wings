@@ -241,4 +241,16 @@ namespace wings {
 		};
 	}
 
+	size_t WObjHasher::operator()(WObj* obj) const {
+		if (WObj* hash = WHash(obj))
+			return (size_t)WGetInt(hash);
+		throw HashException();
+	}
+
+	bool WObjComparer::operator()(WObj* lhs, WObj* rhs) const {
+		if (WObj* eq = WEquals(lhs, rhs))
+			return WGetBool(eq);
+		throw HashException();
+	}
+
 } // namespace wings

@@ -98,7 +98,7 @@ extern "C" {
 			for (int i = 0; i < argc; i++) {
 				refs.emplace_back(keys[i]);
 				refs.emplace_back(values[i]);
-				WASSERT(keys[i] && values[i] && WIsImmutableType(keys[i]));
+				WASSERT(keys[i] && values[i]);
 			}
 		}
 
@@ -111,8 +111,13 @@ extern "C" {
 		dummyKwargs->data = &wd;
 
 		if (WObj* v = WCall(context->builtins.dict, nullptr, 0, dummyKwargs)) {
-			for (int i = 0; i < argc; i++)
-				v->Get<wings::WDict>().insert({ keys[i], values[i] });
+			for (int i = 0; i < argc; i++) {
+				try {
+					v->Get<wings::WDict>()[keys[i]] = values[i];
+				} catch (wings::HashException&) {
+					return nullptr;
+				}
+			}
 			return v;
 		} else {
 			return nullptr;
@@ -126,13 +131,18 @@ extern "C" {
 			WASSERT(argv);
 			for (int i = 0; i < argc; i++) {
 				refs.emplace_back(argv[i]);
-				WASSERT(argv[i] && WIsImmutableType(argv[i]));
+				WASSERT(argv[i]);
 			}
 		}
 
 		if (WObj* v = WCall(context->builtins.set, nullptr, 0, nullptr)) {
-			for (int i = 0; i < argc; i++)
-				v->Get<wings::WSet>().insert(argv[i]);
+			for (int i = 0; i < argc; i++) {
+				try {
+					v->Get<wings::WSet>().insert(argv[i]);
+				} catch (wings::HashException&) {
+					return nullptr;
+				}
+			}
 			return v;
 		} else {
 			return nullptr;
@@ -337,21 +347,6 @@ extern "C" {
 	bool WIsFunction(const WObj* obj) {
 		WASSERT(obj);
 		return obj->type == "__func";
-	}
-
-	bool WIsImmutableType(const WObj* obj) {
-		WASSERT(obj);
-		if (WIsTuple(obj)) {
-			for (WObj* elem : obj->Get<std::vector<WObj*>>())
-				if (!WIsImmutableType(elem))
-					return false;
-			return true;
-		} else {
-			return WIsNone(obj)
-				|| WIsBool(obj)
-				|| WIsIntOrFloat(obj)
-				|| WIsString(obj);
-		}
 	}
 
 	bool WGetBool(const WObj* obj) {
@@ -636,11 +631,17 @@ extern "C" {
 			if (key == nullptr)
 				return false;
 
-			auto it = buf.find(key);
-			if (it == buf.end()) {
-				out[i] = nullptr;
-			} else {
+			wings::WDict::iterator it;
+			try {
+				it = buf.find(key);
+			} catch (wings::HashException&) {
+				return false;
+			}
+
+			if (it != buf.end()) {
 				out[i] = it->second;
+			} else {
+				out[i] = nullptr;
 			}
 		}
 		return true;

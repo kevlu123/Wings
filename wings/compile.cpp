@@ -701,6 +701,8 @@ namespace wings {
 		{ Statement::Type::Try, CompileTry },
 		{ Statement::Type::Raise, CompileRaise },
 		{ Statement::Type::Pass, [](auto, auto) {}},
+		{ Statement::Type::Global, [](auto, auto) {}},
+		{ Statement::Type::Nonlocal, [](auto, auto) {}},
 	};
 
 	static void CompileStatement(const Statement& node, std::vector<Instruction>& instructions) {

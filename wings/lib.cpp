@@ -2333,7 +2333,11 @@ namespace wings {
 		static WObj* map_contains(WObj** argv, int argc, WObj* kwargs, WContext* context) {
 			EXPECT_ARG_COUNT(2);
 			EXPECT_ARG_TYPE_MAP(0);
-			return WCreateBool(context, argv[0]->Get<WDict>().contains(argv[1]));
+			try {
+				return WCreateBool(context, argv[0]->Get<WDict>().contains(argv[1]));
+			} catch (HashException&) {
+				return nullptr;
+			}
 		}
 
 		static WObj* map_getitem(WObj** argv, int argc, WObj* kwargs, WContext* context) {
@@ -2342,11 +2346,15 @@ namespace wings {
 
 			auto& buf = argv[0]->Get<WDict>();
 			WDict::iterator it;
-			if (!WIsImmutableType(argv[1]) || (it = buf.find(argv[1])) == buf.end()) {
+			try {
+				it = buf.find(argv[1]);
+			} catch (HashException&) {
+				return nullptr;
+			}
+			if (it == buf.end()) {
 				WRaiseKeyError(context, argv[1]);
 				return nullptr;
 			}
-
 			return it->second;
 		}
 

@@ -2,7 +2,7 @@
 #include "rcptr.h"
 #include "wings.h"
 #include "attributetable.h"
-#include "wdict.h"
+#include "hash.h"
 #include <string>
 #include <string_view>
 #include <vector>
@@ -57,6 +57,8 @@ namespace wings {
 			return { srcPos, lineText.data(), tag.data(), func.data() };
 		}
 	};
+
+	struct HashException : public std::exception {};
 
 	struct WObjRef {
 		WObjRef() : obj(nullptr) {}

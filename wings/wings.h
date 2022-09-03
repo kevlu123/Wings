@@ -638,17 +638,6 @@ WDLL_EXPORT bool WIsFunction(const WObj* obj);
 WDLL_EXPORT bool WIsClass(const WObj* obj);
 
 /**
-* Check if an object is an immutable type.
-*
-* Remarks:
-* Immutable types are None, bool, int, float, str, and tuples with immutable elements.
-* 
-* @param obj The object to inspect.
-* @return True if the object is an immutable type, otherwise false.
-*/
-WDLL_EXPORT bool WIsImmutableType(const WObj* obj);
-
-/**
 * Get the value from a boolean object.
 * 
 * @param obj The object to get the value from.
