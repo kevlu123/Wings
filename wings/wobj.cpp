@@ -112,6 +112,7 @@ extern "C" {
 
 		if (WObj* v = WCall(context->builtins.dict, nullptr, 0, dummyKwargs)) {
 			for (int i = 0; i < argc; i++) {
+				refs.emplace_back(v);
 				try {
 					v->Get<wings::WDict>()[keys[i]] = values[i];
 				} catch (wings::HashException&) {

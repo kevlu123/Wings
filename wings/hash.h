@@ -280,6 +280,10 @@ namespace wings {
 		using iterator = Iterator<RelaxedMap>;
 		using const_iterator = Iterator<const RelaxedMap>;
 
+		RelaxedMap() = default;
+		RelaxedMap(RelaxedMap&&) = delete;
+		RelaxedMap& operator=(RelaxedMap&&) = delete;
+
 		void clear() noexcept {
 			this->clear_buckets();
 			storage.clear();
@@ -294,13 +298,31 @@ namespace wings {
 			}
 		}
 
-		void erase(const Key& key) {
+		std::optional<Value> erase(const Key& key) {
 			Bucket* buck = nullptr;
 			if (auto* index = this->get_item(key, &buck)) {
 				buck->erase(std::find(buck->begin(), buck->end(), *index));
+				auto pair = std::move(storage[*index]);
 				storage[*index] = std::nullopt;
 				this->decr_size();
+				return pair.value().second;
 			}
+			return std::nullopt;
+		}
+
+		std::pair<const Key, Value> pop() {
+			size_t i = storage.size() - 1;
+			while (storage[i] == std::nullopt)
+				i--;
+			const auto& key = storage[i].value().first;
+
+			Bucket* buck = nullptr;
+			auto* index = this->get_item(key, &buck);
+			buck->erase(std::find(buck->begin(), buck->end(), *index));
+			auto pair = std::move(storage[*index]);
+			storage[*index] = std::nullopt;
+			this->decr_size();
+			return pair.value();
 		}
 		
 		iterator find(const Key& key) {
@@ -330,12 +352,12 @@ namespace wings {
 		}
 
 		Value& operator[](const Key& key) {
+			this->incr_size();
 			Bucket* buck = nullptr;
 			if (auto* index = this->get_item(key, &buck))
 				return storage[*index].value().second;
 			buck->push_back(storage.size());
 			storage.push_back(std::pair<const Key, Value>({ key, Value() }));
-			this->incr_size();
 			return storage.back().value().second;
 		}
 

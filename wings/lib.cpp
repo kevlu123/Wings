@@ -99,6 +99,11 @@ class slice:
 			self.stop = stop
 			self.step = step
 
+def sorted(iterable, reverse=False):
+	li = list(iterable)
+	li.sort(reverse=reverse)
+	return li
+
 )";
 
 
@@ -376,7 +381,7 @@ namespace wings {
 
 		static WObj* _bool(WObj** argv, int argc, WObj* kwargs, void* ud) {
 			WContext* context = (WContext*)ud;
-			EXPECT_ARG_COUNT_BETWEEN(0, 1);
+			EXPECT_ARG_COUNT_BETWEEN(0, 1); // Called without self
 
 			if (argc == 1) {
 				WObj* res = WCallMethod(argv[0], "__nonzero__", nullptr, 0);
@@ -393,11 +398,11 @@ namespace wings {
 		}
 
 		static WObj* _int(WObj** argv, int argc, WObj* kwargs, WContext* context) {
-			EXPECT_ARG_COUNT_BETWEEN(1, 2);
+			EXPECT_ARG_COUNT_BETWEEN(1, 3);
 
 			wint v = 0;
-			if (argc == 2) {
-				WObj* res = WCallMethod(argv[1], "__int__", nullptr, 0);
+			if (argc >= 2) {
+				WObj* res = WCallMethod(argv[1], "__int__", argv + 2, argc - 2);
 				if (res == nullptr) {
 					return nullptr;
 				} else if (!WIsInt(res)) {
@@ -1091,60 +1096,49 @@ namespace wings {
 		}
 
 		static WObj* str_int(WObj** argv, int argc, WObj* kwargs, WContext* context) {
-			EXPECT_ARG_COUNT(1);
+			EXPECT_ARG_COUNT_BETWEEN(1, 2);
 			EXPECT_ARG_TYPE_STRING(0);
 
-			auto isDigit = [](char c, int base = 10) {
-				switch (base) {
-				case 2: return c >= '0' && c <= '1';
-				case 8: return c >= '0' && c <= '7';
-				case 10: return c >= '0' && c <= '9';
-				case 16: return (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F');
-				default: WUNREACHABLE();
-				}
+			constexpr std::string_view DIGITS = "0123456789abcdefghijklmnopqrstuvwxyz";
+
+			auto isDigit = [&](char c, int base = 10) {
+				auto sub = DIGITS.substr(0, base);
+				return sub.find(std::tolower(c)) != std::string_view::npos;
 			};
 
 			auto digitValueOf = [](char c, int base) {
-				switch (base) {
-				case 2:
-				case 8:
-				case 10:
-					return c - '0';
-				case 16:
-					if (c >= '0' && c <= '9') {
-						return c - '0';
-					} else if (c >= 'a' && c <= 'f') {
-						return c - 'a' + 10;
-					} else {
-						return c - 'A' + 10;
-					}
-				default:
-					WUNREACHABLE();
-				}
+				return DIGITS.substr(0, base).find(std::tolower(c));
 			};
 
 			std::string s = WGetString(argv[0]);
 			const char* p = s.c_str();
 
+			std::optional<int> expectedBase;
+			if (argc == 2) {
+				expectedBase = (int)WGetInt(argv[1]);
+			}
+
 			int base = 10;
-			if (*p == '0') {
+			if (expectedBase.has_value()) {
+				base = expectedBase.value();
+			} else if (*p == '0') {
 				switch (p[1]) {
 				case 'b': case 'B': base = 2; break;
 				case 'x': case 'X': base = 16; break;
 				default: base = 8; break;
 				}
-			}
 
-			if (base == 2 || base == 16) {
-				p += 2;
+				if (base == 2 || base == 16) {
+					p += 2;
 
-				if (!isDigit(*p, base)) {
-					if (base == 2) {
-						WRaiseValueError(context, "Invalid binary string");
-					} else {
-						WRaiseValueError(context, "Invalid hexadecimal string");
+					if (!isDigit(*p, base)) {
+						if (base == 2) {
+							WRaiseValueError(context, "Invalid binary string");
+						} else {
+							WRaiseValueError(context, "Invalid hexadecimal string");
+						}
+						return nullptr;
 					}
-					return nullptr;
 				}
 			}
 
@@ -2340,6 +2334,25 @@ namespace wings {
 			}
 		}
 
+		static WObj* map_get(WObj** argv, int argc, WObj* kwargs, WContext* context) {
+			EXPECT_ARG_COUNT_BETWEEN(2, 3);
+			EXPECT_ARG_TYPE_MAP(0);
+
+			auto& buf = argv[0]->Get<WDict>();
+			WDict::iterator it;
+			try {
+				it = buf.find(argv[1]);
+			} catch (HashException&) {
+				return nullptr;
+			}
+
+			if (it == buf.end()) {
+				return argc == 3 ? argv[2] : WCreateNone(context);
+			}
+
+			return it->second;
+		}
+
 		static WObj* map_getitem(WObj** argv, int argc, WObj* kwargs, WContext* context) {
 			EXPECT_ARG_COUNT(2);
 			EXPECT_ARG_TYPE_MAP(0);
@@ -2351,11 +2364,74 @@ namespace wings {
 			} catch (HashException&) {
 				return nullptr;
 			}
+
 			if (it == buf.end()) {
 				WRaiseKeyError(context, argv[1]);
 				return nullptr;
 			}
+
 			return it->second;
+		}
+
+		static WObj* map_setitem(WObj** argv, int argc, WObj* kwargs, WContext* context) {
+			EXPECT_ARG_COUNT(3);
+			EXPECT_ARG_TYPE_MAP(0);
+
+			try {
+				argv[0]->Get<WDict>()[argv[1]] = argv[2];
+			} catch (HashException&) {
+				return nullptr;
+			}
+			return WCreateNone(context);
+		}
+
+		static WObj* map_clear(WObj** argv, int argc, WObj* kwargs, WContext* context) {
+			EXPECT_ARG_COUNT(1);
+			EXPECT_ARG_TYPE_MAP(0);
+			argv[0]->Get<WDict>().clear();
+			return WCreateNone(context);
+		}
+
+		static WObj* map_copy(WObj** argv, int argc, WObj* kwargs, WContext* context) {
+			EXPECT_ARG_COUNT(1);
+			EXPECT_ARG_TYPE_MAP(0);
+
+			std::vector<WObj*> keys;
+			std::vector<WObj*> values;
+			for (const auto& [k, v] : argv[0]->Get<WDict>()) {
+				keys.push_back(k);
+				values.push_back(v);
+			}
+			return WCreateDictionary(context, keys.data(), values.data(), (int)keys.size());
+		}
+
+		static WObj* map_pop(WObj** argv, int argc, WObj* kwargs, WContext* context) {
+			EXPECT_ARG_COUNT_BETWEEN(2, 3);
+			EXPECT_ARG_TYPE_MAP(0);
+
+			if (auto popped = argv[0]->Get<WDict>().erase(argv[1]))
+				return popped.value();
+
+			if (argc == 3)
+				return argv[2];
+
+			WRaiseKeyError(context, argv[1]);
+			return nullptr;
+		}
+
+		static WObj* map_popitem(WObj** argv, int argc, WObj* kwargs, WContext* context) {
+			EXPECT_ARG_COUNT(1);
+			EXPECT_ARG_TYPE_MAP(0);
+
+			auto& buf = argv[0]->Get<WDict>();
+			if (buf.empty()) {
+				WRaiseKeyError(context);
+				return nullptr;
+			}
+
+			auto popped = buf.pop();
+			WObj* tupElems[2] = { popped.first, popped.second };
+			return WCreateTuple(context, tupElems, 2);
 		}
 
 		static WObj* set_str(WObj** argv, int argc, WObj* kwargs, WContext* context) {
@@ -2845,17 +2921,17 @@ namespace wings {
 			RegisterMethod<methods::map_getitem>(context->builtins.dict, "__getitem__");
 			//RegisterMethod<methods::map_iter>(context->builtins.dict, "__iter__");
 			RegisterMethod<methods::map_len>(context->builtins.dict, "__len__");
-			//RegisterMethod<methods::map_setitem>(context->builtins.dict, "__setitem__");
-			//RegisterMethod<methods::map_clear>(context->builtins.dict, "clear");
-			//RegisterMethod<methods::map_copy>(context->builtins.dict, "");
-			//RegisterMethod<methods::map_get>(context->builtins.dict, "");
-			//RegisterMethod<methods::map_items>(context->builtins.dict, "");
-			//RegisterMethod<methods::map_keys>(context->builtins.dict, "");
-			//RegisterMethod<methods::map_pop>(context->builtins.dict, "");
-			//RegisterMethod<methods::map_popitem>(context->builtins.dict, "");
-			//RegisterMethod<methods::map_setdefault>(context->builtins.dict, "");
-			//RegisterMethod<methods::map_update>(context->builtins.dict, "");
-			//RegisterMethod<methods::map_values>(context->builtins.dict, "");
+			RegisterMethod<methods::map_setitem>(context->builtins.dict, "__setitem__");
+			RegisterMethod<methods::map_clear>(context->builtins.dict, "clear");
+			RegisterMethod<methods::map_copy>(context->builtins.dict, "copy");
+			RegisterMethod<methods::map_get>(context->builtins.dict, "get");
+			//RegisterMethod<methods::map_items>(context->builtins.dict, "items");
+			//RegisterMethod<methods::map_keys>(context->builtins.dict, "keys");
+			RegisterMethod<methods::map_pop>(context->builtins.dict, "pop");
+			RegisterMethod<methods::map_popitem>(context->builtins.dict, "popitem");
+			//RegisterMethod<methods::map_setdefault>(context->builtins.dict, "setdefault");
+			//RegisterMethod<methods::map_update>(context->builtins.dict, "update");
+			//RegisterMethod<methods::map_values>(context->builtins.dict, "values");
 
 			context->builtins.set = createClass("set");
 			RegisterMethod<ctors::set>(context->builtins.set, "__init__");

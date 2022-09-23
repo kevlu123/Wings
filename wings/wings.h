@@ -200,8 +200,9 @@ WDLL_EXPORT void WRaiseIndexError(WContext* context);
 * If an exception is already set, the old exception will be overwritten.
 *
 * @param context The relevant context.
+* @param key The key that caused the KeyError, or nullptr to leave unspecified.
 */
-WDLL_EXPORT void WRaiseKeyError(WContext* context, WObj* key);
+WDLL_EXPORT void WRaiseKeyError(WContext* context, WObj* key WDEFAULT_ARG(nullptr));
 
 /**
 * Raise a StopIteration to terminate iteration.

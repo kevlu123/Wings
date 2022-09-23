@@ -140,13 +140,16 @@ extern "C" {
     }
 
     void WRaiseKeyError(WContext* context, WObj* key) {
-        WASSERT_VOID(context && key);
+        WASSERT_VOID(context);
 
-        std::string s = "<exception str() failed>";
-        if (WObj* repr = WRepr(key))
-            s = WGetString(repr);
-
-        WRaiseException(context, s.c_str(), context->builtins.keyError);
+        if (key == nullptr) {
+            WRaiseException(context, nullptr, context->builtins.keyError);
+        } else {
+            std::string s = "<exception str() failed>";
+            if (WObj* repr = WRepr(key))
+                s = WGetString(repr);
+            WRaiseException(context, s.c_str(), context->builtins.keyError);
+        }
     }
 
     void WRaiseOverflowError(WContext* context) {
