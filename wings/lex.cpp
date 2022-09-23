@@ -204,22 +204,22 @@ namespace wings {
 		if (*p == '0') {
 			switch (p[1]) {
 			case 'b': case 'B': base = 2; break;
+			case 'o': case 'O': base = 8; break;
 			case 'x': case 'X': base = 16; break;
-			case '.': break;
-			default: base = 8; break;
 			}
 		}
 
-		if (base == 2 || base == 16) {
+		if (base != 10) {
 			t.text += p[0];
 			t.text += p[1];
 			p += 2;
 
 			if (!IsDigit(*p, base) && *p != '.') {
-				if (base == 2) {
-					return CodeError::Bad("Invalid binary literal");
-				} else {
-					return CodeError::Bad("Invalid hexadecimal literal");
+				switch (base) {
+				case 2: return CodeError::Bad("Invalid binary string");
+				case 8: return CodeError::Bad("Invalid octal string");
+				case 16: return CodeError::Bad("Invalid hexadecimal string");
+				default: WUNREACHABLE();
 				}
 			}
 		}

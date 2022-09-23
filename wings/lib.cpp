@@ -52,6 +52,8 @@ class __RangeIter:
 				raise StopIteration
 		self.cur = cur + self.step
 		return cur
+	def __iter__(self):
+		return self
 
 class range:
 	def __init__(self, start, stop=None, step=None):
@@ -101,7 +103,7 @@ class slice:
 
 def sorted(iterable, reverse=False):
 	li = list(iterable)
-	li.sort(reverse=reverse)
+	li.sort(reverse=reverse) 
 	return li
 
 )";
@@ -544,6 +546,17 @@ namespace wings {
 				return nullptr;
 			}
 		}
+
+		static WObj* DictIter(WObj** argv, int argc, WObj* kwargs, WContext* context) {
+			EXPECT_ARG_COUNT(2);
+			EXPECT_ARG_TYPE_MAP(1);
+			auto* it = new WDict::iterator(argv[1]->Get<WDict>().begin());
+			WSetUserdata(argv[0], it);
+			argv[0]->finalizer.fptr = [](WObj* obj, void*) { delete (WDict::iterator*)obj->data; };
+			WLinkReference(argv[0], argv[1]);
+			return WCreateNone(context);
+		}
+		
 	} // namespace ctors
 
 	namespace methods {
@@ -1124,20 +1137,19 @@ namespace wings {
 			} else if (*p == '0') {
 				switch (p[1]) {
 				case 'b': case 'B': base = 2; break;
+				case 'o': case 'O': base = 8; break;
 				case 'x': case 'X': base = 16; break;
-				default: base = 8; break;
 				}
 
-				if (base == 2 || base == 16) {
+				if (base != 10) {
 					p += 2;
-
 					if (!isDigit(*p, base)) {
-						if (base == 2) {
-							WRaiseValueError(context, "Invalid binary string");
-						} else {
-							WRaiseValueError(context, "Invalid hexadecimal string");
+						switch (base) {
+						case 2: WRaiseValueError(context, "Invalid binary string"); return nullptr;
+						case 8: WRaiseValueError(context, "Invalid octal string"); return nullptr;
+						case 16: WRaiseValueError(context, "Invalid hexadecimal string"); return nullptr;
+						default: WUNREACHABLE();
 						}
-						return nullptr;
 					}
 				}
 			}
@@ -1200,22 +1212,20 @@ namespace wings {
 			if (*p == '0') {
 				switch (p[1]) {
 				case 'b': case 'B': base = 2; break;
+				case 'o': case 'O': base = 8; break;
 				case 'x': case 'X': base = 16; break;
-				case '.': break;
-				default: base = 8; break;
 				}
 			}
 
-			if (base == 2 || base == 16) {
+			if (base != 10) {
 				p += 2;
-
 				if (!isDigit(*p, base) && *p != '.') {
-					if (base == 2) {
-						WRaiseValueError(context, "Invalid binary string");
-					} else {
-						WRaiseValueError(context, "Invalid hexadecimal string");
+					switch (base) {
+					case 2: WRaiseValueError(context, "Invalid binary string"); return nullptr;
+					case 8: WRaiseValueError(context, "Invalid octal string"); return nullptr;
+					case 16: WRaiseValueError(context, "Invalid hexadecimal string"); return nullptr;
+					default: WUNREACHABLE();
 					}
-					return nullptr;
 				}
 			}
 
@@ -2334,6 +2344,24 @@ namespace wings {
 			}
 		}
 
+		static WObj* map_iter(WObj** argv, int argc, WObj* kwargs, WContext* context) {
+			EXPECT_ARG_COUNT(1);
+			EXPECT_ARG_TYPE_MAP(0);
+			return WCall(context->builtins.dictKeysIter, argv, 1, nullptr);
+		}
+
+		static WObj* map_values(WObj** argv, int argc, WObj* kwargs, WContext* context) {
+			EXPECT_ARG_COUNT(1);
+			EXPECT_ARG_TYPE_MAP(0);
+			return WCall(context->builtins.dictValuesIter, argv, 1, nullptr);
+		}
+
+		static WObj* map_items(WObj** argv, int argc, WObj* kwargs, WContext* context) {
+			EXPECT_ARG_COUNT(1);
+			EXPECT_ARG_TYPE_MAP(0);
+			return WCall(context->builtins.dictItemsIter, argv, 1, nullptr);
+		}
+
 		static WObj* map_get(WObj** argv, int argc, WObj* kwargs, WContext* context) {
 			EXPECT_ARG_COUNT_BETWEEN(2, 3);
 			EXPECT_ARG_TYPE_MAP(0);
@@ -2485,6 +2513,68 @@ namespace wings {
 		static WObj* BaseException_str(WObj** argv, int argc, WObj* kwargs, WContext* context) {
 			EXPECT_ARG_COUNT(1);
 			return WGetAttribute(argv[0], "_message");
+		}
+
+		static WObj* DictKeysIter_next(WObj** argv, int argc, WObj* kwargs, WContext* context) {
+			EXPECT_ARG_COUNT(1);
+			void* data{};
+			if (!WTryGetUserdata(argv[0], "__DictKeysIter", &data)) {
+				WRaiseArgumentTypeError(context, 0, "__DictKeysIter");
+				return nullptr;
+			}
+			
+			auto& it = *(WDict::iterator*)data;
+			if (it == WDict::iterator{}) {
+				WRaiseStopIteration(context);
+				return nullptr;
+			}
+			
+			WObj* key = it->first;
+			++it;
+			return key;
+		}
+
+		static WObj* DictValuesIter_next(WObj** argv, int argc, WObj* kwargs, WContext* context) {
+			EXPECT_ARG_COUNT(1);
+			void* data{};
+			if (!WTryGetUserdata(argv[0], "__DictValuesIter", &data)) {
+				WRaiseArgumentTypeError(context, 0, "__DictValuesIter");
+				return nullptr;
+			}
+
+			auto& it = *(WDict::iterator*)data;
+			if (it == WDict::iterator{}) {
+				WRaiseStopIteration(context);
+				return nullptr;
+			}
+
+			WObj* value = it->second;
+			++it;
+			return value;
+		}
+
+		static WObj* DictItemsIter_next(WObj** argv, int argc, WObj* kwargs, WContext* context) {
+			EXPECT_ARG_COUNT(1);
+			void* data{};
+			if (!WTryGetUserdata(argv[0], "__DictItemsIter", &data)) {
+				WRaiseArgumentTypeError(context, 0, "__DictItemsIter");
+				return nullptr;
+			}
+
+			auto& it = *(WDict::iterator*)data;
+			if (it == WDict::iterator{}) {
+				WRaiseStopIteration(context);
+				return nullptr;
+			}
+
+			WObj* tup[2] = { it->first, it->second };
+			++it;
+			return WCreateTuple(context, tup, 2);
+		}
+		
+		static WObj* self(WObj** argv, int argc, WObj* kwargs, WContext* context) {
+			EXPECT_ARG_COUNT(1);
+			return argv[0];
 		}
 
 	} // namespace methods
@@ -2639,9 +2729,10 @@ namespace wings {
 				throw LibraryInitException();
 			};
 
-			auto createClass = [&](const char* name, WObj* base = nullptr) {
+			auto createClass = [&](const char* name, WObj* base = nullptr, bool assign = true) {
 				if (WObj* v = WCreateClass(context, name, &base, base ? 1 : 0)) {
-					WSetGlobal(context, name, v);
+					if (assign)
+						WSetGlobal(context, name, v);
 					return v;
 				}
 				throw LibraryInitException();
@@ -2919,14 +3010,15 @@ namespace wings {
 			RegisterMethod<methods::map_str>(context->builtins.dict, "__str__");
 			RegisterMethod<methods::map_contains>(context->builtins.dict, "__contains__");
 			RegisterMethod<methods::map_getitem>(context->builtins.dict, "__getitem__");
-			//RegisterMethod<methods::map_iter>(context->builtins.dict, "__iter__");
+			RegisterMethod<methods::map_iter>(context->builtins.dict, "__iter__");
 			RegisterMethod<methods::map_len>(context->builtins.dict, "__len__");
 			RegisterMethod<methods::map_setitem>(context->builtins.dict, "__setitem__");
 			RegisterMethod<methods::map_clear>(context->builtins.dict, "clear");
 			RegisterMethod<methods::map_copy>(context->builtins.dict, "copy");
 			RegisterMethod<methods::map_get>(context->builtins.dict, "get");
-			//RegisterMethod<methods::map_items>(context->builtins.dict, "items");
-			//RegisterMethod<methods::map_keys>(context->builtins.dict, "keys");
+			RegisterMethod<methods::map_iter>(context->builtins.dict, "keys");
+			RegisterMethod<methods::map_values>(context->builtins.dict, "values");
+			RegisterMethod<methods::map_items>(context->builtins.dict, "items");
 			RegisterMethod<methods::map_pop>(context->builtins.dict, "pop");
 			RegisterMethod<methods::map_popitem>(context->builtins.dict, "popitem");
 			//RegisterMethod<methods::map_setdefault>(context->builtins.dict, "setdefault");
@@ -2953,6 +3045,21 @@ namespace wings {
 			//RegisterMethod<methods::set_symmetric_difference>(context->builtins.set, "symmetric_difference");
 			//RegisterMethod<methods::set_union>(context->builtins.set, "union");
 			//RegisterMethod<methods::set_update>(context->builtins.set, "update");
+
+			context->builtins.dictKeysIter = createClass("__DictKeysIter", nullptr, false);
+			RegisterMethod<ctors::DictIter>(context->builtins.dictKeysIter, "__init__");
+			RegisterMethod<methods::DictKeysIter_next>(context->builtins.dictKeysIter, "__next__");
+			RegisterMethod<methods::self>(context->builtins.dictKeysIter, "__iter__");
+
+			context->builtins.dictValuesIter = createClass("__DictValuesIter", nullptr, false);
+			RegisterMethod<ctors::DictIter>(context->builtins.dictValuesIter, "__init__");
+			RegisterMethod<methods::DictValuesIter_next>(context->builtins.dictValuesIter, "__next__");
+			RegisterMethod<methods::self>(context->builtins.dictValuesIter, "__iter__");
+
+			context->builtins.dictItemsIter = createClass("__DictItemsIter", nullptr, false);
+			RegisterMethod<ctors::DictIter>(context->builtins.dictItemsIter, "__init__");
+			RegisterMethod<methods::DictItemsIter_next>(context->builtins.dictItemsIter, "__next__");
+			RegisterMethod<methods::self>(context->builtins.dictItemsIter, "__iter__");
 
 			// Add free functions
 			context->builtins.isinstance = RegisterFunction<lib::isinstance>(context, "isinstance");
