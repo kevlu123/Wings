@@ -657,9 +657,10 @@ namespace wings {
 			PushStack(WCreateBool(context, PopStack() != PopStack()));
 			break;
 		case Instruction::Type::ListComprehension: {
-			WObj* expr = stack[stack.size() - 3];
-			WObj* assign = stack[stack.size() - 2];
-			WObj* iterable = stack[stack.size() - 1];
+			WObj* expr = stack[stack.size() - 4];
+			WObj* assign = stack[stack.size() - 3];
+			WObj* iterable = stack[stack.size() - 2];
+			WObj* condition = stack[stack.size() - 1];
 
 			WObj* list = WCreateList(context);
 			if (list == nullptr) {
@@ -672,7 +673,8 @@ namespace wings {
 				WObj* expr;
 				WObj* assign;
 				WObj* list;
-			} state = { expr, assign, list };
+				WObj* condition;
+			} state = { expr, assign, list, condition };
 
 			bool success = WIterate(iterable, &state, [](WObj* value, void* userdata) {
 				State& state = *(State*)userdata;
@@ -680,15 +682,26 @@ namespace wings {
 				if (WCall(state.assign, &value, 1) == nullptr)
 					return false;
 
-				WObj* entry = WCall(state.expr, nullptr, 0);
-				if (entry == nullptr)
+				WObj* condition = WCall(state.condition, nullptr, 0);
+				if (condition == nullptr)
 					return false;
 
-				state.list->Get<std::vector<WObj*>>().push_back(entry);
+				condition = WConvertToBool(condition);
+				if (condition == nullptr)
+					return false;
+
+				if (WGetBool(condition)) {
+					WObj* entry = WCall(state.expr, nullptr, 0);
+					if (entry == nullptr)
+						return false;
+
+					state.list->Get<std::vector<WObj*>>().push_back(entry);
+				}
+
 				return true;
 				});
 
-			for (int i = 0; i < 3; i++)
+			for (int i = 0; i < 4; i++)
 				PopStack();
 
 			if (!success) {

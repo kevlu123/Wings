@@ -419,6 +419,7 @@ namespace wings {
 			out.operation = Operation::IfElse;
 
 			// Consume 'if'
+			TokenIter start = p;
 			++p;
 
 			// Consume condition
@@ -430,10 +431,10 @@ namespace wings {
 			}
 
 			// Consume 'else'
-			if (p.EndReached()) {
-				return CodeError::Bad("Expected 'else'", (--p)->srcPos);
-			} else if (p->text != "else") {
-				return CodeError::Bad("Expected 'else'", p->srcPos);
+			if (p.EndReached() || p->text != "else") {
+				p = start;
+				out = std::move(arg);
+				return CodeError::Good();
 			}
 			++p;
 
@@ -618,6 +619,21 @@ namespace wings {
 			return error;
 		}
 
+		Expression condition{};
+		if (p.EndReached()) {
+			return CodeError::Bad("Expected a ']'", (--p)->srcPos);
+		} else if (p->text == "if") {
+			++p;
+			if (auto error = ParseExpression(p, condition)) {
+				return error;
+			}
+		} else {
+			condition.srcPos = p->srcPos;
+			condition.operation = Operation::Literal;
+			condition.literalValue.type = LiteralValue::Type::Bool;
+			condition.literalValue.b = true;
+		}
+
 		if (p.EndReached()) {
 			return CodeError::Bad("Expected a ']'", (--p)->srcPos);
 		} else if (p->text != "]") {
@@ -659,10 +675,23 @@ namespace wings {
 		exprFn.def.name = "<lambda>";
 		exprFn.def.localCaptures = std::move(exprCaptures);
 		exprFn.def.body.push_back(std::move(exprRet));
+		
+		auto conditionCaptures = GetReferencedVariables(condition);
+		Statement conditionRet{};
+		conditionRet.srcPos = condition.srcPos;
+		conditionRet.type = Statement::Type::Return;
+		conditionRet.expr = std::move(condition);
+		Expression conditionFn{};
+		conditionFn.srcPos = condition.srcPos;
+		conditionFn.operation = Operation::Function;
+		conditionFn.def.name = "<lambda>";
+		conditionFn.def.localCaptures = std::move(conditionCaptures);
+		conditionFn.def.body.push_back(std::move(conditionRet));
 
 		out.children.push_back(std::move(exprFn));
 		out.children.push_back(std::move(assignFn));
 		out.children.push_back(std::move(iterable));
+		out.children.push_back(std::move(conditionFn));
 		return CodeError::Good();
 	}
 
