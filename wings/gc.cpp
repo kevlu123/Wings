@@ -52,6 +52,9 @@ extern "C" {
 			inUse.push_back(obj);
 		for (auto& var : context->globals)
 			inUse.push_back(*var.second);
+		for (Wg_Obj* obj : context->kwargs)
+			if (obj)
+				inUse.push_back(obj);
 		for (auto& obj : context->builtins.GetAll())
 			if (obj)
 				inUse.push_back(obj);
@@ -139,6 +142,7 @@ extern "C" {
 		WASSERT_VOID(parent && child);
 		parent->references.push_back(child);
 	}
+	
 	void Wg_UnlinkReference(Wg_Obj* parent, Wg_Obj* child) {
 		WASSERT_VOID(parent && child);
 		auto it = std::find(

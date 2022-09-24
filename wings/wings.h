@@ -9,7 +9,7 @@ struct Wg_Obj;
 typedef int64_t Wg_int;
 typedef double Wg_float;
 
-typedef Wg_Obj* (*Wg_Function)(Wg_Obj** args, int argc, Wg_Obj* kwargs, void* userdata);
+typedef Wg_Obj* (*Wg_Function)(Wg_Obj** args, int argc, void* userdata);
 typedef void (*Wg_Finalizer)(Wg_Obj* obj, void* userdata);
 typedef void (*Wg_PrintFunction)(const char* message, int len, void* userdata);
 typedef void (*Wg_ErrorCallback)(const char* message, void* userdata);
@@ -77,15 +77,15 @@ enum Wg_BinOp {
 };
 
 #if defined(_WIN32) && defined(_WINDLL)
-#define WDLL_EXPORT __declspec(dllexport)
+#define WG_DLL_EXPORT __declspec(dllexport)
 #else
-#define WDLL_EXPORT
+#define WG_DLL_EXPORT
 #endif
 
 #ifdef __cplusplus
-#define WDEFAULT_ARG(arg) = arg
+#define WG_DEFAULT_ARG(arg) = arg
 #else
-#define WDEFAULT_ARG(arg)
+#define WG_DEFAULT_ARG(arg)
 #endif
 
 #ifdef __cplusplus
@@ -103,14 +103,14 @@ extern "C" {
 *               or nullptr for the default configuration.
 * @return A newly created context.
 */
-WDLL_EXPORT Wg_Context* Wg_CreateContext(const Wg_Config* config WDEFAULT_ARG(nullptr));
+WG_DLL_EXPORT Wg_Context* Wg_CreateContext(const Wg_Config* config WG_DEFAULT_ARG(nullptr));
 
 /**
 * Free a context created with Wg_CreateContext().
 * 
 * @param context The context to free.
 */
-WDLL_EXPORT void Wg_DestroyContext(Wg_Context* context);
+WG_DLL_EXPORT void Wg_DestroyContext(Wg_Context* context);
 
 /**
 * Compile a script to a function object.
@@ -124,7 +124,7 @@ WDLL_EXPORT void Wg_DestroyContext(Wg_Context* context);
 *            in error messages relating to this script. This parameter may be nullptr.
 * @return A function object, or nullptr on failure. Call Wg_Call() to execute the function object.
 */
-WDLL_EXPORT Wg_Obj* Wg_Compile(Wg_Context* context, const char* code, const char* tag WDEFAULT_ARG(nullptr));
+WG_DLL_EXPORT Wg_Obj* Wg_Compile(Wg_Context* context, const char* code, const char* tag WG_DEFAULT_ARG(nullptr));
 
 /**
 * Set a function to be called when a programmer error occurs.
@@ -132,7 +132,7 @@ WDLL_EXPORT Wg_Obj* Wg_Compile(Wg_Context* context, const char* code, const char
 * @param callback The function to call or nullptr to use abort() instead.
 * @param userdata User data to pass to the callback.
 */
-WDLL_EXPORT void Wg_SetErrorCallback(Wg_ErrorCallback callback, void* userdata);
+WG_DLL_EXPORT void Wg_SetErrorCallback(Wg_ErrorCallback callback, void* userdata);
 
 /**
 * Get the current error string.
@@ -141,7 +141,7 @@ WDLL_EXPORT void Wg_SetErrorCallback(Wg_ErrorCallback callback, void* userdata);
 * @return The current error as a null terminated ASCII string.
 *         This string is owned by the function and should not be freed.
 */
-WDLL_EXPORT const char* Wg_GetErrorMessage(Wg_Context* context);
+WG_DLL_EXPORT const char* Wg_GetErrorMessage(Wg_Context* context);
 
 /**
 * Get the current exception object.
@@ -149,7 +149,7 @@ WDLL_EXPORT const char* Wg_GetErrorMessage(Wg_Context* context);
 * @param context The relevant context.
 * @return The current exception object, or nullptr if there is no exception.
 */
-WDLL_EXPORT Wg_Obj* Wg_GetCurrentException(Wg_Context* context);
+WG_DLL_EXPORT Wg_Obj* Wg_GetCurrentException(Wg_Context* context);
 
 /**
 * Create and raise an exception.
@@ -163,7 +163,7 @@ WDLL_EXPORT Wg_Obj* Wg_GetCurrentException(Wg_Context* context);
 * @param type A class object of the type of exception to be raised,
 *             or nullptr for Exception. The type must be a subclass of BaseException.
 */
-WDLL_EXPORT void Wg_RaiseException(Wg_Context* context, const char* message WDEFAULT_ARG(nullptr), Wg_Obj* type WDEFAULT_ARG(nullptr));
+WG_DLL_EXPORT void Wg_RaiseException(Wg_Context* context, const char* message WG_DEFAULT_ARG(nullptr), Wg_Obj* type WG_DEFAULT_ARG(nullptr));
 
 /**
 * Raise an existing exception object.
@@ -174,7 +174,7 @@ WDLL_EXPORT void Wg_RaiseException(Wg_Context* context, const char* message WDEF
 * @param context The relevant context.
 * @param type The exception object to raise. The type must be a subclass of BaseException.
 */
-WDLL_EXPORT void Wg_RaiseExceptionObject(Wg_Context* context, Wg_Obj* exception);
+WG_DLL_EXPORT void Wg_RaiseExceptionObject(Wg_Context* context, Wg_Obj* exception);
 
 /**
 * Raise a TypeError with a formatted message.
@@ -186,7 +186,7 @@ WDLL_EXPORT void Wg_RaiseExceptionObject(Wg_Context* context, Wg_Obj* exception)
 * @param given The number of arguments given.
 * @param expected The number of arguments expected, or -1 if this is not a fixed number.
 */
-WDLL_EXPORT void Wg_RaiseArgumentCountError(Wg_Context* context, int given, int expected);
+WG_DLL_EXPORT void Wg_RaiseArgumentCountError(Wg_Context* context, int given, int expected);
 
 /**
 * Raise a TypeError with a formatted message.
@@ -198,7 +198,7 @@ WDLL_EXPORT void Wg_RaiseArgumentCountError(Wg_Context* context, int given, int 
 * @param argIndex The parameter index of the invalid argument.
 * @param expected A null terminated ASCII string describing the expected type.
 */
-WDLL_EXPORT void Wg_RaiseArgumentTypeError(Wg_Context* context, int argIndex, const char* expected);
+WG_DLL_EXPORT void Wg_RaiseArgumentTypeError(Wg_Context* context, int argIndex, const char* expected);
 
 /**
 * Raise a AttributeError with a formatted message.
@@ -209,7 +209,7 @@ WDLL_EXPORT void Wg_RaiseArgumentTypeError(Wg_Context* context, int argIndex, co
 * @param obj The object that does not have the attribute.
 * @param attribute A null terminated ASCII string containing the attribute.
 */
-WDLL_EXPORT void Wg_RaiseAttributeError(const Wg_Obj* obj, const char* attribute);
+WG_DLL_EXPORT void Wg_RaiseAttributeError(const Wg_Obj* obj, const char* attribute);
 
 /**
 * Raise a ZeroDivisionError.
@@ -219,7 +219,7 @@ WDLL_EXPORT void Wg_RaiseAttributeError(const Wg_Obj* obj, const char* attribute
 *
 * @param context The relevant context.
 */
-WDLL_EXPORT void Wg_RaiseZeroDivisionError(Wg_Context* context);
+WG_DLL_EXPORT void Wg_RaiseZeroDivisionError(Wg_Context* context);
 
 /**
 * Raise a IndexError.
@@ -229,7 +229,7 @@ WDLL_EXPORT void Wg_RaiseZeroDivisionError(Wg_Context* context);
 *
 * @param context The relevant context.
 */
-WDLL_EXPORT void Wg_RaiseIndexError(Wg_Context* context);
+WG_DLL_EXPORT void Wg_RaiseIndexError(Wg_Context* context);
 
 /**
 * Raise a KeyError.
@@ -240,7 +240,7 @@ WDLL_EXPORT void Wg_RaiseIndexError(Wg_Context* context);
 * @param context The relevant context.
 * @param key The key that caused the KeyError, or nullptr to leave unspecified.
 */
-WDLL_EXPORT void Wg_RaiseKeyError(Wg_Context* context, Wg_Obj* key WDEFAULT_ARG(nullptr));
+WG_DLL_EXPORT void Wg_RaiseKeyError(Wg_Context* context, Wg_Obj* key WG_DEFAULT_ARG(nullptr));
 
 /**
 * Raise a StopIteration to terminate iteration.
@@ -250,7 +250,7 @@ WDLL_EXPORT void Wg_RaiseKeyError(Wg_Context* context, Wg_Obj* key WDEFAULT_ARG(
 *
 * @param context The relevant context.
 */
-WDLL_EXPORT void Wg_RaiseStopIteration(Wg_Context* context);
+WG_DLL_EXPORT void Wg_RaiseStopIteration(Wg_Context* context);
 
 /**
 * Raise a TypeError.
@@ -262,7 +262,7 @@ WDLL_EXPORT void Wg_RaiseStopIteration(Wg_Context* context);
 * @param message A null terminated ASCII string containing the exception message,
 *                or nullptr for an empty string.
 */
-WDLL_EXPORT void Wg_RaiseTypeError(Wg_Context* context, const char* message WDEFAULT_ARG(nullptr));
+WG_DLL_EXPORT void Wg_RaiseTypeError(Wg_Context* context, const char* message WG_DEFAULT_ARG(nullptr));
 
 /**
 * Raise a ValueError.
@@ -274,7 +274,7 @@ WDLL_EXPORT void Wg_RaiseTypeError(Wg_Context* context, const char* message WDEF
 * @param message A null terminated ASCII string containing the exception message,
 *                or nullptr for an empty string.
 */
-WDLL_EXPORT void Wg_RaiseValueError(Wg_Context* context, const char* message WDEFAULT_ARG(nullptr));
+WG_DLL_EXPORT void Wg_RaiseValueError(Wg_Context* context, const char* message WG_DEFAULT_ARG(nullptr));
 
 /**
 * Raise a NameError.
@@ -285,7 +285,7 @@ WDLL_EXPORT void Wg_RaiseValueError(Wg_Context* context, const char* message WDE
 * @param context The relevant context.
 * @param name A null terminated ASCII string containing the name that was not found.
 */
-WDLL_EXPORT void Wg_RaiseNameError(Wg_Context* context, const char* name);
+WG_DLL_EXPORT void Wg_RaiseNameError(Wg_Context* context, const char* name);
 
 /**
 * Check if an object's class derives from any of the specified classes.
@@ -297,14 +297,14 @@ WDLL_EXPORT void Wg_RaiseNameError(Wg_Context* context, const char* name);
 * @return The first subclass matched, or nullptr if the object's
 *         class does not derive from any of the specified classes.
 */
-WDLL_EXPORT Wg_Obj* Wg_IsInstance(const Wg_Obj* instance, Wg_Obj*const* types, int typesLen);
+WG_DLL_EXPORT Wg_Obj* Wg_IsInstance(const Wg_Obj* instance, Wg_Obj*const* types, int typesLen);
 
 /**
 * Clear the current exception.
 *
 * @param context The relevant context.
 */
-WDLL_EXPORT void Wg_ClearCurrentException(Wg_Context* context);
+WG_DLL_EXPORT void Wg_ClearCurrentException(Wg_Context* context);
 
 /**
 * Get the current configuration.
@@ -312,7 +312,7 @@ WDLL_EXPORT void Wg_ClearCurrentException(Wg_Context* context);
 * @param context The relevant context.
 * @param out A pointer to a Wg_Config struct to receive the configuration information.
 */
-WDLL_EXPORT void Wg_GetConfig(const Wg_Context* context, Wg_Config* out);
+WG_DLL_EXPORT void Wg_GetConfig(const Wg_Context* context, Wg_Config* out);
 
 /**
 * Set the current configuration.
@@ -320,7 +320,7 @@ WDLL_EXPORT void Wg_GetConfig(const Wg_Context* context, Wg_Config* out);
 * @param context The relevant context.
 * @param config The configuration information.
 */
-WDLL_EXPORT void Wg_SetConfig(Wg_Context* context, const Wg_Config* config);
+WG_DLL_EXPORT void Wg_SetConfig(Wg_Context* context, const Wg_Config* config);
 
 /**
 * Get a global variable.
@@ -330,7 +330,7 @@ WDLL_EXPORT void Wg_SetConfig(Wg_Context* context, const Wg_Config* config);
 *             global variable to retrieve.
 * @return The value of the global variable, or nullptr if it does not exist.
 */
-WDLL_EXPORT Wg_Obj* Wg_GetGlobal(Wg_Context* context, const char* name);
+WG_DLL_EXPORT Wg_Obj* Wg_GetGlobal(Wg_Context* context, const char* name);
 
 /**
 * Set a global variable.
@@ -340,7 +340,7 @@ WDLL_EXPORT Wg_Obj* Wg_GetGlobal(Wg_Context* context, const char* name);
 *        global variable to set.
 * @param value The value to set the global variable to.
 */
-WDLL_EXPORT void Wg_SetGlobal(Wg_Context* context, const char* name, Wg_Obj* value);
+WG_DLL_EXPORT void Wg_SetGlobal(Wg_Context* context, const char* name, Wg_Obj* value);
 
 /**
 * Delete a global variable.
@@ -355,7 +355,7 @@ WDLL_EXPORT void Wg_SetGlobal(Wg_Context* context, const char* name, Wg_Obj* val
 * @param name A null terminated ASCII string containing the name of the
 *        global variable to set.
 */
-WDLL_EXPORT void Wg_DeleteGlobal(Wg_Context* context, const char* name);
+WG_DLL_EXPORT void Wg_DeleteGlobal(Wg_Context* context, const char* name);
 
 /**
 * Print a message.
@@ -369,7 +369,7 @@ WDLL_EXPORT void Wg_DeleteGlobal(Wg_Context* context, const char* name);
 *                nullptr if len is 0.
 * @param len The length of the message byte array.
 */
-WDLL_EXPORT void Wg_Print(const Wg_Context* context, const char* message, int len);
+WG_DLL_EXPORT void Wg_Print(const Wg_Context* context, const char* message, int len);
 
 /**
 * Print a message.
@@ -381,14 +381,14 @@ WDLL_EXPORT void Wg_Print(const Wg_Context* context, const char* message, int le
 * @param context The relevant context.
 * @param message A pointer to a null terminated byte array containing the message.
 */
-WDLL_EXPORT void Wg_PrintString(const Wg_Context* context, const char* message);
+WG_DLL_EXPORT void Wg_PrintString(const Wg_Context* context, const char* message);
 
 /**
 * Run the garbage collector and free all unreachable objects.
 * 
 * @param context The relevant context.
 */
-WDLL_EXPORT void Wg_CollectGarbage(Wg_Context* context);
+WG_DLL_EXPORT void Wg_CollectGarbage(Wg_Context* context);
 
 /**
 * Protect an object from being garbage collected.
@@ -398,14 +398,14 @@ WDLL_EXPORT void Wg_CollectGarbage(Wg_Context* context);
 * 
 * @param obj the object to protect.
 */
-WDLL_EXPORT void Wg_ProtectObject(const Wg_Obj* obj);
+WG_DLL_EXPORT void Wg_ProtectObject(const Wg_Obj* obj);
 
 /**
 * Allow a object protected with Wg_ProtectObject() to be garbage collected again.
 *
 * @param obj the object to unprotect.
 */
-WDLL_EXPORT void Wg_UnprotectObject(const Wg_Obj* obj);
+WG_DLL_EXPORT void Wg_UnprotectObject(const Wg_Obj* obj);
 
 /**
 * Make a parent object reference a child object.
@@ -418,7 +418,7 @@ WDLL_EXPORT void Wg_UnprotectObject(const Wg_Obj* obj);
 * @param parent the parent object.
 * @param child the child object being.
 */
-WDLL_EXPORT void Wg_LinkReference(Wg_Obj* parent, Wg_Obj* child);
+WG_DLL_EXPORT void Wg_LinkReference(Wg_Obj* parent, Wg_Obj* child);
 
 /**
 * Remove a reference created with Wg_LinkReference().
@@ -426,7 +426,7 @@ WDLL_EXPORT void Wg_LinkReference(Wg_Obj* parent, Wg_Obj* child);
 * @param parent the parent object.
 * @param child the child object.
 */
-WDLL_EXPORT void Wg_UnlinkReference(Wg_Obj* parent, Wg_Obj* child);
+WG_DLL_EXPORT void Wg_UnlinkReference(Wg_Obj* parent, Wg_Obj* child);
 
 /**
 * Get the None singleton value.
@@ -438,7 +438,7 @@ WDLL_EXPORT void Wg_UnlinkReference(Wg_Obj* parent, Wg_Obj* child);
 * @param context The relevant context.
 * @return The None singleton value.
 */
-WDLL_EXPORT Wg_Obj* Wg_CreateNone(Wg_Context* context);
+WG_DLL_EXPORT Wg_Obj* Wg_CreateNone(Wg_Context* context);
 
 /**
 * Instantiate a boolean object.
@@ -451,7 +451,7 @@ WDLL_EXPORT Wg_Obj* Wg_CreateNone(Wg_Context* context);
 * @param value The value of the object.
 * @return The instantiated object.
 */
-WDLL_EXPORT Wg_Obj* Wg_CreateBool(Wg_Context* context, bool value WDEFAULT_ARG(false));
+WG_DLL_EXPORT Wg_Obj* Wg_CreateBool(Wg_Context* context, bool value WG_DEFAULT_ARG(false));
 
 /**
 * Instantiate an integer object.
@@ -463,7 +463,7 @@ WDLL_EXPORT Wg_Obj* Wg_CreateBool(Wg_Context* context, bool value WDEFAULT_ARG(f
 * @param value The value of the object.
 * @return The instantiated object, or nullptr on failure.
 */
-WDLL_EXPORT Wg_Obj* Wg_CreateInt(Wg_Context* context, Wg_int value WDEFAULT_ARG(0));
+WG_DLL_EXPORT Wg_Obj* Wg_CreateInt(Wg_Context* context, Wg_int value WG_DEFAULT_ARG(0));
 
 /**
 * Instantiate a float object.
@@ -475,7 +475,7 @@ WDLL_EXPORT Wg_Obj* Wg_CreateInt(Wg_Context* context, Wg_int value WDEFAULT_ARG(
 * @param value The value of the object.
 * @return The instantiated object, or nullptr on failure.
 */
-WDLL_EXPORT Wg_Obj* Wg_CreateFloat(Wg_Context* context, Wg_float value WDEFAULT_ARG(0));
+WG_DLL_EXPORT Wg_Obj* Wg_CreateFloat(Wg_Context* context, Wg_float value WG_DEFAULT_ARG(0));
 
 /**
 * Instantiate a string object.
@@ -487,7 +487,7 @@ WDLL_EXPORT Wg_Obj* Wg_CreateFloat(Wg_Context* context, Wg_float value WDEFAULT_
 * @param value A null terminated ASCII string, or nullptr for an empty string.
 * @return The instantiated object, or nullptr on failure.
 */
-WDLL_EXPORT Wg_Obj* Wg_CreateString(Wg_Context* context, const char* value WDEFAULT_ARG(nullptr));
+WG_DLL_EXPORT Wg_Obj* Wg_CreateString(Wg_Context* context, const char* value WG_DEFAULT_ARG(nullptr));
 
 /**
 * Instantiate a tuple object.
@@ -501,7 +501,7 @@ WDLL_EXPORT Wg_Obj* Wg_CreateString(Wg_Context* context, const char* value WDEFA
 * @param argc The number of objects to initialise the tuple with.
 * @return The instantiated object, or nullptr on failure.
 */
-WDLL_EXPORT Wg_Obj* Wg_CreateTuple(Wg_Context* context, Wg_Obj** argv, int argc);
+WG_DLL_EXPORT Wg_Obj* Wg_CreateTuple(Wg_Context* context, Wg_Obj** argv, int argc);
 
 /**
 * Instantiate a list object.
@@ -515,7 +515,7 @@ WDLL_EXPORT Wg_Obj* Wg_CreateTuple(Wg_Context* context, Wg_Obj** argv, int argc)
 * @param argc The number of objects to initialise the list with.
 * @return The instantiated object, or nullptr on failure.
 */
-WDLL_EXPORT Wg_Obj* Wg_CreateList(Wg_Context* context, Wg_Obj** argv WDEFAULT_ARG(nullptr), int argc WDEFAULT_ARG(0));
+WG_DLL_EXPORT Wg_Obj* Wg_CreateList(Wg_Context* context, Wg_Obj** argv WG_DEFAULT_ARG(nullptr), int argc WG_DEFAULT_ARG(0));
 
 /**
 * Instantiate a dictionary object.
@@ -531,7 +531,7 @@ WDLL_EXPORT Wg_Obj* Wg_CreateList(Wg_Context* context, Wg_Obj** argv WDEFAULT_AR
 * @param argc The number of key value pairs to initialise the dictionary with.
 * @return The instantiated object, or nullptr on failure.
 */
-WDLL_EXPORT Wg_Obj* Wg_CreateDictionary(Wg_Context* context, Wg_Obj** keys WDEFAULT_ARG(nullptr), Wg_Obj** values WDEFAULT_ARG(nullptr), int argc WDEFAULT_ARG(0));
+WG_DLL_EXPORT Wg_Obj* Wg_CreateDictionary(Wg_Context* context, Wg_Obj** keys WG_DEFAULT_ARG(nullptr), Wg_Obj** values WG_DEFAULT_ARG(nullptr), int argc WG_DEFAULT_ARG(0));
 
 /**
 * Instantiate a set object.
@@ -545,7 +545,7 @@ WDLL_EXPORT Wg_Obj* Wg_CreateDictionary(Wg_Context* context, Wg_Obj** keys WDEFA
 * @param argc The number of objects to initialise the set with.
 * @return The instantiated object, or nullptr on failure.
 */
-WDLL_EXPORT Wg_Obj* Wg_CreateSet(Wg_Context* context, Wg_Obj** argv WDEFAULT_ARG(nullptr), int argc WDEFAULT_ARG(0));
+WG_DLL_EXPORT Wg_Obj* Wg_CreateSet(Wg_Context* context, Wg_Obj** argv WG_DEFAULT_ARG(nullptr), int argc WG_DEFAULT_ARG(0));
 
 /**
 * Instantiate a function object.
@@ -557,7 +557,7 @@ WDLL_EXPORT Wg_Obj* Wg_CreateSet(Wg_Context* context, Wg_Obj** argv WDEFAULT_ARG
 * @param value A function description.
 * @return The instantiated object, or nullptr on failure.
 */
-WDLL_EXPORT Wg_Obj* Wg_CreateFunction(Wg_Context* context, const Wg_FuncDesc* value);
+WG_DLL_EXPORT Wg_Obj* Wg_CreateFunction(Wg_Context* context, const Wg_FuncDesc* value);
 
 /**
 * Instantiate a class object.
@@ -574,7 +574,7 @@ WDLL_EXPORT Wg_Obj* Wg_CreateFunction(Wg_Context* context, const Wg_FuncDesc* va
 * @param baseCount The length of the bases array.
 * @return The instantiated object, or nullptr on failure.
 */
-WDLL_EXPORT Wg_Obj* Wg_CreateClass(Wg_Context* context, const char* name, Wg_Obj** bases, int baseCount);
+WG_DLL_EXPORT Wg_Obj* Wg_CreateClass(Wg_Context* context, const char* name, Wg_Obj** bases, int baseCount);
 
 /**
 * Add an attribute to a class.
@@ -586,7 +586,7 @@ WDLL_EXPORT Wg_Obj* Wg_CreateClass(Wg_Context* context, const char* name, Wg_Obj
 * @param attribute A null terminated ASCII string containing the attribute name.
 * @param value The value of the attribute.
 */
-WDLL_EXPORT void Wg_AddAttributeToClass(Wg_Obj* class_, const char* attribute, Wg_Obj* value);
+WG_DLL_EXPORT void Wg_AddAttributeToClass(Wg_Obj* class_, const char* attribute, Wg_Obj* value);
 
 /**
 * Check if an object is None.
@@ -594,7 +594,7 @@ WDLL_EXPORT void Wg_AddAttributeToClass(Wg_Obj* class_, const char* attribute, W
 * @param obj The object to inspect.
 * @return True if the object is None, otherwise false.
 */
-WDLL_EXPORT bool Wg_IsNone(const Wg_Obj* obj);
+WG_DLL_EXPORT bool Wg_IsNone(const Wg_Obj* obj);
 
 /**
 * Check if an object is a boolean.
@@ -602,7 +602,7 @@ WDLL_EXPORT bool Wg_IsNone(const Wg_Obj* obj);
 * @param obj The object to inspect.
 * @return True if the object is a boolean, otherwise false.
 */
-WDLL_EXPORT bool Wg_IsBool(const Wg_Obj* obj);
+WG_DLL_EXPORT bool Wg_IsBool(const Wg_Obj* obj);
 
 /**
 * Check if an object is an integer.
@@ -610,7 +610,7 @@ WDLL_EXPORT bool Wg_IsBool(const Wg_Obj* obj);
 * @param obj The object to inspect.
 * @return True if the object is an integer, otherwise false.
 */
-WDLL_EXPORT bool Wg_IsInt(const Wg_Obj* obj);
+WG_DLL_EXPORT bool Wg_IsInt(const Wg_Obj* obj);
 
 /**
 * Check if an object is a float.
@@ -618,7 +618,7 @@ WDLL_EXPORT bool Wg_IsInt(const Wg_Obj* obj);
 * @param obj The object to inspect.
 * @return True if the object is an integer or float, otherwise false.
 */
-WDLL_EXPORT bool Wg_IsIntOrFloat(const Wg_Obj* obj);
+WG_DLL_EXPORT bool Wg_IsIntOrFloat(const Wg_Obj* obj);
 
 /**
 * Check if an object is a string.
@@ -626,7 +626,7 @@ WDLL_EXPORT bool Wg_IsIntOrFloat(const Wg_Obj* obj);
 * @param obj The object to inspect.
 * @return True if the object is a string, otherwise false.
 */
-WDLL_EXPORT bool Wg_IsString(const Wg_Obj* obj);
+WG_DLL_EXPORT bool Wg_IsString(const Wg_Obj* obj);
 
 /**
 * Check if an object is a tuple.
@@ -634,7 +634,7 @@ WDLL_EXPORT bool Wg_IsString(const Wg_Obj* obj);
 * @param obj The object to inspect.
 * @return True if the object is a tuple, otherwise false.
 */
-WDLL_EXPORT bool Wg_IsTuple(const Wg_Obj* obj);
+WG_DLL_EXPORT bool Wg_IsTuple(const Wg_Obj* obj);
 
 /**
 * Check if an object is a list.
@@ -642,7 +642,7 @@ WDLL_EXPORT bool Wg_IsTuple(const Wg_Obj* obj);
 * @param obj The object to inspect.
 * @return True if the object is a list, otherwise false.
 */
-WDLL_EXPORT bool Wg_IsList(const Wg_Obj* obj);
+WG_DLL_EXPORT bool Wg_IsList(const Wg_Obj* obj);
 
 /**
 * Check if an object is a dictionary.
@@ -650,7 +650,7 @@ WDLL_EXPORT bool Wg_IsList(const Wg_Obj* obj);
 * @param obj The object to inspect.
 * @return True if the object is a dictionary, otherwise false.
 */
-WDLL_EXPORT bool Wg_IsDictionary(const Wg_Obj* obj);
+WG_DLL_EXPORT bool Wg_IsDictionary(const Wg_Obj* obj);
 
 /**
 * Check if an object is a set.
@@ -658,7 +658,7 @@ WDLL_EXPORT bool Wg_IsDictionary(const Wg_Obj* obj);
 * @param obj The object to inspect.
 * @return True if the object is a set, otherwise false.
 */
-WDLL_EXPORT bool Wg_IsSet(const Wg_Obj* obj);
+WG_DLL_EXPORT bool Wg_IsSet(const Wg_Obj* obj);
 
 /**
 * Check if an object is a function.
@@ -666,7 +666,7 @@ WDLL_EXPORT bool Wg_IsSet(const Wg_Obj* obj);
 * @param obj The object to inspect.
 * @return True if the object is a function, otherwise false.
 */
-WDLL_EXPORT bool Wg_IsFunction(const Wg_Obj* obj);
+WG_DLL_EXPORT bool Wg_IsFunction(const Wg_Obj* obj);
 
 /**
 * Check if an object is a class.
@@ -674,7 +674,7 @@ WDLL_EXPORT bool Wg_IsFunction(const Wg_Obj* obj);
 * @param obj The object to inspect.
 * @return True if the object is a class, otherwise false.
 */
-WDLL_EXPORT bool Wg_IsClass(const Wg_Obj* obj);
+WG_DLL_EXPORT bool Wg_IsClass(const Wg_Obj* obj);
 
 /**
 * Get the value from a boolean object.
@@ -682,7 +682,7 @@ WDLL_EXPORT bool Wg_IsClass(const Wg_Obj* obj);
 * @param obj The object to get the value from.
 * @return The boolean value of the object.
 */
-WDLL_EXPORT bool Wg_GetBool(const Wg_Obj* obj);
+WG_DLL_EXPORT bool Wg_GetBool(const Wg_Obj* obj);
 
 /**
 * Get the value from an integer object.
@@ -690,7 +690,7 @@ WDLL_EXPORT bool Wg_GetBool(const Wg_Obj* obj);
 * @param obj The object to get the value from.
 * @return The integer value of the object.
 */
-WDLL_EXPORT Wg_int Wg_GetInt(const Wg_Obj* obj);
+WG_DLL_EXPORT Wg_int Wg_GetInt(const Wg_Obj* obj);
 
 /**
 * Get the float value from an integer or float object.
@@ -698,7 +698,7 @@ WDLL_EXPORT Wg_int Wg_GetInt(const Wg_Obj* obj);
 * @param obj The object to get the value from.
 * @return The float value of the object.
 */
-WDLL_EXPORT Wg_float Wg_GetFloat(const Wg_Obj* obj);
+WG_DLL_EXPORT Wg_float Wg_GetFloat(const Wg_Obj* obj);
 
 /**
 * Get the value from a string object.
@@ -707,7 +707,7 @@ WDLL_EXPORT Wg_float Wg_GetFloat(const Wg_Obj* obj);
 * @return The string value of the object. This string is
 *         owned by the function and should not be freed.
 */
-WDLL_EXPORT const char* Wg_GetString(const Wg_Obj* obj);
+WG_DLL_EXPORT const char* Wg_GetString(const Wg_Obj* obj);
 
 /**
 * Set the userdata for an object.
@@ -715,7 +715,7 @@ WDLL_EXPORT const char* Wg_GetString(const Wg_Obj* obj);
 * @param obj The object to set the userdata for.
 * @param userdata The userdata to set.
 */
-WDLL_EXPORT void Wg_SetUserdata(Wg_Obj* obj, void* userdata);
+WG_DLL_EXPORT void Wg_SetUserdata(Wg_Obj* obj, void* userdata);
 
 /**
 * Try to get the userdata from an object.
@@ -726,7 +726,7 @@ WDLL_EXPORT void Wg_SetUserdata(Wg_Obj* obj, void* userdata);
 * @param out A pointer to a void* to receive the userdata.
 * @return True if obj matches the type given, otherwise false.
 */
-WDLL_EXPORT bool Wg_TryGetUserdata(const Wg_Obj* obj, const char* type, void** out);
+WG_DLL_EXPORT bool Wg_TryGetUserdata(const Wg_Obj* obj, const char* type, void** out);
 
 /**
 * Get the finalizer of an object.
@@ -734,7 +734,7 @@ WDLL_EXPORT bool Wg_TryGetUserdata(const Wg_Obj* obj, const char* type, void** o
 * @param obj The object to get the finalizer from.
 * @param finalizer A finalizer description.
 */
-WDLL_EXPORT void Wg_GetFinalizer(const Wg_Obj* obj, Wg_FinalizerDesc* finalizer);
+WG_DLL_EXPORT void Wg_GetFinalizer(const Wg_Obj* obj, Wg_FinalizerDesc* finalizer);
 
 /**
 * Set the finalizer of an object.
@@ -745,7 +745,7 @@ WDLL_EXPORT void Wg_GetFinalizer(const Wg_Obj* obj, Wg_FinalizerDesc* finalizer)
 * @param obj The object to set the finalizer for.
 * @param finalizer The received finalizer description.
 */
-WDLL_EXPORT void Wg_SetFinalizer(Wg_Obj* obj, const Wg_FinalizerDesc* finalizer);
+WG_DLL_EXPORT void Wg_SetFinalizer(Wg_Obj* obj, const Wg_FinalizerDesc* finalizer);
 
 /**
 * Check if an object contains an attribute.
@@ -754,7 +754,7 @@ WDLL_EXPORT void Wg_SetFinalizer(Wg_Obj* obj, const Wg_FinalizerDesc* finalizer)
 * @param member A null terminated ASCII string containing the attribute name to get.
 * @return The attribute value, or nullptr if the attribute does not exist.
 */
-WDLL_EXPORT Wg_Obj* Wg_HasAttribute(Wg_Obj* obj, const char* member);
+WG_DLL_EXPORT Wg_Obj* Wg_HasAttribute(Wg_Obj* obj, const char* member);
 
 /**
 * Get an attribute of an object.
@@ -764,7 +764,7 @@ WDLL_EXPORT Wg_Obj* Wg_HasAttribute(Wg_Obj* obj, const char* member);
 * @param member A null terminated ASCII string containing the attribute name to get.
 * @return The attribute value, or nullptr if the attribute does not exist.
 */
-WDLL_EXPORT Wg_Obj* Wg_GetAttribute(Wg_Obj* obj, const char* member);
+WG_DLL_EXPORT Wg_Obj* Wg_GetAttribute(Wg_Obj* obj, const char* member);
 
 /**
 * Set an attribute of an object.
@@ -773,7 +773,7 @@ WDLL_EXPORT Wg_Obj* Wg_GetAttribute(Wg_Obj* obj, const char* member);
 * @param member A null terminated ASCII string containing the attribute name to set.
 * @param value The value to set the attribute to.
 */
-WDLL_EXPORT void Wg_SetAttribute(Wg_Obj* obj, const char* member, Wg_Obj* value);
+WG_DLL_EXPORT void Wg_SetAttribute(Wg_Obj* obj, const char* member, Wg_Obj* value);
 
 /**
 * Get an attribute from the base class of an object.
@@ -787,7 +787,7 @@ WDLL_EXPORT void Wg_SetAttribute(Wg_Obj* obj, const char* member, Wg_Obj* value)
 * @param baseClass The base class to search in, or nullptr to search in all bases.
 * @return The attribute value, or nullptr if the attribute does not exist.
 */
-WDLL_EXPORT Wg_Obj* Wg_GetAttributeFromBase(Wg_Obj* obj, const char* member, Wg_Obj* baseClass WDEFAULT_ARG(nullptr));
+WG_DLL_EXPORT Wg_Obj* Wg_GetAttributeFromBase(Wg_Obj* obj, const char* member, Wg_Obj* baseClass WG_DEFAULT_ARG(nullptr));
 
 /**
 * Iterate over an iterable object.
@@ -806,7 +806,7 @@ WDLL_EXPORT Wg_Obj* Wg_GetAttributeFromBase(Wg_Obj* obj, const char* member, Wg_
 *                 otherwise it should return false to signal an error and abort iteration.
 * @return true on success, or false on failure.
 */
-WDLL_EXPORT bool Wg_Iterate(Wg_Obj* obj, void* userdata, Wg_IterationCallback callback);
+WG_DLL_EXPORT bool Wg_Iterate(Wg_Obj* obj, void* userdata, Wg_IterationCallback callback);
 
 /**
 * Unpack an iterable object into an array of Wg_Obj*.
@@ -825,7 +825,17 @@ WDLL_EXPORT bool Wg_Iterate(Wg_Obj* obj, void* userdata, Wg_IterationCallback ca
 * @param count The length of the out array.
 * @return true on success, or false on failure.
 */
-WDLL_EXPORT bool Wg_Unpack(Wg_Obj* obj, Wg_Obj** out, int count);
+WG_DLL_EXPORT bool Wg_Unpack(Wg_Obj* obj, Wg_Obj** out, int count);
+
+/**
+* Get the keyword arguments dictionary passed to the current function.
+* 
+* Remarks:
+* Call Wg_GetCurrentException() or Wg_GetErrorMessage() to get error information.
+* 
+* @return The keywords arguments dictionary, or nullptr on failure.
+*/
+WG_DLL_EXPORT Wg_Obj* Wg_GetKwargs(Wg_Context* context);
 
 /**
 * Call a callable object.
@@ -845,7 +855,7 @@ WDLL_EXPORT bool Wg_Unpack(Wg_Obj* obj, Wg_Obj** out, int count);
 * @param kwargsDict A dictionary object containing the keyword arguments or nullptr if none.
 * @return The return value of the callable, or nullptr on failure.
 */
-WDLL_EXPORT Wg_Obj* Wg_Call(Wg_Obj* callable, Wg_Obj** argv, int argc, Wg_Obj* kwargsDict WDEFAULT_ARG(nullptr));
+WG_DLL_EXPORT Wg_Obj* Wg_Call(Wg_Obj* callable, Wg_Obj** argv, int argc, Wg_Obj* kwargsDict WG_DEFAULT_ARG(nullptr));
 
 /**
 * Call a method.
@@ -861,7 +871,7 @@ WDLL_EXPORT Wg_Obj* Wg_Call(Wg_Obj* callable, Wg_Obj** argv, int argc, Wg_Obj* k
 * @param kwargsDict A dictionary object containing the keyword arguments or nullptr if none.
 * @return The return value of the method, or nullptr on failure.
 */
-WDLL_EXPORT Wg_Obj* Wg_CallMethod(Wg_Obj* obj, const char* member, Wg_Obj** argv, int argc, Wg_Obj* kwargsDict WDEFAULT_ARG(nullptr));
+WG_DLL_EXPORT Wg_Obj* Wg_CallMethod(Wg_Obj* obj, const char* member, Wg_Obj** argv, int argc, Wg_Obj* kwargsDict WG_DEFAULT_ARG(nullptr));
 
 /**
 * Call a method from the base class.
@@ -879,7 +889,7 @@ WDLL_EXPORT Wg_Obj* Wg_CallMethod(Wg_Obj* obj, const char* member, Wg_Obj** argv
 * @param baseClass The base class to search in, or nullptr to search in all bases.
 * @return The return value of the method, or nullptr on failure.
 */
-WDLL_EXPORT Wg_Obj* Wg_CallMethodFromBase(Wg_Obj* obj, const char* member, Wg_Obj** argv, int argc, Wg_Obj* kwargsDict WDEFAULT_ARG(nullptr), Wg_Obj* baseClass WDEFAULT_ARG(nullptr));
+WG_DLL_EXPORT Wg_Obj* Wg_CallMethodFromBase(Wg_Obj* obj, const char* member, Wg_Obj** argv, int argc, Wg_Obj* kwargsDict WG_DEFAULT_ARG(nullptr), Wg_Obj* baseClass WG_DEFAULT_ARG(nullptr));
 
 /**
 * Get the values from a **kwargs parameter.
@@ -894,7 +904,7 @@ WDLL_EXPORT Wg_Obj* Wg_CallMethodFromBase(Wg_Obj* obj, const char* member, Wg_Ob
 * @param out The object at the specified index, or nullptr if it is not found.
 * @return False if an exception was raised due to an allocation failure, otherwise false.
 */
-WDLL_EXPORT bool Wg_ParseKwargs(Wg_Obj* kwargs, const char*const* keys, int count, Wg_Obj** out);
+WG_DLL_EXPORT bool Wg_ParseKwargs(Wg_Obj* kwargs, const char*const* keys, int count, Wg_Obj** out);
 
 /**
 * Get at an index of an object. i.e. obj[index]
@@ -907,7 +917,7 @@ WDLL_EXPORT bool Wg_ParseKwargs(Wg_Obj* kwargs, const char*const* keys, int coun
 * @param index The index to get at.
 * @return The object at the specified index, or nullptr on failure.
 */
-WDLL_EXPORT Wg_Obj* Wg_GetIndex(Wg_Obj* obj, Wg_Obj* index);
+WG_DLL_EXPORT Wg_Obj* Wg_GetIndex(Wg_Obj* obj, Wg_Obj* index);
 
 /**
 * Set at an index of an object i.e. obj[index] = value
@@ -920,7 +930,7 @@ WDLL_EXPORT Wg_Obj* Wg_GetIndex(Wg_Obj* obj, Wg_Obj* index);
 * @param value The value to set.
 * @return The new object at the specified index, or nullptr on failure.
 */
-WDLL_EXPORT Wg_Obj* Wg_SetIndex(Wg_Obj* obj, Wg_Obj* index, Wg_Obj* value);
+WG_DLL_EXPORT Wg_Obj* Wg_SetIndex(Wg_Obj* obj, Wg_Obj* index, Wg_Obj* value);
 
 /**
 * Call a unary operator on an object.
@@ -933,7 +943,7 @@ WDLL_EXPORT Wg_Obj* Wg_SetIndex(Wg_Obj* obj, Wg_Obj* index, Wg_Obj* value);
 * @param arg The object to call the operator on.
 * @return The result of the operation, or nullptr on failure.
 */
-WDLL_EXPORT Wg_Obj* Wg_UnaryOp(Wg_UnOp op, Wg_Obj* arg);
+WG_DLL_EXPORT Wg_Obj* Wg_UnaryOp(Wg_UnOp op, Wg_Obj* arg);
 
 /**
 * Call a binary operator on an object.
@@ -947,10 +957,10 @@ WDLL_EXPORT Wg_Obj* Wg_UnaryOp(Wg_UnOp op, Wg_Obj* arg);
 * @param arg The object to call the operator on.
 * @return The result of the operation, or nullptr on failure.
 */
-WDLL_EXPORT Wg_Obj* Wg_BinaryOp(Wg_BinOp op, Wg_Obj* lhs, Wg_Obj* rhs);
+WG_DLL_EXPORT Wg_Obj* Wg_BinaryOp(Wg_BinOp op, Wg_Obj* lhs, Wg_Obj* rhs);
 
-#undef WDEFAULT_ARG
-#undef WDLL_EXPORT
+#undef WG_DEFAULT_ARG
+#undef WG_DLL_EXPORT
 
 #ifdef __cplusplus
 } // extern "C"

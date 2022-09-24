@@ -3,9 +3,12 @@
 
 namespace wings {
 
-	Wg_Obj* DefObject::Run(Wg_Obj** args, int argc, Wg_Obj* kwargs, void* userdata) {
+	Wg_Obj* DefObject::Run(Wg_Obj** args, int argc, void* userdata) {
 		DefObject* def = (DefObject*)userdata;
 		Wg_Context* context = def->context;
+		Wg_Obj* kwargs = Wg_GetKwargs(context);
+		if (kwargs == nullptr)
+			return nullptr;
 
 		Executor executor{};
 		executor.def = def;

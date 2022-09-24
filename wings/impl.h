@@ -144,7 +144,7 @@ namespace wings {
 struct Wg_Obj {
 	struct Func {
 		Wg_Obj* self;
-		Wg_Obj* (*fptr)(Wg_Obj** args, int argc, Wg_Obj* kwargs, void* userdata);
+		Wg_Obj* (*fptr)(Wg_Obj** args, int argc, void* userdata);
 		void* userdata;
 		bool isMethod;
 		std::string tag;
@@ -153,7 +153,7 @@ struct Wg_Obj {
 
 	struct Class {
 		std::string name;
-		Wg_Obj* (*ctor)(Wg_Obj** args, int argc, Wg_Obj* kwargs, void* userdata);
+		Wg_Obj* (*ctor)(Wg_Obj** args, int argc, void* userdata);
 		void* userdata;
 		std::vector<Wg_Obj*> bases;
 		wings::AttributeTable instanceAttributes;
@@ -192,6 +192,7 @@ struct Wg_Context {
 	std::vector<wings::OwnedTraceFrame> exceptionTrace;
 	std::string traceMessage;
 	wings::Builtins builtins{};
+	std::vector<Wg_Obj*> kwargs;
 };
 
 #define STRINGIZE_HELPER(x) STRINGIZE2_HELPER(x)

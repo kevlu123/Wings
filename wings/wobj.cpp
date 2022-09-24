@@ -208,7 +208,7 @@ extern "C" {
 		tostr.isMethod = true;
 		tostr.prettyName = "__str__";
 		tostr.userdata = context;
-		tostr.fptr = [](Wg_Obj** argv, int argc, Wg_Obj* kwargs, void* ud) -> Wg_Obj* {
+		tostr.fptr = [](Wg_Obj** argv, int argc, void* ud) -> Wg_Obj* {
 			if (argc != 1) {
 				Wg_RaiseArgumentCountError((Wg_Context*)ud, argc, 1);
 				return nullptr;
@@ -224,7 +224,7 @@ extern "C" {
 
 		// Set construction function. This function forwards to __init__().
 		_class->Get<Wg_Obj::Class>().userdata = _class;
-		_class->Get<Wg_Obj::Class>().ctor = [](Wg_Obj** argv, int argc, Wg_Obj* kwargs, void* userdata) -> Wg_Obj* {
+		_class->Get<Wg_Obj::Class>().ctor = [](Wg_Obj** argv, int argc, void* userdata) -> Wg_Obj* {
 			Wg_Obj* _classObj = (Wg_Obj*)userdata;
 			Wg_Context* context = _classObj->context;
 
@@ -238,6 +238,10 @@ extern "C" {
 
 			if (Wg_Obj* init = Wg_HasAttribute(instance, "__init__")) {
 				if (Wg_IsFunction(init)) {
+					Wg_Obj* kwargs = Wg_GetKwargs(context);
+					if (kwargs == nullptr)
+						return nullptr;
+					
 					Wg_Obj* ret = Wg_Call(init, argv, argc, kwargs);
 					if (ret == nullptr) {
 						return nullptr;
@@ -257,7 +261,7 @@ extern "C" {
 		init.prettyName = initName.c_str();
 		init.isMethod = true;
 		init.userdata = _class;
-		init.fptr = [](Wg_Obj** argv, int argc, Wg_Obj* kwargs, void* userdata) -> Wg_Obj* {
+		init.fptr = [](Wg_Obj** argv, int argc, void* userdata) -> Wg_Obj* {
 			Wg_Obj* _class = (Wg_Obj*)userdata;
 			if (argc < 1) {
 				Wg_RaiseArgumentCountError(_class->context, argc, -1);
@@ -268,17 +272,22 @@ extern "C" {
 			if (bases.empty())
 				return nullptr;
 
+			Wg_Context* context = argv[0]->context;
 			if (Wg_Obj* baseInit = Wg_GetAttributeFromBase(argv[0], "__init__", bases[0])) {
+				Wg_Obj* kwargs = Wg_GetKwargs(context);
+				if (kwargs == nullptr)
+					return nullptr;
+				
 				Wg_Obj* ret = Wg_Call(baseInit, argv + 1, argc - 1, kwargs);
 				if (ret == nullptr) {
 					return nullptr;
 				} else if (!Wg_IsNone(ret)) {
-					Wg_RaiseTypeError(argv[0]->context, "__init__() returned a non NoneType type");
+					Wg_RaiseTypeError(context, "__init__() returned a non NoneType type");
 					return nullptr;
 				}
 			}
 
-			return Wg_CreateNone(argv[0]->context);
+			return Wg_CreateNone(context);
 		};
 		Wg_Obj* initFn = Wg_CreateFunction(context, &init);
 		if (initFn == nullptr)
@@ -530,26 +539,12 @@ extern "C" {
 		}
 	}
 
-	Wg_Obj* WConvertToBool(Wg_Obj* arg) {
-		WASSERT(arg);
-		return Wg_Call(arg->context->builtins._bool, &arg, 1);
-	}
-
-	Wg_Obj* WConvertToInt(Wg_Obj* arg) {
-		return Wg_Call(arg->context->builtins._int, &arg, 1);
-	}
-
-	Wg_Obj* WConvertToFloat(Wg_Obj* arg) {
-		return Wg_Call(arg->context->builtins._float, &arg, 1);
-	}
-
-	Wg_Obj* WConvertToString(Wg_Obj* arg) {
-		return Wg_Call(arg->context->builtins.str, &arg, 1);
-	}
-
-	Wg_Obj* WRepr(Wg_Obj* arg) {
-		WASSERT(arg);
-		return Wg_Call(arg->context->builtins.repr, &arg, 1);
+	Wg_Obj* Wg_GetKwargs(Wg_Context* context) {
+		WASSERT(context && !context->kwargs.empty());
+		if (context->kwargs.back() == nullptr) {
+			context->kwargs.back() = Wg_CreateDictionary(context);
+		}
+		return context->kwargs.back();
 	}
 
 	Wg_Obj* Wg_Call(Wg_Obj* callable, Wg_Obj** argv, int argc, Wg_Obj* kwargsDict) {
@@ -578,7 +573,7 @@ extern "C" {
 			for (int i = 0; i < argc; i++)
 				refs.emplace_back(argv[i]);
 
-			Wg_Obj* (*fptr)(Wg_Obj**, int, Wg_Obj*, void*);
+			Wg_Obj* (*fptr)(Wg_Obj**, int, void*);
 			void* userdata = nullptr;
 			Wg_Obj* self = nullptr;
 			std::string prettyName;
@@ -609,15 +604,9 @@ extern "C" {
 			}
 			argsWithSelf.insert(argsWithSelf.end(), argv, argv + argc);
 
-			// If the dictionary (map) class doesn't exist yet then skip this
-			if (kwargsDict == nullptr && callable != callable->context->builtins.dict && callable->context->builtins.dict) {
-				kwargsDict = Wg_CreateDictionary(callable->context);
-				if (kwargsDict == nullptr)
-					return nullptr;
-			}
-			refs.emplace_back(kwargsDict);
-
-			Wg_Obj* ret = fptr(argsWithSelf.data(), (int)argsWithSelf.size(), kwargsDict, userdata);
+			callable->context->kwargs.push_back(kwargsDict);
+			Wg_Obj* ret = fptr(argsWithSelf.data(), (int)argsWithSelf.size(), userdata);
+			callable->context->kwargs.pop_back();
 
 			if (Wg_IsFunction(callable)) {
 				callable->context->currentTrace.pop_back();

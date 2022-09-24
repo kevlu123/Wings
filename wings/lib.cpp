@@ -374,14 +374,14 @@ namespace wings {
 
 	namespace ctors {
 
-		static Wg_Obj* object(Wg_Obj** argv, int argc, Wg_Obj* kwargs, Wg_Context* context) {
+		static Wg_Obj* object(Wg_Obj** argv, int argc, Wg_Context* context) {
 			EXPECT_ARG_COUNT(1);
 			argv[0]->attributes = context->builtins.object->Get<Wg_Obj::Class>().instanceAttributes.Copy();
 			argv[0]->type = "__object";
 			return Wg_CreateNone(context);
 		}
 
-		static Wg_Obj* _bool(Wg_Obj** argv, int argc, Wg_Obj* kwargs, void* ud) {
+		static Wg_Obj* _bool(Wg_Obj** argv, int argc, void* ud) {
 			Wg_Context* context = (Wg_Context*)ud;
 			EXPECT_ARG_COUNT_BETWEEN(0, 1); // Called without self
 
@@ -399,7 +399,7 @@ namespace wings {
 			return context->builtins._false;
 		}
 
-		static Wg_Obj* _int(Wg_Obj** argv, int argc, Wg_Obj* kwargs, Wg_Context* context) {
+		static Wg_Obj* _int(Wg_Obj** argv, int argc, Wg_Context* context) {
 			EXPECT_ARG_COUNT_BETWEEN(1, 3);
 
 			Wg_int v = 0;
@@ -422,7 +422,7 @@ namespace wings {
 			return Wg_CreateNone(context);
 		}
 
-		static Wg_Obj* _float(Wg_Obj** argv, int argc, Wg_Obj* kwargs, Wg_Context* context) {
+		static Wg_Obj* _float(Wg_Obj** argv, int argc, Wg_Context* context) {
 			EXPECT_ARG_COUNT_BETWEEN(1, 2);
 
 			Wg_float v = 0;
@@ -445,7 +445,7 @@ namespace wings {
 			return Wg_CreateNone(context);
 		}
 
-		static Wg_Obj* str(Wg_Obj** argv, int argc, Wg_Obj* kwargs, Wg_Context* context) {
+		static Wg_Obj* str(Wg_Obj** argv, int argc, Wg_Context* context) {
 			EXPECT_ARG_COUNT_BETWEEN(1, 2);
 
 			const char* v = "";
@@ -468,7 +468,7 @@ namespace wings {
 		}
 
 		template <Collection collection_t>
-		static Wg_Obj* collection(Wg_Obj** argv, int argc, Wg_Obj* kwargs, Wg_Context* context) {
+		static Wg_Obj* collection(Wg_Obj** argv, int argc, Wg_Context* context) {
 			EXPECT_ARG_COUNT_BETWEEN(1, 2);
 
 			struct State {
@@ -500,7 +500,7 @@ namespace wings {
 			return Wg_CreateNone(context);
 		}
 
-		static Wg_Obj* map(Wg_Obj** argv, int argc, Wg_Obj* kwargs, Wg_Context* context) {
+		static Wg_Obj* map(Wg_Obj** argv, int argc, Wg_Context* context) {
 			EXPECT_ARG_COUNT_BETWEEN(1, 2);
 
 			argv[0]->attributes = context->builtins.dict->Get<Wg_Obj::Class>().instanceAttributes.Copy();
@@ -511,7 +511,7 @@ namespace wings {
 			return Wg_CreateNone(context);
 		}
 
-		static Wg_Obj* set(Wg_Obj** argv, int argc, Wg_Obj* kwargs, Wg_Context* context) {
+		static Wg_Obj* set(Wg_Obj** argv, int argc, Wg_Context* context) {
 			EXPECT_ARG_COUNT(1);
 
 			argv[0]->attributes = context->builtins.set->Get<Wg_Obj::Class>().instanceAttributes.Copy();
@@ -522,7 +522,7 @@ namespace wings {
 			return Wg_CreateNone(context);
 		}
 
-		static Wg_Obj* func(Wg_Obj** argv, int argc, Wg_Obj* kwargs, void* ud) {
+		static Wg_Obj* func(Wg_Obj** argv, int argc, void* ud) {
 			// Not callable from user code
 
 			//argv[0]->attributes = ((Wg_Context*)ud)->builtins.func->Get<Wg_Obj::Class>().instanceAttributes.Copy();
@@ -534,7 +534,7 @@ namespace wings {
 			//return Wg_CreateNone(context);
 		}
 
-		static Wg_Obj* BaseException(Wg_Obj** argv, int argc, Wg_Obj* kwargs, Wg_Context* context) {
+		static Wg_Obj* BaseException(Wg_Obj** argv, int argc, Wg_Context* context) {
 			EXPECT_ARG_COUNT_BETWEEN(1, 2);
 			if (argc == 2) {
 				Wg_SetAttribute(argv[0], "_message", argv[1]);
@@ -547,7 +547,7 @@ namespace wings {
 			}
 		}
 
-		static Wg_Obj* DictIter(Wg_Obj** argv, int argc, Wg_Obj* kwargs, Wg_Context* context) {
+		static Wg_Obj* DictIter(Wg_Obj** argv, int argc, Wg_Context* context) {
 			EXPECT_ARG_COUNT(2);
 			EXPECT_ARG_TYPE_MAP(1);
 			auto* it = new WDict::iterator(argv[1]->Get<WDict>().begin());
@@ -561,33 +561,33 @@ namespace wings {
 
 	namespace methods {
 
-		static Wg_Obj* object_pos(Wg_Obj** argv, int argc, Wg_Obj* kwargs, Wg_Context* context) {
+		static Wg_Obj* object_pos(Wg_Obj** argv, int argc, Wg_Context* context) {
 			EXPECT_ARG_COUNT(1);
 			return argv[0];
 		}
 
-		static Wg_Obj* object_str(Wg_Obj** argv, int argc, Wg_Obj* kwargs, Wg_Context* context) {
+		static Wg_Obj* object_str(Wg_Obj** argv, int argc, Wg_Context* context) {
 			EXPECT_ARG_COUNT(1);
 			std::string s = "<" + WObjTypeToString(argv[0]) + " object at 0x" + PtrToString(argv[0]) + ">";
 			return Wg_CreateString(context, s.c_str());
 		}
 
-		static Wg_Obj* object_nonzero(Wg_Obj** argv, int argc, Wg_Obj* kwargs, Wg_Context* context) {
+		static Wg_Obj* object_nonzero(Wg_Obj** argv, int argc, Wg_Context* context) {
 			EXPECT_ARG_COUNT(1);
 			return Wg_CreateBool(context, true);
 		}
 
-		static Wg_Obj* object_repr(Wg_Obj** argv, int argc, Wg_Obj* kwargs, Wg_Context* context) {
+		static Wg_Obj* object_repr(Wg_Obj** argv, int argc, Wg_Context* context) {
 			EXPECT_ARG_COUNT(1);
 			return Wg_UnaryOp(WG_UOP_STR, argv[0]);
 		}
 
-		static Wg_Obj* object_eq(Wg_Obj** argv, int argc, Wg_Obj* kwargs, Wg_Context* context) {
+		static Wg_Obj* object_eq(Wg_Obj** argv, int argc, Wg_Context* context) {
 			EXPECT_ARG_COUNT(2);
 			return Wg_CreateBool(context, argv[0] == argv[1]);
 		}
 
-		static Wg_Obj* object_ne(Wg_Obj** argv, int argc, Wg_Obj* kwargs, Wg_Context* context) {
+		static Wg_Obj* object_ne(Wg_Obj** argv, int argc, Wg_Context* context) {
 			EXPECT_ARG_COUNT(2);
 			Wg_Obj* eq = Wg_BinaryOp(WG_BOP_EQ, argv[0], argv[1]);
 			if (eq == nullptr)
@@ -595,7 +595,7 @@ namespace wings {
 			return Wg_CreateBool(context, !Wg_GetBool(eq));
 		}
 
-		static Wg_Obj* object_le(Wg_Obj** argv, int argc, Wg_Obj* kwargs, Wg_Context* context) {
+		static Wg_Obj* object_le(Wg_Obj** argv, int argc, Wg_Context* context) {
 			EXPECT_ARG_COUNT(2);
 			Wg_Obj* lt = Wg_BinaryOp(WG_BOP_LT, argv[0], argv[1]);
 			if (lt == nullptr)
@@ -605,7 +605,7 @@ namespace wings {
 			return Wg_BinaryOp(WG_BOP_EQ, argv[0], argv[1]);
 		}
 
-		static Wg_Obj* object_ge(Wg_Obj** argv, int argc, Wg_Obj* kwargs, Wg_Context* context) {
+		static Wg_Obj* object_ge(Wg_Obj** argv, int argc, Wg_Context* context) {
 			EXPECT_ARG_COUNT(2);
 			Wg_Obj* lt = Wg_BinaryOp(WG_BOP_LT, argv[0], argv[1]);
 			if (lt == nullptr)
@@ -613,7 +613,7 @@ namespace wings {
 			return Wg_CreateBool(context, !Wg_GetBool(lt));
 		}
 
-		static Wg_Obj* object_gt(Wg_Obj** argv, int argc, Wg_Obj* kwargs, Wg_Context* context) {
+		static Wg_Obj* object_gt(Wg_Obj** argv, int argc, Wg_Context* context) {
 			EXPECT_ARG_COUNT(2);
 			Wg_Obj* lt = Wg_BinaryOp(WG_BOP_LT, argv[0], argv[1]);
 			if (lt == nullptr)
@@ -627,194 +627,194 @@ namespace wings {
 			return Wg_CreateBool(context, !Wg_GetBool(eq));
 		}
 
-		static Wg_Obj* object_hash(Wg_Obj** argv, int argc, Wg_Obj* kwargs, Wg_Context* context) {
+		static Wg_Obj* object_hash(Wg_Obj** argv, int argc, Wg_Context* context) {
 			EXPECT_ARG_COUNT(1);
 			Wg_int hash = (Wg_int)std::hash<Wg_Obj*>()(argv[0]);
 			return Wg_CreateInt(context, hash);
 		}
 
-		static Wg_Obj* object_iadd(Wg_Obj** argv, int argc, Wg_Obj* kwargs, Wg_Context* context) {
+		static Wg_Obj* object_iadd(Wg_Obj** argv, int argc, Wg_Context* context) {
 			EXPECT_ARG_COUNT(2);
 			return Wg_CallMethod(argv[0], "__add__", &argv[1], 1);
 		}
 
-		static Wg_Obj* object_isub(Wg_Obj** argv, int argc, Wg_Obj* kwargs, Wg_Context* context) {
+		static Wg_Obj* object_isub(Wg_Obj** argv, int argc, Wg_Context* context) {
 			EXPECT_ARG_COUNT(2);
 			return Wg_CallMethod(argv[0], "__sub__", &argv[1], 1);
 		}
 
-		static Wg_Obj* object_imul(Wg_Obj** argv, int argc, Wg_Obj* kwargs, Wg_Context* context) {
+		static Wg_Obj* object_imul(Wg_Obj** argv, int argc, Wg_Context* context) {
 			EXPECT_ARG_COUNT(2);
 			return Wg_CallMethod(argv[0], "__mul__", &argv[1], 1);
 		}
 
-		static Wg_Obj* object_itruediv(Wg_Obj** argv, int argc, Wg_Obj* kwargs, Wg_Context* context) {
+		static Wg_Obj* object_itruediv(Wg_Obj** argv, int argc, Wg_Context* context) {
 			EXPECT_ARG_COUNT(2);
 			return Wg_CallMethod(argv[0], "__truediv__", &argv[1], 1);
 		}
 
-		static Wg_Obj* object_ifloordiv(Wg_Obj** argv, int argc, Wg_Obj* kwargs, Wg_Context* context) {
+		static Wg_Obj* object_ifloordiv(Wg_Obj** argv, int argc, Wg_Context* context) {
 			EXPECT_ARG_COUNT(2);
 			return Wg_CallMethod(argv[0], "__floordiv__", &argv[1], 1);
 		}
 
-		static Wg_Obj* object_imod(Wg_Obj** argv, int argc, Wg_Obj* kwargs, Wg_Context* context) {
+		static Wg_Obj* object_imod(Wg_Obj** argv, int argc, Wg_Context* context) {
 			EXPECT_ARG_COUNT(2);
 			return Wg_CallMethod(argv[0], "__mod__", &argv[1], 1);
 		}
 
-		static Wg_Obj* object_ipow(Wg_Obj** argv, int argc, Wg_Obj* kwargs, Wg_Context* context) {
+		static Wg_Obj* object_ipow(Wg_Obj** argv, int argc, Wg_Context* context) {
 			EXPECT_ARG_COUNT(2);
 			return Wg_CallMethod(argv[0], "__pow__", &argv[1], 1);
 		}
 
-		static Wg_Obj* object_iand(Wg_Obj** argv, int argc, Wg_Obj* kwargs, Wg_Context* context) {
+		static Wg_Obj* object_iand(Wg_Obj** argv, int argc, Wg_Context* context) {
 			EXPECT_ARG_COUNT(2);
 			return Wg_CallMethod(argv[0], "__and__", &argv[1], 1);
 		}
 
-		static Wg_Obj* object_ior(Wg_Obj** argv, int argc, Wg_Obj* kwargs, Wg_Context* context) {
+		static Wg_Obj* object_ior(Wg_Obj** argv, int argc, Wg_Context* context) {
 			EXPECT_ARG_COUNT(2);
 			return Wg_CallMethod(argv[0], "__or__", &argv[1], 1);
 		}
 
-		static Wg_Obj* object_ixor(Wg_Obj** argv, int argc, Wg_Obj* kwargs, Wg_Context* context) {
+		static Wg_Obj* object_ixor(Wg_Obj** argv, int argc, Wg_Context* context) {
 			EXPECT_ARG_COUNT(2);
 			return Wg_CallMethod(argv[0], "__xor__", &argv[1], 1);
 		}
 
-		static Wg_Obj* object_ilshift(Wg_Obj** argv, int argc, Wg_Obj* kwargs, Wg_Context* context) {
+		static Wg_Obj* object_ilshift(Wg_Obj** argv, int argc, Wg_Context* context) {
 			EXPECT_ARG_COUNT(2);
 			return Wg_CallMethod(argv[0], "__lshift__", &argv[1], 1);
 		}
 
-		static Wg_Obj* object_irshift(Wg_Obj** argv, int argc, Wg_Obj* kwargs, Wg_Context* context) {
+		static Wg_Obj* object_irshift(Wg_Obj** argv, int argc, Wg_Context* context) {
 			EXPECT_ARG_COUNT(2);
 			return Wg_CallMethod(argv[0], "__rshift__", &argv[1], 1);
 		}
 
-		static Wg_Obj* object_iter(Wg_Obj** argv, int argc, Wg_Obj* kwargs, Wg_Context* context) {
+		static Wg_Obj* object_iter(Wg_Obj** argv, int argc, Wg_Context* context) {
 			EXPECT_ARG_COUNT(1);
 			return Wg_Call(context->builtins.defaultIter, argv, 1);
 		}
 
-		static Wg_Obj* object_reversed(Wg_Obj** argv, int argc, Wg_Obj* kwargs, Wg_Context* context) {
+		static Wg_Obj* object_reversed(Wg_Obj** argv, int argc, Wg_Context* context) {
 			EXPECT_ARG_COUNT(1);
 			return Wg_Call(context->builtins.defaultReverseIter, argv, 1);
 		}
 
-		static Wg_Obj* null_nonzero(Wg_Obj** argv, int argc, Wg_Obj* kwargs, Wg_Context* context) {
+		static Wg_Obj* null_nonzero(Wg_Obj** argv, int argc, Wg_Context* context) {
 			EXPECT_ARG_COUNT(1);
 			EXPECT_ARG_TYPE_NULL(0);
 			return Wg_CreateNone(context);
 		}
 
-		static Wg_Obj* null_str(Wg_Obj** argv, int argc, Wg_Obj* kwargs, Wg_Context* context) {
+		static Wg_Obj* null_str(Wg_Obj** argv, int argc, Wg_Context* context) {
 			EXPECT_ARG_COUNT(1);
 			EXPECT_ARG_TYPE_NULL(0);
 			return Wg_CreateString(context, "None");
 		}
 
-		static Wg_Obj* bool_nonzero(Wg_Obj** argv, int argc, Wg_Obj* kwargs, Wg_Context* context) {
+		static Wg_Obj* bool_nonzero(Wg_Obj** argv, int argc, Wg_Context* context) {
 			EXPECT_ARG_COUNT(1);
 			EXPECT_ARG_TYPE_BOOL(0);
 			return argv[0];
 		}
 
-		static Wg_Obj* bool_int(Wg_Obj** argv, int argc, Wg_Obj* kwargs, Wg_Context* context) {
+		static Wg_Obj* bool_int(Wg_Obj** argv, int argc, Wg_Context* context) {
 			EXPECT_ARG_COUNT(1);
 			EXPECT_ARG_TYPE_BOOL(0);
 			return Wg_CreateInt(context, Wg_GetBool(argv[0]) ? 1 : 0);
 		}
 
-		static Wg_Obj* bool_float(Wg_Obj** argv, int argc, Wg_Obj* kwargs, Wg_Context* context) {
+		static Wg_Obj* bool_float(Wg_Obj** argv, int argc, Wg_Context* context) {
 			EXPECT_ARG_COUNT(1);
 			EXPECT_ARG_TYPE_BOOL(0);
 			return Wg_CreateFloat(context, Wg_GetBool(argv[0]) ? (Wg_float)1 : (Wg_float)0);
 		}
 
-		static Wg_Obj* bool_str(Wg_Obj** argv, int argc, Wg_Obj* kwargs, Wg_Context* context) {
+		static Wg_Obj* bool_str(Wg_Obj** argv, int argc, Wg_Context* context) {
 			EXPECT_ARG_COUNT(1);
 			EXPECT_ARG_TYPE_BOOL(0);
 			return Wg_CreateString(context, Wg_GetBool(argv[0]) ? "True" : "False");
 		}
 
-		static Wg_Obj* bool_eq(Wg_Obj** argv, int argc, Wg_Obj* kwargs, Wg_Context* context) {
+		static Wg_Obj* bool_eq(Wg_Obj** argv, int argc, Wg_Context* context) {
 			EXPECT_ARG_COUNT(2);
 			EXPECT_ARG_TYPE_BOOL(0);
 			return Wg_CreateBool(context, Wg_IsBool(argv[1]) && Wg_GetBool(argv[0]) == Wg_GetBool(argv[1]));
 		}
 
-		static Wg_Obj* bool_hash(Wg_Obj** argv, int argc, Wg_Obj* kwargs, Wg_Context* context) {
+		static Wg_Obj* bool_hash(Wg_Obj** argv, int argc, Wg_Context* context) {
 			EXPECT_ARG_COUNT(1);
 			EXPECT_ARG_TYPE_BOOL(0);
 			Wg_int hash = (Wg_int)std::hash<bool>()(Wg_GetBool(argv[0]));
 			return Wg_CreateInt(context, hash);
 		}
 
-		static Wg_Obj* bool_abs(Wg_Obj** argv, int argc, Wg_Obj* kwargs, Wg_Context* context) {
+		static Wg_Obj* bool_abs(Wg_Obj** argv, int argc, Wg_Context* context) {
 			EXPECT_ARG_COUNT(1);
 			EXPECT_ARG_TYPE_BOOL(0);
 			return Wg_CreateInt(context, Wg_GetBool(argv[0]) ? 1 : 0);
 		}
 
-		static Wg_Obj* int_nonzero(Wg_Obj** argv, int argc, Wg_Obj* kwargs, Wg_Context* context) {
+		static Wg_Obj* int_nonzero(Wg_Obj** argv, int argc, Wg_Context* context) {
 			EXPECT_ARG_COUNT(1);
 			EXPECT_ARG_TYPE_INT(0);
 			return Wg_CreateBool(context, Wg_GetInt(argv[0]) != 0);
 		}
 
-		static Wg_Obj* int_int(Wg_Obj** argv, int argc, Wg_Obj* kwargs, Wg_Context* context) {
+		static Wg_Obj* int_int(Wg_Obj** argv, int argc, Wg_Context* context) {
 			EXPECT_ARG_COUNT(1);
 			EXPECT_ARG_TYPE_INT(0);
 			return argv[0];
 		}
 
-		static Wg_Obj* int_float(Wg_Obj** argv, int argc, Wg_Obj* kwargs, Wg_Context* context) {
+		static Wg_Obj* int_float(Wg_Obj** argv, int argc, Wg_Context* context) {
 			EXPECT_ARG_COUNT(1);
 			EXPECT_ARG_TYPE_INT(0);
 			return Wg_CreateFloat(context, Wg_GetFloat(argv[0]));
 		}
 
-		static Wg_Obj* int_str(Wg_Obj** argv, int argc, Wg_Obj* kwargs, Wg_Context* context) {
+		static Wg_Obj* int_str(Wg_Obj** argv, int argc, Wg_Context* context) {
 			EXPECT_ARG_COUNT(1);
 			EXPECT_ARG_TYPE_INT(0);
 			return Wg_CreateString(context, std::to_string(argv[0]->Get<Wg_int>()).c_str());
 		}
 
-		static Wg_Obj* int_eq(Wg_Obj** argv, int argc, Wg_Obj* kwargs, Wg_Context* context) {
+		static Wg_Obj* int_eq(Wg_Obj** argv, int argc, Wg_Context* context) {
 			EXPECT_ARG_COUNT(2);
 			EXPECT_ARG_TYPE_INT(0);
 			return Wg_CreateBool(context, Wg_IsInt(argv[1]) && Wg_GetInt(argv[0]) == Wg_GetInt(argv[1]));
 		}
 
-		static Wg_Obj* int_lt(Wg_Obj** argv, int argc, Wg_Obj* kwargs, Wg_Context* context) {
+		static Wg_Obj* int_lt(Wg_Obj** argv, int argc, Wg_Context* context) {
 			EXPECT_ARG_COUNT(2);
 			EXPECT_ARG_TYPE_INT(0);
 			EXPECT_ARG_TYPE_INT_OR_FLOAT(1);
 			return Wg_CreateBool(context, Wg_GetFloat(argv[0]) < Wg_GetFloat(argv[1]));
 		}
 
-		static Wg_Obj* int_hash(Wg_Obj** argv, int argc, Wg_Obj* kwargs, Wg_Context* context) {
+		static Wg_Obj* int_hash(Wg_Obj** argv, int argc, Wg_Context* context) {
 			EXPECT_ARG_COUNT(1);
 			EXPECT_ARG_TYPE_INT(0);
 			Wg_int hash = (Wg_int)std::hash<Wg_int>()(Wg_GetInt(argv[0]));
 			return Wg_CreateInt(context, hash);
 		}
 
-		static Wg_Obj* int_abs(Wg_Obj** argv, int argc, Wg_Obj* kwargs, Wg_Context* context) {
+		static Wg_Obj* int_abs(Wg_Obj** argv, int argc, Wg_Context* context) {
 			EXPECT_ARG_COUNT(1);
 			EXPECT_ARG_TYPE_INT(0);
 			return Wg_CreateInt(context, std::abs(Wg_GetInt(argv[0])));
 		}
 
-		static Wg_Obj* int_neg(Wg_Obj** argv, int argc, Wg_Obj* kwargs, Wg_Context* context) {
+		static Wg_Obj* int_neg(Wg_Obj** argv, int argc, Wg_Context* context) {
 			EXPECT_ARG_COUNT(1);
 			EXPECT_ARG_TYPE_INT(0);
 			return Wg_CreateInt(context, -Wg_GetInt(argv[0]));
 		}
 
-		static Wg_Obj* int_add(Wg_Obj** argv, int argc, Wg_Obj* kwargs, Wg_Context* context) {
+		static Wg_Obj* int_add(Wg_Obj** argv, int argc, Wg_Context* context) {
 			EXPECT_ARG_COUNT(2);
 			EXPECT_ARG_TYPE_INT(0);
 			EXPECT_ARG_TYPE_INT_OR_FLOAT(1);
@@ -825,7 +825,7 @@ namespace wings {
 			}
 		}
 
-		static Wg_Obj* int_sub(Wg_Obj** argv, int argc, Wg_Obj* kwargs, Wg_Context* context) {
+		static Wg_Obj* int_sub(Wg_Obj** argv, int argc, Wg_Context* context) {
 			EXPECT_ARG_COUNT(2);
 			EXPECT_ARG_TYPE_INT(0);
 			EXPECT_ARG_TYPE_INT_OR_FLOAT(1);
@@ -836,7 +836,7 @@ namespace wings {
 			}
 		}
 
-		static Wg_Obj* int_mul(Wg_Obj** argv, int argc, Wg_Obj* kwargs, Wg_Context* context) {
+		static Wg_Obj* int_mul(Wg_Obj** argv, int argc, Wg_Context* context) {
 			EXPECT_ARG_COUNT(2);
 			EXPECT_ARG_TYPE_INT(0);
 
@@ -856,7 +856,7 @@ namespace wings {
 			}
 		}
 
-		static Wg_Obj* int_truediv(Wg_Obj** argv, int argc, Wg_Obj* kwargs, Wg_Context* context) {
+		static Wg_Obj* int_truediv(Wg_Obj** argv, int argc, Wg_Context* context) {
 			EXPECT_ARG_COUNT(2);
 			EXPECT_ARG_TYPE_INT(0);
 			EXPECT_ARG_TYPE_INT_OR_FLOAT(0);
@@ -868,7 +868,7 @@ namespace wings {
 			return Wg_CreateFloat(context, Wg_GetFloat(argv[0]) / Wg_GetFloat(argv[1]));
 		}
 
-		static Wg_Obj* int_floordiv(Wg_Obj** argv, int argc, Wg_Obj* kwargs, Wg_Context* context) {
+		static Wg_Obj* int_floordiv(Wg_Obj** argv, int argc, Wg_Context* context) {
 			EXPECT_ARG_COUNT(2);
 			EXPECT_ARG_TYPE_INT(0);
 			EXPECT_ARG_TYPE_INT_OR_FLOAT(1);
@@ -885,7 +885,7 @@ namespace wings {
 			}
 		}
 
-		static Wg_Obj* int_mod(Wg_Obj** argv, int argc, Wg_Obj* kwargs, Wg_Context* context) {
+		static Wg_Obj* int_mod(Wg_Obj** argv, int argc, Wg_Context* context) {
 			EXPECT_ARG_COUNT(2);
 			EXPECT_ARG_TYPE_INT(0);
 			EXPECT_ARG_TYPE_INT_OR_FLOAT(1);
@@ -906,41 +906,41 @@ namespace wings {
 			}
 		}
 
-		static Wg_Obj* int_pow(Wg_Obj** argv, int argc, Wg_Obj* kwargs, Wg_Context* context) {
+		static Wg_Obj* int_pow(Wg_Obj** argv, int argc, Wg_Context* context) {
 			EXPECT_ARG_COUNT(2);
 			EXPECT_ARG_TYPE_INT(0);
 			EXPECT_ARG_TYPE_INT_OR_FLOAT(1);
 			return Wg_CreateFloat(context, std::pow(Wg_GetFloat(argv[0]), Wg_GetFloat(argv[1])));
 		}
 
-		static Wg_Obj* int_and(Wg_Obj** argv, int argc, Wg_Obj* kwargs, Wg_Context* context) {
+		static Wg_Obj* int_and(Wg_Obj** argv, int argc, Wg_Context* context) {
 			EXPECT_ARG_COUNT(2);
 			EXPECT_ARG_TYPE_INT(0);
 			EXPECT_ARG_TYPE_INT(1);
 			return Wg_CreateInt(context, Wg_GetInt(argv[0]) & Wg_GetInt(argv[1]));
 		}
 
-		static Wg_Obj* int_or(Wg_Obj** argv, int argc, Wg_Obj* kwargs, Wg_Context* context) {
+		static Wg_Obj* int_or(Wg_Obj** argv, int argc, Wg_Context* context) {
 			EXPECT_ARG_COUNT(2);
 			EXPECT_ARG_TYPE_INT(0);
 			EXPECT_ARG_TYPE_INT(1);
 			return Wg_CreateInt(context, Wg_GetInt(argv[0]) | Wg_GetInt(argv[1]));
 		}
 
-		static Wg_Obj* int_xor(Wg_Obj** argv, int argc, Wg_Obj* kwargs, Wg_Context* context) {
+		static Wg_Obj* int_xor(Wg_Obj** argv, int argc, Wg_Context* context) {
 			EXPECT_ARG_COUNT(2);
 			EXPECT_ARG_TYPE_INT(0);
 			EXPECT_ARG_TYPE_INT(1);
 			return Wg_CreateInt(context, Wg_GetInt(argv[0]) ^ Wg_GetInt(argv[1]));
 		}
 
-		static Wg_Obj* int_invert(Wg_Obj** argv, int argc, Wg_Obj* kwargs, Wg_Context* context) {
+		static Wg_Obj* int_invert(Wg_Obj** argv, int argc, Wg_Context* context) {
 			EXPECT_ARG_COUNT(1);
 			EXPECT_ARG_TYPE_INT(0);
 			return Wg_CreateInt(context, ~Wg_GetInt(argv[0]));
 		}
 
-		static Wg_Obj* int_lshift(Wg_Obj** argv, int argc, Wg_Obj* kwargs, Wg_Context* context) {
+		static Wg_Obj* int_lshift(Wg_Obj** argv, int argc, Wg_Context* context) {
 			EXPECT_ARG_COUNT(2);
 			EXPECT_ARG_TYPE_INT(0);
 			EXPECT_ARG_TYPE_INT(1);
@@ -954,7 +954,7 @@ namespace wings {
 			return Wg_CreateInt(context, Wg_GetInt(argv[0]) << shift);
 		}
 
-		static Wg_Obj* int_rshift(Wg_Obj** argv, int argc, Wg_Obj* kwargs, Wg_Context* context) {
+		static Wg_Obj* int_rshift(Wg_Obj** argv, int argc, Wg_Context* context) {
 			EXPECT_ARG_COUNT(2);
 			EXPECT_ARG_TYPE_INT(0);
 			EXPECT_ARG_TYPE_INT(1);
@@ -968,7 +968,7 @@ namespace wings {
 			return Wg_CreateInt(context, Wg_GetInt(argv[0]) >> shift);
 		}
 
-		static Wg_Obj* int_bit_length(Wg_Obj** argv, int argc, Wg_Obj* kwargs, Wg_Context* context) {
+		static Wg_Obj* int_bit_length(Wg_Obj** argv, int argc, Wg_Context* context) {
 			EXPECT_ARG_COUNT(1);
 			EXPECT_ARG_TYPE_INT(0);
 
@@ -976,7 +976,7 @@ namespace wings {
 			return Wg_CreateInt(context, (Wg_int)std::bit_width(n));
 		}
 
-		static Wg_Obj* int_bit_count(Wg_Obj** argv, int argc, Wg_Obj* kwargs, Wg_Context* context) {
+		static Wg_Obj* int_bit_count(Wg_Obj** argv, int argc, Wg_Context* context) {
 			EXPECT_ARG_COUNT(1);
 			EXPECT_ARG_TYPE_INT(0);
 
@@ -984,25 +984,25 @@ namespace wings {
 			return Wg_CreateInt(context, (Wg_int)std::popcount(n));
 		}
 
-		static Wg_Obj* float_nonzero(Wg_Obj** argv, int argc, Wg_Obj* kwargs, Wg_Context* context) {
+		static Wg_Obj* float_nonzero(Wg_Obj** argv, int argc, Wg_Context* context) {
 			EXPECT_ARG_COUNT(1);
 			EXPECT_ARG_TYPE_INT_OR_FLOAT(0);
 			return Wg_CreateBool(context, Wg_GetFloat(argv[0]) != 0);
 		}
 
-		static Wg_Obj* float_int(Wg_Obj** argv, int argc, Wg_Obj* kwargs, Wg_Context* context) {
+		static Wg_Obj* float_int(Wg_Obj** argv, int argc, Wg_Context* context) {
 			EXPECT_ARG_COUNT(1);
 			EXPECT_ARG_TYPE_INT_OR_FLOAT(0);
 			return Wg_CreateInt(context, (Wg_int)Wg_GetFloat(argv[0]));
 		}
 
-		static Wg_Obj* float_float(Wg_Obj** argv, int argc, Wg_Obj* kwargs, Wg_Context* context) {
+		static Wg_Obj* float_float(Wg_Obj** argv, int argc, Wg_Context* context) {
 			EXPECT_ARG_COUNT(1);
 			EXPECT_ARG_TYPE_INT_OR_FLOAT(0);
 			return argv[0];
 		}
 
-		static Wg_Obj* float_str(Wg_Obj** argv, int argc, Wg_Obj* kwargs, Wg_Context* context) {
+		static Wg_Obj* float_str(Wg_Obj** argv, int argc, Wg_Context* context) {
 			EXPECT_ARG_COUNT(1);
 			EXPECT_ARG_TYPE_FLOAT(0);
 			std::string s = std::to_string(argv[0]->Get<Wg_float>());
@@ -1012,88 +1012,88 @@ namespace wings {
 			return Wg_CreateString(context, s.c_str());
 		}
 
-		static Wg_Obj* float_eq(Wg_Obj** argv, int argc, Wg_Obj* kwargs, Wg_Context* context) {
+		static Wg_Obj* float_eq(Wg_Obj** argv, int argc, Wg_Context* context) {
 			EXPECT_ARG_COUNT(2);
 			EXPECT_ARG_TYPE_INT_OR_FLOAT(0);
 			return Wg_CreateBool(context, Wg_IsIntOrFloat(argv[1]) && Wg_GetFloat(argv[0]) == Wg_GetFloat(argv[1]));
 		}
 
-		static Wg_Obj* float_lt(Wg_Obj** argv, int argc, Wg_Obj* kwargs, Wg_Context* context) {
+		static Wg_Obj* float_lt(Wg_Obj** argv, int argc, Wg_Context* context) {
 			EXPECT_ARG_COUNT(2);
 			EXPECT_ARG_TYPE_INT_OR_FLOAT(0);
 			EXPECT_ARG_TYPE_INT_OR_FLOAT(1);
 			return Wg_CreateBool(context, Wg_GetFloat(argv[0]) < Wg_GetFloat(argv[1]));
 		}
 
-		static Wg_Obj* float_hash(Wg_Obj** argv, int argc, Wg_Obj* kwargs, Wg_Context* context) {
+		static Wg_Obj* float_hash(Wg_Obj** argv, int argc, Wg_Context* context) {
 			EXPECT_ARG_COUNT(1);
 			EXPECT_ARG_TYPE_FLOAT(0);
 			Wg_int hash = (Wg_int)std::hash<Wg_float>()(Wg_GetFloat(argv[0]));
 			return Wg_CreateInt(context, hash);
 		}
 
-		static Wg_Obj* float_abs(Wg_Obj** argv, int argc, Wg_Obj* kwargs, Wg_Context* context) {
+		static Wg_Obj* float_abs(Wg_Obj** argv, int argc, Wg_Context* context) {
 			EXPECT_ARG_COUNT(1);
 			EXPECT_ARG_TYPE_FLOAT(0);
 			return Wg_CreateFloat(context, std::abs(Wg_GetFloat(argv[0])));
 		}
 
-		static Wg_Obj* float_neg(Wg_Obj** argv, int argc, Wg_Obj* kwargs, Wg_Context* context) {
+		static Wg_Obj* float_neg(Wg_Obj** argv, int argc, Wg_Context* context) {
 			EXPECT_ARG_COUNT(1);
 			EXPECT_ARG_TYPE_INT_OR_FLOAT(0);
 			return Wg_CreateFloat(context, -Wg_GetFloat(argv[0]));
 		}
 
-		static Wg_Obj* float_add(Wg_Obj** argv, int argc, Wg_Obj* kwargs, Wg_Context* context) {
+		static Wg_Obj* float_add(Wg_Obj** argv, int argc, Wg_Context* context) {
 			EXPECT_ARG_COUNT(2);
 			EXPECT_ARG_TYPE_INT_OR_FLOAT(0);
 			EXPECT_ARG_TYPE_INT_OR_FLOAT(1);
 			return Wg_CreateFloat(context, Wg_GetFloat(argv[0]) + Wg_GetFloat(argv[1]));
 		}
 
-		static Wg_Obj* float_sub(Wg_Obj** argv, int argc, Wg_Obj* kwargs, Wg_Context* context) {
+		static Wg_Obj* float_sub(Wg_Obj** argv, int argc, Wg_Context* context) {
 			EXPECT_ARG_COUNT(2);
 			EXPECT_ARG_TYPE_INT_OR_FLOAT(0);
 			EXPECT_ARG_TYPE_INT_OR_FLOAT(1);
 			return Wg_CreateFloat(context, Wg_GetFloat(argv[0]) - Wg_GetFloat(argv[1]));
 		}
 
-		static Wg_Obj* float_mul(Wg_Obj** argv, int argc, Wg_Obj* kwargs, Wg_Context* context) {
+		static Wg_Obj* float_mul(Wg_Obj** argv, int argc, Wg_Context* context) {
 			EXPECT_ARG_COUNT(2);
 			EXPECT_ARG_TYPE_INT_OR_FLOAT(0);
 			EXPECT_ARG_TYPE_INT_OR_FLOAT(1);
 			return Wg_CreateFloat(context, Wg_GetFloat(argv[0]) * Wg_GetFloat(argv[1]));
 		}
 
-		static Wg_Obj* float_truediv(Wg_Obj** argv, int argc, Wg_Obj* kwargs, Wg_Context* context) {
+		static Wg_Obj* float_truediv(Wg_Obj** argv, int argc, Wg_Context* context) {
 			EXPECT_ARG_COUNT(2);
 			EXPECT_ARG_TYPE_INT_OR_FLOAT(0);
 			EXPECT_ARG_TYPE_INT_OR_FLOAT(1);
 			return Wg_CreateFloat(context, Wg_GetFloat(argv[0]) / Wg_GetFloat(argv[1]));
 		}
 
-		static Wg_Obj* float_floordiv(Wg_Obj** argv, int argc, Wg_Obj* kwargs, Wg_Context* context) {
+		static Wg_Obj* float_floordiv(Wg_Obj** argv, int argc, Wg_Context* context) {
 			EXPECT_ARG_COUNT(2);
 			EXPECT_ARG_TYPE_INT_OR_FLOAT(0);
 			EXPECT_ARG_TYPE_INT_OR_FLOAT(1);
 			return Wg_CreateFloat(context, std::floor(Wg_GetFloat(argv[0]) / Wg_GetFloat(argv[1])));
 		}
 
-		static Wg_Obj* float_mod(Wg_Obj** argv, int argc, Wg_Obj* kwargs, Wg_Context* context) {
+		static Wg_Obj* float_mod(Wg_Obj** argv, int argc, Wg_Context* context) {
 			EXPECT_ARG_COUNT(2);
 			EXPECT_ARG_TYPE_INT_OR_FLOAT(0);
 			EXPECT_ARG_TYPE_INT_OR_FLOAT(1);
 			return Wg_CreateFloat(context, std::fmod(Wg_GetFloat(argv[0]), Wg_GetFloat(argv[1])));
 		}
 
-		static Wg_Obj* float_pow(Wg_Obj** argv, int argc, Wg_Obj* kwargs, Wg_Context* context) {
+		static Wg_Obj* float_pow(Wg_Obj** argv, int argc, Wg_Context* context) {
 			EXPECT_ARG_COUNT(2);
 			EXPECT_ARG_TYPE_INT_OR_FLOAT(0);
 			EXPECT_ARG_TYPE_INT_OR_FLOAT(1);
 			return Wg_CreateFloat(context, std::pow(Wg_GetFloat(argv[0]), Wg_GetFloat(argv[1])));
 		}
 
-		static Wg_Obj* float_is_integer(Wg_Obj** argv, int argc, Wg_Obj* kwargs, Wg_Context* context) {
+		static Wg_Obj* float_is_integer(Wg_Obj** argv, int argc, Wg_Context* context) {
 			EXPECT_ARG_COUNT(1);
 			EXPECT_ARG_TYPE_FLOAT(0);
 
@@ -1101,14 +1101,14 @@ namespace wings {
 			return Wg_CreateBool(context, std::floor(f) == f);
 		}
 
-		static Wg_Obj* str_nonzero(Wg_Obj** argv, int argc, Wg_Obj* kwargs, Wg_Context* context) {
+		static Wg_Obj* str_nonzero(Wg_Obj** argv, int argc, Wg_Context* context) {
 			EXPECT_ARG_COUNT(1);
 			EXPECT_ARG_TYPE_STRING(0);
 			std::string s = Wg_GetString(argv[0]);
 			return Wg_CreateBool(context, !s.empty());
 		}
 
-		static Wg_Obj* str_int(Wg_Obj** argv, int argc, Wg_Obj* kwargs, Wg_Context* context) {
+		static Wg_Obj* str_int(Wg_Obj** argv, int argc, Wg_Context* context) {
 			EXPECT_ARG_COUNT_BETWEEN(1, 2);
 			EXPECT_ARG_TYPE_STRING(0);
 
@@ -1172,7 +1172,7 @@ namespace wings {
 			return Wg_CreateInt(context, (Wg_int)value);
 		}
 
-		static Wg_Obj* str_float(Wg_Obj** argv, int argc, Wg_Obj* kwargs, Wg_Context* context) {
+		static Wg_Obj* str_float(Wg_Obj** argv, int argc, Wg_Context* context) {
 			EXPECT_ARG_COUNT(1);
 			EXPECT_ARG_TYPE_STRING(0);
 
@@ -1250,13 +1250,13 @@ namespace wings {
 			return Wg_CreateFloat(context, fvalue);
 		}
 
-		static Wg_Obj* str_str(Wg_Obj** argv, int argc, Wg_Obj* kwargs, Wg_Context* context) {
+		static Wg_Obj* str_str(Wg_Obj** argv, int argc, Wg_Context* context) {
 			EXPECT_ARG_COUNT(1);
 			EXPECT_ARG_TYPE_STRING(0);
 			return argv[0];
 		}
 
-		static Wg_Obj* str_repr(Wg_Obj** argv, int argc, Wg_Obj* kwargs, Wg_Context* context) {
+		static Wg_Obj* str_repr(Wg_Obj** argv, int argc, Wg_Context* context) {
 			EXPECT_ARG_COUNT(1);
 			EXPECT_ARG_TYPE_STRING(0);
 
@@ -1264,33 +1264,33 @@ namespace wings {
 			return Wg_CreateString(context, ("'" + s + "'").c_str());
 		}
 
-		static Wg_Obj* str_len(Wg_Obj** argv, int argc, Wg_Obj* kwargs, Wg_Context* context) {
+		static Wg_Obj* str_len(Wg_Obj** argv, int argc, Wg_Context* context) {
 			EXPECT_ARG_COUNT(1);
 			EXPECT_ARG_TYPE_STRING(0);
 			return Wg_CreateInt(context, (Wg_int)argv[0]->Get<std::string>().size());
 		}
 
-		static Wg_Obj* str_eq(Wg_Obj** argv, int argc, Wg_Obj* kwargs, Wg_Context* context) {
+		static Wg_Obj* str_eq(Wg_Obj** argv, int argc, Wg_Context* context) {
 			EXPECT_ARG_COUNT(2);
 			EXPECT_ARG_TYPE_STRING(0);
 			return Wg_CreateBool(context, Wg_IsString(argv[1]) && std::strcmp(Wg_GetString(argv[0]), Wg_GetString(argv[1])) == 0);
 		}
 
-		static Wg_Obj* str_lt(Wg_Obj** argv, int argc, Wg_Obj* kwargs, Wg_Context* context) {
+		static Wg_Obj* str_lt(Wg_Obj** argv, int argc, Wg_Context* context) {
 			EXPECT_ARG_COUNT(2);
 			EXPECT_ARG_TYPE_STRING(0);
 			EXPECT_ARG_TYPE_STRING(1);
 			return Wg_CreateBool(context, std::strcmp(Wg_GetString(argv[0]), Wg_GetString(argv[1])) < 0);
 		}
 
-		static Wg_Obj* str_hash(Wg_Obj** argv, int argc, Wg_Obj* kwargs, Wg_Context* context) {
+		static Wg_Obj* str_hash(Wg_Obj** argv, int argc, Wg_Context* context) {
 			EXPECT_ARG_COUNT(1);
 			EXPECT_ARG_TYPE_STRING(0);
 			Wg_int hash = (Wg_int)std::hash<std::string_view>()(Wg_GetString(argv[0]));
 			return Wg_CreateInt(context, hash);
 		}
 
-		static Wg_Obj* str_add(Wg_Obj** argv, int argc, Wg_Obj* kwargs, Wg_Context* context) {
+		static Wg_Obj* str_add(Wg_Obj** argv, int argc, Wg_Context* context) {
 			EXPECT_ARG_COUNT(2);
 			EXPECT_ARG_TYPE_STRING(0);
 			EXPECT_ARG_TYPE_STRING(1);
@@ -1299,7 +1299,7 @@ namespace wings {
 			return Wg_CreateString(context, s.c_str());
 		}
 
-		static Wg_Obj* str_mul(Wg_Obj** argv, int argc, Wg_Obj* kwargs, Wg_Context* context) {
+		static Wg_Obj* str_mul(Wg_Obj** argv, int argc, Wg_Context* context) {
 			EXPECT_ARG_COUNT(2);
 			EXPECT_ARG_TYPE_STRING(0);
 			EXPECT_ARG_TYPE_INT(1);
@@ -1312,14 +1312,14 @@ namespace wings {
 			return Wg_CreateString(context, s.c_str());
 		}
 
-		static Wg_Obj* str_contains(Wg_Obj** argv, int argc, Wg_Obj* kwargs, Wg_Context* context) {
+		static Wg_Obj* str_contains(Wg_Obj** argv, int argc, Wg_Context* context) {
 			EXPECT_ARG_COUNT(2);
 			EXPECT_ARG_TYPE_STRING(0);
 			EXPECT_ARG_TYPE_STRING(1);
 			return Wg_CreateBool(context, std::strstr(Wg_GetString(argv[0]), Wg_GetString(argv[1])));
 		}
 
-		static Wg_Obj* str_getitem(Wg_Obj** argv, int argc, Wg_Obj* kwargs, Wg_Context* context) {
+		static Wg_Obj* str_getitem(Wg_Obj** argv, int argc, Wg_Context* context) {
 			EXPECT_ARG_COUNT(2);
 			EXPECT_ARG_TYPE_STRING(0);
 
@@ -1359,7 +1359,7 @@ namespace wings {
 			}
 		}
 
-		static Wg_Obj* str_capitalize(Wg_Obj** argv, int argc, Wg_Obj* kwargs, Wg_Context* context) {
+		static Wg_Obj* str_capitalize(Wg_Obj** argv, int argc, Wg_Context* context) {
 			EXPECT_ARG_COUNT(1);
 			EXPECT_ARG_TYPE_STRING(0);
 			std::string s = Wg_GetString(argv[0]);
@@ -1368,7 +1368,7 @@ namespace wings {
 			return Wg_CreateString(context, s.c_str());
 		}
 
-		static Wg_Obj* str_lower(Wg_Obj** argv, int argc, Wg_Obj* kwargs, Wg_Context* context) {
+		static Wg_Obj* str_lower(Wg_Obj** argv, int argc, Wg_Context* context) {
 			EXPECT_ARG_COUNT(1);
 			EXPECT_ARG_TYPE_STRING(0);
 
@@ -1377,7 +1377,7 @@ namespace wings {
 			return Wg_CreateString(context, s.c_str());
 		}
 
-		static Wg_Obj* str_upper(Wg_Obj** argv, int argc, Wg_Obj* kwargs, Wg_Context* context) {
+		static Wg_Obj* str_upper(Wg_Obj** argv, int argc, Wg_Context* context) {
 			EXPECT_ARG_COUNT(1);
 			EXPECT_ARG_TYPE_STRING(0);
 
@@ -1386,11 +1386,11 @@ namespace wings {
 			return Wg_CreateString(context, s.c_str());
 		}
 
-		static Wg_Obj* str_casefold(Wg_Obj** argv, int argc, Wg_Obj* kwargs, Wg_Context* context) {
-			return str_lower(argv, argc, kwargs, context);
+		static Wg_Obj* str_casefold(Wg_Obj** argv, int argc, Wg_Context* context) {
+			return str_lower(argv, argc, context);
 		}
 
-		static Wg_Obj* str_center(Wg_Obj** argv, int argc, Wg_Obj* kwargs, Wg_Context* context) {
+		static Wg_Obj* str_center(Wg_Obj** argv, int argc, Wg_Context* context) {
 			EXPECT_ARG_COUNT_BETWEEN(2, 3);
 			EXPECT_ARG_TYPE_STRING(0);
 			EXPECT_ARG_TYPE_INT(1);
@@ -1416,7 +1416,7 @@ namespace wings {
 			return Wg_CreateString(context, s.c_str());
 		}
 
-		static Wg_Obj* str_count(Wg_Obj** argv, int argc, Wg_Obj* kwargs, Wg_Context* context) {
+		static Wg_Obj* str_count(Wg_Obj** argv, int argc, Wg_Context* context) {
 			EXPECT_ARG_COUNT(2);
 			EXPECT_ARG_TYPE_STRING(0);
 			EXPECT_ARG_TYPE_STRING(1);
@@ -1433,7 +1433,7 @@ namespace wings {
 			return Wg_CreateInt(context, count);
 		}
 
-		static Wg_Obj* str_format(Wg_Obj** argv, int argc, Wg_Obj* kwargs, Wg_Context* context) {
+		static Wg_Obj* str_format(Wg_Obj** argv, int argc, Wg_Context* context) {
 			EXPECT_ARG_COUNT_AT_LEAST(1);
 			EXPECT_ARG_TYPE_STRING(0);
 			
@@ -1497,7 +1497,7 @@ namespace wings {
 			return Wg_CreateString(context, s.c_str());
 		}
 
-		static Wg_Obj* str_startswith(Wg_Obj** argv, int argc, Wg_Obj* kwargs, Wg_Context* context) {
+		static Wg_Obj* str_startswith(Wg_Obj** argv, int argc, Wg_Context* context) {
 			EXPECT_ARG_COUNT(2);
 			EXPECT_ARG_TYPE_STRING(0);
 			EXPECT_ARG_TYPE_STRING(1);
@@ -1507,7 +1507,7 @@ namespace wings {
 			return Wg_CreateBool(context, s.starts_with(end));
 		}
 
-		static Wg_Obj* str_endswith(Wg_Obj** argv, int argc, Wg_Obj* kwargs, Wg_Context* context) {
+		static Wg_Obj* str_endswith(Wg_Obj** argv, int argc, Wg_Context* context) {
 			EXPECT_ARG_COUNT(2);
 			EXPECT_ARG_TYPE_STRING(0);
 			EXPECT_ARG_TYPE_STRING(1);
@@ -1518,7 +1518,7 @@ namespace wings {
 		}
 
 		template <bool reverse>
-		static Wg_Obj* str_findx(Wg_Obj** argv, int argc, Wg_Obj* kwargs, Wg_Context* context) {
+		static Wg_Obj* str_findx(Wg_Obj** argv, int argc, Wg_Context* context) {
 			EXPECT_ARG_COUNT_BETWEEN(2, 4);
 			EXPECT_ARG_TYPE_STRING(0);
 			EXPECT_ARG_TYPE_STRING(1);
@@ -1567,8 +1567,8 @@ namespace wings {
 		}
 
 		template <bool reverse>
-		static Wg_Obj* str_indexx(Wg_Obj** argv, int argc, Wg_Obj* kwargs, Wg_Context* context) {
-			Wg_Obj* location = str_findx<reverse>(argv, argc, kwargs, context);
+		static Wg_Obj* str_indexx(Wg_Obj** argv, int argc, Wg_Context* context) {
+			Wg_Obj* location = str_findx<reverse>(argv, argc, context);
 			if (location == nullptr)
 				return nullptr;
 			
@@ -1580,24 +1580,24 @@ namespace wings {
 			}
 		}
 
-		static Wg_Obj* str_find(Wg_Obj** argv, int argc, Wg_Obj* kwargs, Wg_Context* context) {
-			return str_findx<false>(argv, argc, kwargs, context);
+		static Wg_Obj* str_find(Wg_Obj** argv, int argc, Wg_Context* context) {
+			return str_findx<false>(argv, argc, context);
 		}
 
-		static Wg_Obj* str_index(Wg_Obj** argv, int argc, Wg_Obj* kwargs, Wg_Context* context) {
-			return str_indexx<false>(argv, argc, kwargs, context);
+		static Wg_Obj* str_index(Wg_Obj** argv, int argc, Wg_Context* context) {
+			return str_indexx<false>(argv, argc, context);
 		}
 
-		static Wg_Obj* str_rfind(Wg_Obj** argv, int argc, Wg_Obj* kwargs, Wg_Context* context) {
-			return str_findx<true>(argv, argc, kwargs, context);
+		static Wg_Obj* str_rfind(Wg_Obj** argv, int argc, Wg_Context* context) {
+			return str_findx<true>(argv, argc, context);
 		}
 
-		static Wg_Obj* str_rindex(Wg_Obj** argv, int argc, Wg_Obj* kwargs, Wg_Context* context) {
-			return str_indexx<true>(argv, argc, kwargs, context);
+		static Wg_Obj* str_rindex(Wg_Obj** argv, int argc, Wg_Context* context) {
+			return str_indexx<true>(argv, argc, context);
 		}
 
 		template <auto F>
-		static Wg_Obj* str_isx(Wg_Obj** argv, int argc, Wg_Obj* kwargs, Wg_Context* context) {
+		static Wg_Obj* str_isx(Wg_Obj** argv, int argc, Wg_Context* context) {
 			EXPECT_ARG_COUNT(1);
 			EXPECT_ARG_TYPE_STRING(0);
 
@@ -1605,54 +1605,54 @@ namespace wings {
 			return Wg_CreateBool(context, std::all_of(s.begin(), s.end(), F));
 		}
 
-		static Wg_Obj* str_isalnum(Wg_Obj** argv, int argc, Wg_Obj* kwargs, Wg_Context* context) {
+		static Wg_Obj* str_isalnum(Wg_Obj** argv, int argc, Wg_Context* context) {
 			constexpr auto f = [](char c) { return ('a' <= c && c <= 'z') || ('A' <= c && c <= 'Z') || ('0' <= c && c <= '9'); };
-			return str_isx<f>(argv, argc, kwargs, context);
+			return str_isx<f>(argv, argc, context);
 		}
 
-		static Wg_Obj* str_isalpha(Wg_Obj** argv, int argc, Wg_Obj* kwargs, Wg_Context* context) {
+		static Wg_Obj* str_isalpha(Wg_Obj** argv, int argc, Wg_Context* context) {
 			constexpr auto f = [](char c) { return ('a' <= c && c <= 'z') || ('A' <= c && c <= 'Z'); };
-			return str_isx<f>(argv, argc, kwargs, context);
+			return str_isx<f>(argv, argc, context);
 		}
 
-		static Wg_Obj* str_isascii(Wg_Obj** argv, int argc, Wg_Obj* kwargs, Wg_Context* context) {
+		static Wg_Obj* str_isascii(Wg_Obj** argv, int argc, Wg_Context* context) {
 			constexpr auto f = [](char c) { return c < 128; };
-			return str_isx<f>(argv, argc, kwargs, context);
+			return str_isx<f>(argv, argc, context);
 		}
 
-		static Wg_Obj* str_isdigit(Wg_Obj** argv, int argc, Wg_Obj* kwargs, Wg_Context* context) {
+		static Wg_Obj* str_isdigit(Wg_Obj** argv, int argc, Wg_Context* context) {
 			constexpr auto f = [](char c) { return '0' <= c && c <= '9'; };
-			return str_isx<f>(argv, argc, kwargs, context);
+			return str_isx<f>(argv, argc, context);
 		}
 
-		static Wg_Obj* str_isdecimal(Wg_Obj** argv, int argc, Wg_Obj* kwargs, Wg_Context* context) {
-			return str_isdigit(argv, argc, kwargs, context);
+		static Wg_Obj* str_isdecimal(Wg_Obj** argv, int argc, Wg_Context* context) {
+			return str_isdigit(argv, argc, context);
 		}
 
-		static Wg_Obj* str_isnumeric(Wg_Obj** argv, int argc, Wg_Obj* kwargs, Wg_Context* context) {
-			return str_isdigit(argv, argc, kwargs, context);
+		static Wg_Obj* str_isnumeric(Wg_Obj** argv, int argc, Wg_Context* context) {
+			return str_isdigit(argv, argc, context);
 		}
 
-		static Wg_Obj* str_isprintable(Wg_Obj** argv, int argc, Wg_Obj* kwargs, Wg_Context* context) {
+		static Wg_Obj* str_isprintable(Wg_Obj** argv, int argc, Wg_Context* context) {
 			constexpr auto f = [](char c) { return c >= 32 && c <= 127; };
-			return str_isx<f>(argv, argc, kwargs, context);
+			return str_isx<f>(argv, argc, context);
 		}
 
-		static Wg_Obj* str_isspace(Wg_Obj** argv, int argc, Wg_Obj* kwargs, Wg_Context* context) {
-			return str_isx<IsSpace>(argv, argc, kwargs, context);
+		static Wg_Obj* str_isspace(Wg_Obj** argv, int argc, Wg_Context* context) {
+			return str_isx<IsSpace>(argv, argc, context);
 		}
 
-		static Wg_Obj* str_isupper(Wg_Obj** argv, int argc, Wg_Obj* kwargs, Wg_Context* context) {
+		static Wg_Obj* str_isupper(Wg_Obj** argv, int argc, Wg_Context* context) {
 			constexpr auto f = [](char c) { return !('a' <= c && c <= 'z'); };
-			return str_isx<f>(argv, argc, kwargs, context);
+			return str_isx<f>(argv, argc, context);
 		}
 
-		static Wg_Obj* str_islower(Wg_Obj** argv, int argc, Wg_Obj* kwargs, Wg_Context* context) {
+		static Wg_Obj* str_islower(Wg_Obj** argv, int argc, Wg_Context* context) {
 			constexpr auto f = [](char c) { return !('A' <= c && c <= 'Z'); };
-			return str_isx<f>(argv, argc, kwargs, context);
+			return str_isx<f>(argv, argc, context);
 		}
 
-		static Wg_Obj* str_isidentifier(Wg_Obj** argv, int argc, Wg_Obj* kwargs, Wg_Context* context) {
+		static Wg_Obj* str_isidentifier(Wg_Obj** argv, int argc, Wg_Context* context) {
 			EXPECT_ARG_COUNT(1);
 			EXPECT_ARG_TYPE_STRING(0);
 
@@ -1662,7 +1662,7 @@ namespace wings {
 			return Wg_CreateBool(context, allAlphaNum && (s.empty() || s[0] < '0' || s[0] > '9'));
 		}
 
-		static Wg_Obj* str_join(Wg_Obj** argv, int argc, Wg_Obj* kwargs, Wg_Context* context) {
+		static Wg_Obj* str_join(Wg_Obj** argv, int argc, Wg_Context* context) {
 			EXPECT_ARG_COUNT(2);
 			EXPECT_ARG_TYPE_STRING(0);
 
@@ -1694,7 +1694,7 @@ namespace wings {
 			return Wg_CreateString(context, state.s.c_str());
 		}
 
-		static Wg_Obj* str_replace(Wg_Obj** argv, int argc, Wg_Obj* kwargs, Wg_Context* context) {
+		static Wg_Obj* str_replace(Wg_Obj** argv, int argc, Wg_Context* context) {
 			EXPECT_ARG_COUNT_BETWEEN(3, 4);
 			EXPECT_ARG_TYPE_STRING(0);
 			EXPECT_ARG_TYPE_STRING(1);
@@ -1714,7 +1714,7 @@ namespace wings {
 		}
 
 		template <bool left, bool zfill = false>
-		static Wg_Obj* str_just(Wg_Obj** argv, int argc, Wg_Obj* kwargs, Wg_Context* context) {
+		static Wg_Obj* str_just(Wg_Obj** argv, int argc, Wg_Context* context) {
 			if constexpr (zfill) {
 				EXPECT_ARG_COUNT(2);
 			} else {
@@ -1752,19 +1752,19 @@ namespace wings {
 			return Wg_CreateString(context, s.c_str());
 		}
 
-		static Wg_Obj* str_ljust(Wg_Obj** argv, int argc, Wg_Obj* kwargs, Wg_Context* context) {
-			return str_just<true>(argv, argc, kwargs, context);
+		static Wg_Obj* str_ljust(Wg_Obj** argv, int argc, Wg_Context* context) {
+			return str_just<true>(argv, argc, context);
 		}
 
-		static Wg_Obj* str_rjust(Wg_Obj** argv, int argc, Wg_Obj* kwargs, Wg_Context* context) {
-			return str_just<false>(argv, argc, kwargs, context);
+		static Wg_Obj* str_rjust(Wg_Obj** argv, int argc, Wg_Context* context) {
+			return str_just<false>(argv, argc, context);
 		}
 
-		static Wg_Obj* str_zfill(Wg_Obj** argv, int argc, Wg_Obj* kwargs, Wg_Context* context) {
-			return str_just<true, true>(argv, argc, kwargs, context);
+		static Wg_Obj* str_zfill(Wg_Obj** argv, int argc, Wg_Context* context) {
+			return str_just<true, true>(argv, argc, context);
 		}
 
-		static Wg_Obj* str_lstrip(Wg_Obj** argv, int argc, Wg_Obj* kwargs, Wg_Context* context) {
+		static Wg_Obj* str_lstrip(Wg_Obj** argv, int argc, Wg_Context* context) {
 			EXPECT_ARG_COUNT_BETWEEN(1, 2);
 			EXPECT_ARG_TYPE_STRING(0);
 
@@ -1781,7 +1781,7 @@ namespace wings {
 			return Wg_CreateString(context, s.data() + pos);
 		}
 
-		static Wg_Obj* str_rstrip(Wg_Obj** argv, int argc, Wg_Obj* kwargs, Wg_Context* context) {
+		static Wg_Obj* str_rstrip(Wg_Obj** argv, int argc, Wg_Context* context) {
 			EXPECT_ARG_COUNT_BETWEEN(1, 2);
 			EXPECT_ARG_TYPE_STRING(0);
 
@@ -1799,7 +1799,7 @@ namespace wings {
 			return Wg_CreateString(context, s.c_str());
 		}
 
-		static Wg_Obj* str_strip(Wg_Obj** argv, int argc, Wg_Obj* kwargs, Wg_Context* context) {
+		static Wg_Obj* str_strip(Wg_Obj** argv, int argc, Wg_Context* context) {
 			EXPECT_ARG_COUNT_BETWEEN(1, 2);
 			EXPECT_ARG_TYPE_STRING(0);
 
@@ -1821,7 +1821,7 @@ namespace wings {
 			return Wg_CreateString(context, s.data() + pos);
 		}
 
-		static Wg_Obj* str_split(Wg_Obj** argv, int argc, Wg_Obj* kwargs, Wg_Context* context) {
+		static Wg_Obj* str_split(Wg_Obj** argv, int argc, Wg_Context* context) {
 			EXPECT_ARG_COUNT_BETWEEN(1, 3);
 			EXPECT_ARG_TYPE_STRING(0);
 
@@ -1855,7 +1855,7 @@ namespace wings {
 			return li;
 		}
 
-		static Wg_Obj* str_splitlines(Wg_Obj** argv, int argc, Wg_Obj* kwargs, Wg_Context* context) {
+		static Wg_Obj* str_splitlines(Wg_Obj** argv, int argc, Wg_Context* context) {
 			EXPECT_ARG_COUNT_BETWEEN(1, 2);
 			EXPECT_ARG_TYPE_STRING(0);
 
@@ -1882,7 +1882,7 @@ namespace wings {
 		}
 
 		template <Collection collection>
-		static Wg_Obj* collection_str(Wg_Obj** argv, int argc, Wg_Obj* kwargs, Wg_Context* context) {
+		static Wg_Obj* collection_str(Wg_Obj** argv, int argc, Wg_Context* context) {
 			constexpr bool isTuple = collection == Collection::Tuple;
 			EXPECT_ARG_COUNT(1);
 			if constexpr (isTuple) {
@@ -1919,7 +1919,7 @@ namespace wings {
 		}
 
 		template <Collection collection>
-		static Wg_Obj* collection_nonzero(Wg_Obj** argv, int argc, Wg_Obj* kwargs, Wg_Context* context) {
+		static Wg_Obj* collection_nonzero(Wg_Obj** argv, int argc, Wg_Context* context) {
 			EXPECT_ARG_COUNT(1);
 			if constexpr (collection == Collection::List) {
 				EXPECT_ARG_TYPE_LIST(0);
@@ -1931,7 +1931,7 @@ namespace wings {
 		}
 
 		template <Collection collection>
-		static Wg_Obj* collection_lt(Wg_Obj** argv, int argc, Wg_Obj* kwargs, Wg_Context* context) {
+		static Wg_Obj* collection_lt(Wg_Obj** argv, int argc, Wg_Context* context) {
 			EXPECT_ARG_COUNT(2);
 			if constexpr (collection == Collection::List) {
 				EXPECT_ARG_TYPE_LIST(0);
@@ -1966,7 +1966,7 @@ namespace wings {
 		}
 
 		template <Collection collection>
-		static Wg_Obj* collection_eq(Wg_Obj** argv, int argc, Wg_Obj* kwargs, Wg_Context* context) {
+		static Wg_Obj* collection_eq(Wg_Obj** argv, int argc, Wg_Context* context) {
 			EXPECT_ARG_COUNT(2);
 			if constexpr (collection == Collection::List) {
 				EXPECT_ARG_TYPE_LIST(0);
@@ -1997,7 +1997,7 @@ namespace wings {
 		}
 
 		template <Collection collection>
-		static Wg_Obj* collection_contains(Wg_Obj** argv, int argc, Wg_Obj* kwargs, Wg_Context* context) {
+		static Wg_Obj* collection_contains(Wg_Obj** argv, int argc, Wg_Context* context) {
 			EXPECT_ARG_COUNT(2);
 			if constexpr (collection == Collection::List) {
 				EXPECT_ARG_TYPE_LIST(0);
@@ -2019,7 +2019,7 @@ namespace wings {
 		}
 
 		template <Collection collection>
-		static Wg_Obj* collection_len(Wg_Obj** argv, int argc, Wg_Obj* kwargs, Wg_Context* context) {
+		static Wg_Obj* collection_len(Wg_Obj** argv, int argc, Wg_Context* context) {
 			EXPECT_ARG_COUNT(1);
 			if constexpr (collection == Collection::List) {
 				EXPECT_ARG_TYPE_LIST(0);
@@ -2031,7 +2031,7 @@ namespace wings {
 		}
 
 		template <Collection collection>
-		static Wg_Obj* collection_count(Wg_Obj** argv, int argc, Wg_Obj* kwargs, Wg_Context* context) {
+		static Wg_Obj* collection_count(Wg_Obj** argv, int argc, Wg_Context* context) {
 			EXPECT_ARG_COUNT(2);
 			if constexpr (collection == Collection::List) {
 				EXPECT_ARG_TYPE_LIST(0);
@@ -2053,7 +2053,7 @@ namespace wings {
 		}
 
 		template <Collection collection>
-		static Wg_Obj* collection_index(Wg_Obj** argv, int argc, Wg_Obj* kwargs, Wg_Context* context) {
+		static Wg_Obj* collection_index(Wg_Obj** argv, int argc, Wg_Context* context) {
 			EXPECT_ARG_COUNT(2);
 			if constexpr (collection == Collection::List) {
 				EXPECT_ARG_TYPE_LIST(0);
@@ -2075,7 +2075,7 @@ namespace wings {
 		}
 
 		template <Collection collection>
-		static Wg_Obj* collection_getitem(Wg_Obj** argv, int argc, Wg_Obj* kwargs, Wg_Context* context) {
+		static Wg_Obj* collection_getitem(Wg_Obj** argv, int argc, Wg_Context* context) {
 			EXPECT_ARG_COUNT(2);
 			if constexpr (collection == Collection::List) {
 				EXPECT_ARG_TYPE_LIST(0);
@@ -2122,7 +2122,7 @@ namespace wings {
 			}
 		}
 
-		static Wg_Obj* list_setitem(Wg_Obj** argv, int argc, Wg_Obj* kwargs, Wg_Context* context) {
+		static Wg_Obj* list_setitem(Wg_Obj** argv, int argc, Wg_Context* context) {
 			EXPECT_ARG_COUNT(3);
 			EXPECT_ARG_TYPE_LIST(0);
 			EXPECT_ARG_TYPE_INT(1);
@@ -2141,7 +2141,7 @@ namespace wings {
 			return Wg_CreateNone(context);
 		}
 		
-		static Wg_Obj* list_append(Wg_Obj** argv, int argc, Wg_Obj* kwargs, Wg_Context* context) {
+		static Wg_Obj* list_append(Wg_Obj** argv, int argc, Wg_Context* context) {
 			EXPECT_ARG_COUNT(2);
 			EXPECT_ARG_TYPE_LIST(0);
 
@@ -2149,7 +2149,7 @@ namespace wings {
 			return Wg_CreateNone(context);
 		}
 
-		static Wg_Obj* list_insert(Wg_Obj** argv, int argc, Wg_Obj* kwargs, Wg_Context* context) {
+		static Wg_Obj* list_insert(Wg_Obj** argv, int argc, Wg_Context* context) {
 			EXPECT_ARG_COUNT(3);
 			EXPECT_ARG_TYPE_LIST(0);
 			EXPECT_ARG_TYPE_INT(1);
@@ -2164,7 +2164,7 @@ namespace wings {
 			return Wg_CreateNone(context);
 		}
 
-		static Wg_Obj* list_pop(Wg_Obj** argv, int argc, Wg_Obj* kwargs, Wg_Context* context) {
+		static Wg_Obj* list_pop(Wg_Obj** argv, int argc, Wg_Context* context) {
 			EXPECT_ARG_COUNT_BETWEEN(1, 2);
 			EXPECT_ARG_TYPE_LIST(0);
 
@@ -2186,7 +2186,7 @@ namespace wings {
 			return popped;
 		}
 
-		static Wg_Obj* list_remove(Wg_Obj** argv, int argc, Wg_Obj* kwargs, Wg_Context* context) {
+		static Wg_Obj* list_remove(Wg_Obj** argv, int argc, Wg_Context* context) {
 			EXPECT_ARG_COUNT(2);
 			EXPECT_ARG_TYPE_LIST(0);
 
@@ -2207,7 +2207,7 @@ namespace wings {
 			return nullptr;
 		}
 
-		static Wg_Obj* list_clear(Wg_Obj** argv, int argc, Wg_Obj* kwargs, Wg_Context* context) {
+		static Wg_Obj* list_clear(Wg_Obj** argv, int argc, Wg_Context* context) {
 			EXPECT_ARG_COUNT(1);
 			EXPECT_ARG_TYPE_LIST(0);
 
@@ -2215,7 +2215,7 @@ namespace wings {
 			return Wg_CreateNone(context);
 		}
 
-		static Wg_Obj* list_copy(Wg_Obj** argv, int argc, Wg_Obj* kwargs, Wg_Context* context) {
+		static Wg_Obj* list_copy(Wg_Obj** argv, int argc, Wg_Context* context) {
 			EXPECT_ARG_COUNT(1);
 			EXPECT_ARG_TYPE_LIST(0);
 
@@ -2223,7 +2223,7 @@ namespace wings {
 			return Wg_CreateList(context, buf.data(), !buf.size());
 		}
 
-		static Wg_Obj* list_extend(Wg_Obj** argv, int argc, Wg_Obj* kwargs, Wg_Context* context) {
+		static Wg_Obj* list_extend(Wg_Obj** argv, int argc, Wg_Context* context) {
 			EXPECT_ARG_COUNT(2);
 			EXPECT_ARG_TYPE_LIST(0);
 
@@ -2245,9 +2245,13 @@ namespace wings {
 			return Wg_CreateNone(context);
 		}
 
-		static Wg_Obj* list_sort(Wg_Obj** argv, int argc, Wg_Obj* kwargs, Wg_Context* context) {
+		static Wg_Obj* list_sort(Wg_Obj** argv, int argc, Wg_Context* context) {
 			EXPECT_ARG_COUNT(1);
 			EXPECT_ARG_TYPE_LIST(0);
+
+			Wg_Obj* kwargs = Wg_GetKwargs(context);
+			if (kwargs == nullptr)
+				return nullptr;
 
 			Wg_Obj* kw[2]{};
 			const char* keys[2] = { "reverse", "key" };
@@ -2278,7 +2282,7 @@ namespace wings {
 			return Wg_CreateNone(context);
 		}
 
-		static Wg_Obj* list_reverse(Wg_Obj** argv, int argc, Wg_Obj* kwargs, Wg_Context* context) {
+		static Wg_Obj* list_reverse(Wg_Obj** argv, int argc, Wg_Context* context) {
 			EXPECT_ARG_COUNT(1);
 			EXPECT_ARG_TYPE_LIST(0);
 
@@ -2287,7 +2291,7 @@ namespace wings {
 			return Wg_CreateNone(context);
 		}
 
-		static Wg_Obj* map_str(Wg_Obj** argv, int argc, Wg_Obj* kwargs, Wg_Context* context) {
+		static Wg_Obj* map_str(Wg_Obj** argv, int argc, Wg_Context* context) {
 			EXPECT_ARG_COUNT(1);
 			EXPECT_ARG_TYPE_MAP(0);
 
@@ -2322,19 +2326,19 @@ namespace wings {
 			}
 		}
 
-		static Wg_Obj* map_nonzero(Wg_Obj** argv, int argc, Wg_Obj* kwargs, Wg_Context* context) {
+		static Wg_Obj* map_nonzero(Wg_Obj** argv, int argc, Wg_Context* context) {
 			EXPECT_ARG_COUNT(1);
 			EXPECT_ARG_TYPE_MAP(0);
 			return Wg_CreateBool(context, !argv[0]->Get<WDict>().empty());
 		}
 
-		static Wg_Obj* map_len(Wg_Obj** argv, int argc, Wg_Obj* kwargs, Wg_Context* context) {
+		static Wg_Obj* map_len(Wg_Obj** argv, int argc, Wg_Context* context) {
 			EXPECT_ARG_COUNT(1);
 			EXPECT_ARG_TYPE_MAP(0);
 			return Wg_CreateInt(context, (Wg_int)argv[0]->Get<WDict>().size());
 		}
 
-		static Wg_Obj* map_contains(Wg_Obj** argv, int argc, Wg_Obj* kwargs, Wg_Context* context) {
+		static Wg_Obj* map_contains(Wg_Obj** argv, int argc, Wg_Context* context) {
 			EXPECT_ARG_COUNT(2);
 			EXPECT_ARG_TYPE_MAP(0);
 			try {
@@ -2344,25 +2348,25 @@ namespace wings {
 			}
 		}
 
-		static Wg_Obj* map_iter(Wg_Obj** argv, int argc, Wg_Obj* kwargs, Wg_Context* context) {
+		static Wg_Obj* map_iter(Wg_Obj** argv, int argc, Wg_Context* context) {
 			EXPECT_ARG_COUNT(1);
 			EXPECT_ARG_TYPE_MAP(0);
 			return Wg_Call(context->builtins.dictKeysIter, argv, 1, nullptr);
 		}
 
-		static Wg_Obj* map_values(Wg_Obj** argv, int argc, Wg_Obj* kwargs, Wg_Context* context) {
+		static Wg_Obj* map_values(Wg_Obj** argv, int argc, Wg_Context* context) {
 			EXPECT_ARG_COUNT(1);
 			EXPECT_ARG_TYPE_MAP(0);
 			return Wg_Call(context->builtins.dictValuesIter, argv, 1, nullptr);
 		}
 
-		static Wg_Obj* map_items(Wg_Obj** argv, int argc, Wg_Obj* kwargs, Wg_Context* context) {
+		static Wg_Obj* map_items(Wg_Obj** argv, int argc, Wg_Context* context) {
 			EXPECT_ARG_COUNT(1);
 			EXPECT_ARG_TYPE_MAP(0);
 			return Wg_Call(context->builtins.dictItemsIter, argv, 1, nullptr);
 		}
 
-		static Wg_Obj* map_get(Wg_Obj** argv, int argc, Wg_Obj* kwargs, Wg_Context* context) {
+		static Wg_Obj* map_get(Wg_Obj** argv, int argc, Wg_Context* context) {
 			EXPECT_ARG_COUNT_BETWEEN(2, 3);
 			EXPECT_ARG_TYPE_MAP(0);
 
@@ -2381,7 +2385,7 @@ namespace wings {
 			return it->second;
 		}
 
-		static Wg_Obj* map_getitem(Wg_Obj** argv, int argc, Wg_Obj* kwargs, Wg_Context* context) {
+		static Wg_Obj* map_getitem(Wg_Obj** argv, int argc, Wg_Context* context) {
 			EXPECT_ARG_COUNT(2);
 			EXPECT_ARG_TYPE_MAP(0);
 
@@ -2401,7 +2405,7 @@ namespace wings {
 			return it->second;
 		}
 
-		static Wg_Obj* map_setitem(Wg_Obj** argv, int argc, Wg_Obj* kwargs, Wg_Context* context) {
+		static Wg_Obj* map_setitem(Wg_Obj** argv, int argc, Wg_Context* context) {
 			EXPECT_ARG_COUNT(3);
 			EXPECT_ARG_TYPE_MAP(0);
 
@@ -2413,14 +2417,14 @@ namespace wings {
 			return Wg_CreateNone(context);
 		}
 
-		static Wg_Obj* map_clear(Wg_Obj** argv, int argc, Wg_Obj* kwargs, Wg_Context* context) {
+		static Wg_Obj* map_clear(Wg_Obj** argv, int argc, Wg_Context* context) {
 			EXPECT_ARG_COUNT(1);
 			EXPECT_ARG_TYPE_MAP(0);
 			argv[0]->Get<WDict>().clear();
 			return Wg_CreateNone(context);
 		}
 
-		static Wg_Obj* map_copy(Wg_Obj** argv, int argc, Wg_Obj* kwargs, Wg_Context* context) {
+		static Wg_Obj* map_copy(Wg_Obj** argv, int argc, Wg_Context* context) {
 			EXPECT_ARG_COUNT(1);
 			EXPECT_ARG_TYPE_MAP(0);
 
@@ -2433,7 +2437,7 @@ namespace wings {
 			return Wg_CreateDictionary(context, keys.data(), values.data(), (int)keys.size());
 		}
 
-		static Wg_Obj* map_pop(Wg_Obj** argv, int argc, Wg_Obj* kwargs, Wg_Context* context) {
+		static Wg_Obj* map_pop(Wg_Obj** argv, int argc, Wg_Context* context) {
 			EXPECT_ARG_COUNT_BETWEEN(2, 3);
 			EXPECT_ARG_TYPE_MAP(0);
 
@@ -2447,7 +2451,7 @@ namespace wings {
 			return nullptr;
 		}
 
-		static Wg_Obj* map_popitem(Wg_Obj** argv, int argc, Wg_Obj* kwargs, Wg_Context* context) {
+		static Wg_Obj* map_popitem(Wg_Obj** argv, int argc, Wg_Context* context) {
 			EXPECT_ARG_COUNT(1);
 			EXPECT_ARG_TYPE_MAP(0);
 
@@ -2462,7 +2466,7 @@ namespace wings {
 			return Wg_CreateTuple(context, tupElems, 2);
 		}
 
-		static Wg_Obj* map_setdefault(Wg_Obj** argv, int argc, Wg_Obj* kwargs, Wg_Context* context) {
+		static Wg_Obj* map_setdefault(Wg_Obj** argv, int argc, Wg_Context* context) {
 			EXPECT_ARG_COUNT_BETWEEN(2, 3);
 			EXPECT_ARG_TYPE_MAP(0);
 
@@ -2476,7 +2480,7 @@ namespace wings {
 			}
 		}
 
-		static Wg_Obj* map_update(Wg_Obj** argv, int argc, Wg_Obj* kwargs, Wg_Context* context) {
+		static Wg_Obj* map_update(Wg_Obj** argv, int argc, Wg_Context* context) {
 			EXPECT_ARG_COUNT(2);
 			EXPECT_ARG_TYPE_MAP(0);
 
@@ -2503,7 +2507,7 @@ namespace wings {
 			}
 		}
 
-		static Wg_Obj* set_str(Wg_Obj** argv, int argc, Wg_Obj* kwargs, Wg_Context* context) {
+		static Wg_Obj* set_str(Wg_Obj** argv, int argc, Wg_Context* context) {
 			EXPECT_ARG_COUNT(1);
 			EXPECT_ARG_TYPE_SET(0);
 
@@ -2537,26 +2541,26 @@ namespace wings {
 			}
 		}
 
-		static Wg_Obj* set_add(Wg_Obj** argv, int argc, Wg_Obj* kwargs, Wg_Context* context) {
+		static Wg_Obj* set_add(Wg_Obj** argv, int argc, Wg_Context* context) {
 			EXPECT_ARG_COUNT(2);
 			EXPECT_ARG_TYPE_SET(0);
 			argv[0]->Get<wings::WSet>().insert(argv[1]);
 			return Wg_CreateNone(context);
 		}
 
-		static Wg_Obj* func_str(Wg_Obj** argv, int argc, Wg_Obj* kwargs, Wg_Context* context) {
+		static Wg_Obj* func_str(Wg_Obj** argv, int argc, Wg_Context* context) {
 			EXPECT_ARG_COUNT(1);
 			EXPECT_ARG_TYPE_FUNC(0);
 			std::string s = "<function at " + PtrToString(argv[0]) + ">";
 			return Wg_CreateString(context, s.c_str());
 		}
 
-		static Wg_Obj* BaseException_str(Wg_Obj** argv, int argc, Wg_Obj* kwargs, Wg_Context* context) {
+		static Wg_Obj* BaseException_str(Wg_Obj** argv, int argc, Wg_Context* context) {
 			EXPECT_ARG_COUNT(1);
 			return Wg_GetAttribute(argv[0], "_message");
 		}
 
-		static Wg_Obj* DictKeysIter_next(Wg_Obj** argv, int argc, Wg_Obj* kwargs, Wg_Context* context) {
+		static Wg_Obj* DictKeysIter_next(Wg_Obj** argv, int argc, Wg_Context* context) {
 			EXPECT_ARG_COUNT(1);
 			void* data{};
 			if (!Wg_TryGetUserdata(argv[0], "__DictKeysIter", &data)) {
@@ -2575,7 +2579,7 @@ namespace wings {
 			return key;
 		}
 
-		static Wg_Obj* DictValuesIter_next(Wg_Obj** argv, int argc, Wg_Obj* kwargs, Wg_Context* context) {
+		static Wg_Obj* DictValuesIter_next(Wg_Obj** argv, int argc, Wg_Context* context) {
 			EXPECT_ARG_COUNT(1);
 			void* data{};
 			if (!Wg_TryGetUserdata(argv[0], "__DictValuesIter", &data)) {
@@ -2594,7 +2598,7 @@ namespace wings {
 			return value;
 		}
 
-		static Wg_Obj* DictItemsIter_next(Wg_Obj** argv, int argc, Wg_Obj* kwargs, Wg_Context* context) {
+		static Wg_Obj* DictItemsIter_next(Wg_Obj** argv, int argc, Wg_Context* context) {
 			EXPECT_ARG_COUNT(1);
 			void* data{};
 			if (!Wg_TryGetUserdata(argv[0], "__DictItemsIter", &data)) {
@@ -2613,7 +2617,7 @@ namespace wings {
 			return Wg_CreateTuple(context, tup, 2);
 		}
 		
-		static Wg_Obj* self(Wg_Obj** argv, int argc, Wg_Obj* kwargs, Wg_Context* context) {
+		static Wg_Obj* self(Wg_Obj** argv, int argc, Wg_Context* context) {
 			EXPECT_ARG_COUNT(1);
 			return argv[0];
 		}
@@ -2622,7 +2626,7 @@ namespace wings {
 
 	namespace lib {
 
-		static Wg_Obj* print(Wg_Obj** argv, int argc, Wg_Obj* kwargs, Wg_Context* context) {
+		static Wg_Obj* print(Wg_Obj** argv, int argc, Wg_Context* context) {
 			std::string text;
 			for (int i = 0; i < argc; i++) {
 				if (Wg_Obj* s = Wg_UnaryOp(WG_UOP_STR, argv[i])) {
@@ -2640,7 +2644,7 @@ namespace wings {
 			return Wg_CreateNone(context);
 		}
 
-		static Wg_Obj* isinstance(Wg_Obj** argv, int argc, Wg_Obj* kwargs, Wg_Context* context) {
+		static Wg_Obj* isinstance(Wg_Obj** argv, int argc, Wg_Context* context) {
 			EXPECT_ARG_COUNT(2);
 			bool ret{};
 			if (Wg_IsTuple(argv[1])) {
@@ -2652,7 +2656,7 @@ namespace wings {
 			return Wg_CreateBool(context, ret);
 		}
 
-		static Wg_Obj* len(Wg_Obj** argv, int argc, Wg_Obj* kwargs, Wg_Context* context) {
+		static Wg_Obj* len(Wg_Obj** argv, int argc, Wg_Context* context) {
 			EXPECT_ARG_COUNT(1);
 			Wg_Obj* res = Wg_CallMethod(argv[0], "__len__", nullptr, 0);
 			if (res == nullptr) {
@@ -2667,7 +2671,7 @@ namespace wings {
 			return res;
 		}
 
-		static Wg_Obj* repr(Wg_Obj** argv, int argc, Wg_Obj* kwargs, Wg_Context* context) {
+		static Wg_Obj* repr(Wg_Obj** argv, int argc, Wg_Context* context) {
 			EXPECT_ARG_COUNT(1);
 			Wg_Obj* res = Wg_CallMethod(argv[0], "__repr__", nullptr, 0);
 			if (res == nullptr) {
@@ -2679,27 +2683,27 @@ namespace wings {
 			return res;
 		}
 
-		static Wg_Obj* next(Wg_Obj** argv, int argc, Wg_Obj* kwargs, Wg_Context* context) {
+		static Wg_Obj* next(Wg_Obj** argv, int argc, Wg_Context* context) {
 			EXPECT_ARG_COUNT(1);
 			return Wg_CallMethod(argv[0], "__next__", nullptr, 0);
 		}
 
-		static Wg_Obj* iter(Wg_Obj** argv, int argc, Wg_Obj* kwargs, Wg_Context* context) {
+		static Wg_Obj* iter(Wg_Obj** argv, int argc, Wg_Context* context) {
 			EXPECT_ARG_COUNT(1);
 			return Wg_CallMethod(argv[0], "__iter__", nullptr, 0);
 		}
 
-		static Wg_Obj* reversed(Wg_Obj** argv, int argc, Wg_Obj* kwargs, Wg_Context* context) {
+		static Wg_Obj* reversed(Wg_Obj** argv, int argc, Wg_Context* context) {
 			EXPECT_ARG_COUNT(1);
 			return Wg_CallMethod(argv[0], "__reversed__", nullptr, 0);
 		}
 
-		static Wg_Obj* abs(Wg_Obj** argv, int argc, Wg_Obj* kwargs, Wg_Context* context) {
+		static Wg_Obj* abs(Wg_Obj** argv, int argc, Wg_Context* context) {
 			EXPECT_ARG_COUNT(1);
 			return Wg_CallMethod(argv[0], "__abs__", nullptr, 0);
 		}
 
-		static Wg_Obj* hash(Wg_Obj** argv, int argc, Wg_Obj* kwargs, Wg_Context* context) {
+		static Wg_Obj* hash(Wg_Obj** argv, int argc, Wg_Context* context) {
 			EXPECT_ARG_COUNT(1);
 			Wg_Obj* res = Wg_CallMethod(argv[0], "__hash__", nullptr, 0);
 			if (res == nullptr) {
@@ -2715,7 +2719,7 @@ namespace wings {
 
 	struct LibraryInitException : std::exception {};
 
-	using WFuncSignature = Wg_Obj * (*)(Wg_Obj**, int, Wg_Obj*, Wg_Context*);
+	using WFuncSignature = Wg_Obj * (*)(Wg_Obj**, int, Wg_Context*);
 
 	template <WFuncSignature fn>
 	void RegisterMethod(Wg_Obj* _class, const char* name) {
@@ -2723,8 +2727,8 @@ namespace wings {
 		wfn.isMethod = true;
 		wfn.prettyName = name;
 		wfn.userdata = _class->context;
-		wfn.fptr = [](Wg_Obj** argv, int argc, Wg_Obj* kwargs, void* userdata) {
-			return fn(argv, argc, kwargs, (Wg_Context*)userdata);
+		wfn.fptr = [](Wg_Obj** argv, int argc, void* userdata) {
+			return fn(argv, argc, (Wg_Context*)userdata);
 		};
 
 		Wg_Obj* method = Wg_CreateFunction(_class->context, &wfn);
@@ -2744,8 +2748,8 @@ namespace wings {
 		wfn.isMethod = true;
 		wfn.prettyName = name;
 		wfn.userdata = context;
-		wfn.fptr = [](Wg_Obj** argv, int argc, Wg_Obj* kwargs, void* userdata) {
-			return fn(argv, argc, kwargs, (Wg_Context*)userdata);
+		wfn.fptr = [](Wg_Obj** argv, int argc, void* userdata) {
+			return fn(argv, argc, (Wg_Context*)userdata);
 		};
 
 		Wg_Obj* obj = Wg_CreateFunction(context, &wfn);
@@ -2789,11 +2793,12 @@ namespace wings {
 			context->builtins.object->Get<Wg_Obj::Class>().instanceAttributes.Set("__class__", context->builtins.object);
 			context->builtins.object->attributes.AddParent(context->builtins.object->Get<Wg_Obj::Class>().instanceAttributes);
 			context->builtins.object->Get<Wg_Obj::Class>().userdata = context;
-			context->builtins.object->Get<Wg_Obj::Class>().ctor = [](Wg_Obj**, int, Wg_Obj* kwargs, void* ud) -> Wg_Obj* {
+			context->builtins.object->Get<Wg_Obj::Class>().ctor = [](Wg_Obj**, int, void* ud) -> Wg_Obj* {
 				Wg_Obj* obj = Alloc((Wg_Context*)ud);
 				if (obj == nullptr)
 					return nullptr;
-				ctors::object(&obj, 1, kwargs, (Wg_Context*)ud);
+				
+				ctors::object(&obj, 1, (Wg_Context*)ud);
 				return obj;
 			};
 			Wg_SetGlobal(context, "object", context->builtins.object);
@@ -2808,11 +2813,12 @@ namespace wings {
 			context->builtins.func->Get<Wg_Obj::Class>().instanceAttributes.Set("__class__", context->builtins.func);
 			context->builtins.func->attributes.AddParent(context->builtins.object->Get<Wg_Obj::Class>().instanceAttributes);
 			context->builtins.func->Get<Wg_Obj::Class>().userdata = context;
-			context->builtins.func->Get<Wg_Obj::Class>().ctor = [](Wg_Obj** argv, int argc, Wg_Obj* kwargs, void* ud) -> Wg_Obj* {
+			context->builtins.func->Get<Wg_Obj::Class>().ctor = [](Wg_Obj** argv, int argc, void* ud) -> Wg_Obj* {
 				Wg_Obj* fn = Alloc((Wg_Context*)ud);
 				if (fn == nullptr)
 					return nullptr;
-				ctors::func(&fn, 1, kwargs, nullptr);
+				
+				ctors::func(&fn, 1, nullptr);
 				return fn;
 			};
 			RegisterMethod<methods::func_str>(context->builtins.func, "__str__");
@@ -2825,11 +2831,12 @@ namespace wings {
 			context->builtins.tuple->Get<Wg_Obj::Class>().instanceAttributes.Set("__class__", context->builtins.tuple);
 			context->builtins.tuple->attributes.AddParent(context->builtins.object->Get<Wg_Obj::Class>().instanceAttributes);
 			context->builtins.tuple->Get<Wg_Obj::Class>().userdata = context;
-			context->builtins.tuple->Get<Wg_Obj::Class>().ctor = [](Wg_Obj** argv, int argc, Wg_Obj* kwargs, void* ud) -> Wg_Obj* {
+			context->builtins.tuple->Get<Wg_Obj::Class>().ctor = [](Wg_Obj** argv, int argc, void* ud) -> Wg_Obj* {
 				Wg_Obj* fn = Alloc((Wg_Context*)ud);
 				if (fn == nullptr)
 					return nullptr;
-				ctors::collection<Collection::Tuple>(&fn, 1, kwargs, (Wg_Context*)ud);
+				
+				ctors::collection<Collection::Tuple>(&fn, 1, (Wg_Context*)ud);
 				return fn;
 			};
 			Wg_SetGlobal(context, "tuple", context->builtins.tuple);
@@ -2853,7 +2860,7 @@ namespace wings {
 			context->builtins.none->Get<Wg_Obj::Class>().instanceAttributes.Set("__class__", context->builtins.none);
 			context->builtins.none->attributes.AddParent(context->builtins.object->Get<Wg_Obj::Class>().instanceAttributes);
 			context->builtins.none->Get<Wg_Obj::Class>().userdata = context;
-			context->builtins.none->Get<Wg_Obj::Class>().ctor = [](Wg_Obj** argv, int argc, Wg_Obj* kwargs, void* ud) -> Wg_Obj* {
+			context->builtins.none->Get<Wg_Obj::Class>().ctor = [](Wg_Obj** argv, int argc, void* ud) -> Wg_Obj* {
 				return ((Wg_Context*)ud)->builtins.none;
 			};
 
