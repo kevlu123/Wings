@@ -771,6 +771,25 @@ WDLL_EXPORT WObj* WGetAttributeFromBase(WObj* obj, const char* member, WObj* bas
 WDLL_EXPORT bool WIterate(WObj* obj, void* userdata, WIterationCallback callback);
 
 /**
+* Unpack an iterable object into an array of WObj*.
+*
+* Remarks:
+* If the number of objects yielded by the iterator does not match the
+* count parameter, a ValueError is raised.
+* This requires the iterable object to implement a __iter__() method
+* which returns an iterator. The iterator must implement a __next__() method
+* to advance the iterator and yield a value. When the iterator is exhausted,
+* it should raise a StopIteration exception.
+* Call WGetCurrentException() or WGetErrorMessage() to get error information.
+*
+* @param obj The object to iterate over.
+* @param out A pointer to an array of WObj* to receive the values.
+* @param count The length of the out array.
+* @return true on success, or false on failure.
+*/
+WDLL_EXPORT bool WUnpack(WObj* obj, WObj** out, int count);
+
+/**
 * Check if an object is truthy.
 * 
 * Remarks:

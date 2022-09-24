@@ -494,6 +494,42 @@ extern "C" {
 		}
 	}
 
+	bool WUnpack(WObj* obj, WObj** out, int count) {
+		WASSERT(obj && (count == 0 || out));
+		
+		WContext* context = obj->context;
+		struct State {
+			WContext* context;
+			WObj** array;
+			int count;
+			int index;
+		} s = { context, out, count, 0 };
+		
+		bool success = WIterate(obj, &s, [](WObj* yielded, void* userdata) {
+			State* s = (State*)userdata;
+			if (s->index >= s->count) {
+				WRaiseValueError(s->context, "Too many values to unpack");
+				return false;
+			}
+			WProtectObject(yielded);
+			s->array[s->index] = yielded;
+			s->index++;
+			return true;
+			});
+
+		for (int i = s.index; i; i--)
+			WUnprotectObject(out[i - 1]);
+
+		if (!success) {
+			return false;
+		} else if (s.index < count) {
+			WRaiseValueError(context, "Not enough values to unpack");
+			return false;
+		} else {
+			return true;
+		}
+	}
+
 	WObj* WConvertToBool(WObj* arg) {
 		WASSERT(arg);
 		return WCall(arg->context->builtins._bool, &arg, 1);

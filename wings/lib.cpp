@@ -2462,6 +2462,47 @@ namespace wings {
 			return WCreateTuple(context, tupElems, 2);
 		}
 
+		static WObj* map_setdefault(WObj** argv, int argc, WObj* kwargs, WContext* context) {
+			EXPECT_ARG_COUNT_BETWEEN(2, 3);
+			EXPECT_ARG_TYPE_MAP(0);
+
+			try {
+				auto& entry = argv[0]->Get<WDict>()[argv[1]];
+				if (entry == nullptr)
+					entry = argc == 3 ? argv[2] : WCreateNone(context);
+				return entry;
+			} catch (HashException&) {
+				return nullptr;
+			}
+		}
+
+		static WObj* map_update(WObj** argv, int argc, WObj* kwargs, WContext* context) {
+			EXPECT_ARG_COUNT(2);
+			EXPECT_ARG_TYPE_MAP(0);
+
+			WObj* iterable = argv[1];
+			if (WIsDictionary(argv[1])) {
+				iterable = WCallMethod(argv[1], "items", nullptr, 0);
+			}
+
+			auto f = [](WObj* obj, void* ud) {
+				WObj* kv[2]{};
+				if (!WUnpack(obj, kv, 2))
+					return false;
+				
+				WProtectObject(kv[1]);
+				((WObj*)ud)->Get<WDict>()[kv[0]] = kv[1];
+				WUnprotectObject(kv[1]);
+				return true;
+			};
+			
+			if (WIterate(iterable, argv[0], f)) {
+				return WCreateNone(context);
+			} else {
+				return nullptr;
+			}
+		}
+
 		static WObj* set_str(WObj** argv, int argc, WObj* kwargs, WContext* context) {
 			EXPECT_ARG_COUNT(1);
 			EXPECT_ARG_TYPE_SET(0);
@@ -2800,6 +2841,7 @@ namespace wings {
 			RegisterMethod<methods::collection_eq<Collection::Tuple>>(context->builtins.tuple, "__eq__");
 			RegisterMethod<methods::collection_lt<Collection::Tuple>>(context->builtins.tuple, "__lt__");
 			RegisterMethod<methods::collection_nonzero<Collection::Tuple>>(context->builtins.tuple, "__nonzero__");
+			RegisterMethod<methods::object_iter>(context->builtins.tuple, "__iter__");
 			RegisterMethod<methods::collection_count<Collection::Tuple>>(context->builtins.tuple, "count");
 			RegisterMethod<methods::collection_index<Collection::Tuple>>(context->builtins.tuple, "index");
 
@@ -3021,9 +3063,8 @@ namespace wings {
 			RegisterMethod<methods::map_items>(context->builtins.dict, "items");
 			RegisterMethod<methods::map_pop>(context->builtins.dict, "pop");
 			RegisterMethod<methods::map_popitem>(context->builtins.dict, "popitem");
-			//RegisterMethod<methods::map_setdefault>(context->builtins.dict, "setdefault");
-			//RegisterMethod<methods::map_update>(context->builtins.dict, "update");
-			//RegisterMethod<methods::map_values>(context->builtins.dict, "values");
+			RegisterMethod<methods::map_setdefault>(context->builtins.dict, "setdefault");
+			RegisterMethod<methods::map_update>(context->builtins.dict, "update");
 
 			context->builtins.set = createClass("set");
 			RegisterMethod<ctors::set>(context->builtins.set, "__init__");
