@@ -7,30 +7,30 @@ namespace wings {
 		owned(true) {
 	}
 
-	WObj* AttributeTable::Get(const std::string& name) const {
+	Wg_Obj* AttributeTable::Get(const std::string& name) const {
 		return attributes->Get(name);
 	}
 
-	WObj* AttributeTable::Table::Get(const std::string& name) const {
+	Wg_Obj* AttributeTable::Table::Get(const std::string& name) const {
 		auto it = entries.find(name);
 		if (it != entries.end())
 			return it->second;
 
 		for (const auto& parent : parents)
-			if (WObj* val = parent->Get(name))
+			if (Wg_Obj* val = parent->Get(name))
 				return val;
 
 		return nullptr;
 	}
 
-	WObj* AttributeTable::GetFromBase(const std::string& name) const {
+	Wg_Obj* AttributeTable::GetFromBase(const std::string& name) const {
 		for (const auto& parent : attributes->parents)
-			if (WObj* val = parent->Get(name))
+			if (Wg_Obj* val = parent->Get(name))
 				return val;
 		return nullptr;
 	}
 
-	void AttributeTable::Set(const std::string& name, WObj* value) {
+	void AttributeTable::Set(const std::string& name, Wg_Obj* value) {
 		if (!owned) {
 			attributes = MakeRcPtr<Table>(*attributes);
 			owned = true;

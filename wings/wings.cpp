@@ -8,17 +8,17 @@
 #include <atomic>
 #include <mutex>
 
-static WErrorCallback errorCallback;
+static Wg_ErrorCallback errorCallback;
 static void* errorCallbackUserdata;
 static std::mutex errorCallbackMutex;
 
 extern "C" {
-	void WGetConfig(const WContext* context, WConfig* out) {
+	void Wg_GetConfig(const Wg_Context* context, Wg_Config* out) {
 		WASSERT_VOID(context && out);
 		*out = context->config;
 	}
 
-	void WSetConfig(WContext* context, const WConfig* config) {
+	void Wg_SetConfig(Wg_Context* context, const Wg_Config* config) {
 		WASSERT_VOID(context);
 		if (config) {
 			WASSERT_VOID(config->maxAlloc >= 0);
@@ -37,44 +37,44 @@ extern "C" {
 		}
 	}
 
-	WContext* WCreateContext(const WConfig* config) {
-		WContext* context = new WContext();
+	Wg_Context* Wg_CreateContext(const Wg_Config* config) {
+		Wg_Context* context = new Wg_Context();
 
 		// Initialise the library without restriction
-		WSetConfig(context, nullptr);
+		Wg_SetConfig(context, nullptr);
 		wings::InitLibrary(context);
 		
 		// Apply possibly restrictive config now
-		WSetConfig(context, config);
+		Wg_SetConfig(context, config);
 		
 		return context;
 	}
 
-	void WDestroyContext(WContext* context) {
+	void Wg_DestroyContext(Wg_Context* context) {
 		WASSERT_VOID(context);
 		wings::DestroyAllObjects(context);
 		delete context;
 	}
 
-	void WPrint(const WContext* context, const char* message, int len) {
+	void Wg_Print(const Wg_Context* context, const char* message, int len) {
 		WASSERT_VOID(context && message);
 		if (context->config.print) {
 			context->config.print(len ? message : "", len, context->config.printUserdata);
 		}
 	}
 
-	void WPrintString(const WContext* context, const char* message) {
+	void Wg_PrintString(const Wg_Context* context, const char* message) {
 		WASSERT_VOID(context && message);
-		WPrint(context, message, (int)std::strlen(message));
+		Wg_Print(context, message, (int)std::strlen(message));
 	}
 
-	void WSetErrorCallback(WErrorCallback callback, void* userdata) {
+	void Wg_SetErrorCallback(Wg_ErrorCallback callback, void* userdata) {
 		std::scoped_lock lock(errorCallbackMutex);
 		errorCallback = callback;
 		errorCallbackUserdata = userdata;
 	}
 
-	WObj* WCompile(WContext* context, const char* code, const char* tag) {
+	Wg_Obj* Wg_Compile(Wg_Context* context, const char* code, const char* tag) {
 		WASSERT(context && code);
 
 		if (tag == nullptr)
@@ -91,7 +91,7 @@ extern "C" {
 				tag
 				});
 
-			WRaiseException(
+			Wg_RaiseException(
 				context,
 				error.message.c_str(),
 				context->builtins.syntaxError
@@ -117,25 +117,25 @@ extern "C" {
 		auto instructions = Compile(parseResult.parseTree);
 		def->instructions = MakeRcPtr<std::vector<wings::Instruction>>(std::move(instructions));
 
-		WFuncDesc func{};
+		Wg_FuncDesc func{};
 		func.fptr = &wings::DefObject::Run;
 		func.userdata = def;
 		func.prettyName = wings::DEFAULT_FUNC_NAME;
-		WObj* obj = WCreateFunction(context, &func);
+		Wg_Obj* obj = Wg_CreateFunction(context, &func);
 		if (obj == nullptr) {
 			delete def;
 			return nullptr;
 		}
 
-		WFinalizerDesc finalizer{};
-		finalizer.fptr = [](WObj* obj, void* userdata) { delete (wings::DefObject*)userdata; };
+		Wg_FinalizerDesc finalizer{};
+		finalizer.fptr = [](Wg_Obj* obj, void* userdata) { delete (wings::DefObject*)userdata; };
 		finalizer.userdata = def;
-		WSetFinalizer(obj, &finalizer);
+		Wg_SetFinalizer(obj, &finalizer);
 
 		return obj;
 	}
 
-	WObj* WGetGlobal(WContext* context, const char* name) {
+	Wg_Obj* Wg_GetGlobal(Wg_Context* context, const char* name) {
 		WASSERT(context && name);
 		auto it = context->globals.find(std::string(name));
 		if (it == context->globals.end()) {
@@ -145,17 +145,17 @@ extern "C" {
 		}
 	}
 
-	void WSetGlobal(WContext* context, const char* name, WObj* value) {
+	void Wg_SetGlobal(Wg_Context* context, const char* name, Wg_Obj* value) {
 		WASSERT_VOID(context && name && value);
 		auto it = context->globals.find(std::string(name));
 		if (it != context->globals.end()) {
 			*it->second = value;
 		} else {
-			context->globals.insert({ std::string(name), wings::MakeRcPtr<WObj*>(value) });
+			context->globals.insert({ std::string(name), wings::MakeRcPtr<Wg_Obj*>(value) });
 		}
 	}
 
-	void WDeleteGlobal(WContext* context, const char* name) {
+	void Wg_DeleteGlobal(Wg_Context* context, const char* name) {
 		WASSERT_VOID(context && name);
 		auto it = context->globals.find(std::string(name));
 		if (it != context->globals.end()) {
@@ -185,28 +185,28 @@ namespace wings {
 		return ++i;
 	}
 
-	std::string WObjTypeToString(const WObj* obj) {
-		if (WIsNone(obj)) {
+	std::string WObjTypeToString(const Wg_Obj* obj) {
+		if (Wg_IsNone(obj)) {
 			return "NoneType";
-		} else if (WIsBool(obj)) {
+		} else if (Wg_IsBool(obj)) {
 			return "bool";
-		} else if (WIsInt(obj)) {
+		} else if (Wg_IsInt(obj)) {
 			return "int";
-		} else if (WIsIntOrFloat(obj)) {
+		} else if (Wg_IsIntOrFloat(obj)) {
 			return "float";
-		} else if (WIsString(obj)) {
+		} else if (Wg_IsString(obj)) {
 			return "str";
-		} else if (WIsTuple(obj)) {
+		} else if (Wg_IsTuple(obj)) {
 			return "tuple";
-		} else if (WIsList(obj)) {
+		} else if (Wg_IsList(obj)) {
 			return "list";
-		} else if (WIsDictionary(obj)) {
+		} else if (Wg_IsDictionary(obj)) {
 			return "dict";
-		} else if (WIsSet(obj)) {
+		} else if (Wg_IsSet(obj)) {
 			return "set";
-		} else if (WIsFunction(obj)) {
+		} else if (Wg_IsFunction(obj)) {
 			return "function";
-		} else if (WIsClass(obj)) {
+		} else if (Wg_IsClass(obj)) {
 			return "class";
 		} else if (obj->type == "__object") {
 			return "object";
@@ -241,15 +241,15 @@ namespace wings {
 		};
 	}
 
-	size_t WObjHasher::operator()(WObj* obj) const {
-		if (WObj* hash = WHash(obj))
-			return (size_t)WGetInt(hash);
+	size_t WObjHasher::operator()(Wg_Obj* obj) const {
+		if (Wg_Obj* hash = Wg_UnaryOp(WG_UOP_HASH, obj))
+			return (size_t)Wg_GetInt(hash);
 		throw HashException();
 	}
 
-	bool WObjComparer::operator()(WObj* lhs, WObj* rhs) const {
-		if (WObj* eq = WEquals(lhs, rhs))
-			return WGetBool(eq);
+	bool WObjComparer::operator()(Wg_Obj* lhs, Wg_Obj* rhs) const {
+		if (Wg_Obj* eq = Wg_BinaryOp(WG_BOP_EQ, lhs, rhs))
+			return Wg_GetBool(eq);
 		throw HashException();
 	}
 

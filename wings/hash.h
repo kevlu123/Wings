@@ -25,7 +25,7 @@
 * the container if left unmodified.
 */
 
-struct WObj;
+struct Wg_Obj;
 
 namespace wings {
 
@@ -401,16 +401,16 @@ namespace wings {
 	};
 
 	struct WObjHasher {
-		size_t operator()(WObj* obj) const;
+		size_t operator()(Wg_Obj* obj) const;
 	};
 
 	struct WObjComparer {
-		bool operator()(WObj* lhs, WObj* rhs) const;
+		bool operator()(Wg_Obj* lhs, Wg_Obj* rhs) const;
 	};
 
-	using WDict = RelaxedMap<WObj*, WObj*, WObjHasher, WObjComparer>;
-	using WSet = RelaxedSet<WObj*, WObjHasher, WObjComparer>;
+	using WDict = RelaxedMap<Wg_Obj*, Wg_Obj*, WObjHasher, WObjComparer>;
+	using WSet = RelaxedSet<Wg_Obj*, WObjHasher, WObjComparer>;
 
-	//using WDict = std::unordered_map<WObj*, WObj*, WObjHasher, WObjComparer>;
-	//using WSet = std::unordered_set<WObj*, WObjHasher, WObjComparer>;
+	//using WDict = std::unordered_map<Wg_Obj*, Wg_Obj*, WObjHasher, WObjComparer>;
+	//using WSet = std::unordered_set<Wg_Obj*, WObjHasher, WObjComparer>;
 }

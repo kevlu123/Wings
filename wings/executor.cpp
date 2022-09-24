@@ -3,9 +3,9 @@
 
 namespace wings {
 
-	WObj* DefObject::Run(WObj** args, int argc, WObj* kwargs, void* userdata) {
+	Wg_Obj* DefObject::Run(Wg_Obj** args, int argc, Wg_Obj* kwargs, void* userdata) {
 		DefObject* def = (DefObject*)userdata;
-		WContext* context = def->context;
+		Wg_Context* context = def->context;
 
 		Executor executor{};
 		executor.def = def;
@@ -13,8 +13,8 @@ namespace wings {
 
 		// Create local variables
 		for (const auto& localVar : def->localVariables) {
-			WObj* null = WCreateNone(def->context);
-			executor.variables.insert({ localVar, MakeRcPtr<WObj*>(null) });
+			Wg_Obj* null = Wg_CreateNone(def->context);
+			executor.variables.insert({ localVar, MakeRcPtr<Wg_Obj*>(null) });
 		}
 
 		// Add captures
@@ -25,24 +25,24 @@ namespace wings {
 		// Initialise parameters
 
 		// Set kwargs
-		WObj* newKwargs = nullptr;
+		Wg_Obj* newKwargs = nullptr;
 		WObjRef ref;
 		if (def->kwArgs.has_value()) {
-			newKwargs = WCreateDictionary(context);
+			newKwargs = Wg_CreateDictionary(context);
 			if (newKwargs == nullptr)
 				return nullptr;
 			ref = WObjRef(newKwargs);
-			executor.variables.insert({ def->kwArgs.value(), MakeRcPtr<WObj*>(newKwargs)});
+			executor.variables.insert({ def->kwArgs.value(), MakeRcPtr<Wg_Obj*>(newKwargs)});
 		}
 
 		std::vector<bool> assignedParams(def->parameterNames.size());
 		if (kwargs) {
 			for (const auto& [k, value] : kwargs->Get<wings::WDict>()) {
-				const char* key = WGetString(k);
+				const char* key = Wg_GetString(k);
 				bool found = false;
 				for (size_t i = 0; i < def->parameterNames.size(); i++) {
 					if (def->parameterNames[i] == key) {
-						executor.variables.insert({ key, MakeRcPtr<WObj*>(value) });
+						executor.variables.insert({ key, MakeRcPtr<Wg_Obj*>(value) });
 						assignedParams[i] = true;
 						found = true;
 						break;
@@ -55,7 +55,7 @@ namespace wings {
 						if (!def->prettyName.empty())
 							msg = def->prettyName + "() ";
 						msg += std::string("got an unexpected keyword argument '") + key + "'";
-						WRaiseTypeError(context, msg.c_str());
+						Wg_RaiseTypeError(context, msg.c_str());
 						return nullptr;
 					}
 
@@ -69,12 +69,12 @@ namespace wings {
 		}
 
 		// Set positional args
-		WObj* listArgs = nullptr;
+		Wg_Obj* listArgs = nullptr;
 		if (def->listArgs.has_value()) {
-			listArgs = WCreateTuple(context, nullptr, 0);
+			listArgs = Wg_CreateTuple(context, nullptr, 0);
 			if (listArgs == nullptr)
 				return nullptr;
-			executor.variables.insert({ def->listArgs.value(), MakeRcPtr<WObj*>(listArgs) });
+			executor.variables.insert({ def->listArgs.value(), MakeRcPtr<Wg_Obj*>(listArgs) });
 		}
 
 		for (int i = 0; i < argc; i++) {
@@ -84,10 +84,10 @@ namespace wings {
 					if (!def->prettyName.empty())
 						msg = def->prettyName + "() ";
 					msg += "got multiple values for argument '" + def->parameterNames[i] + "'";
-					WRaiseTypeError(context, msg.c_str());
+					Wg_RaiseTypeError(context, msg.c_str());
 					return nullptr;
 				}
-				executor.variables.insert({ def->parameterNames[i], MakeRcPtr<WObj*>(args[i]) });
+				executor.variables.insert({ def->parameterNames[i], MakeRcPtr<Wg_Obj*>(args[i]) });
 				assignedParams[i] = true;
 			} else {
 				if (listArgs == nullptr) {
@@ -97,10 +97,10 @@ namespace wings {
 					msg += "takes " + std::to_string(def->parameterNames.size())
 						+ " positional argument(s) but " + std::to_string(argc)
 						+ (argc == 1 ? " was given" : " were given");
-					WRaiseTypeError(context, msg.c_str());
+					Wg_RaiseTypeError(context, msg.c_str());
 					return nullptr;
 				}
-				listArgs->Get<std::vector<WObj*>>().push_back(args[i]);
+				listArgs->Get<std::vector<Wg_Obj*>>().push_back(args[i]);
 			}
 		}
 		
@@ -109,7 +109,7 @@ namespace wings {
 		for (size_t i = 0; i < def->defaultParameterValues.size(); i++) {
 			size_t index = defaultableArgsStart + i;
 			if (!assignedParams[index]) {
-				executor.variables.insert({ def->parameterNames[index], MakeRcPtr<WObj*>(def->defaultParameterValues[i]) });
+				executor.variables.insert({ def->parameterNames[index], MakeRcPtr<Wg_Obj*>(def->defaultParameterValues[i]) });
 				assignedParams[index] = true;
 			}
 		}
@@ -126,7 +126,7 @@ namespace wings {
 				def->prettyName + "()"
 				+ " missing parameter(s) "
 				+ unassigned;
-			WRaiseTypeError(context, msg.c_str());
+			Wg_RaiseTypeError(context, msg.c_str());
 			return nullptr;
 		}
 
@@ -134,23 +134,23 @@ namespace wings {
 	}
 
 	DefObject::~DefObject() {
-		for (WObj* val : defaultParameterValues)
-			WUnprotectObject(val);
+		for (Wg_Obj* val : defaultParameterValues)
+			Wg_UnprotectObject(val);
 	}
 
-	void  Executor::PushStack(WObj* obj) {
-		WProtectObject(obj);
+	void  Executor::PushStack(Wg_Obj* obj) {
+		Wg_ProtectObject(obj);
 		stack.push_back(obj);
 	}
 
-	WObj* Executor::PopStack() {
+	Wg_Obj* Executor::PopStack() {
 		auto obj = stack.back();
 		stack.pop_back();
-		WUnprotectObject(obj);
+		Wg_UnprotectObject(obj);
 		return obj;
 	}
 
-	WObj* Executor::PeekStack() {
+	Wg_Obj* Executor::PeekStack() {
 		return stack.back();
 	}
 
@@ -168,46 +168,46 @@ namespace wings {
 		return ret;
 	}
 
-	WObj* Executor::GetVariable(const std::string& name) {
+	Wg_Obj* Executor::GetVariable(const std::string& name) {
 		auto it = variables.find(name);
 		if (it != variables.end()) {
 			return *it->second;
 		} else {
-			return WGetGlobal(context, name.c_str());
+			return Wg_GetGlobal(context, name.c_str());
 		}
 	}
 
-	void Executor::SetVariable(const std::string& name, WObj* value) {
+	void Executor::SetVariable(const std::string& name, Wg_Obj* value) {
 		auto it = variables.find(name);
 		if (it != variables.end()) {
 			if (*it->second != value) {
-				WUnprotectObject(*it->second);
-				WProtectObject(value);
+				Wg_UnprotectObject(*it->second);
+				Wg_ProtectObject(value);
 				*it->second = value;
 			}
 		} else {
-			WSetGlobal(context, name.c_str(), value);
+			Wg_SetGlobal(context, name.c_str(), value);
 		}
 	}
 
-	WObj* Executor::DirectAssign(const AssignTarget& target, WObj* value) {
+	Wg_Obj* Executor::DirectAssign(const AssignTarget& target, Wg_Obj* value) {
 		switch (target.type) {
 		case AssignType::Direct:
 			SetVariable(target.direct, value);
 			return value;
 		case AssignType::Pack: {
 			std::vector<WObjRef> values;
-			auto f = [](WObj* value, void* userdata) {
-				WProtectObject(value);
+			auto f = [](Wg_Obj* value, void* userdata) {
+				Wg_ProtectObject(value);
 				((std::vector<WObjRef>*)userdata)->emplace_back(value);
 				return true;
 			};
 
-			if (!WIterate(value, &values, f))
+			if (!Wg_Iterate(value, &values, f))
 				return nullptr;
 
 			if (values.size() != target.pack.size()) {
-				WRaiseValueError(context, "Packed assignment argument count mismatch");
+				Wg_RaiseValueError(context, "Packed assignment argument count mismatch");
 				return nullptr;
 			}
 
@@ -215,19 +215,19 @@ namespace wings {
 				if (!DirectAssign(target.pack[i], values[i].Get()))
 					return nullptr;
 
-			std::vector<WObj*> buf;
+			std::vector<Wg_Obj*> buf;
 			for (const auto& v : values)
 				buf.push_back(v.Get());
-			return WCreateTuple(context, buf.data(), (int)buf.size());
+			return Wg_CreateTuple(context, buf.data(), (int)buf.size());
 		}
 		default:
 			WUNREACHABLE();
 		}
 	}
 
-	WObj* Executor::Run() {
+	Wg_Obj* Executor::Run() {
 		for (const auto& var : variables)
-			WProtectObject(*var.second);
+			Wg_ProtectObject(*var.second);
 
 		auto& frame = context->currentTrace.back();
 		frame.tag = def->tag;
@@ -268,12 +268,12 @@ namespace wings {
 
 		ClearStack();
 		for (const auto& var : variables)
-			WUnprotectObject(*var.second);
+			Wg_UnprotectObject(*var.second);
 
 		if (exitValue.has_value()) {
 			return exitValue.value();
 		} else {
-			return WCreateNone(context);
+			return Wg_CreateNone(context);
 		}
 	}
 
@@ -283,8 +283,8 @@ namespace wings {
 			pc = instr.jump->location - 1;
 			break;
 		case Instruction::Type::JumpIfFalse:
-			if (WObj* truthy = WConvertToBool(PopStack())) {
-				if (!WGetBool(truthy)) {
+			if (Wg_Obj* truthy = Wg_UnaryOp(WG_UOP_BOOL, PopStack())) {
+				if (!Wg_GetBool(truthy)) {
 					pc = instr.jump->location - 1;
 				}
 			} else {
@@ -308,8 +308,8 @@ namespace wings {
 			for (const auto& param : instr.def->parameters)
 				def->parameterNames.push_back(param.name);
 			for (size_t i = 0; i < instr.def->defaultParameterCount; i++) {
-				WObj* value = PopStack();
-				WProtectObject(value);
+				Wg_Obj* value = PopStack();
+				Wg_ProtectObject(value);
 				def->defaultParameterValues.push_back(value);
 			}
 			def->listArgs = instr.def->listArgs;
@@ -320,7 +320,7 @@ namespace wings {
 					def->captures.insert({ capture, variables[capture] });
 				} else {
 					if (!context->globals.contains(capture))
-						WSetGlobal(context, capture.c_str(), WCreateNone(context));
+						Wg_SetGlobal(context, capture.c_str(), Wg_CreateNone(context));
 					def->captures.insert({ capture, context->globals.at(capture) });
 				}
 			}
@@ -329,22 +329,22 @@ namespace wings {
 			}
 			def->localVariables = instr.def->variables;
 
-			WFuncDesc func{};
+			Wg_FuncDesc func{};
 			func.fptr = &DefObject::Run;
 			func.userdata = def;
 			func.isMethod = instr.def->isMethod;
 			func.prettyName = instr.def->prettyName.c_str();
-			WObj* obj = WCreateFunction(context, &func);
+			Wg_Obj* obj = Wg_CreateFunction(context, &func);
 			if (obj == nullptr) {
 				delete def;
 				exitValue = nullptr;
 				return;
 			}
 
-			WFinalizerDesc finalizer{};
-			finalizer.fptr = [](WObj* obj, void* userdata) { delete (DefObject*)userdata; };
+			Wg_FinalizerDesc finalizer{};
+			finalizer.fptr = [](Wg_Obj* obj, void* userdata) { delete (DefObject*)userdata; };
 			finalizer.userdata = def;
-			WSetFinalizer(obj, &finalizer);
+			Wg_SetFinalizer(obj, &finalizer);
 
 			PushStack(obj);
 			break;
@@ -358,17 +358,17 @@ namespace wings {
 			for (const auto& methodName : instr._class->methodNames)
 				methodNames.push_back(methodName.c_str());
 
-			WObj** bases = stackEnd - baseCount;
-			WObj** methods = stackEnd - methodCount - baseCount;
+			Wg_Obj** bases = stackEnd - baseCount;
+			Wg_Obj** methods = stackEnd - methodCount - baseCount;
 
-			WObj* _class = WCreateClass(context, instr._class->prettyName.c_str(), bases, (int)baseCount);
+			Wg_Obj* _class = Wg_CreateClass(context, instr._class->prettyName.c_str(), bases, (int)baseCount);
 			if (_class == nullptr) {
 				exitValue = nullptr;
 				return;
 			}
 
 			for (size_t i = 0; i < methodCount; i++)
-				WAddAttributeToClass(_class, instr._class->methodNames[i].c_str(), methods[i]);
+				Wg_AddAttributeToClass(_class, instr._class->methodNames[i].c_str(), methods[i]);
 
 			for (size_t i = 0; i < methodCount + baseCount; i++)
 				PopStack();
@@ -381,17 +381,17 @@ namespace wings {
 			break;
 		}
 		case Instruction::Type::Literal: {
-			WObj* value{};
+			Wg_Obj* value{};
 			if (auto* n = std::get_if<std::nullptr_t>(instr.literal.get())) {
-				value = WCreateNone(context);
+				value = Wg_CreateNone(context);
 			} else if (auto* b = std::get_if<bool>(instr.literal.get())) {
-				value = WCreateBool(context, *b);
-			} else if (auto* i = std::get_if<wint>(instr.literal.get())) {
-				value = WCreateInt(context, *i);
-			} else if (auto* f = std::get_if<wfloat>(instr.literal.get())) {
-				value = WCreateFloat(context, *f);
+				value = Wg_CreateBool(context, *b);
+			} else if (auto* i = std::get_if<Wg_int>(instr.literal.get())) {
+				value = Wg_CreateInt(context, *i);
+			} else if (auto* f = std::get_if<Wg_float>(instr.literal.get())) {
+				value = Wg_CreateFloat(context, *f);
 			} else if (auto* s = std::get_if<std::string>(instr.literal.get())) {
-				value = WCreateString(context, s->c_str());
+				value = Wg_CreateString(context, s->c_str());
 			} else {
 				WUNREACHABLE();
 			}
@@ -406,15 +406,15 @@ namespace wings {
 		case Instruction::Type::Tuple:
 		case Instruction::Type::List:
 		case Instruction::Type::Set: {
-			WObj* (*creator)(WContext*, WObj**, int) = nullptr;
+			Wg_Obj* (*creator)(Wg_Context*, Wg_Obj**, int) = nullptr;
 			switch (instr.type) {
-			case Instruction::Type::Tuple: creator = WCreateTuple; break;
-			case Instruction::Type::List: creator = WCreateList; break;
-			case Instruction::Type::Set: creator = WCreateSet; break;
+			case Instruction::Type::Tuple: creator = Wg_CreateTuple; break;
+			case Instruction::Type::List: creator = Wg_CreateList; break;
+			case Instruction::Type::Set: creator = Wg_CreateSet; break;
 			}
 			size_t argc = PopArgFrame();
-			WObj** argv = stack.data() + stack.size() - argc;
-			if (WObj* li = creator(context, argv, (int)argc)) {
+			Wg_Obj** argv = stack.data() + stack.size() - argc;
+			if (Wg_Obj* li = creator(context, argv, (int)argc)) {
 				for (size_t i = 0; i < argc; i++)
 					PopStack();
 				PushStack(li);
@@ -424,12 +424,12 @@ namespace wings {
 			break;
 		}
 		case Instruction::Type::Map:
-			if (WObj* dict = WCreateDictionary(context)) {
+			if (Wg_Obj* dict = Wg_CreateDictionary(context)) {
 				size_t argc = PopArgFrame();
-				WObj** start = stack.data() + stack.size() - argc;
+				Wg_Obj** start = stack.data() + stack.size() - argc;
 				for (size_t i = 0; i < argc / 2; i++) {
-					WObj* key = start[2 * i];
-					WObj* val = start[2 * i + 1];
+					Wg_Obj* key = start[2 * i];
+					Wg_Obj* val = start[2 * i + 1];
 					WObjRef ref(dict);
 					try {
 						dict->Get<wings::WDict>()[key] = val;
@@ -447,15 +447,15 @@ namespace wings {
 			}
 			break;
 		case Instruction::Type::Variable:
-			if (WObj* value = GetVariable(instr.string->string)) {
+			if (Wg_Obj* value = GetVariable(instr.string->string)) {
 				PushStack(value);
 			} else {
-				WRaiseNameError(context, instr.string->string.c_str());
+				Wg_RaiseNameError(context, instr.string->string.c_str());
 				exitValue = nullptr;
 			}
 			break;
 		case Instruction::Type::DirectAssign: {
-			if (WObj* v = DirectAssign(instr.directAssign->assignTarget, PopStack())) {
+			if (Wg_Obj* v = DirectAssign(instr.directAssign->assignTarget, PopStack())) {
 				PushStack(v);
 			} else {
 				exitValue = nullptr;
@@ -463,9 +463,9 @@ namespace wings {
 			break;
 		}
 		case Instruction::Type::MemberAssign: {
-			WObj* value = PopStack();
-			WObj* obj = PopStack();
-			WSetAttribute(obj, instr.string->string.c_str(), value);
+			Wg_Obj* value = PopStack();
+			Wg_Obj* obj = PopStack();
+			Wg_SetAttribute(obj, instr.string->string.c_str(), value);
 			PushStack(value);
 			break;
 		}
@@ -477,17 +477,17 @@ namespace wings {
 			size_t kwargc = kwargsStack.top().size();
 			size_t argc = stack.size() - argFrames.top() - kwargc - 1;
 
-			WObj* fn = stack[stack.size() - argc - kwargc - 1];
-			WObj** args = stack.data() + stack.size() - argc - kwargc;
-			WObj** kwargsv = stack.data() + stack.size() - kwargc;
+			Wg_Obj* fn = stack[stack.size() - argc - kwargc - 1];
+			Wg_Obj** args = stack.data() + stack.size() - argc - kwargc;
+			Wg_Obj** kwargsv = stack.data() + stack.size() - kwargc;
 
-			WObj* kwargs = WCreateDictionary(context, kwargsStack.top().data(), kwargsv, (int)kwargc);
+			Wg_Obj* kwargs = Wg_CreateDictionary(context, kwargsStack.top().data(), kwargsv, (int)kwargc);
 			if (kwargs == nullptr) {
 				exitValue = nullptr;
 				return;
 			}
 
-			if (WObj* ret = WCall(fn, args, (int)argc, kwargs)) {
+			if (Wg_Obj* ret = Wg_Call(fn, args, (int)argc, kwargs)) {
 				for (size_t i = 0; i < argc + kwargc + 1; i++)
 					PopStack();
 				PushStack(ret);
@@ -498,8 +498,8 @@ namespace wings {
 			break;
 		}
 		case Instruction::Type::Dot: {
-			WObj* obj = PopStack();
-			if (WObj* attr = WGetAttribute(obj, instr.string->string.c_str())) {
+			Wg_Obj* obj = PopStack();
+			if (Wg_Obj* attr = Wg_GetAttribute(obj, instr.string->string.c_str())) {
 				PushStack(attr);
 			} else {
 				exitValue = nullptr;
@@ -507,23 +507,23 @@ namespace wings {
 			break;
 		}
 		case Instruction::Type::Unpack: {
-			WObj* iterable = PopStack();
+			Wg_Obj* iterable = PopStack();
 
-			auto f = [](WObj* value, void* userdata) {
+			auto f = [](Wg_Obj* value, void* userdata) {
 				Executor* executor = (Executor*)userdata;
 				executor->PushStack(value);
 				return true;
 			};
 
-			if (!WIterate(iterable, this, f)) {
+			if (!Wg_Iterate(iterable, this, f)) {
 				exitValue = nullptr;
 			}
 			break;
 		}
 		case Instruction::Type::UnpackMapForMapCreation: {
-			WObj* map = PopStack();
-			if (!WIsDictionary(map)) {
-				WRaiseTypeError(context, "Unary '**' must be applied to a dictionary");
+			Wg_Obj* map = PopStack();
+			if (!Wg_IsDictionary(map)) {
+				Wg_RaiseTypeError(context, "Unary '**' must be applied to a dictionary");
 				exitValue = nullptr;
 				return;
 			}
@@ -535,16 +535,16 @@ namespace wings {
 			break;
 		}
 		case Instruction::Type::UnpackMapForCall: {
-			WObj* map = PopStack();
-			if (!WIsDictionary(map)) {
-				WRaiseTypeError(context, "Unary '**' must be applied to a dictionary");
+			Wg_Obj* map = PopStack();
+			if (!Wg_IsDictionary(map)) {
+				Wg_RaiseTypeError(context, "Unary '**' must be applied to a dictionary");
 				exitValue = nullptr;
 				return;
 			}
 
 			for (const auto& [key, value] : map->Get<wings::WDict>()) {
-				if (!WIsString(key)) {
-					WRaiseTypeError(context, "Keywords must be strings");
+				if (!Wg_IsString(key)) {
+					Wg_RaiseTypeError(context, "Keywords must be strings");
 					exitValue = nullptr;
 					return;
 				}
@@ -557,15 +557,15 @@ namespace wings {
 			kwargsStack.top().push_back(PopStack());
 			break;
 		case Instruction::Type::And: {
-			WObj* arg1 = WConvertToBool(PopStack());
+			Wg_Obj* arg1 = Wg_UnaryOp(WG_UOP_BOOL, PopStack());
 			if (arg1 == nullptr) {
 				exitValue = nullptr;
 				break;
 			}
 
-			if (!WGetBool(arg1)) {
+			if (!Wg_GetBool(arg1)) {
 				// Short circuit
-				if (WObj* value = WCreateBool(context, false)) {
+				if (Wg_Obj* value = Wg_CreateBool(context, false)) {
 					PushStack(value);
 				} else {
 					exitValue = nullptr;
@@ -573,13 +573,13 @@ namespace wings {
 				}
 			}
 
-			WObj* arg2 = WConvertToBool(PopStack());
+			Wg_Obj* arg2 = Wg_UnaryOp(WG_UOP_BOOL, PopStack());
 			if (arg2 == nullptr) {
 				exitValue = nullptr;
 				break;
 			}
 			
-			if (WObj* value = WCreateBool(context, WGetBool(arg2))) {
+			if (Wg_Obj* value = Wg_CreateBool(context, Wg_GetBool(arg2))) {
 				PushStack(value);
 			} else {
 				exitValue = nullptr;
@@ -587,15 +587,15 @@ namespace wings {
 			break;
 		}
 		case Instruction::Type::Or: {
-			WObj* arg1 = WConvertToBool(PopStack());
+			Wg_Obj* arg1 = Wg_UnaryOp(WG_UOP_BOOL, PopStack());
 			if (arg1 == nullptr) {
 				exitValue = nullptr;
 				break;
 			}
 
-			if (WGetBool(arg1)) {
+			if (Wg_GetBool(arg1)) {
 				// Short circuit
-				if (WObj* value = WCreateBool(context, true)) {
+				if (Wg_Obj* value = Wg_CreateBool(context, true)) {
 					PushStack(value);
 				} else {
 					exitValue = nullptr;
@@ -603,13 +603,13 @@ namespace wings {
 				}
 			}
 
-			WObj* arg2 = WConvertToBool(PopStack());
+			Wg_Obj* arg2 = Wg_UnaryOp(WG_UOP_BOOL, PopStack());
 			if (arg2 == nullptr) {
 				exitValue = nullptr;
 				break;
 			}
 
-			if (WObj* value = WCreateBool(context, WGetBool(arg2))) {
+			if (Wg_Obj* value = Wg_CreateBool(context, Wg_GetBool(arg2))) {
 				PushStack(value);
 			} else {
 				exitValue = nullptr;
@@ -617,13 +617,13 @@ namespace wings {
 			break;
 		}
 		case Instruction::Type::Not: {
-			WObj* arg = WConvertToBool(PopStack());
+			Wg_Obj* arg = Wg_UnaryOp(WG_UOP_BOOL, PopStack());
 			if (arg == nullptr) {
 				exitValue = nullptr;
 				break;
 			}
 
-			if (WObj* value = WCreateBool(context, !WGetBool(arg))) {
+			if (Wg_Obj* value = Wg_CreateBool(context, !Wg_GetBool(arg))) {
 				PushStack(value);
 			} else {
 				exitValue = nullptr;
@@ -631,9 +631,9 @@ namespace wings {
 			break;
 		}
 		case Instruction::Type::In: {
-			WObj* container = PopStack();
-			WObj* obj = PopStack();
-			if (WObj* value = WIn(container, obj)) {
+			Wg_Obj* container = PopStack();
+			Wg_Obj* obj = PopStack();
+			if (Wg_Obj* value = Wg_BinaryOp(WG_BOP_IN, obj, container)) {
 				PushStack(value);
 			} else {
 				exitValue = nullptr;
@@ -641,9 +641,9 @@ namespace wings {
 			break;
 		}
 		case Instruction::Type::NotIn: {
-			WObj* container = PopStack();
-			WObj* obj = PopStack();
-			if (WObj* value = WNotIn(container, obj)) {
+			Wg_Obj* container = PopStack();
+			Wg_Obj* obj = PopStack();
+			if (Wg_Obj* value = Wg_BinaryOp(WG_BOP_NOTIN, obj, container)) {
 				PushStack(value);
 			} else {
 				exitValue = nullptr;
@@ -651,18 +651,18 @@ namespace wings {
 			break;
 		}
 		case Instruction::Type::Is:
-			PushStack(WCreateBool(context, PopStack() == PopStack()));
+			PushStack(Wg_CreateBool(context, PopStack() == PopStack()));
 			break;
 		case Instruction::Type::IsNot:
-			PushStack(WCreateBool(context, PopStack() != PopStack()));
+			PushStack(Wg_CreateBool(context, PopStack() != PopStack()));
 			break;
 		case Instruction::Type::ListComprehension: {
-			WObj* expr = stack[stack.size() - 4];
-			WObj* assign = stack[stack.size() - 3];
-			WObj* iterable = stack[stack.size() - 2];
-			WObj* condition = stack[stack.size() - 1];
+			Wg_Obj* expr = stack[stack.size() - 4];
+			Wg_Obj* assign = stack[stack.size() - 3];
+			Wg_Obj* iterable = stack[stack.size() - 2];
+			Wg_Obj* condition = stack[stack.size() - 1];
 
-			WObj* list = WCreateList(context);
+			Wg_Obj* list = Wg_CreateList(context);
 			if (list == nullptr) {
 				exitValue = nullptr;
 				return;
@@ -670,32 +670,32 @@ namespace wings {
 			WObjRef ref(list);
 
 			struct State {
-				WObj* expr;
-				WObj* assign;
-				WObj* list;
-				WObj* condition;
+				Wg_Obj* expr;
+				Wg_Obj* assign;
+				Wg_Obj* list;
+				Wg_Obj* condition;
 			} state = { expr, assign, list, condition };
 
-			bool success = WIterate(iterable, &state, [](WObj* value, void* userdata) {
+			bool success = Wg_Iterate(iterable, &state, [](Wg_Obj* value, void* userdata) {
 				State& state = *(State*)userdata;
 
-				if (WCall(state.assign, &value, 1) == nullptr)
+				if (Wg_Call(state.assign, &value, 1) == nullptr)
 					return false;
 
-				WObj* condition = WCall(state.condition, nullptr, 0);
+				Wg_Obj* condition = Wg_Call(state.condition, nullptr, 0);
 				if (condition == nullptr)
 					return false;
 
-				condition = WConvertToBool(condition);
+				condition = Wg_UnaryOp(WG_UOP_BOOL, condition);
 				if (condition == nullptr)
 					return false;
 
-				if (WGetBool(condition)) {
-					WObj* entry = WCall(state.expr, nullptr, 0);
+				if (Wg_GetBool(condition)) {
+					Wg_Obj* entry = Wg_Call(state.expr, nullptr, 0);
 					if (entry == nullptr)
 						return false;
 
-					state.list->Get<std::vector<WObj*>>().push_back(entry);
+					state.list->Get<std::vector<Wg_Obj*>>().push_back(entry);
 				}
 
 				return true;
@@ -712,11 +712,11 @@ namespace wings {
 			break;
 		}
 		case Instruction::Type::Raise: {
-			WObj* expr = PopStack();
-			if (WIsClass(expr)) {
-				WRaiseException(context, nullptr, expr);
+			Wg_Obj* expr = PopStack();
+			if (Wg_IsClass(expr)) {
+				Wg_RaiseException(context, nullptr, expr);
 			} else {
-				WRaiseExceptionObject(context, expr);
+				Wg_RaiseExceptionObject(context, expr);
 			}
 			exitValue = nullptr;
 			break;
@@ -726,31 +726,31 @@ namespace wings {
 			break;
 		case Instruction::Type::PopTry:
 			tryFrames.pop();
-			if (WGetCurrentException(context))
+			if (Wg_GetCurrentException(context))
 				exitValue = nullptr;
 			break;
 		case Instruction::Type::Except:
-			WClearCurrentException(context);
+			Wg_ClearCurrentException(context);
 			break;
 		case Instruction::Type::CurrentException:
-			PushStack(WGetCurrentException(context));
+			PushStack(Wg_GetCurrentException(context));
 			break;
 		case Instruction::Type::IsInstance:
 			PushStack(context->builtins.isinstance);
 			break;
 		case Instruction::Type::Slice: {
-			WObj* slice = WCall(context->builtins.slice, &context->builtins.none, 1);
+			Wg_Obj* slice = Wg_Call(context->builtins.slice, &context->builtins.none, 1);
 			if (slice == nullptr) {
 				exitValue = nullptr;
 				break;
 			}
 
-			WObj* step = PopStack();
-			WObj* stop = PopStack();
-			WObj* start = PopStack();
-			WSetAttribute(slice, "step", step);
-			WSetAttribute(slice, "stop", stop);
-			WSetAttribute(slice, "start", start);
+			Wg_Obj* step = PopStack();
+			Wg_Obj* stop = PopStack();
+			Wg_Obj* start = PopStack();
+			Wg_SetAttribute(slice, "step", step);
+			Wg_SetAttribute(slice, "stop", stop);
+			Wg_SetAttribute(slice, "start", start);
 			PushStack(slice);
 			break;
 		}

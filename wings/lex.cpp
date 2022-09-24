@@ -232,9 +232,9 @@ namespace wings {
 		if (*p == '.') {
 			// Is a float
 			++p;
-			wfloat fvalue = (wfloat)value;
+			Wg_float fvalue = (Wg_float)value;
 			for (int i = 1; *p && IsDigit(*p, base); ++p, ++i) {
-				fvalue += DigitValueOf(*p, base) * std::pow((wfloat)base, (wfloat)-i);
+				fvalue += DigitValueOf(*p, base) * std::pow((Wg_float)base, (Wg_float)-i);
 			}
 			t.literal.f = fvalue;
 			t.type = Token::Type::Float;

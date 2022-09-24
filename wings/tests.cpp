@@ -10,25 +10,25 @@ static void Expect(const char* code, const char* expected, size_t line) {
 	testsRun++;
 	output.clear();
 
-	WContext* context{};
+	Wg_Context* context{};
 	try {
-		context = WCreateContext();
+		context = Wg_CreateContext();
 		if (context == nullptr)
 			throw std::string("Context creation failed");
 
-		WConfig cfg{};
-		WGetConfig(context, &cfg);
+		Wg_Config cfg{};
+		Wg_GetConfig(context, &cfg);
 		cfg.print = [](const char* message, int len, void*) {
 			output += std::string(message, len);
 		};
-		WSetConfig(context, &cfg);
+		Wg_SetConfig(context, &cfg);
 
-		WObj* exe = WCompile(context, code);
+		Wg_Obj* exe = Wg_Compile(context, code);
 		if (exe == nullptr)
-			throw std::string(WGetErrorMessage(context));
+			throw std::string(Wg_GetErrorMessage(context));
 
-		if (WCall(exe, nullptr, 0) == nullptr)
-			throw std::string(WGetErrorMessage(context));
+		if (Wg_Call(exe, nullptr, 0) == nullptr)
+			throw std::string(Wg_GetErrorMessage(context));
 
 		std::string trimmed = output.substr(0, output.size() - 1);
 		if (trimmed != std::string(expected)) {
@@ -46,39 +46,39 @@ static void Expect(const char* code, const char* expected, size_t line) {
 		std::cout << err << std::endl;
 	}
 
-	WDestroyContext(context);
+	Wg_DestroyContext(context);
 }
 
 static void ExpectFailure(const char* code, size_t line) {
 	testsRun++;
 	output.clear();
 	
-	WContext* context{};
+	Wg_Context* context{};
 	try {
-		context = WCreateContext();
+		context = Wg_CreateContext();
 		if (context == nullptr)
 			throw std::string("Context creation failed");
 
-		WConfig cfg{};
-		WGetConfig(context, &cfg);
+		Wg_Config cfg{};
+		Wg_GetConfig(context, &cfg);
 		cfg.print = [](const char* message, int len, void*) {
 			output += std::string(message, len);
 		};
-		WSetConfig(context, &cfg);
+		Wg_SetConfig(context, &cfg);
 
-		WObj* exe = WCompile(context, code);
+		Wg_Obj* exe = Wg_Compile(context, code);
 		if (exe == nullptr)
-			throw std::string(WGetErrorMessage(context));
+			throw std::string(Wg_GetErrorMessage(context));
 
-		if (WCall(exe, nullptr, 0) == nullptr)
-			throw std::string(WGetErrorMessage(context));
+		if (Wg_Call(exe, nullptr, 0) == nullptr)
+			throw std::string(Wg_GetErrorMessage(context));
 
 		std::cout << "Test on line " << line << " did not fail as expected." << std::endl;
 	} catch (std::string&) {
 		testsPassed++;
 	}
 
-	WDestroyContext(context);
+	Wg_DestroyContext(context);
 }
 
 #define T(code, expected) Expect(code, expected, __LINE__)

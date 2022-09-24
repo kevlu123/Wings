@@ -61,8 +61,8 @@ namespace wings {
 		struct {
 			union {
 				bool b;
-				wint i;
-				wfloat f;
+				Wg_int i;
+				Wg_float f;
 			};
 			std::string s;
 		};

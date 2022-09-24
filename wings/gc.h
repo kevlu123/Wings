@@ -2,6 +2,6 @@
 #include "impl.h"
 
 namespace wings {
-	WObj* Alloc(WContext* context);
-	void DestroyAllObjects(WContext* context);
+	Wg_Obj* Alloc(Wg_Context* context);
+	void DestroyAllObjects(Wg_Context* context);
 }

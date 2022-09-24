@@ -26,7 +26,7 @@ namespace wings {
 		std::string prettyName;
 	};
 
-	using LiteralInstruction = std::variant<std::nullptr_t, bool, wint, wfloat, std::string>;
+	using LiteralInstruction = std::variant<std::nullptr_t, bool, Wg_int, Wg_float, std::string>;
 
 	struct StringArgInstruction {
 		std::string string;

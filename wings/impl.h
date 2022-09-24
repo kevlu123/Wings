@@ -15,14 +15,14 @@
 #include <type_traits>
 #include <cstdlib> // std::abort
 
-using wuint = std::make_unsigned_t<wint>;
+using wuint = std::make_unsigned_t<Wg_int>;
 
-struct WContext;
+struct Wg_Context;
 
 namespace wings {
 	size_t Guid();
-	void InitLibrary(WContext* context);
-	std::string WObjTypeToString(const WObj* obj);
+	void InitLibrary(Wg_Context* context);
+	std::string WObjTypeToString(const Wg_Obj* obj);
 	void CallErrorCallback(const char* message);
 
 	struct SourcePosition {
@@ -62,64 +62,64 @@ namespace wings {
 
 	struct WObjRef {
 		WObjRef() : obj(nullptr) {}
-		explicit WObjRef(WObj* obj) : obj(obj) { if (obj) WProtectObject(obj); }
+		explicit WObjRef(Wg_Obj* obj) : obj(obj) { if (obj) Wg_ProtectObject(obj); }
 		explicit WObjRef(WObjRef&& other) noexcept : obj(other.obj) { other.obj = nullptr; }
 		WObjRef& operator=(WObjRef&& other) noexcept { obj = other.obj; other.obj = nullptr; return *this; }
 		WObjRef(const WObjRef&) = delete;
 		WObjRef& operator=(const WObjRef&) = delete;
-		~WObjRef() { if (obj) WUnprotectObject(obj); }
-		WObj* Get() const { return obj; }
+		~WObjRef() { if (obj) Wg_UnprotectObject(obj); }
+		Wg_Obj* Get() const { return obj; }
 	private:
-		WObj* obj;
+		Wg_Obj* obj;
 	};
 
 	struct Builtins {
 		// Types
-		WObj* object;
-		WObj* noneType;
-		WObj* _bool;
-		WObj* _int;
-		WObj* _float;
-		WObj* str;
-		WObj* tuple;
-		WObj* list;
-		WObj* dict;
-		WObj* set;
-		WObj* func;
-		WObj* slice;
-		WObj* defaultIter;
-		WObj* defaultReverseIter;
-		WObj* dictKeysIter;
-		WObj* dictValuesIter;
-		WObj* dictItemsIter;
+		Wg_Obj* object;
+		Wg_Obj* noneType;
+		Wg_Obj* _bool;
+		Wg_Obj* _int;
+		Wg_Obj* _float;
+		Wg_Obj* str;
+		Wg_Obj* tuple;
+		Wg_Obj* list;
+		Wg_Obj* dict;
+		Wg_Obj* set;
+		Wg_Obj* func;
+		Wg_Obj* slice;
+		Wg_Obj* defaultIter;
+		Wg_Obj* defaultReverseIter;
+		Wg_Obj* dictKeysIter;
+		Wg_Obj* dictValuesIter;
+		Wg_Obj* dictItemsIter;
 
 		// Exception types
-		WObj* baseException;
-		WObj* exception;
-		WObj* syntaxError;
-		WObj* nameError;
-		WObj* typeError;
-		WObj* valueError;
-		WObj* attributeError;
-		WObj* lookupError;
-		WObj* indexError;
-		WObj* keyError;
-		WObj* arithmeticError;
-		WObj* overflowError;
-		WObj* zeroDivisionError;
-		WObj* stopIteration;
+		Wg_Obj* baseException;
+		Wg_Obj* exception;
+		Wg_Obj* syntaxError;
+		Wg_Obj* nameError;
+		Wg_Obj* typeError;
+		Wg_Obj* valueError;
+		Wg_Obj* attributeError;
+		Wg_Obj* lookupError;
+		Wg_Obj* indexError;
+		Wg_Obj* keyError;
+		Wg_Obj* arithmeticError;
+		Wg_Obj* overflowError;
+		Wg_Obj* zeroDivisionError;
+		Wg_Obj* stopIteration;
 
 		// Functions
-		WObj* isinstance;
-		WObj* repr;
-		WObj* hash;
-		WObj* len;
+		Wg_Obj* isinstance;
+		Wg_Obj* repr;
+		Wg_Obj* hash;
+		Wg_Obj* len;
 
 		// Instances
-		WObj* none;
-		WObj* _true;
-		WObj* _false;
-		WObj* memoryErrorInstance;
+		Wg_Obj* none;
+		Wg_Obj* _true;
+		Wg_Obj* _false;
+		Wg_Obj* memoryErrorInstance;
 
 		auto GetAll() const {
 			return std::array{
@@ -141,10 +141,10 @@ namespace wings {
 	constexpr const char* DEFAULT_FUNC_NAME = "<unnamed>";
 }
 
-struct WObj {
+struct Wg_Obj {
 	struct Func {
-		WObj* self;
-		WObj* (*fptr)(WObj** args, int argc, WObj* kwargs, void* userdata);
+		Wg_Obj* self;
+		Wg_Obj* (*fptr)(Wg_Obj** args, int argc, Wg_Obj* kwargs, void* userdata);
 		void* userdata;
 		bool isMethod;
 		std::string tag;
@@ -153,9 +153,9 @@ struct WObj {
 
 	struct Class {
 		std::string name;
-		WObj* (*ctor)(WObj** args, int argc, WObj* kwargs, void* userdata);
+		Wg_Obj* (*ctor)(Wg_Obj** args, int argc, Wg_Obj* kwargs, void* userdata);
 		void* userdata;
-		std::vector<WObj*> bases;
+		std::vector<Wg_Obj*> bases;
 		wings::AttributeTable instanceAttributes;
 	};
 
@@ -163,10 +163,10 @@ struct WObj {
 	union {
 		void* data;
 		bool* _bool;
-		wint* _int;
-		wfloat* _float;
+		Wg_int* _int;
+		Wg_float* _float;
 		std::string* _str;
-		std::vector<WObj*>* _list;
+		std::vector<Wg_Obj*>* _list;
 		wings::WDict* _map;
 		Func* _func;
 		Class* _class;
@@ -175,19 +175,19 @@ struct WObj {
 	template <class T> T& Get() { return *(T*)data; }
 
 	wings::AttributeTable attributes;
-	WFinalizerDesc finalizer{};
-	std::vector<WObj*> references;
-	WContext* context;
+	Wg_FinalizerDesc finalizer{};
+	std::vector<Wg_Obj*> references;
+	Wg_Context* context;
 };
 
-struct WContext {
-	WConfig config{};
+struct Wg_Context {
+	Wg_Config config{};
 	size_t lastObjectCountAfterGC = 0;
-	std::deque<std::unique_ptr<WObj>> mem;
-	std::unordered_map<const WObj*, size_t> protectedObjects;
-	std::unordered_map<std::string, wings::RcPtr<WObj*>> globals;
-	WObj* currentException = nullptr;
-	std::vector<WObj*> reprStack;
+	std::deque<std::unique_ptr<Wg_Obj>> mem;
+	std::unordered_map<const Wg_Obj*, size_t> protectedObjects;
+	std::unordered_map<std::string, wings::RcPtr<Wg_Obj*>> globals;
+	Wg_Obj* currentException = nullptr;
+	std::vector<Wg_Obj*> reprStack;
 	std::vector<wings::TraceFrame> currentTrace;
 	std::vector<wings::OwnedTraceFrame> exceptionTrace;
 	std::string traceMessage;

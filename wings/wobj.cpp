@@ -6,12 +6,12 @@
 
 extern "C" {
 
-	WObj* WCreateNone(WContext* context) {
+	Wg_Obj* Wg_CreateNone(Wg_Context* context) {
 		WASSERT(context);
 		return context->builtins.none;
 	}
 
-	WObj* WCreateBool(WContext* context, bool value) {
+	Wg_Obj* Wg_CreateBool(Wg_Context* context, bool value) {
 		WASSERT(context);
 		if (value && context->builtins._true) {
 			return context->builtins._true;
@@ -22,29 +22,29 @@ extern "C" {
 		}
 	}
 
-	WObj* WCreateInt(WContext* context, wint value) {
+	Wg_Obj* Wg_CreateInt(Wg_Context* context, Wg_int value) {
 		WASSERT(context);
-		if (WObj* v = WCall(context->builtins._int, nullptr, 0)) {
-			v->Get<wint>() = value;
+		if (Wg_Obj* v = Wg_Call(context->builtins._int, nullptr, 0)) {
+			v->Get<Wg_int>() = value;
 			return v;
 		} else {
 			return nullptr;
 		}
 	}
 
-	WObj* WCreateFloat(WContext* context, wfloat value) {
+	Wg_Obj* Wg_CreateFloat(Wg_Context* context, Wg_float value) {
 		WASSERT(context);
-		if (WObj* v = WCall(context->builtins._float, nullptr, 0)) {
-			v->Get<wfloat>() = value;
+		if (Wg_Obj* v = Wg_Call(context->builtins._float, nullptr, 0)) {
+			v->Get<Wg_float>() = value;
 			return v;
 		} else {
 			return nullptr;
 		}
 	}
 
-	WObj* WCreateString(WContext* context, const char* value) {
+	Wg_Obj* Wg_CreateString(Wg_Context* context, const char* value) {
 		WASSERT(context);
-		if (WObj* v = WCall(context->builtins.str, nullptr, 0)) {
+		if (Wg_Obj* v = Wg_Call(context->builtins.str, nullptr, 0)) {
 			v->Get<std::string>() = value ? value : "";
 			return v;
 		} else {
@@ -52,7 +52,7 @@ extern "C" {
 		}
 	}
 
-	WObj* WCreateTuple(WContext* context, WObj** argv, int argc) {
+	Wg_Obj* Wg_CreateTuple(Wg_Context* context, Wg_Obj** argv, int argc) {
 		std::vector<wings::WObjRef> refs;
 		WASSERT(context && argc >= 0);
 		if (argc > 0) {
@@ -63,15 +63,15 @@ extern "C" {
 			}
 		}
 
-		if (WObj* v = WCall(context->builtins.tuple, nullptr, 0)) {
-			v->Get<std::vector<WObj*>>() = std::vector<WObj*>(argv, argv + argc);
+		if (Wg_Obj* v = Wg_Call(context->builtins.tuple, nullptr, 0)) {
+			v->Get<std::vector<Wg_Obj*>>() = std::vector<Wg_Obj*>(argv, argv + argc);
 			return v;
 		} else {
 			return nullptr;
 		}
 	}
 
-	WObj* WCreateList(WContext* context, WObj** argv, int argc) {
+	Wg_Obj* Wg_CreateList(Wg_Context* context, Wg_Obj** argv, int argc) {
 		std::vector<wings::WObjRef> refs;
 		WASSERT(context && argc >= 0);
 		if (argc > 0) {
@@ -82,15 +82,15 @@ extern "C" {
 			}
 		}
 
-		if (WObj* v = WCall(context->builtins.list, nullptr, 0)) {
-			v->Get<std::vector<WObj*>>() = std::vector<WObj*>(argv, argv + argc);
+		if (Wg_Obj* v = Wg_Call(context->builtins.list, nullptr, 0)) {
+			v->Get<std::vector<Wg_Obj*>>() = std::vector<Wg_Obj*>(argv, argv + argc);
 			return v;
 		} else {
 			return nullptr;
 		}
 	}
 
-	WObj* WCreateDictionary(WContext* context, WObj** keys, WObj** values, int argc) {
+	Wg_Obj* Wg_CreateDictionary(Wg_Context* context, Wg_Obj** keys, Wg_Obj** values, int argc) {
 		std::vector<wings::WObjRef> refs;
 		WASSERT(context && argc >= 0);
 		if (argc > 0) {
@@ -103,14 +103,14 @@ extern "C" {
 		}
 
 		// Pass a dummy kwargs to prevent stack overflow from recursion
-		WObj* dummyKwargs = wings::Alloc(context);
+		Wg_Obj* dummyKwargs = wings::Alloc(context);
 		if (dummyKwargs == nullptr)
 			return nullptr;
 		dummyKwargs->type = "__map";
 		wings::WDict wd{};
 		dummyKwargs->data = &wd;
 
-		if (WObj* v = WCall(context->builtins.dict, nullptr, 0, dummyKwargs)) {
+		if (Wg_Obj* v = Wg_Call(context->builtins.dict, nullptr, 0, dummyKwargs)) {
 			for (int i = 0; i < argc; i++) {
 				refs.emplace_back(v);
 				try {
@@ -125,7 +125,7 @@ extern "C" {
 		}
 	}
 
-	WObj* WCreateSet(WContext* context, WObj** argv, int argc) {
+	Wg_Obj* Wg_CreateSet(Wg_Context* context, Wg_Obj** argv, int argc) {
 		std::vector<wings::WObjRef> refs;
 		WASSERT(context && argc >= 0);
 		if (argc > 0) {
@@ -136,7 +136,7 @@ extern "C" {
 			}
 		}
 
-		if (WObj* v = WCall(context->builtins.set, nullptr, 0, nullptr)) {
+		if (Wg_Obj* v = Wg_Call(context->builtins.set, nullptr, 0, nullptr)) {
 			for (int i = 0; i < argc; i++) {
 				try {
 					v->Get<wings::WSet>().insert(argv[i]);
@@ -150,10 +150,10 @@ extern "C" {
 		}
 	}
 
-	WObj* WCreateFunction(WContext* context, const WFuncDesc* value) {
+	Wg_Obj* Wg_CreateFunction(Wg_Context* context, const Wg_FuncDesc* value) {
 		WASSERT(context && value);
-		if (WObj* v = WCall(context->builtins.func, nullptr, 0)) {
-			v->Get<WObj::Func>() = {
+		if (Wg_Obj* v = Wg_Call(context->builtins.func, nullptr, 0)) {
+			v->Get<Wg_Obj::Func>() = {
 				nullptr,
 				value->fptr,
 				value->userdata,
@@ -167,82 +167,82 @@ extern "C" {
 		}
 	}
 
-	WObj* WCreateClass(WContext* context, const char* name, WObj** bases, int baseCount) {
+	Wg_Obj* Wg_CreateClass(Wg_Context* context, const char* name, Wg_Obj** bases, int baseCount) {
 		std::vector<wings::WObjRef> refs;
 		WASSERT(context && name && baseCount >= 0);
 		if (baseCount > 0) {
 			WASSERT(bases);
 			for (int i = 0; i < baseCount; i++) {
-				WASSERT(bases[i] && WIsClass(bases[i]));
+				WASSERT(bases[i] && Wg_IsClass(bases[i]));
 				refs.emplace_back(bases[i]);
 			}
 		}
 
 		// Allocate class
-		WObj* _class = wings::Alloc(context);
+		Wg_Obj* _class = wings::Alloc(context);
 		if (_class == nullptr) {
 			return nullptr;
 		}
 		refs.emplace_back(_class);
 		_class->type = "__class";
-		_class->data = new WObj::Class{ std::string(name) };
-		_class->finalizer.fptr = [](WObj* obj, void*) { delete (WObj::Class*)obj->data; };
-		_class->Get<WObj::Class>().instanceAttributes.Set("__class__", _class);
-		_class->attributes.AddParent(context->builtins.object->Get<WObj::Class>().instanceAttributes);
+		_class->data = new Wg_Obj::Class{ std::string(name) };
+		_class->finalizer.fptr = [](Wg_Obj* obj, void*) { delete (Wg_Obj::Class*)obj->data; };
+		_class->Get<Wg_Obj::Class>().instanceAttributes.Set("__class__", _class);
+		_class->attributes.AddParent(context->builtins.object->Get<Wg_Obj::Class>().instanceAttributes);
 
 		// Set bases
 		int actualBaseCount = baseCount ? baseCount : 1;
-		WObj** actualBases = baseCount ? bases : &context->builtins.object;
+		Wg_Obj** actualBases = baseCount ? bases : &context->builtins.object;
 		for (int i = 0; i < actualBaseCount; i++) {
-			_class->Get<WObj::Class>().instanceAttributes.AddParent(actualBases[i]->Get<WObj::Class>().instanceAttributes);
-			_class->Get<WObj::Class>().bases.push_back(actualBases[i]);
+			_class->Get<Wg_Obj::Class>().instanceAttributes.AddParent(actualBases[i]->Get<Wg_Obj::Class>().instanceAttributes);
+			_class->Get<Wg_Obj::Class>().bases.push_back(actualBases[i]);
 		}
-		if (WObj* basesTuple = WCreateTuple(context, actualBases, actualBaseCount)) {
+		if (Wg_Obj* basesTuple = Wg_CreateTuple(context, actualBases, actualBaseCount)) {
 			_class->attributes.Set("__bases__", basesTuple);
 		} else {
 			return nullptr;
 		}
 
 		// Set __str__()
-		WFuncDesc tostr{};
+		Wg_FuncDesc tostr{};
 		tostr.isMethod = true;
 		tostr.prettyName = "__str__";
 		tostr.userdata = context;
-		tostr.fptr = [](WObj** argv, int argc, WObj* kwargs, void* ud) -> WObj* {
+		tostr.fptr = [](Wg_Obj** argv, int argc, Wg_Obj* kwargs, void* ud) -> Wg_Obj* {
 			if (argc != 1) {
-				WRaiseArgumentCountError((WContext*)ud, argc, 1);
+				Wg_RaiseArgumentCountError((Wg_Context*)ud, argc, 1);
 				return nullptr;
 			}
-			std::string s = "<class '" + argv[0]->Get<WObj::Class>().name + "'>";
-			return WCreateString(argv[0]->context, s.c_str());
+			std::string s = "<class '" + argv[0]->Get<Wg_Obj::Class>().name + "'>";
+			return Wg_CreateString(argv[0]->context, s.c_str());
 		};
-		if (WObj* tostrFn = WCreateFunction(context, &tostr)) {
-			WSetAttribute(_class, "__str__", tostrFn);
+		if (Wg_Obj* tostrFn = Wg_CreateFunction(context, &tostr)) {
+			Wg_SetAttribute(_class, "__str__", tostrFn);
 		} else {
 			return nullptr;
 		}
 
 		// Set construction function. This function forwards to __init__().
-		_class->Get<WObj::Class>().userdata = _class;
-		_class->Get<WObj::Class>().ctor = [](WObj** argv, int argc, WObj* kwargs, void* userdata) -> WObj* {
-			WObj* _classObj = (WObj*)userdata;
-			WContext* context = _classObj->context;
+		_class->Get<Wg_Obj::Class>().userdata = _class;
+		_class->Get<Wg_Obj::Class>().ctor = [](Wg_Obj** argv, int argc, Wg_Obj* kwargs, void* userdata) -> Wg_Obj* {
+			Wg_Obj* _classObj = (Wg_Obj*)userdata;
+			Wg_Context* context = _classObj->context;
 
-			WObj* instance = wings::Alloc(context);
+			Wg_Obj* instance = wings::Alloc(context);
 			if (instance == nullptr)
 				return nullptr;
 			wings::WObjRef ref(instance);
 
-			instance->attributes = _classObj->Get<WObj::Class>().instanceAttributes.Copy();
-			instance->type = _classObj->Get<WObj::Class>().name;
+			instance->attributes = _classObj->Get<Wg_Obj::Class>().instanceAttributes.Copy();
+			instance->type = _classObj->Get<Wg_Obj::Class>().name;
 
-			if (WObj* init = WHasAttribute(instance, "__init__")) {
-				if (WIsFunction(init)) {
-					WObj* ret = WCall(init, argv, argc, kwargs);
+			if (Wg_Obj* init = Wg_HasAttribute(instance, "__init__")) {
+				if (Wg_IsFunction(init)) {
+					Wg_Obj* ret = Wg_Call(init, argv, argc, kwargs);
 					if (ret == nullptr) {
 						return nullptr;
-					} else if (!WIsNone(ret)) {
-						WRaiseTypeError(context, "__init__() returned a non NoneType type");
+					} else if (!Wg_IsNone(ret)) {
+						Wg_RaiseTypeError(context, "__init__() returned a non NoneType type");
 						return nullptr;
 					}
 				}
@@ -253,130 +253,130 @@ extern "C" {
 
 		// Set init method
 		std::string initName = std::string(name) + ".__init__";
-		WFuncDesc init{};
+		Wg_FuncDesc init{};
 		init.prettyName = initName.c_str();
 		init.isMethod = true;
 		init.userdata = _class;
-		init.fptr = [](WObj** argv, int argc, WObj* kwargs, void* userdata) -> WObj* {
-			WObj* _class = (WObj*)userdata;
+		init.fptr = [](Wg_Obj** argv, int argc, Wg_Obj* kwargs, void* userdata) -> Wg_Obj* {
+			Wg_Obj* _class = (Wg_Obj*)userdata;
 			if (argc < 1) {
-				WRaiseArgumentCountError(_class->context, argc, -1);
+				Wg_RaiseArgumentCountError(_class->context, argc, -1);
 				return nullptr;
 			}
 
-			const auto& bases = _class->Get<WObj::Class>().bases;
+			const auto& bases = _class->Get<Wg_Obj::Class>().bases;
 			if (bases.empty())
 				return nullptr;
 
-			if (WObj* baseInit = WGetAttributeFromBase(argv[0], "__init__", bases[0])) {
-				WObj* ret = WCall(baseInit, argv + 1, argc - 1, kwargs);
+			if (Wg_Obj* baseInit = Wg_GetAttributeFromBase(argv[0], "__init__", bases[0])) {
+				Wg_Obj* ret = Wg_Call(baseInit, argv + 1, argc - 1, kwargs);
 				if (ret == nullptr) {
 					return nullptr;
-				} else if (!WIsNone(ret)) {
-					WRaiseTypeError(argv[0]->context, "__init__() returned a non NoneType type");
+				} else if (!Wg_IsNone(ret)) {
+					Wg_RaiseTypeError(argv[0]->context, "__init__() returned a non NoneType type");
 					return nullptr;
 				}
 			}
 
-			return WCreateNone(argv[0]->context);
+			return Wg_CreateNone(argv[0]->context);
 		};
-		WObj* initFn = WCreateFunction(context, &init);
+		Wg_Obj* initFn = Wg_CreateFunction(context, &init);
 		if (initFn == nullptr)
 			return nullptr;
-		WLinkReference(initFn, _class);
-		WAddAttributeToClass(_class, "__init__", initFn);
+		Wg_LinkReference(initFn, _class);
+		Wg_AddAttributeToClass(_class, "__init__", initFn);
 
 		return _class;
 	}
 	
-	void WAddAttributeToClass(WObj* class_, const char* attribute, WObj* value) {
-		WASSERT_VOID(class_ && attribute && value && WIsClass(class_));
-		class_->Get<WObj::Class>().instanceAttributes.Set(attribute, value);
+	void Wg_AddAttributeToClass(Wg_Obj* class_, const char* attribute, Wg_Obj* value) {
+		WASSERT_VOID(class_ && attribute && value && Wg_IsClass(class_));
+		class_->Get<Wg_Obj::Class>().instanceAttributes.Set(attribute, value);
 	}
 
-	bool WIsNone(const WObj* obj) {
+	bool Wg_IsNone(const Wg_Obj* obj) {
 		WASSERT(obj);
 		return obj == obj->context->builtins.none;
 	}
 
-	bool WIsBool(const WObj* obj) {
+	bool Wg_IsBool(const Wg_Obj* obj) {
 		WASSERT(obj);
 		return obj == obj->context->builtins._true
 			|| obj == obj->context->builtins._false;
 	}
 
-	bool WIsInt(const WObj* obj) {
+	bool Wg_IsInt(const Wg_Obj* obj) {
 		WASSERT(obj);
 		return obj->type == "__int";
 	}
 
-	bool WIsIntOrFloat(const WObj* obj) {
+	bool Wg_IsIntOrFloat(const Wg_Obj* obj) {
 		WASSERT(obj);
 		return obj->type == "__int" || obj->type == "__float";
 	}
 
-	bool WIsString(const WObj* obj) {
+	bool Wg_IsString(const Wg_Obj* obj) {
 		WASSERT(obj);
 		return obj->type == "__str";
 	}
 
-	bool WIsTuple(const WObj* obj) {
+	bool Wg_IsTuple(const Wg_Obj* obj) {
 		WASSERT(obj);
 		return obj->type == "__tuple";
 	}
 
-	bool WIsList(const WObj* obj) {
+	bool Wg_IsList(const Wg_Obj* obj) {
 		WASSERT(obj);
 		return obj->type == "__list";
 	}
 
-	bool WIsDictionary(const WObj* obj) {
+	bool Wg_IsDictionary(const Wg_Obj* obj) {
 		WASSERT(obj);
 		return obj->type == "__map";
 	}
 
-	bool WIsSet(const WObj* obj) {
+	bool Wg_IsSet(const Wg_Obj* obj) {
 		WASSERT(obj);
 		return obj->type == "__set";
 	}
 
-	bool WIsClass(const WObj* obj) {
+	bool Wg_IsClass(const Wg_Obj* obj) {
 		WASSERT(obj);
 		return obj->type == "__class";
 	}
 
-	bool WIsFunction(const WObj* obj) {
+	bool Wg_IsFunction(const Wg_Obj* obj) {
 		WASSERT(obj);
 		return obj->type == "__func";
 	}
 
-	bool WGetBool(const WObj* obj) {
-		WASSERT(obj && WIsBool(obj));
+	bool Wg_GetBool(const Wg_Obj* obj) {
+		WASSERT(obj && Wg_IsBool(obj));
 		return obj->Get<bool>();
 	}
 
-	wint WGetInt(const WObj* obj) {
-		WASSERT(obj && WIsInt(obj));
-		return obj->Get<wint>();
+	Wg_int Wg_GetInt(const Wg_Obj* obj) {
+		WASSERT(obj && Wg_IsInt(obj));
+		return obj->Get<Wg_int>();
 	}
 
-	wfloat WGetFloat(const WObj* obj) {
-		WASSERT(obj && WIsIntOrFloat(obj));
-		if (WIsInt(obj)) return (wfloat)obj->Get<wint>();
-		else return obj->Get<wfloat>();
+	Wg_float Wg_GetFloat(const Wg_Obj* obj) {
+		WASSERT(obj && Wg_IsIntOrFloat(obj));
+		if (Wg_IsInt(obj)) return (Wg_float)obj->Get<Wg_int>();
+		else return obj->Get<Wg_float>();
 	}
 
-	const char* WGetString(const WObj* obj) {
-		WASSERT(obj && WIsString(obj));
+	const char* Wg_GetString(const Wg_Obj* obj) {
+		WASSERT(obj && Wg_IsString(obj));
 		return obj->Get<std::string>().c_str();
 	}
 
-	void WSetUserdata(WObj* obj, void* userdata) {
+	void Wg_SetUserdata(Wg_Obj* obj, void* userdata) {
 		WASSERT_VOID(obj);
 		obj->data = userdata;
 	}
 
-	bool WTryGetUserdata(const WObj* obj, const char* type, void** out) {
+	bool Wg_TryGetUserdata(const Wg_Obj* obj, const char* type, void** out) {
 		WASSERT(obj && type);
 		if (obj->type == std::string(type)) {
 			*out = obj->data;
@@ -386,64 +386,64 @@ extern "C" {
 		}
 	}
 
-	void WGetFinalizer(const WObj* obj, WFinalizerDesc* out) {
+	void Wg_GetFinalizer(const Wg_Obj* obj, Wg_FinalizerDesc* out) {
 		WASSERT_VOID(obj && out);
 		*out = obj->finalizer;
 	}
 
-	void WSetFinalizer(WObj* obj, const WFinalizerDesc* finalizer) {
+	void Wg_SetFinalizer(Wg_Obj* obj, const Wg_FinalizerDesc* finalizer) {
 		WASSERT_VOID(obj && finalizer);
 		obj->finalizer = *finalizer;
 	}
 
-	WObj* WHasAttribute(WObj* obj, const char* member) {
+	Wg_Obj* Wg_HasAttribute(Wg_Obj* obj, const char* member) {
 		WASSERT(obj && member);
-		WObj* mem = obj->attributes.Get(member);
-		if (mem && WIsFunction(mem) && mem->Get<WObj::Func>().isMethod) {
-			mem->Get<WObj::Func>().self = obj;
+		Wg_Obj* mem = obj->attributes.Get(member);
+		if (mem && Wg_IsFunction(mem) && mem->Get<Wg_Obj::Func>().isMethod) {
+			mem->Get<Wg_Obj::Func>().self = obj;
 		}
 		return mem;
 	}
 
-	WObj* WGetAttribute(WObj* obj, const char* member) {
+	Wg_Obj* Wg_GetAttribute(Wg_Obj* obj, const char* member) {
 		WASSERT(obj && member);
-		WObj* mem = obj->attributes.Get(member);
+		Wg_Obj* mem = obj->attributes.Get(member);
 		if (mem == nullptr) {
-			WRaiseAttributeError(obj, member);
-		} else if (WIsFunction(mem) && mem->Get<WObj::Func>().isMethod) {
-			mem->Get<WObj::Func>().self = obj;
+			Wg_RaiseAttributeError(obj, member);
+		} else if (Wg_IsFunction(mem) && mem->Get<Wg_Obj::Func>().isMethod) {
+			mem->Get<Wg_Obj::Func>().self = obj;
 		}
 		return mem;
 	}
 
-	void WSetAttribute(WObj* obj, const char* member, WObj* value) {
+	void Wg_SetAttribute(Wg_Obj* obj, const char* member, Wg_Obj* value) {
 		WASSERT_VOID(obj && member && value);
 		obj->attributes.Set(member, value);
 	}
 
-	WObj* WGetAttributeFromBase(WObj* obj, const char* member, WObj* baseClass) {
+	Wg_Obj* Wg_GetAttributeFromBase(Wg_Obj* obj, const char* member, Wg_Obj* baseClass) {
 		WASSERT(obj && member);
 
-		WObj* mem{};
+		Wg_Obj* mem{};
 		if (baseClass == nullptr) {
 			mem = obj->attributes.GetFromBase(member);
 		} else {
-			mem = baseClass->Get<WObj::Class>().instanceAttributes.Get(member);
+			mem = baseClass->Get<Wg_Obj::Class>().instanceAttributes.Get(member);
 		}
 
-		if (mem && WIsFunction(mem) && mem->Get<WObj::Func>().isMethod) {
-			mem->Get<WObj::Func>().self = obj;
+		if (mem && Wg_IsFunction(mem) && mem->Get<Wg_Obj::Func>().isMethod) {
+			mem->Get<Wg_Obj::Func>().self = obj;
 		}
 		return mem;
 	}
 
-	WObj* WIsInstance(const WObj* instance, WObj*const* types, int typesLen) {
+	Wg_Obj* Wg_IsInstance(const Wg_Obj* instance, Wg_Obj*const* types, int typesLen) {
 		WASSERT(instance && typesLen >= 0 && (types || typesLen == 0));
 		for (int i = 0; i < typesLen; i++)
-			WASSERT(types[i] && WIsClass(types[i]));
+			WASSERT(types[i] && Wg_IsClass(types[i]));
 
-		// Cannot use WHasAttribute here because instance is a const pointer
-		WObj* _class = instance->attributes.Get("__class__");
+		// Cannot use Wg_HasAttribute here because instance is a const pointer
+		Wg_Obj* _class = instance->attributes.Get("__class__");
 		if (_class == nullptr)
 			return nullptr;
 		wings::WObjRef ref(_class);
@@ -457,9 +457,9 @@ extern "C" {
 			if (it != end)
 				return *it;
 
-			WObj* bases = WHasAttribute(toCheck.front().Get(), "__bases__");
-			if (bases && WIsTuple(bases))
-				for (WObj* base : bases->Get<std::vector<WObj*>>())
+			Wg_Obj* bases = Wg_HasAttribute(toCheck.front().Get(), "__bases__");
+			if (bases && Wg_IsTuple(bases))
+				for (Wg_Obj* base : bases->Get<std::vector<Wg_Obj*>>())
 					toCheck.emplace(base);
 
 			toCheck.pop();
@@ -467,25 +467,25 @@ extern "C" {
 		return nullptr;
 	}
 
-	bool WIterate(WObj* obj, void* userdata, WIterationCallback callback) {
+	bool Wg_Iterate(Wg_Obj* obj, void* userdata, Wg_IterationCallback callback) {
 		WASSERT(obj && callback);
-		WContext* context = obj->context;
+		Wg_Context* context = obj->context;
 
-		WObj* iter = WCallMethod(obj, "__iter__", nullptr, 0);
+		Wg_Obj* iter = Wg_CallMethod(obj, "__iter__", nullptr, 0);
 		if (iter == nullptr)
 			return false;
 		wings::WObjRef iterRef(iter);
 
 		while (true) {
-			WObj* yielded = WCallMethod(iter, "__next__", nullptr, 0);
+			Wg_Obj* yielded = Wg_CallMethod(iter, "__next__", nullptr, 0);
 			wings::WObjRef yieldedRef(yielded);
 			if (yielded)
 				callback(yielded, userdata);
 
-			WObj* exc = WGetCurrentException(context);
+			Wg_Obj* exc = Wg_GetCurrentException(context);
 			if (exc) {
-				if (WIsInstance(exc, &context->builtins.stopIteration, 1)) {
-					WClearCurrentException(context);
+				if (Wg_IsInstance(exc, &context->builtins.stopIteration, 1)) {
+					Wg_ClearCurrentException(context);
 					return true;
 				} else {
 					return false;
@@ -494,80 +494,80 @@ extern "C" {
 		}
 	}
 
-	bool WUnpack(WObj* obj, WObj** out, int count) {
+	bool Wg_Unpack(Wg_Obj* obj, Wg_Obj** out, int count) {
 		WASSERT(obj && (count == 0 || out));
 		
-		WContext* context = obj->context;
+		Wg_Context* context = obj->context;
 		struct State {
-			WContext* context;
-			WObj** array;
+			Wg_Context* context;
+			Wg_Obj** array;
 			int count;
 			int index;
 		} s = { context, out, count, 0 };
 		
-		bool success = WIterate(obj, &s, [](WObj* yielded, void* userdata) {
+		bool success = Wg_Iterate(obj, &s, [](Wg_Obj* yielded, void* userdata) {
 			State* s = (State*)userdata;
 			if (s->index >= s->count) {
-				WRaiseValueError(s->context, "Too many values to unpack");
+				Wg_RaiseValueError(s->context, "Too many values to unpack");
 				return false;
 			}
-			WProtectObject(yielded);
+			Wg_ProtectObject(yielded);
 			s->array[s->index] = yielded;
 			s->index++;
 			return true;
 			});
 
 		for (int i = s.index; i; i--)
-			WUnprotectObject(out[i - 1]);
+			Wg_UnprotectObject(out[i - 1]);
 
 		if (!success) {
 			return false;
 		} else if (s.index < count) {
-			WRaiseValueError(context, "Not enough values to unpack");
+			Wg_RaiseValueError(context, "Not enough values to unpack");
 			return false;
 		} else {
 			return true;
 		}
 	}
 
-	WObj* WConvertToBool(WObj* arg) {
+	Wg_Obj* WConvertToBool(Wg_Obj* arg) {
 		WASSERT(arg);
-		return WCall(arg->context->builtins._bool, &arg, 1);
+		return Wg_Call(arg->context->builtins._bool, &arg, 1);
 	}
 
-	WObj* WConvertToInt(WObj* arg) {
-		return WCall(arg->context->builtins._int, &arg, 1);
+	Wg_Obj* WConvertToInt(Wg_Obj* arg) {
+		return Wg_Call(arg->context->builtins._int, &arg, 1);
 	}
 
-	WObj* WConvertToFloat(WObj* arg) {
-		return WCall(arg->context->builtins._float, &arg, 1);
+	Wg_Obj* WConvertToFloat(Wg_Obj* arg) {
+		return Wg_Call(arg->context->builtins._float, &arg, 1);
 	}
 
-	WObj* WConvertToString(WObj* arg) {
-		return WCall(arg->context->builtins.str, &arg, 1);
+	Wg_Obj* WConvertToString(Wg_Obj* arg) {
+		return Wg_Call(arg->context->builtins.str, &arg, 1);
 	}
 
-	WObj* WRepr(WObj* arg) {
+	Wg_Obj* WRepr(Wg_Obj* arg) {
 		WASSERT(arg);
-		return WCall(arg->context->builtins.repr, &arg, 1);
+		return Wg_Call(arg->context->builtins.repr, &arg, 1);
 	}
 
-	WObj* WCall(WObj* callable, WObj** argv, int argc, WObj* kwargsDict) {
+	Wg_Obj* Wg_Call(Wg_Obj* callable, Wg_Obj** argv, int argc, Wg_Obj* kwargsDict) {
 		WASSERT(callable && argc >= 0 && (argc == 0 || argv));
-		if (WIsFunction(callable) || WIsClass(callable)) {
+		if (Wg_IsFunction(callable) || Wg_IsClass(callable)) {
 			if (argc)
 				WASSERT(argv);
 			for (int i = 0; i < argc; i++)
 				WASSERT(argv[i]);
 
 			if (kwargsDict) {
-				if (!WIsDictionary(kwargsDict)) {
-					WRaiseTypeError(kwargsDict->context, "Keyword arguments must be a dictionary");
+				if (!Wg_IsDictionary(kwargsDict)) {
+					Wg_RaiseTypeError(kwargsDict->context, "Keyword arguments must be a dictionary");
 					return nullptr;
 				}
 				for (const auto& [key, value] : kwargsDict->Get<wings::WDict>()) {
-					if (!WIsString(key)) {
-						WRaiseTypeError(kwargsDict->context, "Keyword arguments dictionary must only contain string keys");
+					if (!Wg_IsString(key)) {
+						Wg_RaiseTypeError(kwargsDict->context, "Keyword arguments dictionary must only contain string keys");
 						return nullptr;
 					}
 				}
@@ -578,12 +578,12 @@ extern "C" {
 			for (int i = 0; i < argc; i++)
 				refs.emplace_back(argv[i]);
 
-			WObj* (*fptr)(WObj**, int, WObj*, void*);
+			Wg_Obj* (*fptr)(Wg_Obj**, int, Wg_Obj*, void*);
 			void* userdata = nullptr;
-			WObj* self = nullptr;
+			Wg_Obj* self = nullptr;
 			std::string prettyName;
-			if (WIsFunction(callable)) {
-				const auto& func = callable->Get<WObj::Func>();
+			if (Wg_IsFunction(callable)) {
+				const auto& func = callable->Get<Wg_Obj::Func>();
 				if (func.self)
 					self = func.self;
 				fptr = func.fptr;
@@ -597,12 +597,12 @@ extern "C" {
 					prettyName
 					});
 			} else {
-				fptr = callable->Get<WObj::Class>().ctor;
-				userdata = callable->Get<WObj::Class>().userdata;
-				prettyName = callable->Get<WObj::Class>().name;
+				fptr = callable->Get<Wg_Obj::Class>().ctor;
+				userdata = callable->Get<Wg_Obj::Class>().userdata;
+				prettyName = callable->Get<Wg_Obj::Class>().name;
 			}
 
-			std::vector<WObj*> argsWithSelf;
+			std::vector<Wg_Obj*> argsWithSelf;
 			if (self) {
 				argsWithSelf.push_back(self);
 				refs.emplace_back(self);
@@ -611,60 +611,60 @@ extern "C" {
 
 			// If the dictionary (map) class doesn't exist yet then skip this
 			if (kwargsDict == nullptr && callable != callable->context->builtins.dict && callable->context->builtins.dict) {
-				kwargsDict = WCreateDictionary(callable->context);
+				kwargsDict = Wg_CreateDictionary(callable->context);
 				if (kwargsDict == nullptr)
 					return nullptr;
 			}
 			refs.emplace_back(kwargsDict);
 
-			WObj* ret = fptr(argsWithSelf.data(), (int)argsWithSelf.size(), kwargsDict, userdata);
+			Wg_Obj* ret = fptr(argsWithSelf.data(), (int)argsWithSelf.size(), kwargsDict, userdata);
 
-			if (WIsFunction(callable)) {
+			if (Wg_IsFunction(callable)) {
 				callable->context->currentTrace.pop_back();
 			}
 
 			return ret;
 		} else {
-			return WCallMethod(callable, "__call__", argv, argc);
+			return Wg_CallMethod(callable, "__call__", argv, argc);
 		}
 	}
 
-	WObj* WCallMethod(WObj* obj, const char* member, WObj** argv, int argc, WObj* kwargsDict) {
+	Wg_Obj* Wg_CallMethod(Wg_Obj* obj, const char* member, Wg_Obj** argv, int argc, Wg_Obj* kwargsDict) {
 		WASSERT(obj && member);
 		if (argc)
 			WASSERT(argv);
 		for (int i = 0; i < argc; i++)
 			WASSERT(argv[i]);
 
-		if (WObj* method = WGetAttribute(obj, member)) {
-			return WCall(method, argv, argc, kwargsDict);
+		if (Wg_Obj* method = Wg_GetAttribute(obj, member)) {
+			return Wg_Call(method, argv, argc, kwargsDict);
 		} else {
 			return nullptr;
 		}
 	}
 
-	WObj* WCallMethodFromBase(WObj* obj, const char* member, WObj** argv, int argc, WObj* kwargsDict, WObj* baseClass) {
+	Wg_Obj* Wg_CallMethodFromBase(Wg_Obj* obj, const char* member, Wg_Obj** argv, int argc, Wg_Obj* kwargsDict, Wg_Obj* baseClass) {
 		WASSERT(obj && member);
 		if (argc)
 			WASSERT(argv);
 		for (int i = 0; i < argc; i++)
 			WASSERT(argv[i]);
 
-		if (WObj* method = WGetAttributeFromBase(obj, member, baseClass)) {
-			return WCall(method, argv, argc, kwargsDict);
+		if (Wg_Obj* method = Wg_GetAttributeFromBase(obj, member, baseClass)) {
+			return Wg_Call(method, argv, argc, kwargsDict);
 		} else {
-			WRaiseAttributeError(obj, member);
+			Wg_RaiseAttributeError(obj, member);
 			return nullptr;
 		}
 	}
 
-	bool WParseKwargs(WObj* kwargs, const char* const* keys, int count, WObj** out) {
-		WASSERT(kwargs && keys && out && count > 0 && WIsDictionary(kwargs));
+	bool Wg_ParseKwargs(Wg_Obj* kwargs, const char* const* keys, int count, Wg_Obj** out) {
+		WASSERT(kwargs && keys && out && count > 0 && Wg_IsDictionary(kwargs));
 		
 		wings::WObjRef ref(kwargs);
 		auto& buf = kwargs->Get<wings::WDict>();
 		for (int i = 0; i < count; i++) {
-			WObj* key = WCreateString(kwargs->context, keys[i]);
+			Wg_Obj* key = Wg_CreateString(kwargs->context, keys[i]);
 			if (key == nullptr)
 				return false;
 
@@ -684,193 +684,130 @@ extern "C" {
 		return true;
 	}
 
-	WObj* WGetIndex(WObj* obj, WObj* index) {
+	Wg_Obj* Wg_GetIndex(Wg_Obj* obj, Wg_Obj* index) {
 		WASSERT(obj && index);
-		return WCallMethod(obj, "__getitem__", &index, 1);
+		return Wg_CallMethod(obj, "__getitem__", &index, 1);
 	}
 
-	WObj* WSetIndex(WObj* obj, WObj* index, WObj* value) {
+	Wg_Obj* Wg_SetIndex(Wg_Obj* obj, Wg_Obj* index, Wg_Obj* value) {
 		WASSERT(obj && index && value);
-		WObj* argv[2] = { index, value };
-		return WCallMethod(obj, "__setitem__", argv, 2);
+		Wg_Obj* argv[2] = { index, value };
+		return Wg_CallMethod(obj, "__setitem__", argv, 2);
 	}
 
-	WObj* WPositive(WObj* arg) {
+	Wg_Obj* Wg_UnaryOp(Wg_UnOp op, Wg_Obj* arg) {
 		WASSERT(arg);
-		return WCallMethod(arg, "__pos__", nullptr, 0);
+		switch (op) {
+		case WG_UOP_POS:
+			return Wg_CallMethod(arg, "__pos__", nullptr, 0);
+		case WG_UOP_NEG:
+			return Wg_CallMethod(arg, "__neg__", nullptr, 0);
+		case WG_UOP_BITNOT:
+			return Wg_CallMethod(arg, "__invert__", nullptr, 0);
+		case WG_UOP_HASH:
+			return Wg_Call(arg->context->builtins.hash, &arg, 1);
+		case WG_UOP_LEN:
+			return Wg_Call(arg->context->builtins.len, &arg, 1);
+		case WG_UOP_BOOL:
+			return Wg_Call(arg->context->builtins._bool, &arg, 1);
+		case WG_UOP_INT:
+			return Wg_Call(arg->context->builtins._int, &arg, 1);
+		case WG_UOP_FLOAT:
+			return Wg_Call(arg->context->builtins._float, &arg, 1);
+		case WG_UOP_STR:
+			return Wg_Call(arg->context->builtins.str, &arg, 1);
+		case WG_UOP_REPR:
+			return Wg_Call(arg->context->builtins.repr, &arg, 1);
+		default:
+			WUNREACHABLE();
+		}
 	}
 
-	WObj* WNegative(WObj* arg) {
-		WASSERT(arg);
-		return WCallMethod(arg, "__neg__", nullptr, 0);
-	}
-
-	WObj* WAdd(WObj* lhs, WObj* rhs) {
+	static const std::unordered_map<Wg_BinOp, const char*> OP_METHOD_NAMES = {
+		{ WG_BOP_ADD, "__add__" },
+		{ WG_BOP_SUB, "__sub__" },
+		{ WG_BOP_MUL, "__mul__" },
+		{ WG_BOP_DIV, "__truediv__" },
+		{ WG_BOP_FLOORDIV, "__floordiv__" },
+		{ WG_BOP_MOD, "__mod__" },
+		{ WG_BOP_POW, "__pow__" },
+		{ WG_BOP_BITAND, "__and__" },
+		{ WG_BOP_BITOR, "__or__" },
+		{ WG_BOP_BITXOR, "__not__" },
+		{ WG_BOP_SHL, "__lshift__" },
+		{ WG_BOP_SHR, "__rshift__" },
+		{ WG_BOP_IN, "__contains__" },
+		{ WG_BOP_EQ, "__eq__" },
+		{ WG_BOP_NE, "__ne__" },
+		{ WG_BOP_LT, "__lt__" },
+		{ WG_BOP_LE, "__le__" },
+		{ WG_BOP_GT, "__gt__" },
+		{ WG_BOP_GE, "__ge__" },
+	};
+	
+	Wg_Obj* Wg_BinaryOp(Wg_BinOp op, Wg_Obj* lhs, Wg_Obj* rhs) {
 		WASSERT(lhs && rhs);
-		return WCallMethod(lhs, "__add__", &rhs, 1);
-	}
 
-	WObj* WSubtract(WObj* lhs, WObj* rhs) {
-		WASSERT(lhs && rhs);
-		return WCallMethod(lhs, "__sub__", &rhs, 1);
-	}
-
-	WObj* WMultiply(WObj* lhs, WObj* rhs) {
-		WASSERT(lhs && rhs);
-		return WCallMethod(lhs, "__mul__", &rhs, 1);
-	}
-
-	WObj* WDivide(WObj* lhs, WObj* rhs) {
-		WASSERT(lhs && rhs);
-		return WCallMethod(lhs, "__truediv__", &rhs, 1);
-	}
-
-	WObj* WFloorDivide(WObj* lhs, WObj* rhs) {
-		WASSERT(lhs && rhs);
-		return WCallMethod(lhs, "__floordiv__", &rhs, 1);
-	}
-
-	WObj* WModulo(WObj* lhs, WObj* rhs) {
-		WASSERT(lhs && rhs);
-		return WCallMethod(lhs, "__mod__", &rhs, 1);
-	}
-
-	WObj* WPower(WObj* lhs, WObj* rhs) {
-		WASSERT(lhs && rhs);
-		return WCallMethod(lhs, "__pow__", &rhs, 1);
-	}
-
-	WObj* WEquals(WObj* lhs, WObj* rhs) {
-		WASSERT(lhs && rhs);
-		if (WObj* res = WCallMethod(lhs, "__eq__", &rhs, 1)) {
-			if (WIsBool(res)) {
-				return res;
-			} else {
-				WRaiseTypeError(lhs->context, "__eq__() returned a non bool type");
+		if (op == WG_BOP_IN)
+			std::swap(lhs, rhs);
+		
+		auto method = OP_METHOD_NAMES.find(op);
+		
+		switch (op) {
+		case WG_BOP_ADD:
+		case WG_BOP_SUB:
+		case WG_BOP_MUL:
+		case WG_BOP_DIV:
+		case WG_BOP_FLOORDIV:
+		case WG_BOP_MOD:
+		case WG_BOP_POW:
+		case WG_BOP_BITAND:
+		case WG_BOP_BITOR:
+		case WG_BOP_BITXOR:
+		case WG_BOP_SHL:
+		case WG_BOP_SHR:
+			return Wg_CallMethod(lhs, method->second, &rhs, 1);
+		case WG_BOP_EQ:
+		case WG_BOP_NE:
+		case WG_BOP_LT:
+		case WG_BOP_LE:
+		case WG_BOP_GT:
+		case WG_BOP_GE:
+		case WG_BOP_IN: {
+			Wg_Obj* boolResult = Wg_CallMethod(lhs, method->second, &rhs, 1);
+			if (!Wg_IsBool(boolResult)) {
+				std::string message = method->second;
+				message += "() returned a non bool type";
+				Wg_RaiseTypeError(boolResult->context, message.c_str());
+				return nullptr;
 			}
+			return boolResult;
 		}
-		return nullptr;
-	}
-
-	WObj* WNotEquals(WObj* lhs, WObj* rhs) {
-		WASSERT(lhs && rhs);
-		if (WObj* res = WCallMethod(lhs, "__ne__", &rhs, 1)) {
-			if (WIsBool(res)) {
-				return res;
+		case WG_BOP_NOTIN:
+			if (Wg_Obj* in = Wg_BinaryOp(WG_BOP_IN, lhs, rhs)) {
+				return Wg_UnaryOp(WG_UOP_NOT, in);
 			} else {
-				WRaiseTypeError(lhs->context, "__ne__() returned a non bool type");
+				return nullptr;
 			}
+		case WG_BOP_AND: {
+			Wg_Obj* lhsb = Wg_UnaryOp(WG_UOP_BOOL, lhs);
+			if (lhsb == nullptr)
+				return nullptr;
+			if (!Wg_GetBool(lhsb))
+				return lhsb;
+			return Wg_UnaryOp(WG_UOP_BOOL, rhs);
 		}
-		return nullptr;
-	}
-
-	WObj* WLessThan(WObj* lhs, WObj* rhs) {
-		WASSERT(lhs && rhs);
-		if (WObj* res = WCallMethod(lhs, "__lt__", &rhs, 1)) {
-			if (WIsBool(res)) {
-				return res;
-			} else {
-				WRaiseTypeError(lhs->context, "__lt__() returned a non bool type");
-			}
+		case WG_BOP_OR: {
+			Wg_Obj* lhsb = Wg_UnaryOp(WG_UOP_BOOL, lhs);
+			if (lhsb == nullptr)
+				return nullptr;
+			if (Wg_GetBool(lhsb))
+				return lhsb;
+			return Wg_UnaryOp(WG_UOP_BOOL, rhs);
 		}
-		return nullptr;
-	}
-
-	WObj* WLessThanOrEqual(WObj* lhs, WObj* rhs) {
-		WASSERT(lhs && rhs);
-		if (WObj* res = WCallMethod(lhs, "__le__", &rhs, 1)) {
-			if (WIsBool(res)) {
-				return res;
-			} else {
-				WRaiseTypeError(lhs->context, "__le__() returned a non bool type");
-			}
+		default:
+			WUNREACHABLE();
 		}
-		return nullptr;
-	}
-
-	WObj* WGreaterThan(WObj* lhs, WObj* rhs) {
-		WASSERT(lhs && rhs);
-		if (WObj* res = WCallMethod(lhs, "__gt__", &rhs, 1)) {
-			if (WIsBool(res)) {
-				return res;
-			} else {
-				WRaiseTypeError(lhs->context, "__gt__() returned a non bool type");
-			}
-		}
-		return nullptr;
-	}
-
-	WObj* WGreaterThanOrEqual(WObj* lhs, WObj* rhs) {
-		WASSERT(lhs && rhs);
-		if (WObj* res = WCallMethod(lhs, "__ge__", &rhs, 1)) {
-			if (WIsBool(res)) {
-				return res;
-			} else {
-				WRaiseTypeError(lhs->context, "__ge__() returned a non bool type");
-			}
-		}
-		return nullptr;
-	}
-
-	WObj* WLen(WObj* obj) {
-		WASSERT(obj);
-		return WCall(obj->context->builtins.len, &obj, 1);
-	}
-
-	WObj* WHash(WObj* obj) {
-		WASSERT(obj);
-		return WCall(obj->context->builtins.hash, &obj, 1);
-	}
-
-	WObj* WIn(WObj* container, WObj* obj) {
-		WASSERT(container && obj);
-		if (WObj* res = WCallMethod(container, "__contains__", &obj, 1)) {
-			if (WIsBool(res)) {
-				return res;
-			} else {
-				WRaiseTypeError(container->context, "__contains__() returned a non bool type");
-			}
-		}
-		return nullptr;
-	}
-
-	WObj* WNotIn(WObj* container, WObj* obj) {
-		WASSERT(container && obj);
-		if (WObj* inOp = WIn(container, obj)) {
-			return WCreateBool(container->context, !WGetBool(inOp));
-		} else {
-			return nullptr;
-		}
-	}
-
-	WObj* WBitAnd(WObj* lhs, WObj* rhs) {
-		WASSERT(lhs && rhs);
-		return WCallMethod(lhs, "__and__", &rhs, 1);
-	}
-
-	WObj* WBitOr(WObj* lhs, WObj* rhs) {
-		WASSERT(lhs && rhs);
-		return WCallMethod(lhs, "__or__", &rhs, 1);
-	}
-
-	WObj* WBitNot(WObj* arg) {
-		WASSERT(arg);
-		return WCallMethod(arg, "__invert__", nullptr, 0);
-	}
-
-	WObj* WBitXor(WObj* lhs, WObj* rhs) {
-		WASSERT(lhs && rhs);
-		return WCallMethod(lhs, "__xor__", &rhs, 1);
-	}
-
-	WObj* WShiftLeft(WObj* lhs, WObj* rhs) {
-		WASSERT(lhs && rhs);
-		return WCallMethod(lhs, "__lshift__", &rhs, 1);
-	}
-
-	WObj* WShiftRight(WObj* lhs, WObj* rhs) {
-		WASSERT(lhs && rhs);
-		return WCallMethod(lhs, "__rshift__", &rhs, 1);
 	}
 
 } // extern "C"

@@ -4,25 +4,25 @@
 #include <cstdlib>
 #include "rcptr.h"
 
-struct WObj;
+struct Wg_Obj;
 
 namespace wings {
 
 	struct AttributeTable {
 		AttributeTable();
-		WObj* Get(const std::string& name) const;
-		void Set(const std::string& name, WObj* value);
-		WObj* GetFromBase(const std::string& name) const;
+		Wg_Obj* Get(const std::string& name) const;
+		void Set(const std::string& name, Wg_Obj* value);
+		Wg_Obj* GetFromBase(const std::string& name) const;
 		void AddParent(AttributeTable& parent);
 		AttributeTable Copy();
 		bool Empty() const;
 		template <class Fn> void ForEach(Fn fn) const;
 	private:
 		struct Table {
-			std::unordered_map<std::string, WObj*> entries;
+			std::unordered_map<std::string, Wg_Obj*> entries;
 			std::vector<RcPtr<Table>> parents;
 
-			WObj* Get(const std::string& name) const;
+			Wg_Obj* Get(const std::string& name) const;
 			template <class Fn> void ForEach(Fn fn) const;
 		};
 
