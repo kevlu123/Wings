@@ -288,6 +288,16 @@ WG_DLL_EXPORT void Wg_RaiseValueError(Wg_Context* context, const char* message W
 WG_DLL_EXPORT void Wg_RaiseNameError(Wg_Context* context, const char* name);
 
 /**
+* Raise a SystemExit exception.
+*
+* Remarks:
+* If an exception is already set, the old exception will be overwritten.
+*
+* @param context The relevant context.
+*/
+WG_DLL_EXPORT void Wg_RaiseSystemExit(Wg_Context* context);
+
+/**
 * Check if an object's class derives from any of the specified classes.
 * 
 * @param instance The object to be checked.

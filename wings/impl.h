@@ -109,6 +109,7 @@ namespace wings {
 		Wg_Obj* overflowError;
 		Wg_Obj* zeroDivisionError;
 		Wg_Obj* stopIteration;
+		Wg_Obj* systemExit;
 
 		// Functions
 		Wg_Obj* isinstance;
@@ -130,7 +131,7 @@ namespace wings {
 				
 				baseException, exception, syntaxError, nameError, typeError, valueError,
 				attributeError, lookupError, indexError, keyError, arithmeticError, overflowError,
-				zeroDivisionError, stopIteration,
+				zeroDivisionError, stopIteration, systemExit,
 
 				isinstance, repr,
 

@@ -3148,6 +3148,11 @@ namespace wings {
 			return res;
 		}
 
+		static Wg_Obj* exit(Wg_Context* context, Wg_Obj** argv, int argc) {
+			Wg_RaiseSystemExit(context);
+			return nullptr;
+		}
+
 	} // namespace lib
 
 	struct LibraryInitException : std::exception {};
@@ -3530,6 +3535,7 @@ namespace wings {
 			RegisterFunction<lib::iter>(context, "iter");
 			RegisterFunction<lib::abs>(context, "abs");
 			RegisterFunction<lib::reversed>(context, "reversed");
+			RegisterFunction<lib::exit>(context, "exit");
 
 			// Create exception classes
 			context->builtins.baseException = createClass("BaseException");
@@ -3548,6 +3554,7 @@ namespace wings {
 			context->builtins.overflowError = createClass("OverflowError", context->builtins.arithmeticError);
 			context->builtins.zeroDivisionError = createClass("ZeroDivisionError", context->builtins.arithmeticError);
 			context->builtins.stopIteration = createClass("StopIteration", context->builtins.exception);
+			context->builtins.systemExit = createClass("SystemExit", context->builtins.baseException);
 
 			// Initialize the rest with a script
 			Wg_Obj* lib = Wg_Compile(context, LIBRARY_CODE, "__builtins__");

@@ -179,4 +179,9 @@ extern "C" {
         msg += "' is not defined";
         Wg_RaiseException(context, msg.c_str(), context->builtins.nameError);
     }
+
+    void Wg_RaiseSystemExit(Wg_Context* context) {
+        WASSERT_VOID(context);
+        Wg_RaiseException(context, nullptr, context->builtins.systemExit);
+    }
 }
