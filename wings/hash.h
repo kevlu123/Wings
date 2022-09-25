@@ -1,6 +1,6 @@
 #pragma once
-#include <unordered_map>
-#include <unordered_set>
+//#include <unordered_map>
+//#include <unordered_set>
 #include <vector>
 #include <utility>
 #include <cstdlib>
@@ -100,7 +100,6 @@ namespace wings {
 		std::vector<Bucket> buckets;
 		Hash hasher;
 		Equal equal;
-	private:
 		float maxLoadFactor = 1.0f;
 		size_t mySize = 0;
 	};
@@ -112,7 +111,7 @@ namespace wings {
 		struct Iterator {
 			Iterator(Container* container = nullptr, size_t bucketIndex = (size_t)-1, size_t itemIndex = (size_t)-1) :
 				container(container), bucketIndex(bucketIndex), itemIndex(itemIndex) {
-				CheckEnd();
+				Revalidate();
 			}
 			
 			const Key& operator*() const {
@@ -125,10 +124,7 @@ namespace wings {
 
 			Iterator& operator++() {
 				itemIndex++;
-				while (!CheckEnd() && itemIndex >= container->buckets[bucketIndex].size()) {
-					bucketIndex++;
-					itemIndex = 0;
-				}
+				Revalidate();
 				return *this;
 			}
 
@@ -140,6 +136,13 @@ namespace wings {
 
 			bool operator!=(const Iterator& rhs) const {
 				return !(*this == rhs);
+			}
+
+			void Revalidate() {
+				while (!CheckEnd() && itemIndex >= container->buckets[bucketIndex].size()) {
+					bucketIndex++;
+					itemIndex = 0;
+				}
 			}
 		private:
 			bool CheckEnd() {
@@ -173,9 +176,14 @@ namespace wings {
 		}
 
 		const_iterator find(const Key& key) const {
-			Bucket* buck = nullptr;
-			if (auto* item = this->get_item(key, &buck))
-				return const_iterator{ this, buck - this->buckets.data(), item - buck->data() };
+			const Bucket* buck = nullptr;
+			if (auto* item = this->get_item(key, &buck)) {
+				return const_iterator{
+					this,
+					(size_t)(buck - this->buckets.data()),
+					(size_t)(item - buck->data())
+				};
+			}
 			return end();
 		}
 
@@ -198,6 +206,7 @@ namespace wings {
 					Bucket* buck = nullptr;
 					this->get_item(item, &buck);
 					buck->push_back(std::move(item));
+					this->mySize++;
 				}
 			}
 		}
@@ -236,7 +245,7 @@ namespace wings {
 		struct Iterator {
 			Iterator(Container* container = nullptr, size_t index = (size_t)-1) :
 				container(container), index(index) {
-				CheckEnd();
+				Revalidate();
 			}
 			
 			auto& operator*() const {
@@ -248,9 +257,8 @@ namespace wings {
 			}
 
 			Iterator& operator++() {
-				do {
-					index++;
-				} while (!CheckEnd() && container->storage[index] == std::nullopt);
+				index++;
+				Revalidate();
 				return *this;
 			}
 
@@ -260,6 +268,12 @@ namespace wings {
 
 			bool operator!=(const Iterator& rhs) const {
 				return !(*this == rhs);
+			}
+
+			void Revalidate() {
+				while (!CheckEnd() && container->storage[index] == std::nullopt) {
+					index++;
+				}
 			}
 		private:
 			bool CheckEnd() {

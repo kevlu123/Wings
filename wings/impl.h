@@ -92,6 +92,7 @@ namespace wings {
 		Wg_Obj* dictKeysIter;
 		Wg_Obj* dictValuesIter;
 		Wg_Obj* dictItemsIter;
+		Wg_Obj* setIter;
 
 		// Exception types
 		Wg_Obj* baseException;
@@ -125,6 +126,7 @@ namespace wings {
 			return std::array{
 				object, noneType, _bool, _int, _float, str, tuple, list, dict, set,
 				func, slice, defaultIter, defaultReverseIter, dictKeysIter, dictValuesIter, dictItemsIter,
+				setIter,
 				
 				baseException, exception, syntaxError, nameError, typeError, valueError,
 				attributeError, lookupError, indexError, keyError, arithmeticError, overflowError,
@@ -168,6 +170,7 @@ struct Wg_Obj {
 		std::string* _str;
 		std::vector<Wg_Obj*>* _list;
 		wings::WDict* _map;
+		wings::WSet* _set;
 		Func* _func;
 		Class* _class;
 	};

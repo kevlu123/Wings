@@ -48,6 +48,8 @@ extern "C" {
 		WASSERT_VOID(context);
 
 		std::deque<const Wg_Obj*> inUse;
+		if (context->currentException)
+			inUse.push_back(context->currentException);
 		for (const auto& [obj, _] : context->protectedObjects)
 			inUse.push_back(obj);
 		for (auto& var : context->globals)
@@ -76,6 +78,10 @@ extern "C" {
 				} else if (Wg_IsDictionary(obj)) {
 					for (const auto& [key, value] : obj->Get<wings::WDict>()) {
 						inUse.push_back(key);
+						inUse.push_back(value);
+					}
+				} else if (Wg_IsSet(obj)) {
+					for (Wg_Obj* value : obj->Get<wings::WSet>()) {
 						inUse.push_back(value);
 					}
 				} else if (Wg_IsFunction(obj)) {

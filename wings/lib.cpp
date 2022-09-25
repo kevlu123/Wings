@@ -643,6 +643,16 @@ namespace wings {
 			Wg_LinkReference(argv[0], argv[1]);
 			return Wg_CreateNone(context);
 		}
+
+		static Wg_Obj* SetIter(Wg_Context* context, Wg_Obj** argv, int argc) {
+			EXPECT_ARG_COUNT(2);
+			EXPECT_ARG_TYPE_SET(1);
+			auto* it = new WSet::iterator(argv[1]->Get<WSet>().begin());
+			Wg_SetUserdata(argv[0], it);
+			argv[0]->finalizer.fptr = [](Wg_Obj* obj, void*) { delete (WSet::iterator*)obj->data; };
+			Wg_LinkReference(argv[0], argv[1]);
+			return Wg_CreateNone(context);
+		}
 		
 	} // namespace ctors
 
@@ -885,7 +895,8 @@ namespace wings {
 		static Wg_Obj* int_hash(Wg_Context* context, Wg_Obj** argv, int argc) {
 			EXPECT_ARG_COUNT(1);
 			EXPECT_ARG_TYPE_INT(0);
-			Wg_int hash = (Wg_int)std::hash<Wg_int>()(Wg_GetInt(argv[0]));
+			//Wg_int hash = (Wg_int)std::hash<Wg_int>()(Wg_GetInt(argv[0]));
+			Wg_int hash = Wg_GetInt(argv[0]);
 			return Wg_CreateInt(context, hash);
 		}
 
@@ -2599,6 +2610,12 @@ namespace wings {
 			}
 		}
 
+		static Wg_Obj* set_nonzero(Wg_Context* context, Wg_Obj** argv, int argc) {
+			EXPECT_ARG_COUNT(1);
+			EXPECT_ARG_TYPE_SET(0);
+			return Wg_CreateBool(context, !argv[0]->Get<WSet>().empty());
+		}
+
 		static Wg_Obj* set_str(Wg_Context* context, Wg_Obj** argv, int argc) {
 			EXPECT_ARG_COUNT(1);
 			EXPECT_ARG_TYPE_SET(0);
@@ -2633,11 +2650,312 @@ namespace wings {
 			}
 		}
 
+		static Wg_Obj* set_iter(Wg_Context* context, Wg_Obj** argv, int argc) {
+			EXPECT_ARG_COUNT(1);
+			EXPECT_ARG_TYPE_SET(0);
+			return Wg_Call(context->builtins.setIter, argv, 1, nullptr);
+		}
+
+		static Wg_Obj* set_contains(Wg_Context* context, Wg_Obj** argv, int argc) {
+			EXPECT_ARG_COUNT(2);
+			EXPECT_ARG_TYPE_SET(0);
+			try {
+				return Wg_CreateBool(context, argv[0]->Get<WSet>().contains(argv[1]));
+			} catch (HashException&) {
+				Wg_ClearCurrentException(context);
+				return Wg_CreateBool(context, false);
+			}
+		}
+
+		static Wg_Obj* set_len(Wg_Context* context, Wg_Obj** argv, int argc) {
+			EXPECT_ARG_COUNT(1);
+			EXPECT_ARG_TYPE_SET(0);
+			return Wg_CreateInt(context, (int)argv[0]->Get<WSet>().size());
+		}
+
+		static Wg_Obj* set_clear(Wg_Context* context, Wg_Obj** argv, int argc) {
+			EXPECT_ARG_COUNT(1);
+			EXPECT_ARG_TYPE_SET(0);
+			argv[0]->Get<WSet>().clear();
+			return Wg_CreateNone(context);
+		}
+
+		static Wg_Obj* set_copy(Wg_Context* context, Wg_Obj** argv, int argc) {
+			EXPECT_ARG_COUNT(1);
+			EXPECT_ARG_TYPE_SET(0);
+			return Wg_Call(context->builtins.set, argv, 1);
+		}
+		
 		static Wg_Obj* set_add(Wg_Context* context, Wg_Obj** argv, int argc) {
 			EXPECT_ARG_COUNT(2);
 			EXPECT_ARG_TYPE_SET(0);
-			argv[0]->Get<wings::WSet>().insert(argv[1]);
+			argv[0]->Get<WSet>().insert(argv[1]);
 			return Wg_CreateNone(context);
+		}
+
+		static Wg_Obj* set_remove(Wg_Context* context, Wg_Obj** argv, int argc) {
+			EXPECT_ARG_COUNT(2);
+			EXPECT_ARG_TYPE_SET(0);
+			
+			WSet::const_iterator it{};
+			auto& set = argv[0]->Get<WSet>();
+			try {
+				it = set.find(argv[1]);
+			} catch (HashException&) {
+				return nullptr;
+			}
+
+			if (it == WSet::const_iterator{}) {
+				Wg_RaiseKeyError(context, argv[1]);
+				return nullptr;
+			} else {
+				set.erase(it);
+				return Wg_CreateNone(context);
+			}
+		}
+
+		static Wg_Obj* set_discard(Wg_Context* context, Wg_Obj** argv, int argc) {
+			EXPECT_ARG_COUNT(2);
+			EXPECT_ARG_TYPE_SET(0);
+
+			WSet::const_iterator it{};
+			auto& set = argv[0]->Get<WSet>();
+			try {
+				it = set.find(argv[1]);
+			} catch (HashException&) {
+				return nullptr;
+			}
+
+			if (it != WSet::const_iterator{})
+				set.erase(it);
+			return Wg_CreateNone(context);
+		}
+
+		static Wg_Obj* set_pop(Wg_Context* context, Wg_Obj** argv, int argc) {
+			EXPECT_ARG_COUNT(1);
+			EXPECT_ARG_TYPE_SET(0);
+			auto& set = argv[0]->Get<WSet>();
+			auto it = set.begin();
+			if (it == set.end()) {
+				Wg_RaiseKeyError(context);
+				return nullptr;
+			}
+			Wg_Obj* obj = *it;
+			set.erase(set.begin());
+			return obj;
+		}
+
+		static Wg_Obj* set_update(Wg_Context* context, Wg_Obj** argv, int argc) {
+			EXPECT_ARG_COUNT(2);
+			EXPECT_ARG_TYPE_SET(0);
+
+			auto f = [](Wg_Obj* obj, void* ud) {
+				auto set = (WSet*)ud;
+				try {
+					set->insert(obj);
+					return true;
+				} catch (HashException&) {
+					return false;
+				}
+			};
+
+			if (!Wg_Iterate(argv[1], &argv[0]->Get<WSet>(), f))
+				return nullptr;
+			
+			return Wg_CreateNone(context);
+		}
+
+		static Wg_Obj* set_union(Wg_Context* context, Wg_Obj** argv, int argc) {
+			EXPECT_ARG_COUNT_AT_LEAST(1);
+			EXPECT_ARG_TYPE_SET(0);
+
+			Wg_Obj* res = Wg_CreateSet(context);
+			WObjRef ref(res);
+			
+			auto f = [](Wg_Obj* obj, void* ud) {
+				try {
+					((WSet*)ud)->insert(obj);
+					return true;
+				} catch (HashException&) {
+					return false;
+				}
+			};
+
+			for (int i = 0; i < argc; i++)
+				if (!Wg_Iterate(argv[i], &res->Get<WSet>(), f))
+					return nullptr;
+
+			return res;
+		}
+
+		static Wg_Obj* set_difference(Wg_Context* context, Wg_Obj** argv, int argc) {
+			EXPECT_ARG_COUNT_AT_LEAST(1);
+			EXPECT_ARG_TYPE_SET(0);
+
+			Wg_Obj* res = Wg_CreateSet(context);
+			WObjRef ref(res);
+
+			struct State {
+				Wg_Obj** other;
+				int otherCount;
+				WSet* res;
+			} s{ argv + 1, argc - 1, &res->Get<WSet>() };
+
+			auto f = [](Wg_Obj* obj, void* ud) {
+				auto s = (State*)ud;
+
+				for (int i = 0; i < s->otherCount; i++) {
+					Wg_Obj* contains = Wg_BinaryOp(WG_BOP_IN, obj, s->other[i]);
+					if (contains == nullptr)
+						return false;
+					else if (Wg_GetBool(contains))
+						return true;
+				}
+
+				try {
+					s->res->insert(obj);
+					return true;
+				} catch (HashException&) {
+					return false;
+				}
+			};
+
+			if (!Wg_Iterate(argv[0], &s, f))
+				return nullptr;
+
+			return res;
+		}
+
+		static Wg_Obj* set_intersection(Wg_Context* context, Wg_Obj** argv, int argc) {
+			EXPECT_ARG_COUNT_AT_LEAST(1);
+			EXPECT_ARG_TYPE_SET(0);
+
+			Wg_Obj* res = Wg_CreateSet(context);
+			WObjRef ref(res);
+
+			struct State {
+				Wg_Obj** other;
+				int otherCount;
+				WSet* res;
+			} s{ argv + 1, argc - 1, &res->Get<WSet>() };
+
+			auto f = [](Wg_Obj* obj, void* ud) {
+				auto s = (State*)ud;
+
+				for (int i = 0; i < s->otherCount; i++) {
+					Wg_Obj* contains = Wg_BinaryOp(WG_BOP_IN, obj, s->other[i]);
+					if (contains == nullptr)
+						return false;
+					else if (!Wg_GetBool(contains))
+						return true;
+				}
+
+				try {
+					s->res->insert(obj);
+					return true;
+				} catch (HashException&) {
+					return false;
+				}
+			};
+
+			if (!Wg_Iterate(argv[0], &s, f))
+				return nullptr;
+
+			return res;
+		}
+
+		static Wg_Obj* set_symmetric_difference(Wg_Context* context, Wg_Obj** argv, int argc) {
+			EXPECT_ARG_COUNT(2);
+			EXPECT_ARG_TYPE_SET(0);
+
+			Wg_Obj* res = Wg_CreateSet(context);
+			WObjRef ref(res);
+
+			struct State {
+				Wg_Obj* other;
+				WSet* res;
+			} s = { nullptr, &res->Get<WSet>() };
+
+			auto f = [](Wg_Obj* obj, void* ud) {
+				auto s = (State*)ud;
+
+				Wg_Obj* contains = Wg_BinaryOp(WG_BOP_IN, obj, s->other);
+				if (contains == nullptr)
+					return false;
+				else if (Wg_GetBool(contains))
+					return true;
+					
+				try {
+					s->res->insert(obj);
+					return true;
+				} catch (HashException&) {
+					return false;
+				}
+			};
+
+			s.other = argv[1];
+			if (!Wg_Iterate(argv[0], &s, f))
+				return nullptr;
+			s.other = argv[0];
+			if (!Wg_Iterate(argv[1], &s, f))
+				return nullptr;
+
+			return res;
+		}
+
+		static Wg_Obj* set_isdisjoint(Wg_Context* context, Wg_Obj** argv, int argc) {
+			EXPECT_ARG_COUNT(2);
+			EXPECT_ARG_TYPE_SET(0);
+
+			Wg_Obj* inters = Wg_CallMethod(argv[0], "intersection", argv + 1, 1);
+			if (inters == nullptr)
+				return nullptr;
+
+			return Wg_UnaryOp(WG_UOP_NOT, inters);
+		}
+
+		static Wg_Obj* set_issubset(Wg_Context* context, Wg_Obj** argv, int argc) {
+			EXPECT_ARG_COUNT(2);
+			EXPECT_ARG_TYPE_SET(0);
+
+			size_t size = argv[0]->Get<WSet>().size();
+
+			Wg_Obj* inters = Wg_CallMethod(argv[0], "intersection", argv + 1, 1);
+			if (inters == nullptr)
+				return nullptr;
+			
+			if (!Wg_IsSet(inters)) {
+				return Wg_CreateBool(context, false);
+			}
+
+			return Wg_CreateBool(context, inters->Get<WSet>().size() == size);
+		}
+
+		static Wg_Obj* set_issuperset(Wg_Context* context, Wg_Obj** argv, int argc) {
+			EXPECT_ARG_COUNT(2);
+			EXPECT_ARG_TYPE_SET(0);
+
+			struct State {
+				Wg_Obj* self;
+				bool result;
+			} s = { argv[0], true };
+
+			auto f = [](Wg_Obj* obj, void* ud) {
+				auto s = (State*)ud;
+				Wg_Obj* contains = Wg_BinaryOp(WG_BOP_IN, obj, s->self);
+				if (contains == nullptr)
+					return false;
+				else if (!Wg_GetBool(contains)) {
+					s->result = false;
+					return false;
+				}
+				return true;
+			};
+
+			if (!Wg_Iterate(argv[1], &s, f) && s.result)
+				return nullptr;
+			Wg_ClearCurrentException(context);
+			return Wg_CreateBool(context, s.result);
 		}
 
 		static Wg_Obj* func_str(Wg_Context* context, Wg_Obj** argv, int argc) {
@@ -2661,6 +2979,7 @@ namespace wings {
 			}
 			
 			auto& it = *(WDict::iterator*)data;
+			it.Revalidate();
 			if (it == WDict::iterator{}) {
 				Wg_RaiseStopIteration(context);
 				return nullptr;
@@ -2680,6 +2999,7 @@ namespace wings {
 			}
 
 			auto& it = *(WDict::iterator*)data;
+			it.Revalidate();
 			if (it == WDict::iterator{}) {
 				Wg_RaiseStopIteration(context);
 				return nullptr;
@@ -2699,6 +3019,7 @@ namespace wings {
 			}
 
 			auto& it = *(WDict::iterator*)data;
+			it.Revalidate();
 			if (it == WDict::iterator{}) {
 				Wg_RaiseStopIteration(context);
 				return nullptr;
@@ -2707,6 +3028,26 @@ namespace wings {
 			Wg_Obj* tup[2] = { it->first, it->second };
 			++it;
 			return Wg_CreateTuple(context, tup, 2);
+		}
+
+		static Wg_Obj* SetIter_next(Wg_Context* context, Wg_Obj** argv, int argc) {
+			EXPECT_ARG_COUNT(1);
+			void* data{};
+			if (!Wg_TryGetUserdata(argv[0], "__SetIter", &data)) {
+				Wg_RaiseArgumentTypeError(context, 0, "__SetIter");
+				return nullptr;
+			}
+
+			auto& it = *(WSet::iterator*)data;
+			it.Revalidate();
+			if (it == WSet::iterator{}) {
+				Wg_RaiseStopIteration(context);
+				return nullptr;
+			}
+			
+			Wg_Obj* obj = *it;
+			++it;
+			return obj;
 		}
 		
 		static Wg_Obj* self(Wg_Context* context, Wg_Obj** argv, int argc) {
@@ -3139,24 +3480,25 @@ namespace wings {
 
 			context->builtins.set = createClass("set");
 			RegisterMethod<ctors::set>(context->builtins.set, "__init__");
+			RegisterMethod<methods::set_nonzero>(context->builtins.set, "__nonzero__");
 			RegisterMethod<methods::set_str>(context->builtins.set, "__str__");
-			//RegisterMethod<methods::set_contains>(context->builtins.set, "__contains__");
-			//RegisterMethod<methods::set_iter>(context->builtins.set, "__iter__");
-			//RegisterMethod<methods::set_len>(context->builtins.set, "__len__");
+			RegisterMethod<methods::set_contains>(context->builtins.set, "__contains__");
+			RegisterMethod<methods::set_iter>(context->builtins.set, "__iter__");
+			RegisterMethod<methods::set_len>(context->builtins.set, "__len__");
 			RegisterMethod<methods::set_add>(context->builtins.set, "add");
-			//RegisterMethod<methods::set_clear>(context->builtins.set, "clear");
-			//RegisterMethod<methods::set_copy>(context->builtins.set, "copy");
-			//RegisterMethod<methods::set_difference>(context->builtins.set, "difference");
-			//RegisterMethod<methods::set_discard>(context->builtins.set, "discard");
-			//RegisterMethod<methods::set_intersection>(context->builtins.set, "intersection");
-			//RegisterMethod<methods::set_isdisjoint>(context->builtins.set, "isdisjoint");
-			//RegisterMethod<methods::set_issubset>(context->builtins.set, "issubset");
-			//RegisterMethod<methods::set_issuperset>(context->builtins.set, "issuperset");
-			//RegisterMethod<methods::set_pop>(context->builtins.set, "pop");
-			//RegisterMethod<methods::set_remove>(context->builtins.set, "remove");
-			//RegisterMethod<methods::set_symmetric_difference>(context->builtins.set, "symmetric_difference");
-			//RegisterMethod<methods::set_union>(context->builtins.set, "union");
-			//RegisterMethod<methods::set_update>(context->builtins.set, "update");
+			RegisterMethod<methods::set_clear>(context->builtins.set, "clear");
+			RegisterMethod<methods::set_copy>(context->builtins.set, "copy");
+			RegisterMethod<methods::set_difference>(context->builtins.set, "difference");
+			RegisterMethod<methods::set_discard>(context->builtins.set, "discard");
+			RegisterMethod<methods::set_intersection>(context->builtins.set, "intersection");
+			RegisterMethod<methods::set_isdisjoint>(context->builtins.set, "isdisjoint");
+			RegisterMethod<methods::set_issubset>(context->builtins.set, "issubset");
+			RegisterMethod<methods::set_issuperset>(context->builtins.set, "issuperset");
+			RegisterMethod<methods::set_pop>(context->builtins.set, "pop");
+			RegisterMethod<methods::set_remove>(context->builtins.set, "remove");
+			RegisterMethod<methods::set_symmetric_difference>(context->builtins.set, "symmetric_difference");
+			RegisterMethod<methods::set_union>(context->builtins.set, "union");
+			RegisterMethod<methods::set_update>(context->builtins.set, "update");
 
 			context->builtins.dictKeysIter = createClass("__DictKeysIter", nullptr, false);
 			RegisterMethod<ctors::DictIter>(context->builtins.dictKeysIter, "__init__");
@@ -3172,6 +3514,11 @@ namespace wings {
 			RegisterMethod<ctors::DictIter>(context->builtins.dictItemsIter, "__init__");
 			RegisterMethod<methods::DictItemsIter_next>(context->builtins.dictItemsIter, "__next__");
 			RegisterMethod<methods::self>(context->builtins.dictItemsIter, "__iter__");
+
+			context->builtins.setIter = createClass("__SetIter", nullptr, false);
+			RegisterMethod<ctors::SetIter>(context->builtins.setIter, "__init__");
+			RegisterMethod<methods::SetIter_next>(context->builtins.setIter, "__next__");
+			RegisterMethod<methods::self>(context->builtins.setIter, "__iter__");
 
 			// Add free functions
 			context->builtins.isinstance = RegisterFunction<lib::isinstance>(context, "isinstance");
