@@ -536,10 +536,45 @@ namespace wings {
 		static Wg_Obj* map(Wg_Context* context, Wg_Obj** argv, int argc) {
 			EXPECT_ARG_COUNT_BETWEEN(1, 2);
 
+			WDict* buf{};
 			argv[0]->attributes = context->builtins.dict->Get<Wg_Obj::Class>().instanceAttributes.Copy();
 			argv[0]->type = "__map";
-			argv[0]->data = new wings::WDict();
+			argv[0]->data = buf = new wings::WDict();
 			argv[0]->finalizer.fptr = [](Wg_Obj* obj, void*) { delete (wings::WDict*)obj->data; };
+
+			if (argc == 2) {
+				Wg_Obj* iterable = argv[1];
+				if (Wg_IsDictionary(argv[1])) {
+					iterable = Wg_CallMethod(argv[1], "items", nullptr, 0);
+				}
+
+				auto f = [](Wg_Obj* obj, void* ud) {
+					Wg_Obj* kv[2]{};
+					if (!Wg_Unpack(obj, kv, 2))
+						return false;
+
+					Wg_ProtectObject(kv[1]);
+					try {
+						((WDict*)ud)->operator[](kv[0]) = kv[1];
+					} catch (HashException&) {
+						Wg_UnprotectObject(kv[1]);
+						return false;
+					}
+					Wg_UnprotectObject(kv[1]);
+					return true;
+				};
+
+				if (!Wg_Iterate(iterable, buf, f))
+					return nullptr;
+			}
+
+			for (const auto& [k, v] : Wg_GetKwargs(context)->Get<WDict>()) {
+				try {
+					buf->operator[](k) = v;
+				} catch (HashException&) {
+					return nullptr;
+				}
+			}
 
 			return Wg_CreateNone(context);
 		}
@@ -547,10 +582,26 @@ namespace wings {
 		static Wg_Obj* set(Wg_Context* context, Wg_Obj** argv, int argc) {
 			EXPECT_ARG_COUNT_BETWEEN(1, 2);
 
+			WSet* buf{};
 			argv[0]->attributes = context->builtins.set->Get<Wg_Obj::Class>().instanceAttributes.Copy();
 			argv[0]->type = "__set";
-			argv[0]->data = new wings::WSet();
+			argv[0]->data = buf = new wings::WSet();
 			argv[0]->finalizer.fptr = [](Wg_Obj* obj, void*) { delete (wings::WSet*)obj->data; };
+
+			if (argc == 2) {
+				Wg_Obj* iterable = argv[1];
+				auto f = [](Wg_Obj* obj, void* ud) {
+					try {
+						((WSet*)ud)->insert(obj);
+						return true;
+					} catch (HashException&) {
+						return false;
+					}
+				};
+
+				if (!Wg_Iterate(iterable, buf, f))
+					return nullptr;
+			}
 
 			return Wg_CreateNone(context);
 		}
@@ -2531,7 +2582,12 @@ namespace wings {
 					return false;
 				
 				Wg_ProtectObject(kv[1]);
-				((Wg_Obj*)ud)->Get<WDict>()[kv[0]] = kv[1];
+				try {
+					((Wg_Obj*)ud)->Get<WDict>()[kv[0]] = kv[1];
+				} catch (HashException&) {
+					Wg_UnprotectObject(kv[1]);
+					return false;
+				}
 				Wg_UnprotectObject(kv[1]);
 				return true;
 			};
