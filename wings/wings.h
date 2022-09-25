@@ -9,33 +9,33 @@ struct Wg_Obj;
 typedef int64_t Wg_int;
 typedef double Wg_float;
 
-typedef Wg_Obj* (*Wg_Function)(Wg_Obj** args, int argc, void* userdata);
+typedef Wg_Obj* (*Wg_Function)(Wg_Context* context, Wg_Obj** args, int argc);
 typedef void (*Wg_Finalizer)(Wg_Obj* obj, void* userdata);
 typedef void (*Wg_PrintFunction)(const char* message, int len, void* userdata);
 typedef void (*Wg_ErrorCallback)(const char* message, void* userdata);
 typedef bool (*Wg_IterationCallback)(Wg_Obj* obj, void* userdata);
 
-struct Wg_FuncDesc {
+typedef struct Wg_FuncDesc {
 	Wg_Function fptr;
 	void* userdata;
 	bool isMethod;
 	const char* tag;
 	const char* prettyName;
-};
+} Wg_FuncDesc;
 
-struct Wg_FinalizerDesc {
+typedef struct Wg_FinalizerDesc {
 	Wg_Finalizer fptr;
 	void* userdata;
-};
+} Wg_FinalizerDesc;
 
-struct Wg_Config {
+typedef struct Wg_Config {
 	int maxAlloc;
 	int maxRecursion;
 	int maxCollectionSize;
 	float gcRunFactor;
 	Wg_PrintFunction print;
 	void* printUserdata;
-};
+} Wg_Config;
 
 enum Wg_UnOp {
 	WG_UOP_POS,			// __pos__
@@ -831,11 +831,22 @@ WG_DLL_EXPORT bool Wg_Unpack(Wg_Obj* obj, Wg_Obj** out, int count);
 * Get the keyword arguments dictionary passed to the current function.
 * 
 * Remarks:
+* This must be called from a function.
 * Call Wg_GetCurrentException() or Wg_GetErrorMessage() to get error information.
 * 
 * @return The keywords arguments dictionary, or nullptr on failure.
 */
 WG_DLL_EXPORT Wg_Obj* Wg_GetKwargs(Wg_Context* context);
+
+/**
+* Get the userdata associated with the current function.
+*
+* Remarks:
+* This must be called from a function.
+*
+* @return The userdata associated with the current function.
+*/
+WG_DLL_EXPORT void* Wg_GetFunctionUserdata(Wg_Context* context);
 
 /**
 * Call a callable object.

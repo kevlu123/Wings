@@ -11,7 +11,7 @@ namespace wings {
 
 	struct DefObject {
 		~DefObject();
-		static Wg_Obj* Run(Wg_Obj** args, int argc, void* userdata);
+		static Wg_Obj* Run(Wg_Context* context, Wg_Obj** args, int argc);
 		Wg_Context* context{};
 		RcPtr<std::vector<Instruction>> instructions;
 		std::string tag;
