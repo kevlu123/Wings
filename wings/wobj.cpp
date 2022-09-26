@@ -486,10 +486,7 @@ extern "C" {
 
 		while (true) {
 			Wg_Obj* yielded = Wg_CallMethod(iter, "__next__", nullptr, 0);
-			wings::WObjRef yieldedRef(yielded);
-			if (yielded)
-				callback(yielded, userdata);
-
+			
 			Wg_Obj* exc = Wg_GetCurrentException(context);
 			if (exc) {
 				if (Wg_IsInstance(exc, &context->builtins.stopIteration, 1)) {
@@ -499,6 +496,11 @@ extern "C" {
 					return false;
 				}
 			}
+			
+			WASSERT(yielded); // If no exception was thrown then a value must be yielded
+			wings::WObjRef yieldedRef(yielded);
+			if (!callback(yielded, userdata))
+				return Wg_GetCurrentException(context) == nullptr;
 		}
 	}
 
@@ -517,11 +519,11 @@ extern "C" {
 			State* s = (State*)userdata;
 			if (s->index >= s->count) {
 				Wg_RaiseValueError(s->context, "Too many values to unpack");
-				return false;
+			} else {
+				Wg_ProtectObject(yielded);
+				s->array[s->index] = yielded;
+				s->index++;
 			}
-			Wg_ProtectObject(yielded);
-			s->array[s->index] = yielded;
-			s->index++;
 			return true;
 			});
 

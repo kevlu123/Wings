@@ -55,6 +55,83 @@ class __RangeIter:
 	def __iter__(self):
 		return self
 
+def abs(x):
+	return x.__abs__()
+
+def all(x):
+	for v in x:
+		if not v:
+			return False
+	return True
+
+def any(x):
+	for v in x:
+		if v:
+			return True
+	return False
+
+def divmod(a, b):
+	return (a // b, a % b)
+
+class enumerate:
+	def __init__(self, x, start=0):
+		self.iter = iter(x)
+		self.i = start
+	def __iter__(self):
+		return self
+	def __next__(self):
+		i = self.i
+		self.i += 1
+		return (i, next(self.iter))
+
+def exit(*args):
+	raise SystemExit
+
+class filter:
+	def __init__(self, f, iterable):
+		self.f = f
+		self.iter = iter(iterable)
+	def __iter__(self):
+		return self
+	def __next__(self):
+		while True:
+			val = next(self.iter)
+			if self.f(val):
+				return val
+		raise StopIteration
+
+def hash(x):
+	v = x.__hash__()
+	if not isinstance(v, int):
+		raise TypeError("__hash__() returned a non integer type")
+	return v
+
+def iter(x):
+	return x.__iter__()
+
+def len(x):
+	v = x.__len__()
+	if not isinstance(v, int):
+		raise TypeError("__len__() returned a non integer type")
+	elif v < 0:
+		raise ValueError("__len__() returned a negative value")
+	return v
+
+class map:
+	def __init__(self, f, iterable):
+		self.f = f
+		self.iter = iter(iterable)
+	def __iter__(self):
+		return self
+	def __next__(self):
+		return self.f(next(self.iter))
+
+def next(x):
+	return x.__next__()
+
+def pow(x, y):
+	return x ** y
+
 class range:
 	def __init__(self, start, stop=None, step=None):
 		if step is 0:
@@ -85,7 +162,16 @@ class range:
 			self.step = step
 	def __iter__(self):
 		return __RangeIter(self.start, self.stop, self.step)
-		
+
+def repr(x):
+	v = x.__repr__()
+	if not isinstance(v, str):
+		raise TypeError("__repr__() returned a non string type")
+	return v
+
+def reversed(x):
+	return x.__reversed__()
+
 class slice:
 	def __init__(self, start, stop=None, step=None):
 		if stop is None and step is None:
@@ -101,11 +187,90 @@ class slice:
 			self.stop = stop
 			self.step = step
 
-def sorted(iterable, reverse=False):
+def sorted(iterable, key=None, reverse=False):
 	li = list(iterable)
-	li.sort(reverse=reverse) 
+	li.sort(key=key, reverse=reverse)
 	return li
 
+def sum(iterable, start=0):
+	n = start
+	for i in iterable:
+		n += i
+	return n
+
+def type(x):
+	return x.__class__
+
+class zip:
+	def __init__(self, *iterables):
+		self.iters = [iter(i) for i in iterables]
+	def __iter__(self):
+		return self
+	def __next__(self):
+		return tuple([next(i) for i in self.iters])
+
+class BaseException:
+	def __init__(self, message=""):
+		self._message = message
+	def __str__(self):
+		return self._message
+
+class SystemExit(BaseException):
+	pass
+
+class Exception(BaseException):
+	pass
+
+class StopIteration(Exception):
+	pass
+
+class ArithmeticError(Exception):
+	pass
+
+class OverflowError(ArithmeticError):
+	pass
+
+class ZeroDivisionError(ArithmeticError):
+	pass
+
+class AttributeError(Exception):
+	pass
+
+class ImportError(Exception):
+	pass
+
+class LookupError(Exception):
+	pass
+
+class IndexError(LookupError):
+	pass
+
+class KeyError(LookupError):
+	pass
+
+class MemoryError(Exception):
+	pass
+
+class NameError(Exception):
+	pass
+
+class RuntimeError(Exception):
+	pass
+
+class NotImplementedError(RuntimeError):
+	pass
+
+class RecursionError(RuntimeError):
+	pass
+
+class SyntaxError(Exception):
+	pass
+
+class TypeError(Exception):
+	pass
+
+class ValueError(Exception):
+	pass
 )";
 
 
@@ -553,14 +718,10 @@ namespace wings {
 					if (!Wg_Unpack(obj, kv, 2))
 						return false;
 
-					Wg_ProtectObject(kv[1]);
+					wings::WObjRef ref(kv[1]);
 					try {
 						((WDict*)ud)->operator[](kv[0]) = kv[1];
-					} catch (HashException&) {
-						Wg_UnprotectObject(kv[1]);
-						return false;
-					}
-					Wg_UnprotectObject(kv[1]);
+					} catch (HashException&) {}
 					return true;
 				};
 
@@ -593,10 +754,8 @@ namespace wings {
 				auto f = [](Wg_Obj* obj, void* ud) {
 					try {
 						((WSet*)ud)->insert(obj);
-						return true;
-					} catch (HashException&) {
-						return false;
-					}
+					} catch (HashException&) {}
+					return true;
 				};
 
 				if (!Wg_Iterate(iterable, buf, f))
@@ -2592,14 +2751,10 @@ namespace wings {
 				if (!Wg_Unpack(obj, kv, 2))
 					return false;
 				
-				Wg_ProtectObject(kv[1]);
+				WObjRef ref(kv[1]);
 				try {
 					((Wg_Obj*)ud)->Get<WDict>()[kv[0]] = kv[1];
-				} catch (HashException&) {
-					Wg_UnprotectObject(kv[1]);
-					return false;
-				}
-				Wg_UnprotectObject(kv[1]);
+				} catch (HashException&) {}
 				return true;
 			};
 			
@@ -2753,10 +2908,8 @@ namespace wings {
 				auto set = (WSet*)ud;
 				try {
 					set->insert(obj);
-					return true;
-				} catch (HashException&) {
-					return false;
-				}
+				} catch (HashException&) {}
+				return true;
 			};
 
 			if (!Wg_Iterate(argv[1], &argv[0]->Get<WSet>(), f))
@@ -2775,10 +2928,8 @@ namespace wings {
 			auto f = [](Wg_Obj* obj, void* ud) {
 				try {
 					((WSet*)ud)->insert(obj);
-					return true;
-				} catch (HashException&) {
-					return false;
-				}
+				} catch (HashException&) {}
+				return true;
 			};
 
 			for (int i = 0; i < argc; i++)
@@ -2814,10 +2965,8 @@ namespace wings {
 
 				try {
 					s->res->insert(obj);
-					return true;
-				} catch (HashException&) {
-					return false;
-				}
+				} catch (HashException&) {}
+				return true;
 			};
 
 			if (!Wg_Iterate(argv[0], &s, f))
@@ -2852,10 +3001,8 @@ namespace wings {
 
 				try {
 					s->res->insert(obj);
-					return true;
-				} catch (HashException&) {
-					return false;
-				}
+				} catch (HashException&) {}
+				return true;
 			};
 
 			if (!Wg_Iterate(argv[0], &s, f))
@@ -2887,10 +3034,8 @@ namespace wings {
 					
 				try {
 					s->res->insert(obj);
-					return true;
-				} catch (HashException&) {
-					return false;
-				}
+				} catch (HashException&) {}
+				return true;
 			};
 
 			s.other = argv[1];
@@ -2943,9 +3088,7 @@ namespace wings {
 			auto f = [](Wg_Obj* obj, void* ud) {
 				auto s = (State*)ud;
 				Wg_Obj* contains = Wg_BinaryOp(WG_BOP_IN, obj, s->self);
-				if (contains == nullptr)
-					return false;
-				else if (!Wg_GetBool(contains)) {
+				if (contains && !Wg_GetBool(contains)) {
 					s->result = false;
 					return false;
 				}
@@ -2954,7 +3097,7 @@ namespace wings {
 
 			if (!Wg_Iterate(argv[1], &s, f) && s.result)
 				return nullptr;
-			Wg_ClearCurrentException(context);
+			
 			return Wg_CreateBool(context, s.result);
 		}
 
@@ -3087,70 +3230,6 @@ namespace wings {
 				ret = Wg_IsInstance(argv[0], argv + 1, 1) != nullptr;
 			}
 			return Wg_CreateBool(context, ret);
-		}
-
-		static Wg_Obj* len(Wg_Context* context, Wg_Obj** argv, int argc) {
-			EXPECT_ARG_COUNT(1);
-			Wg_Obj* res = Wg_CallMethod(argv[0], "__len__", nullptr, 0);
-			if (res == nullptr) {
-				return nullptr;
-			} else if (!Wg_IsInt(res)) {
-				Wg_RaiseTypeError(context, "__len__() returned a non int type");
-				return nullptr;
-			} else if (Wg_GetInt(res) < 0) {
-				Wg_RaiseValueError(context, "__len__() returned a negative number");
-				return nullptr;
-			}
-			return res;
-		}
-
-		static Wg_Obj* repr(Wg_Context* context, Wg_Obj** argv, int argc) {
-			EXPECT_ARG_COUNT(1);
-			Wg_Obj* res = Wg_CallMethod(argv[0], "__repr__", nullptr, 0);
-			if (res == nullptr) {
-				return nullptr;
-			} else if (!Wg_IsString(res)) {
-				Wg_RaiseTypeError(context, "__repr__() returned a non string type");
-				return nullptr;
-			}
-			return res;
-		}
-
-		static Wg_Obj* next(Wg_Context* context, Wg_Obj** argv, int argc) {
-			EXPECT_ARG_COUNT(1);
-			return Wg_CallMethod(argv[0], "__next__", nullptr, 0);
-		}
-
-		static Wg_Obj* iter(Wg_Context* context, Wg_Obj** argv, int argc) {
-			EXPECT_ARG_COUNT(1);
-			return Wg_CallMethod(argv[0], "__iter__", nullptr, 0);
-		}
-
-		static Wg_Obj* reversed(Wg_Context* context, Wg_Obj** argv, int argc) {
-			EXPECT_ARG_COUNT(1);
-			return Wg_CallMethod(argv[0], "__reversed__", nullptr, 0);
-		}
-
-		static Wg_Obj* abs(Wg_Context* context, Wg_Obj** argv, int argc) {
-			EXPECT_ARG_COUNT(1);
-			return Wg_CallMethod(argv[0], "__abs__", nullptr, 0);
-		}
-
-		static Wg_Obj* hash(Wg_Context* context, Wg_Obj** argv, int argc) {
-			EXPECT_ARG_COUNT(1);
-			Wg_Obj* res = Wg_CallMethod(argv[0], "__hash__", nullptr, 0);
-			if (res == nullptr) {
-				return nullptr;
-			} else if (!Wg_IsInt(res)) {
-				Wg_RaiseTypeError(context, "__hash__() returned a non int type");
-				return nullptr;
-			}
-			return res;
-		}
-
-		static Wg_Obj* exit(Wg_Context* context, Wg_Obj** argv, int argc) {
-			Wg_RaiseSystemExit(context);
-			return nullptr;
 		}
 
 	} // namespace lib
@@ -3525,37 +3604,10 @@ namespace wings {
 			RegisterMethod<methods::SetIter_next>(context->builtins.setIter, "__next__");
 			RegisterMethod<methods::self>(context->builtins.setIter, "__iter__");
 
-			// Add free functions
-			context->builtins.isinstance = RegisterFunction<lib::isinstance>(context, "isinstance");
-			context->builtins.len = RegisterFunction<lib::len>(context, "len");
-			context->builtins.repr = RegisterFunction<lib::repr>(context, "repr");
-			context->builtins.hash = RegisterFunction<lib::hash>(context, "hash");
+			// Add native free functions
 			RegisterFunction<lib::print>(context, "print");
-			RegisterFunction<lib::next>(context, "next");
-			RegisterFunction<lib::iter>(context, "iter");
-			RegisterFunction<lib::abs>(context, "abs");
-			RegisterFunction<lib::reversed>(context, "reversed");
-			RegisterFunction<lib::exit>(context, "exit");
-
-			// Create exception classes
-			context->builtins.baseException = createClass("BaseException");
-			RegisterMethod<ctors::BaseException>(context->builtins.baseException, "__init__");
-			RegisterMethod<methods::BaseException_str>(context->builtins.baseException, "__str__");
-			context->builtins.exception = createClass("Exception", context->builtins.baseException);
-			context->builtins.syntaxError = createClass("SyntaxError", context->builtins.exception);
-			context->builtins.nameError = createClass("NameError", context->builtins.exception);
-			context->builtins.typeError = createClass("TypeError", context->builtins.exception);
-			context->builtins.valueError = createClass("ValueError", context->builtins.exception);
-			context->builtins.attributeError = createClass("AttributeError", context->builtins.exception);
-			context->builtins.lookupError = createClass("LookupError", context->builtins.exception);
-			context->builtins.indexError = createClass("IndexError", context->builtins.lookupError);
-			context->builtins.keyError = createClass("KeyError", context->builtins.lookupError);
-			context->builtins.arithmeticError = createClass("ArithmeticError", context->builtins.exception);
-			context->builtins.overflowError = createClass("OverflowError", context->builtins.arithmeticError);
-			context->builtins.zeroDivisionError = createClass("ZeroDivisionError", context->builtins.arithmeticError);
-			context->builtins.stopIteration = createClass("StopIteration", context->builtins.exception);
-			context->builtins.systemExit = createClass("SystemExit", context->builtins.baseException);
-
+			context->builtins.isinstance = RegisterFunction<lib::isinstance>(context, "isinstance");
+			
 			// Initialize the rest with a script
 			Wg_Obj* lib = Wg_Compile(context, LIBRARY_CODE, "__builtins__");
 			if (lib == nullptr)
@@ -3563,9 +3615,30 @@ namespace wings {
 			if (Wg_Call(lib, nullptr, 0) == nullptr)
 				throw LibraryInitException();
 
+			context->builtins.len = getGlobal("len");
+			context->builtins.repr = getGlobal("repr");
+			context->builtins.hash = getGlobal("hash");
 			context->builtins.slice = getGlobal("slice");
+
 			context->builtins.defaultIter = getGlobal("__DefaultIter");
 			context->builtins.defaultReverseIter = getGlobal("__DefaultReverseIter");
+			
+			context->builtins.memoryErrorInstance = Wg_Call(getGlobal("MemoryError"), nullptr, 0);
+			if (context->builtins.memoryErrorInstance == nullptr)
+				throw LibraryInitException();
+			context->builtins.baseException = getGlobal("BaseException");
+			context->builtins.systemExit = getGlobal("SystemExit");
+			context->builtins.exception = getGlobal("Exception");
+			context->builtins.stopIteration = getGlobal("StopIteration");
+			context->builtins.overflowError = getGlobal("OverflowError");
+			context->builtins.zeroDivisionError = getGlobal("ZeroDivisionError");
+			context->builtins.attributeError = getGlobal("AttributeError");
+			context->builtins.syntaxError = getGlobal("SyntaxError");
+			context->builtins.indexError = getGlobal("IndexError");
+			context->builtins.keyError = getGlobal("KeyError");
+			context->builtins.nameError = getGlobal("NameError");
+			context->builtins.typeError = getGlobal("TypeError");
+			context->builtins.valueError = getGlobal("ValueError");
 
 		} catch (LibraryInitException&) {
 			std::abort(); // Internal error

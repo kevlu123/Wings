@@ -134,9 +134,9 @@ namespace wings {
 		wh.type = Statement::Type::While;
 		wh.expr = std::move(condition);
 
-		// Try:
-		//		block
-		// Except:
+		// try:
+		//		__VarXXX = __VarXXX.__next__()
+		// except StopIteration:
 		//		break
 		Statement brk{};
 		brk.srcPos = forLoop.expr.srcPos;
@@ -189,10 +189,9 @@ namespace wings {
 		tryExcept.body.push_back(std::move(iterAssignStat));
 
 		// Transfer body over
-		for (auto& child : forLoop.body)
-			tryExcept.body.push_back(std::move(child));
-
 		wh.body.push_back(std::move(tryExcept));
+		for (auto& child : forLoop.body)
+			wh.body.push_back(std::move(child));
 
 		Statement out{};
 		out.srcPos = forLoop.expr.srcPos;

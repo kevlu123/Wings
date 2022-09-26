@@ -105,7 +105,6 @@ namespace wings {
 		Wg_Obj* lookupError;
 		Wg_Obj* indexError;
 		Wg_Obj* keyError;
-		Wg_Obj* arithmeticError;
 		Wg_Obj* overflowError;
 		Wg_Obj* zeroDivisionError;
 		Wg_Obj* stopIteration;
@@ -130,7 +129,7 @@ namespace wings {
 				setIter,
 				
 				baseException, exception, syntaxError, nameError, typeError, valueError,
-				attributeError, lookupError, indexError, keyError, arithmeticError, overflowError,
+				attributeError, lookupError, indexError, keyError, overflowError,
 				zeroDivisionError, stopIteration, systemExit,
 
 				isinstance, repr,

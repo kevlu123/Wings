@@ -200,7 +200,6 @@ namespace wings {
 		case AssignType::Pack: {
 			std::vector<WObjRef> values;
 			auto f = [](Wg_Obj* value, void* userdata) {
-				Wg_ProtectObject(value);
 				((std::vector<WObjRef>*)userdata)->emplace_back(value);
 				return true;
 			};
@@ -699,7 +698,6 @@ namespace wings {
 
 					state.list->Get<std::vector<Wg_Obj*>>().push_back(entry);
 				}
-
 				return true;
 				});
 
