@@ -55,6 +55,10 @@ class __RangeIter:
 	def __iter__(self):
 		return self
 
+class __CodeObject:
+	def __init__(self, f):
+		self.f = f
+
 def abs(x):
 	return x.__abs__()
 
@@ -100,6 +104,13 @@ class filter:
 				return val
 		raise StopIteration
 
+def hasattr(obj, name):
+	try:
+		getattr(obj, name)
+		return True
+	except AttributeError:
+		return False
+
 def hash(x):
 	v = x.__hash__()
 	if not isinstance(v, int):
@@ -125,6 +136,50 @@ class map:
 		return self
 	def __next__(self):
 		return self.f(next(self.iter))
+
+def max(*args, **kwargs):
+	if len(args) == 1:
+		args = list(args[0])
+	else:
+		args = list(args)
+
+	if len(args) == 0:
+		if "default" in kwargs:
+			return kwargs["default"]
+		raise ValueError("max() arg is an empty sequence")
+		
+	if "key" in kwargs:
+		key = kwargs["key"]
+	else:
+		key = lambda x: x
+	
+	m = args[0]
+	for i in range(1, len(args)):
+		if key(args[i]) > key(m):
+			m = args[i]
+	return m
+
+def min(*args, **kwargs):
+	if len(args) == 1:
+		args = list(args[0])
+	else:
+		args = list(args)
+
+	if len(args) == 0:
+		if "default" in kwargs:
+			return kwargs["default"]
+		raise ValueError("min() arg is an empty sequence")
+		
+	if "key" in kwargs:
+		key = kwargs["key"]
+	else:
+		key = lambda x: x
+	
+	m = args[0]
+	for i in range(1, len(args)):
+		if key(args[i]) < key(m):
+			m = args[i]
+	return m
 
 def next(x):
 	return x.__next__()
@@ -186,6 +241,8 @@ class slice:
 			self.start = start
 			self.stop = stop
 			self.step = step
+	def __index__(self):
+		return self
 
 def sorted(iterable, key=None, reverse=False):
 	li = list(iterable)
@@ -285,7 +342,7 @@ static std::string PtrToString(const void* p) {
 	return ss.str();
 }
 
-static bool ParseIndex(Wg_Obj* container, Wg_Obj* index, Wg_int& out, std::optional<Wg_int>& size) {
+static bool AbsIndex(Wg_Obj* container, Wg_Obj* index, Wg_int& out, std::optional<Wg_int>& size) {
 	Wg_Obj* len = Wg_UnaryOp(WG_UOP_LEN, container);
 	if (len == nullptr)
 		return false;
@@ -306,9 +363,9 @@ static bool ParseIndex(Wg_Obj* container, Wg_Obj* index, Wg_int& out, std::optio
 	return true;
 }
 
-static bool ParseIndex(Wg_Obj* container, Wg_Obj* index, Wg_int& out) {
+static bool AbsIndex(Wg_Obj* container, Wg_Obj* index, Wg_int& out) {
 	std::optional<Wg_int> size;
-	return ParseIndex(container, index, out, size);
+	return AbsIndex(container, index, out, size);
 }
 
 template <class F>
@@ -326,7 +383,7 @@ static bool IterateRange(Wg_int start, Wg_int stop, Wg_int step, F f) {
 	return true;
 }
 
-static bool ParseSlice(Wg_Obj* container, Wg_Obj* slice, Wg_int& start, Wg_int& stop, Wg_int& step) {
+static bool AbsSlice(Wg_Obj* container, Wg_Obj* slice, Wg_int& start, Wg_int& stop, Wg_int& step) {
 	std::optional<Wg_int> size;
 	std::vector<wings::WObjRef> refs;
 	refs.emplace_back(container);
@@ -353,7 +410,7 @@ static bool ParseSlice(Wg_Obj* container, Wg_Obj* slice, Wg_int& start, Wg_int& 
 		return false;
 	} else if (Wg_IsNone(startAttr)) {
 		hasStart = false;
-	} else if (!ParseIndex(container, startAttr, start, size)) {
+	} else if (!AbsIndex(container, startAttr, start, size)) {
 		return false;
 	}
 
@@ -364,7 +421,7 @@ static bool ParseSlice(Wg_Obj* container, Wg_Obj* slice, Wg_int& start, Wg_int& 
 		return false;
 	} else if (Wg_IsNone(stopAttr)) {
 		hasStop = false;
-	} else if (!ParseIndex(container, stopAttr, stop, size)) {
+	} else if (!AbsIndex(container, stopAttr, stop, size)) {
 		return false;
 	}
 
@@ -816,12 +873,7 @@ namespace wings {
 	} // namespace ctors
 
 	namespace methods {
-
-		static Wg_Obj* object_pos(Wg_Context* context, Wg_Obj** argv, int argc) {
-			EXPECT_ARG_COUNT(1);
-			return argv[0];
-		}
-
+		
 		static Wg_Obj* object_str(Wg_Context* context, Wg_Obj** argv, int argc) {
 			EXPECT_ARG_COUNT(1);
 			std::string s = "<" + WObjTypeToString(argv[0]) + " object at 0x" + PtrToString(argv[0]) + ">";
@@ -971,12 +1023,6 @@ namespace wings {
 			return Wg_CreateString(context, "None");
 		}
 
-		static Wg_Obj* bool_nonzero(Wg_Context* context, Wg_Obj** argv, int argc) {
-			EXPECT_ARG_COUNT(1);
-			EXPECT_ARG_TYPE_BOOL(0);
-			return argv[0];
-		}
-
 		static Wg_Obj* bool_int(Wg_Context* context, Wg_Obj** argv, int argc) {
 			EXPECT_ARG_COUNT(1);
 			EXPECT_ARG_TYPE_BOOL(0);
@@ -1018,12 +1064,6 @@ namespace wings {
 			EXPECT_ARG_COUNT(1);
 			EXPECT_ARG_TYPE_INT(0);
 			return Wg_CreateBool(context, Wg_GetInt(argv[0]) != 0);
-		}
-
-		static Wg_Obj* int_int(Wg_Context* context, Wg_Obj** argv, int argc) {
-			EXPECT_ARG_COUNT(1);
-			EXPECT_ARG_TYPE_INT(0);
-			return argv[0];
 		}
 
 		static Wg_Obj* int_float(Wg_Context* context, Wg_Obj** argv, int argc) {
@@ -1251,12 +1291,6 @@ namespace wings {
 			EXPECT_ARG_COUNT(1);
 			EXPECT_ARG_TYPE_INT_OR_FLOAT(0);
 			return Wg_CreateInt(context, (Wg_int)Wg_GetFloat(argv[0]));
-		}
-
-		static Wg_Obj* float_float(Wg_Context* context, Wg_Obj** argv, int argc) {
-			EXPECT_ARG_COUNT(1);
-			EXPECT_ARG_TYPE_INT_OR_FLOAT(0);
-			return argv[0];
 		}
 
 		static Wg_Obj* float_str(Wg_Context* context, Wg_Obj** argv, int argc) {
@@ -1507,12 +1541,6 @@ namespace wings {
 			return Wg_CreateFloat(context, fvalue);
 		}
 
-		static Wg_Obj* str_str(Wg_Context* context, Wg_Obj** argv, int argc) {
-			EXPECT_ARG_COUNT(1);
-			EXPECT_ARG_TYPE_STRING(0);
-			return argv[0];
-		}
-
 		static Wg_Obj* str_repr(Wg_Context* context, Wg_Obj** argv, int argc) {
 			EXPECT_ARG_COUNT(1);
 			EXPECT_ARG_TYPE_STRING(0);
@@ -1580,24 +1608,11 @@ namespace wings {
 			EXPECT_ARG_COUNT(2);
 			EXPECT_ARG_TYPE_STRING(0);
 
-			if (Wg_IsInt(argv[1])) {
-				Wg_int index;
-				if (!ParseIndex(argv[0], argv[1], index))
-					return nullptr;
-
-				std::string_view s = Wg_GetString(argv[0]);
-				if (index < 0 || index >= (Wg_int)s.size()) {
-					Wg_RaiseIndexError(context);
-					return nullptr;
-				}
-
-				char buf[2] = { s[index], '\0' };
-				return Wg_CreateString(context, buf);
-			} else if (Wg_IsInstance(argv[1], &context->builtins.slice, 1)) {
+			if (Wg_IsInstance(argv[1], &context->builtins.slice, 1)) {
 				Wg_int start, stop, step;
-				if (!ParseSlice(argv[0], argv[1], start, stop, step))
+				if (!AbsSlice(argv[0], argv[1], start, stop, step))
 					return nullptr;
-				
+
 				std::string_view s = Wg_GetString(argv[0]);
 				std::string sliced;
 				bool success = IterateRange(start, stop, step, [&](Wg_int i) {
@@ -1608,12 +1623,31 @@ namespace wings {
 
 				if (!success)
 					return nullptr;
-				
+
 				return Wg_CreateString(context, sliced.c_str());
-			} else {
-				Wg_RaiseArgumentTypeError(context, 1, "int or slice");
-				return nullptr;
 			}
+
+			Wg_Obj* idx = Wg_UnaryOp(WG_UOP_INDEX, argv[1]);
+			if (idx == nullptr)
+				return nullptr;
+			
+			if (Wg_IsInt(idx)) {
+				Wg_int index;
+				if (!AbsIndex(argv[0], idx, index))
+					return nullptr;
+
+				std::string_view s = Wg_GetString(argv[0]);
+				if (index < 0 || index >= (Wg_int)s.size()) {
+					Wg_RaiseIndexError(context);
+					return nullptr;
+				}
+
+				char buf[2] = { s[index], '\0' };
+				return Wg_CreateString(context, buf);
+			}
+			
+			Wg_RaiseArgumentTypeError(context, 1, "int or slice");
+			return nullptr;
 		}
 
 		static Wg_Obj* str_capitalize(Wg_Context* context, Wg_Obj** argv, int argc) {
@@ -1784,14 +1818,14 @@ namespace wings {
 			std::optional<Wg_int> size;
 			if (argc >= 3) {
 				EXPECT_ARG_TYPE_INT(2);
-				if (!ParseIndex(argv[0], argv[2], start, size))
+				if (!AbsIndex(argv[0], argv[2], start, size))
 					return nullptr;
 			}
 
 			Wg_int end = 0;
 			if (argc >= 4) {
 				EXPECT_ARG_TYPE_INT(3);
-				if (!ParseIndex(argv[0], argv[3], end, size))
+				if (!AbsIndex(argv[0], argv[3], end, size))
 					return nullptr;
 			} else {
 				Wg_Obj* len = Wg_UnaryOp(WG_UOP_LEN, argv[0]);
@@ -2340,21 +2374,9 @@ namespace wings {
 				EXPECT_ARG_TYPE_TUPLE(0);
 			}
 
-			if (Wg_IsInt(argv[1])) {
-				Wg_int index;
-				if (!ParseIndex(argv[0], argv[1], index))
-					return nullptr;
-
-				auto& buf = argv[0]->Get<std::vector<Wg_Obj*>>();
-				if (index < 0 || index >= (Wg_int)buf.size()) {
-					Wg_RaiseIndexError(context);
-					return nullptr;
-				}
-
-				return buf[index];
-			} else if (Wg_IsInstance(argv[1], &context->builtins.slice, 1)) {
+			if (Wg_IsInstance(argv[1], &context->builtins.slice, 1)) {
 				Wg_int start, stop, step;
-				if (!ParseSlice(argv[0], argv[1], start, stop, step))
+				if (!AbsSlice(argv[0], argv[1], start, stop, step))
 					return nullptr;
 
 				auto& buf = argv[0]->Get<std::vector<Wg_Obj*>>();
@@ -2373,10 +2395,28 @@ namespace wings {
 				} else {
 					return Wg_CreateTuple(context, sliced.data(), (int)sliced.size());
 				}
-			} else {
-				Wg_RaiseArgumentTypeError(context, 1, "int or slice");
-				return nullptr;
 			}
+
+			Wg_Obj* idx = Wg_UnaryOp(WG_UOP_INDEX, argv[1]);
+			if (idx == nullptr)
+				return nullptr;
+
+			if (Wg_IsInt(idx)) {
+				Wg_int index;
+				if (!AbsIndex(argv[0], idx, index))
+					return nullptr;
+
+				auto& buf = argv[0]->Get<std::vector<Wg_Obj*>>();
+				if (index < 0 || index >= (Wg_int)buf.size()) {
+					Wg_RaiseIndexError(context);
+					return nullptr;
+				}
+
+				return buf[index];
+			}
+
+			Wg_RaiseArgumentTypeError(context, 1, "int or slice");
+			return nullptr;
 		}
 
 		static Wg_Obj* list_setitem(Wg_Context* context, Wg_Obj** argv, int argc) {
@@ -2385,7 +2425,7 @@ namespace wings {
 			EXPECT_ARG_TYPE_INT(1);
 			
 			Wg_int index;
-			if (!ParseIndex(argv[0], argv[1], index))
+			if (!AbsIndex(argv[0], argv[1], index))
 				return nullptr;
 
 			auto& buf = argv[0]->Get<std::vector<Wg_Obj*>>();
@@ -2412,7 +2452,7 @@ namespace wings {
 			EXPECT_ARG_TYPE_INT(1);
 
 			Wg_int index;
-			if (!ParseIndex(argv[0], argv[1], index))
+			if (!AbsIndex(argv[0], argv[1], index))
 				return nullptr;
 
 			auto& buf = argv[0]->Get<std::vector<Wg_Obj*>>();			
@@ -2429,7 +2469,7 @@ namespace wings {
 			Wg_int index = (Wg_int)buf.size() - 1;
 			if (argc == 2) {
 				EXPECT_ARG_TYPE_INT(1);
-				if (!ParseIndex(argv[0], argv[1], index))
+				if (!AbsIndex(argv[0], argv[1], index))
 					return nullptr;
 			}
 
@@ -3202,6 +3242,177 @@ namespace wings {
 
 	namespace lib {
 
+		template <size_t base>
+		static Wg_Obj* base_str(Wg_Context* context, Wg_Obj** argv, int argc) {
+			EXPECT_ARG_COUNT(1);
+
+			Wg_Obj* val = Wg_UnaryOp(WG_UOP_INDEX, argv[0]);
+			if (val == nullptr)
+				return nullptr;
+			
+			Wg_int i = Wg_GetInt(val);			
+			std::string s;
+
+			if constexpr (base == 2) {
+				s = "0b";
+			} else if constexpr (base == 8) {
+				s = "0o";
+			} else if constexpr (base == 16) {
+				s = "0x";
+			}
+			
+			do {
+				s += "0123456789abcdef"[i % base];
+				i /= base;
+			}
+			while (i > 0);
+
+			return Wg_CreateString(context, s.c_str());
+		}
+
+		static Wg_Obj* callable(Wg_Context* context, Wg_Obj** argv, int argc) {
+			EXPECT_ARG_COUNT(1);
+			
+			if (Wg_IsFunction(argv[0])) {
+				return Wg_CreateBool(context, true);
+			} else {
+				return Wg_CreateBool(context, Wg_HasAttribute(argv[0], "__call__"));
+			}
+		}
+
+		static Wg_Obj* chr(Wg_Context* context, Wg_Obj** argv, int argc) {
+			EXPECT_ARG_COUNT(1);
+			EXPECT_ARG_TYPE_INT(0);
+			
+			Wg_int i = Wg_GetInt(argv[0]);
+			char s[2] = { (char)i, 0 };
+			return Wg_CreateString(context, s);
+		}
+
+		static Wg_Obj* compile(Wg_Context* context, Wg_Obj** argv, int argc) {
+			EXPECT_ARG_COUNT(3);
+			EXPECT_ARG_TYPE_STRING(0);
+			EXPECT_ARG_TYPE_STRING(1);
+			EXPECT_ARG_TYPE_STRING(2);
+		
+			const char* source = Wg_GetString(argv[0]);
+			const char* filename = Wg_GetString(argv[1]);
+			const char* mode = Wg_GetString(argv[2]);
+			
+			Wg_Obj* fn = nullptr;
+			if (std::strcmp(mode, "exec")) {
+				fn = Wg_Compile(context, source, filename);
+			} else if (std::strcmp(mode, "eval")) {
+				fn = Wg_CompileExpression(context, source, filename);
+			} else {
+				Wg_RaiseValueError(context, "compile() mode must be 'exec' or 'eval'");
+			}
+			
+			if (fn == nullptr)
+				return nullptr;
+
+			return Wg_Call(context->builtins.codeObject, &fn, 1);
+		}
+
+		static Wg_Obj* delattr(Wg_Context* context, Wg_Obj** argv, int argc) {
+			EXPECT_ARG_COUNT(2);
+			EXPECT_ARG_TYPE_STRING(1);
+
+			const char* name = Wg_GetString(argv[1]);
+			return Wg_DeleteAttribute(argv[0], name) ? Wg_CreateNone(context) : nullptr;
+		}
+
+		static Wg_Obj* eval(Wg_Context* context, Wg_Obj** argv, int argc) {
+			EXPECT_ARG_COUNT(1);
+			
+			if (Wg_IsInstance(argv[0], &context->builtins.codeObject, 1)) {
+				return Wg_CallMethod(argv[0], "f", nullptr, 0);
+			} else {
+				EXPECT_ARG_TYPE_STRING(0);
+				const char* source = Wg_GetString(argv[0]);
+				Wg_Obj* fn = Wg_CompileExpression(context, source, "<string>");
+				if (fn == nullptr)
+					return nullptr;
+				return Wg_Call(fn, nullptr, 0);
+			}
+		}
+
+		static Wg_Obj* exec(Wg_Context* context, Wg_Obj** argv, int argc) {
+			EXPECT_ARG_COUNT(1);
+
+			if (Wg_IsInstance(argv[0], &context->builtins.codeObject, 1)) {
+				if (Wg_CallMethod(argv[0], "f", nullptr, 0) == nullptr)
+					return nullptr;
+			} else {
+				EXPECT_ARG_TYPE_STRING(0);
+				const char* source = Wg_GetString(argv[0]);
+				Wg_Obj* fn = Wg_Compile(context, source, "<string>");
+				if (fn == nullptr)
+					return nullptr;
+				if (Wg_Call(fn, nullptr, 0) == nullptr)
+					return nullptr;
+			}
+			return Wg_CreateNone(context);
+		}
+
+		static Wg_Obj* getattr(Wg_Context* context, Wg_Obj** argv, int argc) {
+			EXPECT_ARG_COUNT(2);
+			EXPECT_ARG_TYPE_STRING(1);
+			
+			const char* name = Wg_GetString(argv[1]);
+			return Wg_GetAttribute(argv[0], name);
+		}
+		
+		static Wg_Obj* id(Wg_Context* context, Wg_Obj** argv, int argc) {
+			EXPECT_ARG_COUNT(1);
+			return Wg_CreateInt(context, (Wg_int)argv[0]);
+		}
+
+		static Wg_Obj* input(Wg_Context* context, Wg_Obj** argv, int argc) {
+			EXPECT_ARG_COUNT_BETWEEN(0, 1);
+			
+			if (argc == 1) {
+				Wg_Obj* prompt = Wg_UnaryOp(WG_UOP_STR, argv[0]);
+				if (prompt == nullptr)
+					return nullptr;
+				
+				Wg_PrintString(context, Wg_GetString(prompt));
+			}
+			
+			std::string s;
+			std::getline(std::cin, s);
+			
+			return Wg_CreateString(context, s.c_str());
+		}
+
+		static Wg_Obj* isinstance(Wg_Context* context, Wg_Obj** argv, int argc) {
+			EXPECT_ARG_COUNT(2);
+			bool ret{};
+			if (Wg_IsTuple(argv[1])) {
+				const auto& buf = argv[1]->Get<std::vector<Wg_Obj*>>();
+				ret = Wg_IsInstance(argv[0], buf.data(), (int)buf.size()) != nullptr;
+			} else {
+				ret = Wg_IsInstance(argv[0], argv + 1, 1) != nullptr;
+			}
+			return Wg_CreateBool(context, ret);
+		}
+
+		static Wg_Obj* ord(Wg_Context* context, Wg_Obj** argv, int argc) {
+			EXPECT_ARG_COUNT(1);
+			EXPECT_ARG_TYPE_STRING(0);
+
+			const char* s = Wg_GetString(argv[0]);
+			if (s[0] == 0) {
+				Wg_RaiseValueError(context, "ord() expected a character, but string of length 0 found");
+				return nullptr;
+			} else if (s[1] == 0) {
+				return Wg_CreateInt(context, (int)s[0]);
+			} else {
+				Wg_RaiseValueError(context, "ord() expected a character, but string of length > 1 found");
+				return nullptr;
+			}
+		}
+
 		static Wg_Obj* print(Wg_Context* context, Wg_Obj** argv, int argc) {
 			std::string text;
 			for (int i = 0; i < argc; i++) {
@@ -3220,16 +3431,13 @@ namespace wings {
 			return Wg_CreateNone(context);
 		}
 
-		static Wg_Obj* isinstance(Wg_Context* context, Wg_Obj** argv, int argc) {
-			EXPECT_ARG_COUNT(2);
-			bool ret{};
-			if (Wg_IsTuple(argv[1])) {
-				const auto& buf = argv[1]->Get<std::vector<Wg_Obj*>>();
-				ret = Wg_IsInstance(argv[0], buf.data(), (int)buf.size()) != nullptr;
-			} else {
-				ret = Wg_IsInstance(argv[0], argv + 1, 1) != nullptr;
-			}
-			return Wg_CreateBool(context, ret);
+		static Wg_Obj* setattr(Wg_Context* context, Wg_Obj** argv, int argc) {
+			EXPECT_ARG_COUNT(3);
+			EXPECT_ARG_TYPE_STRING(1);
+
+			const char* name = Wg_GetString(argv[1]);
+			Wg_SetAttribute(argv[0], name, argv[2]);
+			return Wg_CreateNone(context);
 		}
 
 	} // namespace lib
@@ -3371,7 +3579,7 @@ namespace wings {
 			Wg_SetAttribute(context->builtins.tuple, "__bases__", emptyTuple);
 
 			// Add methods
-			RegisterMethod<methods::object_pos>(context->builtins.object, "__pos__");
+			RegisterMethod<methods::self>(context->builtins.object, "__pos__");
 			RegisterMethod<methods::object_str>(context->builtins.object, "__str__");
 			RegisterMethod<methods::object_nonzero>(context->builtins.object, "__nonzero__");
 			RegisterMethod<methods::object_repr>(context->builtins.object, "__repr__");
@@ -3398,7 +3606,7 @@ namespace wings {
 
 			context->builtins._bool = createClass("bool");
 			context->builtins._bool->Get<Wg_Obj::Class>().ctor = ctors::_bool;
-			RegisterMethod<methods::bool_nonzero>(context->builtins._bool, "__nonzero__");
+			RegisterMethod<methods::self>(context->builtins._bool, "__nonzero__");
 			RegisterMethod<methods::bool_int>(context->builtins._bool, "__int__");
 			RegisterMethod<methods::bool_float>(context->builtins._bool, "__float__");
 			RegisterMethod<methods::bool_str>(context->builtins._bool, "__str__");
@@ -3426,9 +3634,10 @@ namespace wings {
 			context->builtins._int = createClass("int");
 			RegisterMethod<ctors::_int>(context->builtins._int, "__init__");
 			RegisterMethod<methods::int_nonzero>(context->builtins._int, "__nonzero__");
-			RegisterMethod<methods::int_int>(context->builtins._int, "__int__");
+			RegisterMethod<methods::self>(context->builtins._int, "__int__");
 			RegisterMethod<methods::int_float>(context->builtins._int, "__float__");
 			RegisterMethod<methods::int_str>(context->builtins._int, "__str__");
+			RegisterMethod<methods::self>(context->builtins._int, "__index__");
 			RegisterMethod<methods::int_neg>(context->builtins._int, "__neg__");
 			RegisterMethod<methods::int_add>(context->builtins._int, "__add__");
 			RegisterMethod<methods::int_sub>(context->builtins._int, "__sub__");
@@ -3454,7 +3663,7 @@ namespace wings {
 			RegisterMethod<ctors::_float>(context->builtins._float, "__init__");
 			RegisterMethod<methods::float_nonzero>(context->builtins._float, "__nonzero__");
 			RegisterMethod<methods::float_int>(context->builtins._float, "__int__");
-			RegisterMethod<methods::float_float>(context->builtins._float, "__float__");
+			RegisterMethod<methods::self>(context->builtins._float, "__float__");
 			RegisterMethod<methods::float_str>(context->builtins._float, "__str__");
 			RegisterMethod<methods::float_neg>(context->builtins._float, "__neg__");
 			RegisterMethod<methods::float_add>(context->builtins._float, "__add__");
@@ -3475,7 +3684,7 @@ namespace wings {
 			RegisterMethod<methods::str_nonzero>(context->builtins.str, "__nonzero__");
 			RegisterMethod<methods::str_int>(context->builtins.str, "__int__");
 			RegisterMethod<methods::str_float>(context->builtins.str, "__float__");
-			RegisterMethod<methods::str_str>(context->builtins.str, "__str__");
+			RegisterMethod<methods::self>(context->builtins.str, "__str__");
 			RegisterMethod<methods::str_repr>(context->builtins.str, "__repr__");
 			RegisterMethod<methods::str_len>(context->builtins.str, "__len__");
 			RegisterMethod<methods::str_add>(context->builtins.str, "__add__");
@@ -3605,8 +3814,22 @@ namespace wings {
 			RegisterMethod<methods::self>(context->builtins.setIter, "__iter__");
 
 			// Add native free functions
-			RegisterFunction<lib::print>(context, "print");
+			RegisterFunction<lib::base_str<2>>(context, "bin");
+			RegisterFunction<lib::base_str<8>>(context, "oct");
+			RegisterFunction<lib::base_str<16>>(context, "hex");
+			RegisterFunction<lib::callable>(context, "callable");
+			RegisterFunction<lib::chr>(context, "chr");
+			RegisterFunction<lib::compile>(context, "compile");
+			RegisterFunction<lib::delattr>(context, "delattr");
+			RegisterFunction<lib::eval>(context, "eval");
+			RegisterFunction<lib::exec>(context, "exec");
+			RegisterFunction<lib::getattr>(context, "getattr");
+			RegisterFunction<lib::id>(context, "id");
+			RegisterFunction<lib::input>(context, "input");
 			context->builtins.isinstance = RegisterFunction<lib::isinstance>(context, "isinstance");
+			RegisterFunction<lib::ord>(context, "ord");
+			RegisterFunction<lib::print>(context, "print");
+			RegisterFunction<lib::setattr>(context, "setattr");
 			
 			// Initialize the rest with a script
 			Wg_Obj* lib = Wg_Compile(context, LIBRARY_CODE, "__builtins__");
@@ -3619,13 +3842,14 @@ namespace wings {
 			context->builtins.repr = getGlobal("repr");
 			context->builtins.hash = getGlobal("hash");
 			context->builtins.slice = getGlobal("slice");
-
 			context->builtins.defaultIter = getGlobal("__DefaultIter");
 			context->builtins.defaultReverseIter = getGlobal("__DefaultReverseIter");
+			context->builtins.codeObject = getGlobal("__CodeObject");
 			
 			context->builtins.memoryErrorInstance = Wg_Call(getGlobal("MemoryError"), nullptr, 0);
 			if (context->builtins.memoryErrorInstance == nullptr)
 				throw LibraryInitException();
+			
 			context->builtins.baseException = getGlobal("BaseException");
 			context->builtins.systemExit = getGlobal("SystemExit");
 			context->builtins.exception = getGlobal("Exception");
@@ -3639,7 +3863,6 @@ namespace wings {
 			context->builtins.nameError = getGlobal("NameError");
 			context->builtins.typeError = getGlobal("TypeError");
 			context->builtins.valueError = getGlobal("ValueError");
-
 		} catch (LibraryInitException&) {
 			std::abort(); // Internal error
 		}

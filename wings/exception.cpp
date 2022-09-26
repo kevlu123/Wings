@@ -2,6 +2,7 @@
 #include "impl.h"
 #include <sstream>
 #include <algorithm>
+#include <ranges>
 
 extern "C" {
     const char* Wg_GetErrorMessage(Wg_Context* context) {
@@ -12,9 +13,12 @@ extern "C" {
         }
 
         std::stringstream ss;
-        ss << "Traceback (most recent call first):\n";
+        ss << "Traceback (most recent call last):\n";
 
         for (const auto& frame : context->exceptionTrace) {
+            if (frame.tag == "__builtins__")
+                continue;
+
             ss << "  ";
             bool written = false;
 
@@ -42,8 +46,8 @@ extern "C" {
 
                 size_t skip = lineText.find_first_not_of(' ');
                 ss << "    " << (lineText.c_str() + skip) << "\n";
-                if (skip <= frame.srcPos.column)
-                    ss << std::string(frame.srcPos.column + 4 - skip, ' ') << "^\n";
+                //if (skip <= frame.srcPos.column)
+                //    ss << std::string(frame.srcPos.column + 4 - skip, ' ') << "^\n";
             }
         }
 

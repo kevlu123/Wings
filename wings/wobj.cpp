@@ -413,6 +413,18 @@ extern "C" {
 		return mem;
 	}
 
+	bool Wg_DeleteAttribute(Wg_Obj* obj, const char* member) {
+		std::abort(); // TODO
+		//WASSERT(obj && member);
+		//Wg_Obj* mem = obj->attributes.Delete(member);
+		//if (mem == nullptr) {
+		//	Wg_RaiseAttributeError(obj, member);
+		//} else if (Wg_IsFunction(mem) && mem->Get<Wg_Obj::Func>().isMethod) {
+		//	mem->Get<Wg_Obj::Func>().self = obj;
+		//}
+		//return mem;
+	}
+
 	Wg_Obj* Wg_GetAttribute(Wg_Obj* obj, const char* member) {
 		WASSERT(obj && member);
 		Wg_Obj* mem = obj->attributes.Get(member);
@@ -717,6 +729,17 @@ extern "C" {
 			return Wg_Call(arg->context->builtins.str, &arg, 1);
 		case WG_UOP_REPR:
 			return Wg_Call(arg->context->builtins.repr, &arg, 1);
+		case WG_UOP_INDEX: {
+			Wg_Obj* index = Wg_CallMethod(arg, "__index__", nullptr, 0);
+			if (index == nullptr) {
+				return nullptr;
+			} else if (!Wg_IsInt(index)) {
+				Wg_RaiseTypeError(arg->context, "__index__() returned a non integer type");
+				return nullptr;
+			} else {
+				return index;
+			}
+		}
 		default:
 			WUNREACHABLE();
 		}

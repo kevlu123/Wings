@@ -49,6 +49,7 @@ enum Wg_UnOp {
 	WG_UOP_FLOAT,		// __float__									(must return float)
 	WG_UOP_STR,			// __str__										(must return string)
 	WG_UOP_REPR,		// __repr__										(must return string)
+	WG_UOP_INDEX,		// __index__									(must return int)						(must return string)
 };
 
 enum Wg_BinOp {
@@ -125,6 +126,20 @@ WG_DLL_EXPORT void Wg_DestroyContext(Wg_Context* context);
 * @return A function object, or nullptr on failure. Call Wg_Call() to execute the function object.
 */
 WG_DLL_EXPORT Wg_Obj* Wg_Compile(Wg_Context* context, const char* code, const char* tag WG_DEFAULT_ARG(nullptr));
+
+/**
+* Compile an expression to a function object.
+*
+* Remarks:
+* Call Wg_GetCurrentException() or Wg_GetErrorMessage() to get error information.
+*
+* @param context The relevant context.
+* @param code A null terminated ASCII string containing the source code.
+* @param tag An optional null terminated ASCII string to be displayed
+*            in error messages relating to this script. This parameter may be nullptr.
+* @return A function object, or nullptr on failure. Call Wg_Call() to execute the function object.
+*/
+WG_DLL_EXPORT Wg_Obj* Wg_CompileExpression(Wg_Context* context, const char* code, const char* tag WG_DEFAULT_ARG(nullptr));
 
 /**
 * Set a function to be called when a programmer error occurs.
@@ -768,7 +783,10 @@ WG_DLL_EXPORT Wg_Obj* Wg_HasAttribute(Wg_Obj* obj, const char* member);
 
 /**
 * Get an attribute of an object.
+* 
+* remarks:
 * If the attribute does not exist, an AttributeError is raised.
+* Call Wg_GetCurrentException() or Wg_GetErrorMessage() to get error information.
 * 
 * @param obj The object to get the attribute from.
 * @param member A null terminated ASCII string containing the attribute name to get.
@@ -784,6 +802,19 @@ WG_DLL_EXPORT Wg_Obj* Wg_GetAttribute(Wg_Obj* obj, const char* member);
 * @param value The value to set the attribute to.
 */
 WG_DLL_EXPORT void Wg_SetAttribute(Wg_Obj* obj, const char* member, Wg_Obj* value);
+
+/**
+* Delete an attribute of an object.
+* 
+* remarks:
+* If the attribute does not exist, an AttributeError is raised.
+* Call Wg_GetCurrentException() or Wg_GetErrorMessage() to get error information.
+*
+* @param obj The object to delete the attribute from.
+* @param member A null terminated ASCII string containing the attribute name to delete.
+* @return True if the attribute was found, otherwise false.
+*/
+WG_DLL_EXPORT bool Wg_DeleteAttribute(Wg_Obj* obj, const char* member);
 
 /**
 * Get an attribute from the base class of an object.

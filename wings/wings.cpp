@@ -74,7 +74,7 @@ extern "C" {
 		errorCallbackUserdata = userdata;
 	}
 
-	Wg_Obj* Wg_Compile(Wg_Context* context, const char* code, const char* tag) {
+	static Wg_Obj* Compile(Wg_Context* context, const char* code, const char* tag, bool expr) {
 		WASSERT(context && code);
 
 		if (tag == nullptr)
@@ -86,7 +86,7 @@ extern "C" {
 		auto raiseException = [&](const wings::CodeError& error) {
 			context->currentTrace.push_back(wings::TraceFrame{
 				error.srcPos,
-				(*originalSource)[error.srcPos.line],
+				error.srcPos.line < originalSource->size() ? (*originalSource)[error.srcPos.line] : "",
 				tag,
 				tag
 				});
@@ -97,7 +97,7 @@ extern "C" {
 				context->builtins.syntaxError
 			);
 		};
-		
+
 		if (lexResult.error) {
 			raiseException(lexResult.error);
 			return nullptr;
@@ -108,7 +108,23 @@ extern "C" {
 			raiseException(parseResult.error);
 			return nullptr;
 		}
-		
+
+		if (expr) {
+			std::vector<wings::Statement> body = std::move(parseResult.parseTree.expr.def.body);
+			if (body.size() != 1 || body[0].type != wings::Statement::Type::Expr) {
+				raiseException(wings::CodeError::Bad("Invalid syntax"));
+				return nullptr;
+			}
+			
+			wings::Statement ret{};
+			ret.srcPos = body[0].srcPos;
+			ret.type = wings::Statement::Type::Return;
+			ret.expr = std::move(body[0].expr);
+			
+			parseResult.parseTree.expr.def.body.clear();
+			parseResult.parseTree.expr.def.body.push_back(std::move(ret));
+		}
+
 		auto* def = new wings::DefObject();
 		def->context = context;
 		def->tag = tag;
@@ -133,6 +149,14 @@ extern "C" {
 		Wg_SetFinalizer(obj, &finalizer);
 
 		return obj;
+	}
+
+	Wg_Obj* Wg_Compile(Wg_Context* context, const char* code, const char* tag) {
+		return Compile(context, code, tag, false);
+	}
+
+	Wg_Obj* Wg_CompileExpression(Wg_Context* context, const char* code, const char* tag) {
+		return Compile(context, code, tag, true);
 	}
 
 	Wg_Obj* Wg_GetGlobal(Wg_Context* context, const char* name) {
