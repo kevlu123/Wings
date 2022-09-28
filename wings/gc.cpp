@@ -11,7 +11,7 @@ namespace wings {
 			Wg_CollectGarbage(context);
 			if (context->mem.size() >= context->config.maxAlloc) {
 				// If there are still too many objects then set a MemoryException
-				Wg_RaiseExceptionObject(context, context->builtins.memoryErrorInstance);
+				Wg_RaiseExceptionObject(context->builtins.memoryErrorInstance);
 				return nullptr;
 			}
 		}
@@ -52,8 +52,9 @@ extern "C" {
 			inUse.push_back(context->currentException);
 		for (const auto& [obj, _] : context->protectedObjects)
 			inUse.push_back(obj);
-		for (auto& var : context->globals)
-			inUse.push_back(*var.second);
+		for (auto& [_, globals] : context->globals)
+			for (auto& var : globals)
+				inUse.push_back(*var.second);
 		for (Wg_Obj* obj : context->kwargs)
 			if (obj)
 				inUse.push_back(obj);

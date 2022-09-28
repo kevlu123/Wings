@@ -7,6 +7,7 @@
 #include <string_view>
 #include <vector>
 #include <deque>
+#include <stack>
 #include <unordered_set>
 #include <unordered_map>
 #include <array>
@@ -97,19 +98,25 @@ namespace wings {
 
 		// Exception types
 		Wg_Obj* baseException;
+		Wg_Obj* systemExit;
 		Wg_Obj* exception;
-		Wg_Obj* syntaxError;
-		Wg_Obj* nameError;
-		Wg_Obj* typeError;
-		Wg_Obj* valueError;
+		Wg_Obj* stopIteration;
+		Wg_Obj* arithmeticError;
+		Wg_Obj* overflowError;
+		Wg_Obj* zeroDivisionError;
 		Wg_Obj* attributeError;
+		Wg_Obj* importError;
+		Wg_Obj* syntaxError;
 		Wg_Obj* lookupError;
 		Wg_Obj* indexError;
 		Wg_Obj* keyError;
-		Wg_Obj* overflowError;
-		Wg_Obj* zeroDivisionError;
-		Wg_Obj* stopIteration;
-		Wg_Obj* systemExit;
+		Wg_Obj* memoryError;
+		Wg_Obj* nameError;
+		Wg_Obj* runtimeError;
+		Wg_Obj* notImplementedError;
+		Wg_Obj* recursionError;
+		Wg_Obj* typeError;
+		Wg_Obj* valueError;
 
 		// Functions
 		Wg_Obj* isinstance;
@@ -125,13 +132,16 @@ namespace wings {
 
 		auto GetAll() const {
 			return std::array{
-				object, noneType, _bool, _int, _float, str, tuple, list, dict, set,
-				func, slice, defaultIter, defaultReverseIter, dictKeysIter, dictValuesIter, dictItemsIter,
-				setIter, codeObject,
-				
-				baseException, exception, syntaxError, nameError, typeError, valueError,
-				attributeError, lookupError, indexError, keyError, overflowError,
-				zeroDivisionError, stopIteration, systemExit,
+				object, noneType, _bool, _int, _float, str, tuple, list,
+				dict, set, func, slice, defaultIter, defaultReverseIter,
+				dictKeysIter, dictValuesIter, dictItemsIter, setIter,
+				codeObject,
+
+				baseException, systemExit, exception, stopIteration, arithmeticError,
+				overflowError, zeroDivisionError, attributeError, importError,
+				syntaxError, lookupError, indexError, keyError, memoryError,
+				nameError, runtimeError, notImplementedError, recursionError,
+				typeError, valueError,
 
 				isinstance, repr,
 
@@ -165,6 +175,8 @@ struct Wg_Obj {
 	std::string type;
 	union {
 		void* data;
+		
+		// For debugging only
 		bool* _bool;
 		Wg_int* _int;
 		Wg_float* _float;
@@ -185,11 +197,12 @@ struct Wg_Obj {
 };
 
 struct Wg_Context {
+	using Globals = std::unordered_map<std::string, wings::RcPtr<Wg_Obj*>>;
 	Wg_Config config{};
 	size_t lastObjectCountAfterGC = 0;
 	std::deque<std::unique_ptr<Wg_Obj>> mem;
 	std::unordered_map<const Wg_Obj*, size_t> protectedObjects;
-	std::unordered_map<std::string, wings::RcPtr<Wg_Obj*>> globals;
+	std::unordered_map<std::string, Globals> globals;
 	Wg_Obj* currentException = nullptr;
 	std::vector<Wg_Obj*> reprStack;
 	std::vector<wings::TraceFrame> currentTrace;
@@ -198,6 +211,9 @@ struct Wg_Context {
 	wings::Builtins builtins{};
 	std::vector<Wg_Obj*> kwargs;
 	std::vector<void*> userdata;
+	std::unordered_map<std::string, Wg_ModuleLoader> moduleLoaders;
+	std::stack<std::string> currentModule;
+	
 };
 
 #define STRINGIZE_HELPER(x) STRINGIZE2_HELPER(x)

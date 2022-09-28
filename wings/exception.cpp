@@ -73,32 +73,80 @@ extern "C" {
         context->traceMessage.clear();
     }
 
-    void Wg_RaiseException(Wg_Context* context, const char* message, Wg_Obj* type) {
+    void Wg_RaiseException(Wg_Context* context, Wg_Exc type, const char* message) {
         WASSERT_VOID(context);
-        type = type ? type : context->builtins.exception;
+        switch (type) {
+		case WG_EXC_BASEEXCEPTION:
+            return Wg_RaiseExceptionClass(context->builtins.baseException, message);
+        case WG_EXC_SYSTEMEXIT:
+            return Wg_RaiseExceptionClass(context->builtins.systemExit, message);
+        case WG_EXC_EXCEPTION:
+            return Wg_RaiseExceptionClass(context->builtins.exception, message);
+        case WG_EXC_STOPITERATION:
+            return Wg_RaiseExceptionClass(context->builtins.stopIteration, message);
+        case WG_EXC_ARITHMETICERROR:
+            return Wg_RaiseExceptionClass(context->builtins.arithmeticError, message);
+        case WG_EXC_OVERFLOWERROR:
+            return Wg_RaiseExceptionClass(context->builtins.overflowError, message);
+        case WG_EXC_ZERODIVISIONERROR:
+            return Wg_RaiseExceptionClass(context->builtins.zeroDivisionError, message);
+        case WG_EXC_ATTRIBUTEERROR:
+            return Wg_RaiseExceptionClass(context->builtins.attributeError, message);
+        case WG_EXC_IMPORTERROR:
+            return Wg_RaiseExceptionClass(context->builtins.importError, message);
+        case WG_EXC_LOOKUPERROR:
+            return Wg_RaiseExceptionClass(context->builtins.lookupError, message);
+        case WG_EXC_INDEXERROR:
+            return Wg_RaiseExceptionClass(context->builtins.indexError, message);
+        case WG_EXC_KEYERROR:
+            return Wg_RaiseExceptionClass(context->builtins.keyError, message);
+        case WG_EXC_MEMORYERROR:
+            return Wg_RaiseExceptionClass(context->builtins.memoryError, message);
+        case WG_EXC_NAMEERROR:
+            return Wg_RaiseExceptionClass(context->builtins.nameError, message);
+        case WG_EXC_RUNTIMEERROR:
+            return Wg_RaiseExceptionClass(context->builtins.runtimeError, message);
+        case WG_EXC_NOTIMPLEMENTEDERROR:
+            return Wg_RaiseExceptionClass(context->builtins.notImplementedError, message);
+        case WG_EXC_RECURSIONERROR:
+            return Wg_RaiseExceptionClass(context->builtins.recursionError, message);
+        case WG_EXC_SYNTAXERROR:
+            return Wg_RaiseExceptionClass(context->builtins.syntaxError, message);
+        case WG_EXC_TYPEERROR:
+            return Wg_RaiseExceptionClass(context->builtins.typeError, message);
+        case WG_EXC_VALUEERROR:
+            return Wg_RaiseExceptionClass(context->builtins.valueError, message);
+        default:
+            WASSERT_VOID(false);
+        }
+    }
+
+    void Wg_RaiseExceptionClass(Wg_Obj* type, const char* message) {
+        WASSERT_VOID(type);
         wings::WObjRef ref(type);
 
-        Wg_Obj* msg = Wg_CreateString(context, message);
+        Wg_Obj* msg = Wg_CreateString(type->context, message);
         if (msg == nullptr) {
             return;
         }
 
         // If exception creation was successful then set the exception.
         // Otherwise the exception will already be set by some other code.
-        if (Wg_Obj* exceptionObject = Wg_Call(type, &msg, 1)) {
-            Wg_RaiseExceptionObject(context, exceptionObject);
+        if (Wg_Obj* exceptionObject = Wg_Call(type, &msg, msg ? 1 : 0)) {
+            Wg_RaiseExceptionObject(exceptionObject);
         }
     }
 
-    void Wg_RaiseExceptionObject(Wg_Context* context, Wg_Obj* exception) {
-        WASSERT_VOID(context && exception);
+    void Wg_RaiseExceptionObject(Wg_Obj* exception) {
+        WASSERT_VOID(exception);
+        Wg_Context* context = exception->context;
         if (Wg_IsInstance(exception, &context->builtins.baseException, 1)) {
             context->currentException = exception;
             context->exceptionTrace.clear();
             for (const auto& frame : context->currentTrace)
                 context->exceptionTrace.push_back(frame.ToOwned());
         } else {
-            Wg_RaiseTypeError(context, "exceptions must derive from BaseException");
+            Wg_RaiseException(context, WG_EXC_TYPEERROR, "exceptions must derive from BaseException");
         }
     }
 
@@ -116,64 +164,44 @@ extern "C" {
                 std::to_string(given) +
                 " argument(s)";
         }
-        Wg_RaiseTypeError(context, msg.c_str());
+        Wg_RaiseException(context, WG_EXC_TYPEERROR, msg.c_str());
     }
 
     void Wg_RaiseArgumentTypeError(Wg_Context* context, int argIndex, const char* expected) {
         WASSERT_VOID(context && argIndex >= 0 && expected);
         std::string msg = "Argument " + std::to_string(argIndex + 1)
             + " Expected type " + expected;
-        Wg_RaiseTypeError(context, msg.c_str());
+        Wg_RaiseException(context, WG_EXC_TYPEERROR, msg.c_str());
     }
 
     void Wg_RaiseAttributeError(const Wg_Obj* obj, const char* attribute) {
         WASSERT_VOID(obj && attribute);
         std::string msg = "'" + wings::WObjTypeToString(obj) +
             "' object has no attribute '" + attribute + "'";
-        Wg_RaiseException(obj->context, msg.c_str(), obj->context->builtins.attributeError);
+        Wg_RaiseException(obj->context, WG_EXC_ATTRIBUTEERROR, msg.c_str());
     }
 
     void Wg_RaiseZeroDivisionError(Wg_Context* context) {
         WASSERT_VOID(context);
-        Wg_RaiseException(context, "division by zero", context->builtins.zeroDivisionError);
+        Wg_RaiseException(context, WG_EXC_ZERODIVISIONERROR, "division by zero");
     }
 
     void Wg_RaiseIndexError(Wg_Context* context) {
         WASSERT_VOID(context);
-        Wg_RaiseException(context, "index out of range", context->builtins.indexError);
+        Wg_RaiseException(context, WG_EXC_INDEXERROR, "index out of range");
     }
 
     void Wg_RaiseKeyError(Wg_Context* context, Wg_Obj* key) {
         WASSERT_VOID(context);
 
         if (key == nullptr) {
-            Wg_RaiseException(context, nullptr, context->builtins.keyError);
+            Wg_RaiseException(context, WG_EXC_KEYERROR);
         } else {
             std::string s = "<exception str() failed>";
             if (Wg_Obj* repr = Wg_UnaryOp(WG_UOP_REPR, key))
                 s = Wg_GetString(repr);
-            Wg_RaiseException(context, s.c_str(), context->builtins.keyError);
+            Wg_RaiseException(context, WG_EXC_KEYERROR, s.c_str());
         }
-    }
-
-    void WRaiseOverflowError(Wg_Context* context) {
-        WASSERT_VOID(context);
-        Wg_RaiseException(context, "index out of range", context->builtins.overflowError);
-    }
-
-    void Wg_RaiseStopIteration(Wg_Context* context) {
-        WASSERT_VOID(context);
-        Wg_RaiseException(context, nullptr, context->builtins.stopIteration);
-    }
-
-    void Wg_RaiseTypeError(Wg_Context* context, const char* message) {
-        WASSERT_VOID(context);
-        Wg_RaiseException(context, message, context->builtins.typeError);
-    }
-
-    void Wg_RaiseValueError(Wg_Context* context, const char* message) {
-        WASSERT_VOID(context);
-        Wg_RaiseException(context, message, context->builtins.valueError);
     }
 
     void Wg_RaiseNameError(Wg_Context* context, const char* name) {
@@ -181,11 +209,6 @@ extern "C" {
         std::string msg = "The name '";
         msg += name;
         msg += "' is not defined";
-        Wg_RaiseException(context, msg.c_str(), context->builtins.nameError);
-    }
-
-    void Wg_RaiseSystemExit(Wg_Context* context) {
-        WASSERT_VOID(context);
-        Wg_RaiseException(context, nullptr, context->builtins.systemExit);
+        Wg_RaiseException(context, WG_EXC_NAMEERROR, msg.c_str());
     }
 }

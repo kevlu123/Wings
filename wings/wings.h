@@ -14,6 +14,7 @@ typedef void (*Wg_Finalizer)(Wg_Obj* obj, void* userdata);
 typedef void (*Wg_PrintFunction)(const char* message, int len, void* userdata);
 typedef void (*Wg_ErrorCallback)(const char* message, void* userdata);
 typedef bool (*Wg_IterationCallback)(Wg_Obj* obj, void* userdata);
+typedef bool (*Wg_ModuleLoader)(Wg_Context* context);
 
 typedef struct Wg_FuncDesc {
 	Wg_Function fptr;
@@ -75,6 +76,29 @@ enum Wg_BinOp {
 	WG_BOP_LE,			// __le__										(must return bool)
 	WG_BOP_GT,			// __gt__										(must return bool)
 	WG_BOP_GE,			// __ge__										(must return bool)
+};
+
+enum Wg_Exc {
+	WG_EXC_BASEEXCEPTION,
+	WG_EXC_SYSTEMEXIT,
+	WG_EXC_EXCEPTION,
+	WG_EXC_STOPITERATION,
+	WG_EXC_ARITHMETICERROR,
+	WG_EXC_OVERFLOWERROR,
+	WG_EXC_ZERODIVISIONERROR,
+	WG_EXC_ATTRIBUTEERROR,
+	WG_EXC_IMPORTERROR,
+	WG_EXC_LOOKUPERROR,
+	WG_EXC_INDEXERROR,
+	WG_EXC_KEYERROR,
+	WG_EXC_MEMORYERROR,
+	WG_EXC_NAMEERROR,
+	WG_EXC_RUNTIMEERROR,
+	WG_EXC_NOTIMPLEMENTEDERROR,
+	WG_EXC_RECURSIONERROR,
+	WG_EXC_SYNTAXERROR,
+	WG_EXC_TYPEERROR,
+	WG_EXC_VALUEERROR,
 };
 
 #if defined(_WIN32) && defined(_WINDLL)
@@ -168,17 +192,30 @@ WG_DLL_EXPORT Wg_Obj* Wg_GetCurrentException(Wg_Context* context);
 
 /**
 * Create and raise an exception.
+*
+* Remarks:
+* If an exception is already set, the old exception will be overwritten.
+*
+* @param context The relevant context.
+* @param type The exception type.
+* @param message A null terminated ASCII string containing the error message string,
+*                or nullptr for an empty string.
+*/
+WG_DLL_EXPORT void Wg_RaiseException(Wg_Context* context, Wg_Exc type, const char* message WG_DEFAULT_ARG(nullptr));
+
+/**
+* Create and raise an exception.
 * 
 * Remarks:
 * If an exception is already set, the old exception will be overwritten.
 * 
 * @param context The relevant context.
+* @param type A class object of the type of exception to be raised.
+*             The type must be a subclass of BaseException.
 * @param message A null terminated ASCII string containing the error message string,
 *                or nullptr for an empty string.
-* @param type A class object of the type of exception to be raised,
-*             or nullptr for Exception. The type must be a subclass of BaseException.
 */
-WG_DLL_EXPORT void Wg_RaiseException(Wg_Context* context, const char* message WG_DEFAULT_ARG(nullptr), Wg_Obj* type WG_DEFAULT_ARG(nullptr));
+WG_DLL_EXPORT void Wg_RaiseExceptionClass(Wg_Obj* type, const char* message WG_DEFAULT_ARG(nullptr));
 
 /**
 * Raise an existing exception object.
@@ -189,7 +226,7 @@ WG_DLL_EXPORT void Wg_RaiseException(Wg_Context* context, const char* message WG
 * @param context The relevant context.
 * @param type The exception object to raise. The type must be a subclass of BaseException.
 */
-WG_DLL_EXPORT void Wg_RaiseExceptionObject(Wg_Context* context, Wg_Obj* exception);
+WG_DLL_EXPORT void Wg_RaiseExceptionObject(Wg_Obj* exception);
 
 /**
 * Raise a TypeError with a formatted message.
@@ -227,27 +264,7 @@ WG_DLL_EXPORT void Wg_RaiseArgumentTypeError(Wg_Context* context, int argIndex, 
 WG_DLL_EXPORT void Wg_RaiseAttributeError(const Wg_Obj* obj, const char* attribute);
 
 /**
-* Raise a ZeroDivisionError.
-*
-* Remarks:
-* If an exception is already set, the old exception will be overwritten.
-*
-* @param context The relevant context.
-*/
-WG_DLL_EXPORT void Wg_RaiseZeroDivisionError(Wg_Context* context);
-
-/**
-* Raise a IndexError.
-*
-* Remarks:
-* If an exception is already set, the old exception will be overwritten.
-*
-* @param context The relevant context.
-*/
-WG_DLL_EXPORT void Wg_RaiseIndexError(Wg_Context* context);
-
-/**
-* Raise a KeyError.
+* Raise a KeyError with a formatted message.
 *
 * Remarks:
 * If an exception is already set, the old exception will be overwritten.
@@ -258,41 +275,7 @@ WG_DLL_EXPORT void Wg_RaiseIndexError(Wg_Context* context);
 WG_DLL_EXPORT void Wg_RaiseKeyError(Wg_Context* context, Wg_Obj* key WG_DEFAULT_ARG(nullptr));
 
 /**
-* Raise a StopIteration to terminate iteration.
-*
-* Remarks:
-* If an exception is already set, the old exception will be overwritten.
-*
-* @param context The relevant context.
-*/
-WG_DLL_EXPORT void Wg_RaiseStopIteration(Wg_Context* context);
-
-/**
-* Raise a TypeError.
-*
-* Remarks:
-* If an exception is already set, the old exception will be overwritten.
-*
-* @param context The relevant context.
-* @param message A null terminated ASCII string containing the exception message,
-*                or nullptr for an empty string.
-*/
-WG_DLL_EXPORT void Wg_RaiseTypeError(Wg_Context* context, const char* message WG_DEFAULT_ARG(nullptr));
-
-/**
-* Raise a ValueError.
-*
-* Remarks:
-* If an exception is already set, the old exception will be overwritten.
-*
-* @param context The relevant context.
-* @param message A null terminated ASCII string containing the exception message,
-*                or nullptr for an empty string.
-*/
-WG_DLL_EXPORT void Wg_RaiseValueError(Wg_Context* context, const char* message WG_DEFAULT_ARG(nullptr));
-
-/**
-* Raise a NameError.
+* Raise a NameError with a formatted message.
 *
 * Remarks:
 * If an exception is already set, the old exception will be overwritten.
@@ -301,16 +284,6 @@ WG_DLL_EXPORT void Wg_RaiseValueError(Wg_Context* context, const char* message W
 * @param name A null terminated ASCII string containing the name that was not found.
 */
 WG_DLL_EXPORT void Wg_RaiseNameError(Wg_Context* context, const char* name);
-
-/**
-* Raise a SystemExit exception.
-*
-* Remarks:
-* If an exception is already set, the old exception will be overwritten.
-*
-* @param context The relevant context.
-*/
-WG_DLL_EXPORT void Wg_RaiseSystemExit(Wg_Context* context);
 
 /**
 * Check if an object's class derives from any of the specified classes.
@@ -1010,6 +983,30 @@ WG_DLL_EXPORT Wg_Obj* Wg_UnaryOp(Wg_UnOp op, Wg_Obj* arg);
 * @return The result of the operation, or nullptr on failure.
 */
 WG_DLL_EXPORT Wg_Obj* Wg_BinaryOp(Wg_BinOp op, Wg_Obj* lhs, Wg_Obj* rhs);
+
+/**
+* Register a callback to be called when a module with the given name is imported.
+* In the callback, new members can be added to the module.
+* 
+* @param context The relevant context.
+* @param name The name of the module to register the callback for.
+* @param loader The callback to register. The callback should return false on failure and otherwise true.
+*/
+WG_DLL_EXPORT void Wg_RegisterModule(Wg_Context* context, const char* name, Wg_ModuleLoader loader);
+
+/**
+* Import a module.
+* 
+* Remarks:
+* If the module is imported successfully, the module object
+* is bound to a global variable with the same name.
+* Call Wg_GetCurrentException() or Wg_GetErrorMessage() to get error information.
+* 
+* @param context The relevant context.
+* @param name The name of the module to import.
+* @return The imported module, or nullptr on failure.
+*/
+WG_DLL_EXPORT Wg_Obj* Wg_ImportModule(Wg_Context* context, const char* name);
 
 #undef WG_DEFAULT_ARG
 #undef WG_DLL_EXPORT

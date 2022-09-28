@@ -39,6 +39,9 @@ extern "C" {
 
 	Wg_Context* Wg_CreateContext(const Wg_Config* config) {
 		Wg_Context* context = new Wg_Context();
+		
+		context->currentModule.push("__main__");
+		context->globals.insert({ std::string("__main__"), {} });
 
 		// Initialise the library without restriction
 		Wg_SetConfig(context, nullptr);
@@ -91,11 +94,7 @@ extern "C" {
 				tag
 				});
 
-			Wg_RaiseException(
-				context,
-				error.message.c_str(),
-				context->builtins.syntaxError
-			);
+			Wg_RaiseException(context, WG_EXC_SYNTAXERROR, error.message.c_str());
 		};
 
 		if (lexResult.error) {
@@ -161,8 +160,10 @@ extern "C" {
 
 	Wg_Obj* Wg_GetGlobal(Wg_Context* context, const char* name) {
 		WASSERT(context && name);
-		auto it = context->globals.find(std::string(name));
-		if (it == context->globals.end()) {
+		const auto& module = context->currentModule.top();
+		auto& globals = context->globals.at(module);
+		auto it = globals.find(name);
+		if (it == globals.end()) {
 			return nullptr;
 		} else {
 			return *it->second;
@@ -171,19 +172,23 @@ extern "C" {
 
 	void Wg_SetGlobal(Wg_Context* context, const char* name, Wg_Obj* value) {
 		WASSERT_VOID(context && name && value);
-		auto it = context->globals.find(std::string(name));
-		if (it != context->globals.end()) {
+		const auto& module = context->currentModule.top();
+		auto& globals = context->globals.at(module);
+		auto it = globals.find(name);
+		if (it != globals.end()) {
 			*it->second = value;
 		} else {
-			context->globals.insert({ std::string(name), wings::MakeRcPtr<Wg_Obj*>(value) });
+			globals.insert({ std::string(name), wings::MakeRcPtr<Wg_Obj*>(value) });
 		}
 	}
 
 	void Wg_DeleteGlobal(Wg_Context* context, const char* name) {
 		WASSERT_VOID(context && name);
-		auto it = context->globals.find(std::string(name));
-		if (it != context->globals.end()) {
-			context->globals.erase(it);
+		const auto& module = context->currentModule.top();
+		auto& globals = context->globals.at(module);
+		auto it = globals.find(name);
+		if (it != globals.end()) {
+			globals.erase(it);
 		}
 	}
 

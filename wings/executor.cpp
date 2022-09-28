@@ -57,7 +57,7 @@ namespace wings {
 						if (!def->prettyName.empty())
 							msg = def->prettyName + "() ";
 						msg += std::string("got an unexpected keyword argument '") + key + "'";
-						Wg_RaiseTypeError(context, msg.c_str());
+						Wg_RaiseException(context, WG_EXC_TYPEERROR, msg.c_str());
 						return nullptr;
 					}
 
@@ -86,7 +86,7 @@ namespace wings {
 					if (!def->prettyName.empty())
 						msg = def->prettyName + "() ";
 					msg += "got multiple values for argument '" + def->parameterNames[i] + "'";
-					Wg_RaiseTypeError(context, msg.c_str());
+					Wg_RaiseException(context, WG_EXC_TYPEERROR, msg.c_str());
 					return nullptr;
 				}
 				executor.variables.insert({ def->parameterNames[i], MakeRcPtr<Wg_Obj*>(args[i]) });
@@ -99,7 +99,7 @@ namespace wings {
 					msg += "takes " + std::to_string(def->parameterNames.size())
 						+ " positional argument(s) but " + std::to_string(argc)
 						+ (argc == 1 ? " was given" : " were given");
-					Wg_RaiseTypeError(context, msg.c_str());
+					Wg_RaiseException(context, WG_EXC_TYPEERROR, msg.c_str());
 					return nullptr;
 				}
 				listArgs->Get<std::vector<Wg_Obj*>>().push_back(args[i]);
@@ -128,7 +128,7 @@ namespace wings {
 				def->prettyName + "()"
 				+ " missing parameter(s) "
 				+ unassigned;
-			Wg_RaiseTypeError(context, msg.c_str());
+			Wg_RaiseException(context, WG_EXC_TYPEERROR, msg.c_str());
 			return nullptr;
 		}
 
@@ -208,7 +208,7 @@ namespace wings {
 				return nullptr;
 
 			if (values.size() != target.pack.size()) {
-				Wg_RaiseValueError(context, "Packed assignment argument count mismatch");
+				Wg_RaiseException(context, WG_EXC_TYPEERROR, "Packed assignment argument count mismatch");
 				return nullptr;
 			}
 
@@ -316,17 +316,21 @@ namespace wings {
 			def->listArgs = instr.def->listArgs;
 			def->kwArgs = instr.def->kwArgs;
 
+			const auto& module = context->currentModule.top();
+			auto& globals = context->globals.at(module);
+			
 			for (const auto& capture : instr.def->localCaptures) {
 				if (variables.contains(capture)) {
 					def->captures.insert({ capture, variables[capture] });
 				} else {
-					if (!context->globals.contains(capture))
+					if (!globals.contains(capture))
 						Wg_SetGlobal(context, capture.c_str(), Wg_CreateNone(context));
-					def->captures.insert({ capture, context->globals.at(capture) });
+					
+					def->captures.insert({ capture, globals.at(capture) });
 				}
 			}
 			for (const auto& capture : instr.def->globalCaptures) {
-				def->captures.insert({ capture, context->globals.at(capture) });
+				def->captures.insert({ capture, globals.at(capture) });
 			}
 			def->localVariables = instr.def->variables;
 
@@ -524,7 +528,7 @@ namespace wings {
 		case Instruction::Type::UnpackMapForMapCreation: {
 			Wg_Obj* map = PopStack();
 			if (!Wg_IsDictionary(map)) {
-				Wg_RaiseTypeError(context, "Unary '**' must be applied to a dictionary");
+				Wg_RaiseException(context, WG_EXC_TYPEERROR, "Unary '**' must be applied to a dictionary");
 				exitValue = nullptr;
 				return;
 			}
@@ -538,14 +542,14 @@ namespace wings {
 		case Instruction::Type::UnpackMapForCall: {
 			Wg_Obj* map = PopStack();
 			if (!Wg_IsDictionary(map)) {
-				Wg_RaiseTypeError(context, "Unary '**' must be applied to a dictionary");
+				Wg_RaiseException(context, WG_EXC_TYPEERROR, "Unary '**' must be applied to a dictionary");
 				exitValue = nullptr;
 				return;
 			}
 
 			for (const auto& [key, value] : map->Get<wings::WDict>()) {
 				if (!Wg_IsString(key)) {
-					Wg_RaiseTypeError(context, "Keywords must be strings");
+					Wg_RaiseException(context, WG_EXC_TYPEERROR, "Keywords must be strings");
 					exitValue = nullptr;
 					return;
 				}
@@ -714,9 +718,9 @@ namespace wings {
 		case Instruction::Type::Raise: {
 			Wg_Obj* expr = PopStack();
 			if (Wg_IsClass(expr)) {
-				Wg_RaiseException(context, nullptr, expr);
+				Wg_RaiseExceptionClass(expr);
 			} else {
-				Wg_RaiseExceptionObject(context, expr);
+				Wg_RaiseExceptionObject(expr);
 			}
 			exitValue = nullptr;
 			break;

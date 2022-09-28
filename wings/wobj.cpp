@@ -245,7 +245,7 @@ extern "C" {
 					if (ret == nullptr) {
 						return nullptr;
 					} else if (!Wg_IsNone(ret)) {
-						Wg_RaiseTypeError(context, "__init__() returned a non NoneType type");
+						Wg_RaiseException(context, WG_EXC_TYPEERROR, "__init__() returned a non NoneType type");
 						return nullptr;
 					}
 				}
@@ -280,7 +280,7 @@ extern "C" {
 				if (ret == nullptr) {
 					return nullptr;
 				} else if (!Wg_IsNone(ret)) {
-					Wg_RaiseTypeError(context, "__init__() returned a non NoneType type");
+					Wg_RaiseException(context, WG_EXC_TYPEERROR, "__init__() returned a non NoneType type");
 					return nullptr;
 				}
 			}
@@ -530,7 +530,7 @@ extern "C" {
 		bool success = Wg_Iterate(obj, &s, [](Wg_Obj* yielded, void* userdata) {
 			State* s = (State*)userdata;
 			if (s->index >= s->count) {
-				Wg_RaiseValueError(s->context, "Too many values to unpack");
+				Wg_RaiseException(s->context, WG_EXC_VALUEERROR, "Too many values to unpack");
 			} else {
 				Wg_ProtectObject(yielded);
 				s->array[s->index] = yielded;
@@ -545,7 +545,7 @@ extern "C" {
 		if (!success) {
 			return false;
 		} else if (s.index < count) {
-			Wg_RaiseValueError(context, "Not enough values to unpack");
+			Wg_RaiseException(context, WG_EXC_VALUEERROR, "Not enough values to unpack");
 			return false;
 		} else {
 			return true;
@@ -577,12 +577,12 @@ extern "C" {
 
 			if (kwargsDict) {
 				if (!Wg_IsDictionary(kwargsDict)) {
-					Wg_RaiseTypeError(context, "Keyword arguments must be a dictionary");
+					Wg_RaiseException(context, WG_EXC_TYPEERROR, "Keyword arguments must be a dictionary");
 					return nullptr;
 				}
 				for (const auto& [key, value] : kwargsDict->Get<wings::WDict>()) {
 					if (!Wg_IsString(key)) {
-						Wg_RaiseTypeError(context, "Keyword arguments dictionary must only contain string keys");
+						Wg_RaiseException(context, WG_EXC_TYPEERROR, "Keyword arguments dictionary must only contain string keys");
 						return nullptr;
 					}
 				}
@@ -708,6 +708,7 @@ extern "C" {
 
 	Wg_Obj* Wg_UnaryOp(Wg_UnOp op, Wg_Obj* arg) {
 		WASSERT(arg);
+		Wg_Context* context = arg->context;
 		switch (op) {
 		case WG_UOP_POS:
 			return Wg_CallMethod(arg, "__pos__", nullptr, 0);
@@ -716,25 +717,25 @@ extern "C" {
 		case WG_UOP_BITNOT:
 			return Wg_CallMethod(arg, "__invert__", nullptr, 0);
 		case WG_UOP_HASH:
-			return Wg_Call(arg->context->builtins.hash, &arg, 1);
+			return Wg_Call(context->builtins.hash, &arg, 1);
 		case WG_UOP_LEN:
-			return Wg_Call(arg->context->builtins.len, &arg, 1);
+			return Wg_Call(context->builtins.len, &arg, 1);
 		case WG_UOP_BOOL:
-			return Wg_Call(arg->context->builtins._bool, &arg, 1);
+			return Wg_Call(context->builtins._bool, &arg, 1);
 		case WG_UOP_INT:
-			return Wg_Call(arg->context->builtins._int, &arg, 1);
+			return Wg_Call(context->builtins._int, &arg, 1);
 		case WG_UOP_FLOAT:
-			return Wg_Call(arg->context->builtins._float, &arg, 1);
+			return Wg_Call(context->builtins._float, &arg, 1);
 		case WG_UOP_STR:
-			return Wg_Call(arg->context->builtins.str, &arg, 1);
+			return Wg_Call(context->builtins.str, &arg, 1);
 		case WG_UOP_REPR:
-			return Wg_Call(arg->context->builtins.repr, &arg, 1);
+			return Wg_Call(context->builtins.repr, &arg, 1);
 		case WG_UOP_INDEX: {
 			Wg_Obj* index = Wg_CallMethod(arg, "__index__", nullptr, 0);
 			if (index == nullptr) {
 				return nullptr;
 			} else if (!Wg_IsInt(index)) {
-				Wg_RaiseTypeError(arg->context, "__index__() returned a non integer type");
+				Wg_RaiseException(context, WG_EXC_TYPEERROR, "__index__() returned a non integer type");
 				return nullptr;
 			} else {
 				return index;
@@ -800,7 +801,7 @@ extern "C" {
 			if (!Wg_IsBool(boolResult)) {
 				std::string message = method->second;
 				message += "() returned a non bool type";
-				Wg_RaiseTypeError(boolResult->context, message.c_str());
+				Wg_RaiseException(boolResult->context, WG_EXC_TYPEERROR, message.c_str());
 				return nullptr;
 			}
 			return boolResult;
@@ -832,4 +833,35 @@ extern "C" {
 		}
 	}
 
+	void Wg_RegisterModule(Wg_Context* context, const char* name, Wg_ModuleLoader loader) {
+		context->moduleLoaders.insert({ std::string(name), loader });
+	}
+
+	Wg_Obj* Wg_ImportModule(Wg_Context* context, const char* name) {
+		// Try to load a module registered with Wg_RegisterModule
+		auto it = context->moduleLoaders.find(name);
+		if (it != context->moduleLoaders.end()) {
+			if (!it->second(context)) {
+				// Failed
+				return nullptr;
+			}
+
+			// Success. Generate a module object.
+			//Wg_Obj* moduleObject = Wg_Call(context->builtins.moduleObject, nullptr, 0);
+			//if (moduleObject == nullptr)
+			//	return nullptr;
+			//auto& module = context->globals.at(name);
+			//for (auto& [var, val] : module) {
+			//	Wg_SetAttribute(moduleObject, var.c_str(), *val);
+			//}
+			//return moduleObject;
+			return nullptr;
+		}
+
+		// Try to load a module from a file
+		// TODO
+		
+		///Wg_RaiseImportError(context);
+		return nullptr;
+	}
 } // extern "C"

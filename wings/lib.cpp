@@ -348,7 +348,7 @@ static bool AbsIndex(Wg_Obj* container, Wg_Obj* index, Wg_int& out, std::optiona
 		return false;
 
 	if (!Wg_IsInt(index)) {
-		Wg_RaiseTypeError(container->context, "index must be an integer");
+		Wg_RaiseException(container->context, WG_EXC_TYPEERROR, "index must be an integer");
 		return false;
 	}
 
@@ -396,10 +396,10 @@ static bool AbsSlice(Wg_Obj* container, Wg_Obj* slice, Wg_int& start, Wg_int& st
 	} else if (Wg_IsNone(stepAttr)) {
 		step = 1;
 	} else if (!Wg_IsInt(stepAttr)) {
-		Wg_RaiseTypeError(slice->context, "slice step attribute must be an integer");
+		Wg_RaiseException(slice->context, WG_EXC_TYPEERROR, "slice step attribute must be an integer");
 		return false;
 	} else if ((step = Wg_GetInt(stepAttr)) == 0) {
-		Wg_RaiseValueError(slice->context, "slice step cannot be 0");
+		Wg_RaiseException(slice->context, WG_EXC_VALUEERROR, "slice step cannot be 0");
 		return false;
 	}
 
@@ -620,7 +620,7 @@ namespace wings {
 				if (res == nullptr) {
 					return nullptr;
 				} else if (!Wg_IsBool(res)) {
-					Wg_RaiseTypeError(context, "__nonzero__() returned a non bool type");
+					Wg_RaiseException(context, WG_EXC_TYPEERROR, "__nonzero__() returned a non bool type");
 					return nullptr;
 				}
 				return res;
@@ -638,7 +638,7 @@ namespace wings {
 				if (res == nullptr) {
 					return nullptr;
 				} else if (!Wg_IsInt(res)) {
-					Wg_RaiseTypeError(context, "__int__() returned a non int type");
+					Wg_RaiseException(context, WG_EXC_TYPEERROR, "__int__() returned a non int type");
 					return nullptr;
 				}
 				v = Wg_GetInt(res);
@@ -661,7 +661,7 @@ namespace wings {
 				if (res == nullptr) {
 					return nullptr;
 				} else if (!Wg_IsIntOrFloat(res)) {
-					Wg_RaiseTypeError(context, "__float__() returned a non float type");
+					Wg_RaiseException(context, WG_EXC_TYPEERROR, "__float__() returned a non float type");
 					return nullptr;
 				}
 				v = Wg_GetFloat(res);
@@ -684,7 +684,7 @@ namespace wings {
 				if (res == nullptr) {
 					return nullptr;
 				} else if (!Wg_IsString(res)) {
-					Wg_RaiseTypeError(context, "__str__() returned a non string type");
+					Wg_RaiseException(context, WG_EXC_TYPEERROR, "__str__() returned a non string type");
 					return nullptr;
 				}
 				v = Wg_GetString(res);
@@ -1159,7 +1159,7 @@ namespace wings {
 			EXPECT_ARG_TYPE_INT_OR_FLOAT(0);
 
 			if (Wg_GetFloat(argv[1]) == 0) {
-				Wg_RaiseZeroDivisionError(context);
+				Wg_RaiseException(context, WG_EXC_ZERODIVISIONERROR);
 				return nullptr;
 			}
 			return Wg_CreateFloat(context, Wg_GetFloat(argv[0]) / Wg_GetFloat(argv[1]));
@@ -1171,7 +1171,7 @@ namespace wings {
 			EXPECT_ARG_TYPE_INT_OR_FLOAT(1);
 
 			if (Wg_GetFloat(argv[1]) == 0) {
-				Wg_RaiseZeroDivisionError(context);
+				Wg_RaiseException(context, WG_EXC_ZERODIVISIONERROR);
 				return nullptr;
 			}
 
@@ -1188,7 +1188,7 @@ namespace wings {
 			EXPECT_ARG_TYPE_INT_OR_FLOAT(1);
 
 			if (Wg_GetFloat(argv[1]) == 0) {
-				Wg_RaiseZeroDivisionError(context);
+				Wg_RaiseException(context, WG_EXC_ZERODIVISIONERROR);
 				return nullptr;
 			}
 
@@ -1244,7 +1244,7 @@ namespace wings {
 
 			Wg_int shift = Wg_GetInt(argv[1]);
 			if (shift < 0) {
-				Wg_RaiseValueError(context, "Shift cannot be negative");
+				Wg_RaiseException(context, WG_EXC_VALUEERROR, "Shift cannot be negative");
 				return nullptr;
 			}
 			shift = std::min(shift, (Wg_int)sizeof(Wg_int) * 8);
@@ -1258,7 +1258,7 @@ namespace wings {
 
 			Wg_int shift = Wg_GetInt(argv[1]);
 			if (shift < 0) {
-				Wg_RaiseValueError(context, "Shift cannot be negative");
+				Wg_RaiseException(context, WG_EXC_VALUEERROR, "Shift cannot be negative");
 				return nullptr;
 			}
 			shift = std::min(shift, (Wg_int)sizeof(Wg_int) * 8);
@@ -1435,12 +1435,15 @@ namespace wings {
 				if (base != 10) {
 					p += 2;
 					if (!isDigit(*p, base)) {
+						const char* message{};
 						switch (base) {
-						case 2: Wg_RaiseValueError(context, "Invalid binary string"); return nullptr;
-						case 8: Wg_RaiseValueError(context, "Invalid octal string"); return nullptr;
-						case 16: Wg_RaiseValueError(context, "Invalid hexadecimal string"); return nullptr;
+						case 2: message = "Invalid binary string"; break;
+						case 8: message = "Invalid octal string"; break;
+						case 16: message = "Invalid hexadecimal string"; break;
 						default: WUNREACHABLE();
 						}
+						Wg_RaiseException(context, WG_EXC_VALUEERROR, message);
+						return nullptr;
 					}
 				}
 			}
@@ -1451,12 +1454,12 @@ namespace wings {
 			}
 
 			if (value > std::numeric_limits<wuint>::max()) {
-				Wg_RaiseException(context, "Integer string is too large", context->builtins.overflowError);
+				Wg_RaiseException(context, WG_EXC_OVERFLOWERROR, "Integer string is too large");
 				return nullptr;
 			}
 
 			if (*p) {
-				Wg_RaiseValueError(context, "Invalid integer string");
+				Wg_RaiseException(context, WG_EXC_VALUEERROR, "Invalid integer string");
 				return nullptr;
 			}
 
@@ -1511,12 +1514,15 @@ namespace wings {
 			if (base != 10) {
 				p += 2;
 				if (!isDigit(*p, base) && *p != '.') {
+					const char* message{};
 					switch (base) {
-					case 2: Wg_RaiseValueError(context, "Invalid binary string"); return nullptr;
-					case 8: Wg_RaiseValueError(context, "Invalid octal string"); return nullptr;
-					case 16: Wg_RaiseValueError(context, "Invalid hexadecimal string"); return nullptr;
+					case 2: message = "Invalid binary string"; break;
+					case 8: message = "Invalid octal string"; break;
+					case 16: message = "Invalid hexadecimal string"; break;
 					default: WUNREACHABLE();
 					}
+					Wg_RaiseException(context, WG_EXC_VALUEERROR, message);
+					return nullptr;
 				}
 			}
 
@@ -1534,7 +1540,7 @@ namespace wings {
 			}
 
 			if (*p) {
-				Wg_RaiseValueError(context, "Invalid float string");
+				Wg_RaiseException(context, WG_EXC_VALUEERROR, "Invalid float string");
 				return nullptr;
 			}
 
@@ -1638,7 +1644,7 @@ namespace wings {
 
 				std::string_view s = Wg_GetString(argv[0]);
 				if (index < 0 || index >= (Wg_int)s.size()) {
-					Wg_RaiseIndexError(context);
+					Wg_RaiseException(context, WG_EXC_INDEXERROR);
 					return nullptr;
 				}
 
@@ -1689,7 +1695,7 @@ namespace wings {
 			
 			const char* fill = argc == 3 ? Wg_GetString(argv[2]) : " ";
 			if (std::strlen(fill) != 1) {
-				Wg_RaiseTypeError(context, "The fill character must be exactly one character long");
+				Wg_RaiseException(context, WG_EXC_TYPEERROR, "The fill character must be exactly one character long");
 				return nullptr;
 			}
 
@@ -1747,16 +1753,17 @@ namespace wings {
 						useAutoIndexing = false;
 						++p;
 					} else {
-						Wg_RaiseValueError(context, "Invalid format string");
+						Wg_RaiseException(context, WG_EXC_VALUEERROR, "Invalid format string");
 						return nullptr;
 					}
 				}
 
 				if (useAutoIndexing) {
 					if (mode == Mode::Manual) {
-						Wg_RaiseValueError(
+						Wg_RaiseException(
 							context,
-							"cannot switch from automatic field numbering to manual field specification"
+							WG_EXC_VALUEERROR,
+							"Cannot switch from manual field numbering to automatic field specification"
 						);
 						return nullptr;
 					}
@@ -1765,9 +1772,10 @@ namespace wings {
 					autoIndex++;
 				} else {
 					if (mode == Mode::Auto) {
-						Wg_RaiseValueError(
+						Wg_RaiseException(
 							context,
-							"cannot switch from automatic field numbering to manual field specification"
+							WG_EXC_VALUEERROR,
+							"Cannot switch from automatic field numbering to manual field specification"
 						);
 						return nullptr;
 					}
@@ -1775,7 +1783,7 @@ namespace wings {
 				}
 
 				if ((int)index >= argc - 1) {
-					Wg_RaiseIndexError(context);
+					Wg_RaiseException(context, WG_EXC_INDEXERROR);
 					return nullptr;
 				}
 
@@ -1864,7 +1872,7 @@ namespace wings {
 				return nullptr;
 			
 			if (Wg_GetInt(location) == -1) {
-				Wg_RaiseValueError(context, "substring not found");
+				Wg_RaiseException(context, WG_EXC_VALUEERROR, "substring not found");
 				return nullptr;
 			} else {
 				return location;
@@ -1967,7 +1975,7 @@ namespace wings {
 				Wg_Context* context = obj->context;
 
 				if (!Wg_IsString(obj)) {
-					Wg_RaiseTypeError(context, "sequence item must be a string");
+					Wg_RaiseException(context, WG_EXC_TYPEERROR, "sequence item must be a string");
 					return false;
 				}
 				
@@ -2020,7 +2028,7 @@ namespace wings {
 					EXPECT_ARG_TYPE_STRING(0);
 					std::string_view fillStr = Wg_GetString(argv[2]);
 					if (fillStr.size() != 1) {
-						Wg_RaiseTypeError(context, "The fill character must be exactly one character long");
+						Wg_RaiseException(context, WG_EXC_TYPEERROR, "The fill character must be exactly one character long");
 						return nullptr;
 					}
 					fill = fillStr[0];
@@ -2361,7 +2369,7 @@ namespace wings {
 					return Wg_CreateInt(context, (Wg_int)i);
 			}
 
-			Wg_RaiseValueError(context, "Value was not found");
+			Wg_RaiseException(context, WG_EXC_VALUEERROR, "Value was not found");
 			return nullptr;
 		}
 
@@ -2408,7 +2416,7 @@ namespace wings {
 
 				auto& buf = argv[0]->Get<std::vector<Wg_Obj*>>();
 				if (index < 0 || index >= (Wg_int)buf.size()) {
-					Wg_RaiseIndexError(context);
+					Wg_RaiseException(context, WG_EXC_INDEXERROR);
 					return nullptr;
 				}
 
@@ -2430,7 +2438,7 @@ namespace wings {
 
 			auto& buf = argv[0]->Get<std::vector<Wg_Obj*>>();
 			if (index < 0 || index >= (Wg_int)buf.size()) {
-				Wg_RaiseIndexError(context);
+				Wg_RaiseException(context, WG_EXC_INDEXERROR);
 				return nullptr;
 			}
 
@@ -2474,7 +2482,7 @@ namespace wings {
 			}
 
 			if (index < 0 || index >= (Wg_int)buf.size()) {
-				Wg_RaiseIndexError(context);
+				Wg_RaiseException(context, WG_EXC_INDEXERROR);
 				return nullptr;
 			}
 			
@@ -2500,7 +2508,7 @@ namespace wings {
 				}
 			}
 
-			Wg_RaiseValueError(context, "Value was not found");
+			Wg_RaiseException(context, WG_EXC_VALUEERROR, "Value was not found");
 			return nullptr;
 		}
 
@@ -3164,7 +3172,7 @@ namespace wings {
 			auto& it = *(WDict::iterator*)data;
 			it.Revalidate();
 			if (it == WDict::iterator{}) {
-				Wg_RaiseStopIteration(context);
+				Wg_RaiseException(context, WG_EXC_STOPITERATION);
 				return nullptr;
 			}
 			
@@ -3184,7 +3192,7 @@ namespace wings {
 			auto& it = *(WDict::iterator*)data;
 			it.Revalidate();
 			if (it == WDict::iterator{}) {
-				Wg_RaiseStopIteration(context);
+				Wg_RaiseException(context, WG_EXC_STOPITERATION);
 				return nullptr;
 			}
 
@@ -3204,7 +3212,7 @@ namespace wings {
 			auto& it = *(WDict::iterator*)data;
 			it.Revalidate();
 			if (it == WDict::iterator{}) {
-				Wg_RaiseStopIteration(context);
+				Wg_RaiseException(context, WG_EXC_STOPITERATION);
 				return nullptr;
 			}
 
@@ -3224,7 +3232,7 @@ namespace wings {
 			auto& it = *(WSet::iterator*)data;
 			it.Revalidate();
 			if (it == WSet::iterator{}) {
-				Wg_RaiseStopIteration(context);
+				Wg_RaiseException(context, WG_EXC_STOPITERATION);
 				return nullptr;
 			}
 			
@@ -3305,7 +3313,7 @@ namespace wings {
 			} else if (std::strcmp(mode, "eval")) {
 				fn = Wg_CompileExpression(context, source, filename);
 			} else {
-				Wg_RaiseValueError(context, "compile() mode must be 'exec' or 'eval'");
+				Wg_RaiseException(context, WG_EXC_VALUEERROR, "compile() mode must be 'exec' or 'eval'");
 			}
 			
 			if (fn == nullptr)
@@ -3403,12 +3411,12 @@ namespace wings {
 
 			const char* s = Wg_GetString(argv[0]);
 			if (s[0] == 0) {
-				Wg_RaiseValueError(context, "ord() expected a character, but string of length 0 found");
+				Wg_RaiseException(context, WG_EXC_VALUEERROR, "ord() arg is an empty string");
 				return nullptr;
 			} else if (s[1] == 0) {
 				return Wg_CreateInt(context, (int)s[0]);
 			} else {
-				Wg_RaiseValueError(context, "ord() expected a character, but string of length > 1 found");
+				Wg_RaiseException(context, WG_EXC_VALUEERROR, "ord() arg is not a single character");
 				return nullptr;
 			}
 		}
@@ -3504,314 +3512,316 @@ namespace wings {
 				throw LibraryInitException();
 			};
 
+			auto& builtins = context->builtins;
+
 			// Create object class
-			context->builtins.object = Alloc(context);
-			if (context->builtins.object == nullptr)
+			builtins.object = Alloc(context);
+			if (builtins.object == nullptr)
 				throw LibraryInitException();
-			context->builtins.object->type = "__class";
-			context->builtins.object->data = new Wg_Obj::Class{ std::string("object") };
-			context->builtins.object->finalizer.fptr = [](Wg_Obj* obj, void*) { delete (Wg_Obj::Class*)obj->data; };
-			context->builtins.object->Get<Wg_Obj::Class>().instanceAttributes.Set("__class__", context->builtins.object);
-			context->builtins.object->attributes.AddParent(context->builtins.object->Get<Wg_Obj::Class>().instanceAttributes);
-			context->builtins.object->Get<Wg_Obj::Class>().userdata = context;
-			context->builtins.object->Get<Wg_Obj::Class>().ctor = ctors::object;
-			Wg_SetGlobal(context, "object", context->builtins.object);
+			builtins.object->type = "__class";
+			builtins.object->data = new Wg_Obj::Class{ std::string("object") };
+			builtins.object->finalizer.fptr = [](Wg_Obj* obj, void*) { delete (Wg_Obj::Class*)obj->data; };
+			builtins.object->Get<Wg_Obj::Class>().instanceAttributes.Set("__class__", builtins.object);
+			builtins.object->attributes.AddParent(builtins.object->Get<Wg_Obj::Class>().instanceAttributes);
+			builtins.object->Get<Wg_Obj::Class>().userdata = context;
+			builtins.object->Get<Wg_Obj::Class>().ctor = ctors::object;
+			Wg_SetGlobal(context, "object", builtins.object);
 
 			// Create function class
-			context->builtins.func = Alloc(context);
-			if (context->builtins.func == nullptr)
+			builtins.func = Alloc(context);
+			if (builtins.func == nullptr)
 				throw LibraryInitException();
-			context->builtins.func->type = "__class";
-			context->builtins.func->data = new Wg_Obj::Class{ std::string("function") };
-			context->builtins.func->finalizer.fptr = [](Wg_Obj* obj, void*) { delete (Wg_Obj::Class*)obj->data; };
-			context->builtins.func->Get<Wg_Obj::Class>().instanceAttributes.Set("__class__", context->builtins.func);
-			context->builtins.func->attributes.AddParent(context->builtins.object->Get<Wg_Obj::Class>().instanceAttributes);
-			context->builtins.func->Get<Wg_Obj::Class>().userdata = context;
-			context->builtins.func->Get<Wg_Obj::Class>().ctor = ctors::func;
-			RegisterMethod<methods::func_str>(context->builtins.func, "__str__");
+			builtins.func->type = "__class";
+			builtins.func->data = new Wg_Obj::Class{ std::string("function") };
+			builtins.func->finalizer.fptr = [](Wg_Obj* obj, void*) { delete (Wg_Obj::Class*)obj->data; };
+			builtins.func->Get<Wg_Obj::Class>().instanceAttributes.Set("__class__", builtins.func);
+			builtins.func->attributes.AddParent(builtins.object->Get<Wg_Obj::Class>().instanceAttributes);
+			builtins.func->Get<Wg_Obj::Class>().userdata = context;
+			builtins.func->Get<Wg_Obj::Class>().ctor = ctors::func;
+			RegisterMethod<methods::func_str>(builtins.func, "__str__");
 
 			// Create tuple class
-			context->builtins.tuple = Alloc(context);
-			context->builtins.tuple->type = "__class";
-			context->builtins.tuple->data = new Wg_Obj::Class{ std::string("tuple") };
-			context->builtins.tuple->finalizer.fptr = [](Wg_Obj* obj, void*) { delete (Wg_Obj::Class*)obj->data; };
-			context->builtins.tuple->Get<Wg_Obj::Class>().instanceAttributes.Set("__class__", context->builtins.tuple);
-			context->builtins.tuple->attributes.AddParent(context->builtins.object->Get<Wg_Obj::Class>().instanceAttributes);
-			context->builtins.tuple->Get<Wg_Obj::Class>().userdata = context;
-			context->builtins.tuple->Get<Wg_Obj::Class>().ctor = ctors::tuple;
-			Wg_SetGlobal(context, "tuple", context->builtins.tuple);
-			RegisterMethod<methods::collection_str<Collection::Tuple>>(context->builtins.tuple, "__str__");
-			RegisterMethod<methods::collection_getitem<Collection::Tuple>>(context->builtins.tuple, "__getitem__");
-			RegisterMethod<methods::collection_len<Collection::Tuple>>(context->builtins.tuple, "__len__");
-			RegisterMethod<methods::collection_contains<Collection::Tuple>>(context->builtins.tuple, "__contains__");
-			RegisterMethod<methods::collection_eq<Collection::Tuple>>(context->builtins.tuple, "__eq__");
-			RegisterMethod<methods::collection_lt<Collection::Tuple>>(context->builtins.tuple, "__lt__");
-			RegisterMethod<methods::collection_nonzero<Collection::Tuple>>(context->builtins.tuple, "__nonzero__");
-			RegisterMethod<methods::object_iter>(context->builtins.tuple, "__iter__");
-			RegisterMethod<methods::collection_count<Collection::Tuple>>(context->builtins.tuple, "count");
-			RegisterMethod<methods::collection_index<Collection::Tuple>>(context->builtins.tuple, "index");
+			builtins.tuple = Alloc(context);
+			builtins.tuple->type = "__class";
+			builtins.tuple->data = new Wg_Obj::Class{ std::string("tuple") };
+			builtins.tuple->finalizer.fptr = [](Wg_Obj* obj, void*) { delete (Wg_Obj::Class*)obj->data; };
+			builtins.tuple->Get<Wg_Obj::Class>().instanceAttributes.Set("__class__", builtins.tuple);
+			builtins.tuple->attributes.AddParent(builtins.object->Get<Wg_Obj::Class>().instanceAttributes);
+			builtins.tuple->Get<Wg_Obj::Class>().userdata = context;
+			builtins.tuple->Get<Wg_Obj::Class>().ctor = ctors::tuple;
+			Wg_SetGlobal(context, "tuple", builtins.tuple);
+			RegisterMethod<methods::collection_str<Collection::Tuple>>(builtins.tuple, "__str__");
+			RegisterMethod<methods::collection_getitem<Collection::Tuple>>(builtins.tuple, "__getitem__");
+			RegisterMethod<methods::collection_len<Collection::Tuple>>(builtins.tuple, "__len__");
+			RegisterMethod<methods::collection_contains<Collection::Tuple>>(builtins.tuple, "__contains__");
+			RegisterMethod<methods::collection_eq<Collection::Tuple>>(builtins.tuple, "__eq__");
+			RegisterMethod<methods::collection_lt<Collection::Tuple>>(builtins.tuple, "__lt__");
+			RegisterMethod<methods::collection_nonzero<Collection::Tuple>>(builtins.tuple, "__nonzero__");
+			RegisterMethod<methods::object_iter>(builtins.tuple, "__iter__");
+			RegisterMethod<methods::collection_count<Collection::Tuple>>(builtins.tuple, "count");
+			RegisterMethod<methods::collection_index<Collection::Tuple>>(builtins.tuple, "index");
 
 			// Create NoneType class
-			context->builtins.none = Alloc(context);
-			context->builtins.none->type = "__class";
-			context->builtins.none->data = new Wg_Obj::Class{ std::string("NoneType") };
-			context->builtins.none->finalizer.fptr = [](Wg_Obj* obj, void*) { delete (Wg_Obj::Class*)obj->data; };
-			context->builtins.none->Get<Wg_Obj::Class>().instanceAttributes.Set("__class__", context->builtins.none);
-			context->builtins.none->attributes.AddParent(context->builtins.object->Get<Wg_Obj::Class>().instanceAttributes);
-			context->builtins.none->Get<Wg_Obj::Class>().userdata = context;
-			context->builtins.none->Get<Wg_Obj::Class>().ctor = ctors::none;
+			builtins.none = Alloc(context);
+			builtins.none->type = "__class";
+			builtins.none->data = new Wg_Obj::Class{ std::string("NoneType") };
+			builtins.none->finalizer.fptr = [](Wg_Obj* obj, void*) { delete (Wg_Obj::Class*)obj->data; };
+			builtins.none->Get<Wg_Obj::Class>().instanceAttributes.Set("__class__", builtins.none);
+			builtins.none->attributes.AddParent(builtins.object->Get<Wg_Obj::Class>().instanceAttributes);
+			builtins.none->Get<Wg_Obj::Class>().userdata = context;
+			builtins.none->Get<Wg_Obj::Class>().ctor = ctors::none;
 
 			// Create None singleton
-			context->builtins.none = Alloc(context);
-			context->builtins.none->type = "__null";
-			Wg_SetAttribute(context->builtins.none, "__class__", context->builtins.none);
-			context->builtins.none->attributes.AddParent(context->builtins.object->Get<Wg_Obj::Class>().instanceAttributes);
-			RegisterMethod<methods::null_nonzero>(context->builtins.none, "__nonzero__");
-			RegisterMethod<methods::null_str>(context->builtins.none, "__str__");
+			builtins.none = Alloc(context);
+			builtins.none->type = "__null";
+			Wg_SetAttribute(builtins.none, "__class__", builtins.none);
+			builtins.none->attributes.AddParent(builtins.object->Get<Wg_Obj::Class>().instanceAttributes);
+			RegisterMethod<methods::null_nonzero>(builtins.none, "__nonzero__");
+			RegisterMethod<methods::null_str>(builtins.none, "__str__");
 
 			// Add __bases__ tuple to the classes created before
 			Wg_Obj* emptyTuple = Wg_CreateTuple(context, nullptr, 0);
 			if (emptyTuple == nullptr)
 				throw LibraryInitException();
-			Wg_SetAttribute(context->builtins.object, "__bases__", emptyTuple);
-			Wg_SetAttribute(context->builtins.none, "__bases__", emptyTuple);
-			Wg_SetAttribute(context->builtins.func, "__bases__", emptyTuple);
-			Wg_SetAttribute(context->builtins.tuple, "__bases__", emptyTuple);
+			Wg_SetAttribute(builtins.object, "__bases__", emptyTuple);
+			Wg_SetAttribute(builtins.none, "__bases__", emptyTuple);
+			Wg_SetAttribute(builtins.func, "__bases__", emptyTuple);
+			Wg_SetAttribute(builtins.tuple, "__bases__", emptyTuple);
 
 			// Add methods
-			RegisterMethod<methods::self>(context->builtins.object, "__pos__");
-			RegisterMethod<methods::object_str>(context->builtins.object, "__str__");
-			RegisterMethod<methods::object_nonzero>(context->builtins.object, "__nonzero__");
-			RegisterMethod<methods::object_repr>(context->builtins.object, "__repr__");
-			RegisterMethod<methods::object_eq>(context->builtins.object, "__eq__");
-			RegisterMethod<methods::object_ne>(context->builtins.object, "__ne__");
-			RegisterMethod<methods::object_le>(context->builtins.object, "__le__");
-			RegisterMethod<methods::object_gt>(context->builtins.object, "__gt__");
-			RegisterMethod<methods::object_ge>(context->builtins.object, "__ge__");
-			RegisterMethod<methods::object_iadd>(context->builtins.object, "__iadd__");
-			RegisterMethod<methods::object_isub>(context->builtins.object, "__isub__");
-			RegisterMethod<methods::object_imul>(context->builtins.object, "__imul__");
-			RegisterMethod<methods::object_itruediv>(context->builtins.object, "__itruediv__");
-			RegisterMethod<methods::object_ifloordiv>(context->builtins.object, "__ifloordiv__");
-			RegisterMethod<methods::object_imod>(context->builtins.object, "__imod__");
-			RegisterMethod<methods::object_ipow>(context->builtins.object, "__ipow__");
-			RegisterMethod<methods::object_iand>(context->builtins.object, "__iand__");
-			RegisterMethod<methods::object_ior>(context->builtins.object, "__ior__");
-			RegisterMethod<methods::object_ixor>(context->builtins.object, "__ixor__");
-			RegisterMethod<methods::object_ilshift>(context->builtins.object, "__ilshift__");
-			RegisterMethod<methods::object_irshift>(context->builtins.object, "__irshift__");
-			RegisterMethod<methods::object_hash>(context->builtins.object, "__hash__");
-			RegisterMethod<methods::object_iter>(context->builtins.object, "__iter__");
-			RegisterMethod<methods::object_reversed>(context->builtins.object, "__reversed__");
+			RegisterMethod<methods::self>(builtins.object, "__pos__");
+			RegisterMethod<methods::object_str>(builtins.object, "__str__");
+			RegisterMethod<methods::object_nonzero>(builtins.object, "__nonzero__");
+			RegisterMethod<methods::object_repr>(builtins.object, "__repr__");
+			RegisterMethod<methods::object_eq>(builtins.object, "__eq__");
+			RegisterMethod<methods::object_ne>(builtins.object, "__ne__");
+			RegisterMethod<methods::object_le>(builtins.object, "__le__");
+			RegisterMethod<methods::object_gt>(builtins.object, "__gt__");
+			RegisterMethod<methods::object_ge>(builtins.object, "__ge__");
+			RegisterMethod<methods::object_iadd>(builtins.object, "__iadd__");
+			RegisterMethod<methods::object_isub>(builtins.object, "__isub__");
+			RegisterMethod<methods::object_imul>(builtins.object, "__imul__");
+			RegisterMethod<methods::object_itruediv>(builtins.object, "__itruediv__");
+			RegisterMethod<methods::object_ifloordiv>(builtins.object, "__ifloordiv__");
+			RegisterMethod<methods::object_imod>(builtins.object, "__imod__");
+			RegisterMethod<methods::object_ipow>(builtins.object, "__ipow__");
+			RegisterMethod<methods::object_iand>(builtins.object, "__iand__");
+			RegisterMethod<methods::object_ior>(builtins.object, "__ior__");
+			RegisterMethod<methods::object_ixor>(builtins.object, "__ixor__");
+			RegisterMethod<methods::object_ilshift>(builtins.object, "__ilshift__");
+			RegisterMethod<methods::object_irshift>(builtins.object, "__irshift__");
+			RegisterMethod<methods::object_hash>(builtins.object, "__hash__");
+			RegisterMethod<methods::object_iter>(builtins.object, "__iter__");
+			RegisterMethod<methods::object_reversed>(builtins.object, "__reversed__");
 
-			context->builtins._bool = createClass("bool");
-			context->builtins._bool->Get<Wg_Obj::Class>().ctor = ctors::_bool;
-			RegisterMethod<methods::self>(context->builtins._bool, "__nonzero__");
-			RegisterMethod<methods::bool_int>(context->builtins._bool, "__int__");
-			RegisterMethod<methods::bool_float>(context->builtins._bool, "__float__");
-			RegisterMethod<methods::bool_str>(context->builtins._bool, "__str__");
-			RegisterMethod<methods::bool_eq>(context->builtins._bool, "__eq__");
-			RegisterMethod<methods::bool_hash>(context->builtins._bool, "__hash__");
-			RegisterMethod<methods::bool_abs>(context->builtins._bool, "__abs__");
+			builtins._bool = createClass("bool");
+			builtins._bool->Get<Wg_Obj::Class>().ctor = ctors::_bool;
+			RegisterMethod<methods::self>(builtins._bool, "__nonzero__");
+			RegisterMethod<methods::bool_int>(builtins._bool, "__int__");
+			RegisterMethod<methods::bool_float>(builtins._bool, "__float__");
+			RegisterMethod<methods::bool_str>(builtins._bool, "__str__");
+			RegisterMethod<methods::bool_eq>(builtins._bool, "__eq__");
+			RegisterMethod<methods::bool_hash>(builtins._bool, "__hash__");
+			RegisterMethod<methods::bool_abs>(builtins._bool, "__abs__");
 
 			Wg_Obj* _false = Alloc(context);
 			if (_false == nullptr)
 				throw LibraryInitException();
-			_false->attributes = context->builtins._bool->Get<Wg_Obj::Class>().instanceAttributes.Copy();
+			_false->attributes = builtins._bool->Get<Wg_Obj::Class>().instanceAttributes.Copy();
 			_false->type = "__bool";
 			_false->data = new bool(false);
 			_false->finalizer.fptr = [](Wg_Obj* obj, void*) { delete (bool*)obj->data; };
-			context->builtins._false = _false;
+			builtins._false = _false;
 			Wg_Obj* _true = Alloc(context);
 			if (_true == nullptr)
 				throw LibraryInitException();
-			_true->attributes = context->builtins._bool->Get<Wg_Obj::Class>().instanceAttributes.Copy();
+			_true->attributes = builtins._bool->Get<Wg_Obj::Class>().instanceAttributes.Copy();
 			_true->type = "__bool";
 			_true->data = new bool(true);
 			_true->finalizer.fptr = [](Wg_Obj* obj, void*) { delete (bool*)obj->data; };
-			context->builtins._true = _true;
+			builtins._true = _true;
 
-			context->builtins._int = createClass("int");
-			RegisterMethod<ctors::_int>(context->builtins._int, "__init__");
-			RegisterMethod<methods::int_nonzero>(context->builtins._int, "__nonzero__");
-			RegisterMethod<methods::self>(context->builtins._int, "__int__");
-			RegisterMethod<methods::int_float>(context->builtins._int, "__float__");
-			RegisterMethod<methods::int_str>(context->builtins._int, "__str__");
-			RegisterMethod<methods::self>(context->builtins._int, "__index__");
-			RegisterMethod<methods::int_neg>(context->builtins._int, "__neg__");
-			RegisterMethod<methods::int_add>(context->builtins._int, "__add__");
-			RegisterMethod<methods::int_sub>(context->builtins._int, "__sub__");
-			RegisterMethod<methods::int_mul>(context->builtins._int, "__mul__");
-			RegisterMethod<methods::int_truediv>(context->builtins._int, "__truediv__");
-			RegisterMethod<methods::int_floordiv>(context->builtins._int, "__floordiv__");
-			RegisterMethod<methods::int_mod>(context->builtins._int, "__mod__");
-			RegisterMethod<methods::int_pow>(context->builtins._int, "__pow__");
-			RegisterMethod<methods::int_and>(context->builtins._int, "__and__");
-			RegisterMethod<methods::int_or>(context->builtins._int, "__or__");
-			RegisterMethod<methods::int_xor>(context->builtins._int, "__xor__");
-			RegisterMethod<methods::int_invert>(context->builtins._int, "__invert__");
-			RegisterMethod<methods::int_lshift>(context->builtins._int, "__lshift__");
-			RegisterMethod<methods::int_rshift>(context->builtins._int, "__rshift__");
-			RegisterMethod<methods::int_lt>(context->builtins._int, "__lt__");
-			RegisterMethod<methods::int_eq>(context->builtins._int, "__eq__");
-			RegisterMethod<methods::int_hash>(context->builtins._int, "__hash__");
-			RegisterMethod<methods::int_abs>(context->builtins._int, "__abs__");
-			RegisterMethod<methods::int_bit_length>(context->builtins._int, "bit_length");
-			RegisterMethod<methods::int_bit_count>(context->builtins._int, "bit_count");
+			builtins._int = createClass("int");
+			RegisterMethod<ctors::_int>(builtins._int, "__init__");
+			RegisterMethod<methods::int_nonzero>(builtins._int, "__nonzero__");
+			RegisterMethod<methods::self>(builtins._int, "__int__");
+			RegisterMethod<methods::int_float>(builtins._int, "__float__");
+			RegisterMethod<methods::int_str>(builtins._int, "__str__");
+			RegisterMethod<methods::self>(builtins._int, "__index__");
+			RegisterMethod<methods::int_neg>(builtins._int, "__neg__");
+			RegisterMethod<methods::int_add>(builtins._int, "__add__");
+			RegisterMethod<methods::int_sub>(builtins._int, "__sub__");
+			RegisterMethod<methods::int_mul>(builtins._int, "__mul__");
+			RegisterMethod<methods::int_truediv>(builtins._int, "__truediv__");
+			RegisterMethod<methods::int_floordiv>(builtins._int, "__floordiv__");
+			RegisterMethod<methods::int_mod>(builtins._int, "__mod__");
+			RegisterMethod<methods::int_pow>(builtins._int, "__pow__");
+			RegisterMethod<methods::int_and>(builtins._int, "__and__");
+			RegisterMethod<methods::int_or>(builtins._int, "__or__");
+			RegisterMethod<methods::int_xor>(builtins._int, "__xor__");
+			RegisterMethod<methods::int_invert>(builtins._int, "__invert__");
+			RegisterMethod<methods::int_lshift>(builtins._int, "__lshift__");
+			RegisterMethod<methods::int_rshift>(builtins._int, "__rshift__");
+			RegisterMethod<methods::int_lt>(builtins._int, "__lt__");
+			RegisterMethod<methods::int_eq>(builtins._int, "__eq__");
+			RegisterMethod<methods::int_hash>(builtins._int, "__hash__");
+			RegisterMethod<methods::int_abs>(builtins._int, "__abs__");
+			RegisterMethod<methods::int_bit_length>(builtins._int, "bit_length");
+			RegisterMethod<methods::int_bit_count>(builtins._int, "bit_count");
 
-			context->builtins._float = createClass("float");
-			RegisterMethod<ctors::_float>(context->builtins._float, "__init__");
-			RegisterMethod<methods::float_nonzero>(context->builtins._float, "__nonzero__");
-			RegisterMethod<methods::float_int>(context->builtins._float, "__int__");
-			RegisterMethod<methods::self>(context->builtins._float, "__float__");
-			RegisterMethod<methods::float_str>(context->builtins._float, "__str__");
-			RegisterMethod<methods::float_neg>(context->builtins._float, "__neg__");
-			RegisterMethod<methods::float_add>(context->builtins._float, "__add__");
-			RegisterMethod<methods::float_sub>(context->builtins._float, "__sub__");
-			RegisterMethod<methods::float_mul>(context->builtins._float, "__mul__");
-			RegisterMethod<methods::float_truediv>(context->builtins._float, "__truediv__");
-			RegisterMethod<methods::float_floordiv>(context->builtins._float, "__floordiv__");
-			RegisterMethod<methods::float_mod>(context->builtins._float, "__mod__");
-			RegisterMethod<methods::float_pow>(context->builtins._float, "__pow__");
-			RegisterMethod<methods::float_lt>(context->builtins._float, "__lt__");
-			RegisterMethod<methods::float_eq>(context->builtins._float, "__eq__");
-			RegisterMethod<methods::float_hash>(context->builtins._float, "__hash__");
-			RegisterMethod<methods::float_abs>(context->builtins._float, "__abs__");
-			RegisterMethod<methods::float_is_integer>(context->builtins._float, "is_integer");
+			builtins._float = createClass("float");
+			RegisterMethod<ctors::_float>(builtins._float, "__init__");
+			RegisterMethod<methods::float_nonzero>(builtins._float, "__nonzero__");
+			RegisterMethod<methods::float_int>(builtins._float, "__int__");
+			RegisterMethod<methods::self>(builtins._float, "__float__");
+			RegisterMethod<methods::float_str>(builtins._float, "__str__");
+			RegisterMethod<methods::float_neg>(builtins._float, "__neg__");
+			RegisterMethod<methods::float_add>(builtins._float, "__add__");
+			RegisterMethod<methods::float_sub>(builtins._float, "__sub__");
+			RegisterMethod<methods::float_mul>(builtins._float, "__mul__");
+			RegisterMethod<methods::float_truediv>(builtins._float, "__truediv__");
+			RegisterMethod<methods::float_floordiv>(builtins._float, "__floordiv__");
+			RegisterMethod<methods::float_mod>(builtins._float, "__mod__");
+			RegisterMethod<methods::float_pow>(builtins._float, "__pow__");
+			RegisterMethod<methods::float_lt>(builtins._float, "__lt__");
+			RegisterMethod<methods::float_eq>(builtins._float, "__eq__");
+			RegisterMethod<methods::float_hash>(builtins._float, "__hash__");
+			RegisterMethod<methods::float_abs>(builtins._float, "__abs__");
+			RegisterMethod<methods::float_is_integer>(builtins._float, "is_integer");
 
-			context->builtins.str = createClass("str");
-			RegisterMethod<ctors::str>(context->builtins.str, "__init__");
-			RegisterMethod<methods::str_nonzero>(context->builtins.str, "__nonzero__");
-			RegisterMethod<methods::str_int>(context->builtins.str, "__int__");
-			RegisterMethod<methods::str_float>(context->builtins.str, "__float__");
-			RegisterMethod<methods::self>(context->builtins.str, "__str__");
-			RegisterMethod<methods::str_repr>(context->builtins.str, "__repr__");
-			RegisterMethod<methods::str_len>(context->builtins.str, "__len__");
-			RegisterMethod<methods::str_add>(context->builtins.str, "__add__");
-			RegisterMethod<methods::str_mul>(context->builtins.str, "__mul__");
-			RegisterMethod<methods::str_getitem>(context->builtins.str, "__getitem__");
-			RegisterMethod<methods::str_contains>(context->builtins.str, "__contains__");
-			RegisterMethod<methods::str_lt>(context->builtins.str, "__lt__");
-			RegisterMethod<methods::str_eq>(context->builtins.str, "__eq__");
-			RegisterMethod<methods::str_hash>(context->builtins.str, "__hash__");
-			RegisterMethod<methods::str_capitalize>(context->builtins.str, "capitalize");
-			RegisterMethod<methods::str_casefold>(context->builtins.str, "casefold");
-			RegisterMethod<methods::str_lower>(context->builtins.str, "lower");
-			RegisterMethod<methods::str_upper>(context->builtins.str, "upper");
-			RegisterMethod<methods::str_center>(context->builtins.str, "center");
-			RegisterMethod<methods::str_count>(context->builtins.str, "count");
-			RegisterMethod<methods::str_format>(context->builtins.str, "format");
-			RegisterMethod<methods::str_find>(context->builtins.str, "find");
-			RegisterMethod<methods::str_index>(context->builtins.str, "index");
-			RegisterMethod<methods::str_startswith>(context->builtins.str, "startswith");
-			RegisterMethod<methods::str_endswith>(context->builtins.str, "endswith");
-			RegisterMethod<methods::str_isalnum>(context->builtins.str, "isalnum");
-			RegisterMethod<methods::str_isalpha>(context->builtins.str, "isalpha");
-			RegisterMethod<methods::str_isascii>(context->builtins.str, "isascii");
-			RegisterMethod<methods::str_isdecimal>(context->builtins.str, "isdecimal");
-			RegisterMethod<methods::str_isdigit>(context->builtins.str, "isdigit");
-			RegisterMethod<methods::str_isidentifier>(context->builtins.str, "isidentifier");
-			RegisterMethod<methods::str_islower>(context->builtins.str, "islower");
-			RegisterMethod<methods::str_isupper>(context->builtins.str, "isupper");
-			RegisterMethod<methods::str_isnumeric>(context->builtins.str, "isnumeric");
-			RegisterMethod<methods::str_isprintable>(context->builtins.str, "isprintable");
-			RegisterMethod<methods::str_isspace>(context->builtins.str, "isspace");
-			RegisterMethod<methods::str_join>(context->builtins.str, "join");
-			RegisterMethod<methods::str_ljust>(context->builtins.str, "ljust");
-			RegisterMethod<methods::str_lstrip>(context->builtins.str, "lstrip");
-			RegisterMethod<methods::str_replace>(context->builtins.str, "replace");
-			RegisterMethod<methods::str_rfind>(context->builtins.str, "rfind");
-			RegisterMethod<methods::str_rindex>(context->builtins.str, "rindex");
-			RegisterMethod<methods::str_rjust>(context->builtins.str, "rjust");
-			RegisterMethod<methods::str_rstrip>(context->builtins.str, "rstrip");
-			RegisterMethod<methods::str_split>(context->builtins.str, "split");
-			RegisterMethod<methods::str_splitlines>(context->builtins.str, "splitlines");
-			RegisterMethod<methods::str_strip>(context->builtins.str, "strip");
-			RegisterMethod<methods::str_zfill>(context->builtins.str, "zfill");
+			builtins.str = createClass("str");
+			RegisterMethod<ctors::str>(builtins.str, "__init__");
+			RegisterMethod<methods::str_nonzero>(builtins.str, "__nonzero__");
+			RegisterMethod<methods::str_int>(builtins.str, "__int__");
+			RegisterMethod<methods::str_float>(builtins.str, "__float__");
+			RegisterMethod<methods::self>(builtins.str, "__str__");
+			RegisterMethod<methods::str_repr>(builtins.str, "__repr__");
+			RegisterMethod<methods::str_len>(builtins.str, "__len__");
+			RegisterMethod<methods::str_add>(builtins.str, "__add__");
+			RegisterMethod<methods::str_mul>(builtins.str, "__mul__");
+			RegisterMethod<methods::str_getitem>(builtins.str, "__getitem__");
+			RegisterMethod<methods::str_contains>(builtins.str, "__contains__");
+			RegisterMethod<methods::str_lt>(builtins.str, "__lt__");
+			RegisterMethod<methods::str_eq>(builtins.str, "__eq__");
+			RegisterMethod<methods::str_hash>(builtins.str, "__hash__");
+			RegisterMethod<methods::str_capitalize>(builtins.str, "capitalize");
+			RegisterMethod<methods::str_casefold>(builtins.str, "casefold");
+			RegisterMethod<methods::str_lower>(builtins.str, "lower");
+			RegisterMethod<methods::str_upper>(builtins.str, "upper");
+			RegisterMethod<methods::str_center>(builtins.str, "center");
+			RegisterMethod<methods::str_count>(builtins.str, "count");
+			RegisterMethod<methods::str_format>(builtins.str, "format");
+			RegisterMethod<methods::str_find>(builtins.str, "find");
+			RegisterMethod<methods::str_index>(builtins.str, "index");
+			RegisterMethod<methods::str_startswith>(builtins.str, "startswith");
+			RegisterMethod<methods::str_endswith>(builtins.str, "endswith");
+			RegisterMethod<methods::str_isalnum>(builtins.str, "isalnum");
+			RegisterMethod<methods::str_isalpha>(builtins.str, "isalpha");
+			RegisterMethod<methods::str_isascii>(builtins.str, "isascii");
+			RegisterMethod<methods::str_isdecimal>(builtins.str, "isdecimal");
+			RegisterMethod<methods::str_isdigit>(builtins.str, "isdigit");
+			RegisterMethod<methods::str_isidentifier>(builtins.str, "isidentifier");
+			RegisterMethod<methods::str_islower>(builtins.str, "islower");
+			RegisterMethod<methods::str_isupper>(builtins.str, "isupper");
+			RegisterMethod<methods::str_isnumeric>(builtins.str, "isnumeric");
+			RegisterMethod<methods::str_isprintable>(builtins.str, "isprintable");
+			RegisterMethod<methods::str_isspace>(builtins.str, "isspace");
+			RegisterMethod<methods::str_join>(builtins.str, "join");
+			RegisterMethod<methods::str_ljust>(builtins.str, "ljust");
+			RegisterMethod<methods::str_lstrip>(builtins.str, "lstrip");
+			RegisterMethod<methods::str_replace>(builtins.str, "replace");
+			RegisterMethod<methods::str_rfind>(builtins.str, "rfind");
+			RegisterMethod<methods::str_rindex>(builtins.str, "rindex");
+			RegisterMethod<methods::str_rjust>(builtins.str, "rjust");
+			RegisterMethod<methods::str_rstrip>(builtins.str, "rstrip");
+			RegisterMethod<methods::str_split>(builtins.str, "split");
+			RegisterMethod<methods::str_splitlines>(builtins.str, "splitlines");
+			RegisterMethod<methods::str_strip>(builtins.str, "strip");
+			RegisterMethod<methods::str_zfill>(builtins.str, "zfill");
 
-			context->builtins.list = createClass("list");
-			RegisterMethod<ctors::list>(context->builtins.list, "__init__");
-			RegisterMethod<methods::collection_nonzero<Collection::List>>(context->builtins.list, "__nonzero__");
-			RegisterMethod<methods::collection_str<Collection::List>>(context->builtins.list, "__str__");
-			RegisterMethod<methods::collection_len<Collection::List>>(context->builtins.list, "__len__");
-			RegisterMethod<methods::collection_getitem<Collection::List>>(context->builtins.list, "__getitem__");
-			RegisterMethod<methods::list_setitem>(context->builtins.list, "__setitem__");
-			RegisterMethod<methods::collection_contains<Collection::List>>(context->builtins.list, "__contains__");
-			RegisterMethod<methods::collection_eq<Collection::List>>(context->builtins.list, "__eq__");
-			RegisterMethod<methods::collection_lt<Collection::List>>(context->builtins.list, "__lt__");
-			RegisterMethod<methods::collection_count<Collection::List>>(context->builtins.list, "count");
-			RegisterMethod<methods::collection_index<Collection::List>>(context->builtins.list, "index");
-			RegisterMethod<methods::list_append>(context->builtins.list, "append");
-			RegisterMethod<methods::list_clear>(context->builtins.list, "clear");
-			RegisterMethod<methods::list_copy>(context->builtins.list, "copy");
-			RegisterMethod<methods::list_extend>(context->builtins.list, "extend");
-			RegisterMethod<methods::list_insert>(context->builtins.list, "insert");
-			RegisterMethod<methods::list_pop>(context->builtins.list, "pop");
-			RegisterMethod<methods::list_remove>(context->builtins.list, "remove");
-			RegisterMethod<methods::list_reverse>(context->builtins.list, "reverse");
-			RegisterMethod<methods::list_sort>(context->builtins.list, "sort");
+			builtins.list = createClass("list");
+			RegisterMethod<ctors::list>(builtins.list, "__init__");
+			RegisterMethod<methods::collection_nonzero<Collection::List>>(builtins.list, "__nonzero__");
+			RegisterMethod<methods::collection_str<Collection::List>>(builtins.list, "__str__");
+			RegisterMethod<methods::collection_len<Collection::List>>(builtins.list, "__len__");
+			RegisterMethod<methods::collection_getitem<Collection::List>>(builtins.list, "__getitem__");
+			RegisterMethod<methods::list_setitem>(builtins.list, "__setitem__");
+			RegisterMethod<methods::collection_contains<Collection::List>>(builtins.list, "__contains__");
+			RegisterMethod<methods::collection_eq<Collection::List>>(builtins.list, "__eq__");
+			RegisterMethod<methods::collection_lt<Collection::List>>(builtins.list, "__lt__");
+			RegisterMethod<methods::collection_count<Collection::List>>(builtins.list, "count");
+			RegisterMethod<methods::collection_index<Collection::List>>(builtins.list, "index");
+			RegisterMethod<methods::list_append>(builtins.list, "append");
+			RegisterMethod<methods::list_clear>(builtins.list, "clear");
+			RegisterMethod<methods::list_copy>(builtins.list, "copy");
+			RegisterMethod<methods::list_extend>(builtins.list, "extend");
+			RegisterMethod<methods::list_insert>(builtins.list, "insert");
+			RegisterMethod<methods::list_pop>(builtins.list, "pop");
+			RegisterMethod<methods::list_remove>(builtins.list, "remove");
+			RegisterMethod<methods::list_reverse>(builtins.list, "reverse");
+			RegisterMethod<methods::list_sort>(builtins.list, "sort");
 
-			context->builtins.dict = createClass("dict");
-			RegisterMethod<ctors::map>(context->builtins.dict, "__init__");
-			RegisterMethod<methods::map_nonzero>(context->builtins.dict, "__nonzero__");
-			RegisterMethod<methods::map_str>(context->builtins.dict, "__str__");
-			RegisterMethod<methods::map_contains>(context->builtins.dict, "__contains__");
-			RegisterMethod<methods::map_getitem>(context->builtins.dict, "__getitem__");
-			RegisterMethod<methods::map_iter>(context->builtins.dict, "__iter__");
-			RegisterMethod<methods::map_len>(context->builtins.dict, "__len__");
-			RegisterMethod<methods::map_setitem>(context->builtins.dict, "__setitem__");
-			RegisterMethod<methods::map_clear>(context->builtins.dict, "clear");
-			RegisterMethod<methods::map_copy>(context->builtins.dict, "copy");
-			RegisterMethod<methods::map_get>(context->builtins.dict, "get");
-			RegisterMethod<methods::map_iter>(context->builtins.dict, "keys");
-			RegisterMethod<methods::map_values>(context->builtins.dict, "values");
-			RegisterMethod<methods::map_items>(context->builtins.dict, "items");
-			RegisterMethod<methods::map_pop>(context->builtins.dict, "pop");
-			RegisterMethod<methods::map_popitem>(context->builtins.dict, "popitem");
-			RegisterMethod<methods::map_setdefault>(context->builtins.dict, "setdefault");
-			RegisterMethod<methods::map_update>(context->builtins.dict, "update");
+			builtins.dict = createClass("dict");
+			RegisterMethod<ctors::map>(builtins.dict, "__init__");
+			RegisterMethod<methods::map_nonzero>(builtins.dict, "__nonzero__");
+			RegisterMethod<methods::map_str>(builtins.dict, "__str__");
+			RegisterMethod<methods::map_contains>(builtins.dict, "__contains__");
+			RegisterMethod<methods::map_getitem>(builtins.dict, "__getitem__");
+			RegisterMethod<methods::map_iter>(builtins.dict, "__iter__");
+			RegisterMethod<methods::map_len>(builtins.dict, "__len__");
+			RegisterMethod<methods::map_setitem>(builtins.dict, "__setitem__");
+			RegisterMethod<methods::map_clear>(builtins.dict, "clear");
+			RegisterMethod<methods::map_copy>(builtins.dict, "copy");
+			RegisterMethod<methods::map_get>(builtins.dict, "get");
+			RegisterMethod<methods::map_iter>(builtins.dict, "keys");
+			RegisterMethod<methods::map_values>(builtins.dict, "values");
+			RegisterMethod<methods::map_items>(builtins.dict, "items");
+			RegisterMethod<methods::map_pop>(builtins.dict, "pop");
+			RegisterMethod<methods::map_popitem>(builtins.dict, "popitem");
+			RegisterMethod<methods::map_setdefault>(builtins.dict, "setdefault");
+			RegisterMethod<methods::map_update>(builtins.dict, "update");
 
-			context->builtins.set = createClass("set");
-			RegisterMethod<ctors::set>(context->builtins.set, "__init__");
-			RegisterMethod<methods::set_nonzero>(context->builtins.set, "__nonzero__");
-			RegisterMethod<methods::set_str>(context->builtins.set, "__str__");
-			RegisterMethod<methods::set_contains>(context->builtins.set, "__contains__");
-			RegisterMethod<methods::set_iter>(context->builtins.set, "__iter__");
-			RegisterMethod<methods::set_len>(context->builtins.set, "__len__");
-			RegisterMethod<methods::set_add>(context->builtins.set, "add");
-			RegisterMethod<methods::set_clear>(context->builtins.set, "clear");
-			RegisterMethod<methods::set_copy>(context->builtins.set, "copy");
-			RegisterMethod<methods::set_difference>(context->builtins.set, "difference");
-			RegisterMethod<methods::set_discard>(context->builtins.set, "discard");
-			RegisterMethod<methods::set_intersection>(context->builtins.set, "intersection");
-			RegisterMethod<methods::set_isdisjoint>(context->builtins.set, "isdisjoint");
-			RegisterMethod<methods::set_issubset>(context->builtins.set, "issubset");
-			RegisterMethod<methods::set_issuperset>(context->builtins.set, "issuperset");
-			RegisterMethod<methods::set_pop>(context->builtins.set, "pop");
-			RegisterMethod<methods::set_remove>(context->builtins.set, "remove");
-			RegisterMethod<methods::set_symmetric_difference>(context->builtins.set, "symmetric_difference");
-			RegisterMethod<methods::set_union>(context->builtins.set, "union");
-			RegisterMethod<methods::set_update>(context->builtins.set, "update");
+			builtins.set = createClass("set");
+			RegisterMethod<ctors::set>(builtins.set, "__init__");
+			RegisterMethod<methods::set_nonzero>(builtins.set, "__nonzero__");
+			RegisterMethod<methods::set_str>(builtins.set, "__str__");
+			RegisterMethod<methods::set_contains>(builtins.set, "__contains__");
+			RegisterMethod<methods::set_iter>(builtins.set, "__iter__");
+			RegisterMethod<methods::set_len>(builtins.set, "__len__");
+			RegisterMethod<methods::set_add>(builtins.set, "add");
+			RegisterMethod<methods::set_clear>(builtins.set, "clear");
+			RegisterMethod<methods::set_copy>(builtins.set, "copy");
+			RegisterMethod<methods::set_difference>(builtins.set, "difference");
+			RegisterMethod<methods::set_discard>(builtins.set, "discard");
+			RegisterMethod<methods::set_intersection>(builtins.set, "intersection");
+			RegisterMethod<methods::set_isdisjoint>(builtins.set, "isdisjoint");
+			RegisterMethod<methods::set_issubset>(builtins.set, "issubset");
+			RegisterMethod<methods::set_issuperset>(builtins.set, "issuperset");
+			RegisterMethod<methods::set_pop>(builtins.set, "pop");
+			RegisterMethod<methods::set_remove>(builtins.set, "remove");
+			RegisterMethod<methods::set_symmetric_difference>(builtins.set, "symmetric_difference");
+			RegisterMethod<methods::set_union>(builtins.set, "union");
+			RegisterMethod<methods::set_update>(builtins.set, "update");
 
-			context->builtins.dictKeysIter = createClass("__DictKeysIter", nullptr, false);
-			RegisterMethod<ctors::DictIter>(context->builtins.dictKeysIter, "__init__");
-			RegisterMethod<methods::DictKeysIter_next>(context->builtins.dictKeysIter, "__next__");
-			RegisterMethod<methods::self>(context->builtins.dictKeysIter, "__iter__");
+			builtins.dictKeysIter = createClass("__DictKeysIter", nullptr, false);
+			RegisterMethod<ctors::DictIter>(builtins.dictKeysIter, "__init__");
+			RegisterMethod<methods::DictKeysIter_next>(builtins.dictKeysIter, "__next__");
+			RegisterMethod<methods::self>(builtins.dictKeysIter, "__iter__");
 
-			context->builtins.dictValuesIter = createClass("__DictValuesIter", nullptr, false);
-			RegisterMethod<ctors::DictIter>(context->builtins.dictValuesIter, "__init__");
-			RegisterMethod<methods::DictValuesIter_next>(context->builtins.dictValuesIter, "__next__");
-			RegisterMethod<methods::self>(context->builtins.dictValuesIter, "__iter__");
+			builtins.dictValuesIter = createClass("__DictValuesIter", nullptr, false);
+			RegisterMethod<ctors::DictIter>(builtins.dictValuesIter, "__init__");
+			RegisterMethod<methods::DictValuesIter_next>(builtins.dictValuesIter, "__next__");
+			RegisterMethod<methods::self>(builtins.dictValuesIter, "__iter__");
 
-			context->builtins.dictItemsIter = createClass("__DictItemsIter", nullptr, false);
-			RegisterMethod<ctors::DictIter>(context->builtins.dictItemsIter, "__init__");
-			RegisterMethod<methods::DictItemsIter_next>(context->builtins.dictItemsIter, "__next__");
-			RegisterMethod<methods::self>(context->builtins.dictItemsIter, "__iter__");
+			builtins.dictItemsIter = createClass("__DictItemsIter", nullptr, false);
+			RegisterMethod<ctors::DictIter>(builtins.dictItemsIter, "__init__");
+			RegisterMethod<methods::DictItemsIter_next>(builtins.dictItemsIter, "__next__");
+			RegisterMethod<methods::self>(builtins.dictItemsIter, "__iter__");
 
-			context->builtins.setIter = createClass("__SetIter", nullptr, false);
-			RegisterMethod<ctors::SetIter>(context->builtins.setIter, "__init__");
-			RegisterMethod<methods::SetIter_next>(context->builtins.setIter, "__next__");
-			RegisterMethod<methods::self>(context->builtins.setIter, "__iter__");
+			builtins.setIter = createClass("__SetIter", nullptr, false);
+			RegisterMethod<ctors::SetIter>(builtins.setIter, "__init__");
+			RegisterMethod<methods::SetIter_next>(builtins.setIter, "__next__");
+			RegisterMethod<methods::self>(builtins.setIter, "__iter__");
 
 			// Add native free functions
 			RegisterFunction<lib::base_str<2>>(context, "bin");
@@ -3826,7 +3836,7 @@ namespace wings {
 			RegisterFunction<lib::getattr>(context, "getattr");
 			RegisterFunction<lib::id>(context, "id");
 			RegisterFunction<lib::input>(context, "input");
-			context->builtins.isinstance = RegisterFunction<lib::isinstance>(context, "isinstance");
+			builtins.isinstance = RegisterFunction<lib::isinstance>(context, "isinstance");
 			RegisterFunction<lib::ord>(context, "ord");
 			RegisterFunction<lib::print>(context, "print");
 			RegisterFunction<lib::setattr>(context, "setattr");
@@ -3838,31 +3848,39 @@ namespace wings {
 			if (Wg_Call(lib, nullptr, 0) == nullptr)
 				throw LibraryInitException();
 
-			context->builtins.len = getGlobal("len");
-			context->builtins.repr = getGlobal("repr");
-			context->builtins.hash = getGlobal("hash");
-			context->builtins.slice = getGlobal("slice");
-			context->builtins.defaultIter = getGlobal("__DefaultIter");
-			context->builtins.defaultReverseIter = getGlobal("__DefaultReverseIter");
-			context->builtins.codeObject = getGlobal("__CodeObject");
+			builtins.len = getGlobal("len");
+			builtins.repr = getGlobal("repr");
+			builtins.hash = getGlobal("hash");
+			builtins.slice = getGlobal("slice");
+			builtins.defaultIter = getGlobal("__DefaultIter");
+			builtins.defaultReverseIter = getGlobal("__DefaultReverseIter");
+			builtins.codeObject = getGlobal("__CodeObject");
 			
-			context->builtins.memoryErrorInstance = Wg_Call(getGlobal("MemoryError"), nullptr, 0);
-			if (context->builtins.memoryErrorInstance == nullptr)
+			builtins.baseException = getGlobal("BaseException");
+			builtins.systemExit = getGlobal("SystemExit");
+			builtins.exception = getGlobal("Exception");
+			builtins.stopIteration = getGlobal("StopIteration");
+			builtins.arithmeticError = getGlobal("ArithmeticError");
+			builtins.overflowError = getGlobal("OverflowError");
+			builtins.zeroDivisionError = getGlobal("ZeroDivisionError");
+			builtins.attributeError = getGlobal("AttributeError");
+			builtins.importError = getGlobal("ImportError");
+			builtins.syntaxError = getGlobal("SyntaxError");
+			builtins.lookupError = getGlobal("LookupError");
+			builtins.indexError = getGlobal("IndexError");
+			builtins.keyError = getGlobal("KeyError");
+			builtins.memoryError = getGlobal("MemoryError");
+			builtins.nameError = getGlobal("NameError");
+			builtins.runtimeError = getGlobal("RuntimeError");
+			builtins.notImplementedError = getGlobal("NotImplementedError");
+			builtins.recursionError = getGlobal("RecursionError");
+			builtins.typeError = getGlobal("TypeError");
+			builtins.valueError = getGlobal("ValueError");
+
+			builtins.memoryErrorInstance = Wg_Call(builtins.memoryError, nullptr, 0);
+			if (builtins.memoryErrorInstance == nullptr)
 				throw LibraryInitException();
 			
-			context->builtins.baseException = getGlobal("BaseException");
-			context->builtins.systemExit = getGlobal("SystemExit");
-			context->builtins.exception = getGlobal("Exception");
-			context->builtins.stopIteration = getGlobal("StopIteration");
-			context->builtins.overflowError = getGlobal("OverflowError");
-			context->builtins.zeroDivisionError = getGlobal("ZeroDivisionError");
-			context->builtins.attributeError = getGlobal("AttributeError");
-			context->builtins.syntaxError = getGlobal("SyntaxError");
-			context->builtins.indexError = getGlobal("IndexError");
-			context->builtins.keyError = getGlobal("KeyError");
-			context->builtins.nameError = getGlobal("NameError");
-			context->builtins.typeError = getGlobal("TypeError");
-			context->builtins.valueError = getGlobal("ValueError");
 		} catch (LibraryInitException&) {
 			std::abort(); // Internal error
 		}
