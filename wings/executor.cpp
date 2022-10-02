@@ -231,7 +231,7 @@ namespace wings {
 			Wg_ProtectObject(*var.second);
 
 		auto& frame = context->currentTrace.back();
-		frame.tag = def->tag;
+		frame.module = def->module;
 		frame.func = def->prettyName;
 
 		for (pc = 0; pc < def->instructions->size(); pc++) {
@@ -301,7 +301,7 @@ namespace wings {
 		case Instruction::Type::Def: {
 			DefObject* def = new DefObject();
 			def->context = context;
-			def->tag = this->def->tag;
+			def->module = this->def->module;
 			def->prettyName = instr.def->prettyName;
 			def->instructions = instr.def->instructions;
 			def->originalSource = this->def->originalSource;
@@ -316,7 +316,7 @@ namespace wings {
 			def->listArgs = instr.def->listArgs;
 			def->kwArgs = instr.def->kwArgs;
 
-			const auto& module = context->currentModule.top();
+			const auto& module = std::string(context->currentModule.top());
 			auto& globals = context->globals.at(module);
 			
 			for (const auto& capture : instr.def->localCaptures) {
@@ -756,6 +756,30 @@ namespace wings {
 			Wg_SetAttribute(slice, "stop", stop);
 			Wg_SetAttribute(slice, "start", start);
 			PushStack(slice);
+			break;
+		}
+		case Instruction::Type::Import: {
+			const char* alias = instr.import->alias.empty() ? nullptr : instr.import->alias.c_str();
+			if (Wg_ImportModule(context, instr.import->module.c_str(), alias) == nullptr)
+				exitValue = nullptr;
+			break;
+		}
+		case Instruction::Type::ImportFrom: {
+			const char* moduleName = instr.importFrom->module.c_str();
+			if (instr.importFrom->names.empty()) {
+				if (!Wg_ImportAllFromModule(context, moduleName))
+					exitValue = nullptr;
+			} else if (!instr.importFrom->alias.empty()) {
+				if (!Wg_ImportFromModule(context, moduleName, instr.importFrom->names[0].c_str(), instr.importFrom->alias.c_str()))
+					exitValue = nullptr;
+			} else {
+				for (const auto& name : instr.importFrom->names) {
+					if (!Wg_ImportFromModule(context, moduleName, name.c_str())) {
+						exitValue = nullptr;
+						break;
+					}
+				}
+			}
 			break;
 		}
 		default:

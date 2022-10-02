@@ -14,7 +14,7 @@ namespace wings {
 		static Wg_Obj* Run(Wg_Context* context, Wg_Obj** args, int argc);
 		Wg_Context* context{};
 		RcPtr<std::vector<Instruction>> instructions;
-		std::string tag;
+		std::string module;
 		std::string prettyName;
 		std::vector<std::string> localVariables;
 		std::vector<std::string> parameterNames;

@@ -7,6 +7,10 @@
 #include <string_view>
 #include <atomic>
 #include <mutex>
+#include <fstream>
+#include <vector>
+#include <string>
+#include <sstream>
 
 static Wg_ErrorCallback errorCallback;
 static void* errorCallbackUserdata;
@@ -77,11 +81,11 @@ extern "C" {
 		errorCallbackUserdata = userdata;
 	}
 
-	static Wg_Obj* Compile(Wg_Context* context, const char* code, const char* tag, bool expr) {
+	static Wg_Obj* Compile(Wg_Context* context, const char* code, const char* module, const char* prettyName, bool expr) {
 		WASSERT(context && code);
 
-		if (tag == nullptr)
-			tag = wings::DEFAULT_TAG_NAME;
+		if (prettyName == nullptr)
+			prettyName = wings::DEFAULT_FUNC_NAME;
 
 		auto lexResult = wings::Lex(code);
 		auto originalSource = wings::MakeRcPtr<std::vector<std::string>>(lexResult.originalSource);
@@ -90,8 +94,8 @@ extern "C" {
 			context->currentTrace.push_back(wings::TraceFrame{
 				error.srcPos,
 				error.srcPos.line < originalSource->size() ? (*originalSource)[error.srcPos.line] : "",
-				tag,
-				tag
+				module,
+				prettyName
 				});
 
 			Wg_RaiseException(context, WG_EXC_SYNTAXERROR, error.message.c_str());
@@ -126,8 +130,8 @@ extern "C" {
 
 		auto* def = new wings::DefObject();
 		def->context = context;
-		def->tag = tag;
-		def->prettyName = wings::DEFAULT_FUNC_NAME;
+		def->module = module;
+		def->prettyName = prettyName;
 		def->originalSource = std::move(originalSource);
 		auto instructions = Compile(parseResult.parseTree);
 		def->instructions = MakeRcPtr<std::vector<wings::Instruction>>(std::move(instructions));
@@ -150,17 +154,17 @@ extern "C" {
 		return obj;
 	}
 
-	Wg_Obj* Wg_Compile(Wg_Context* context, const char* code, const char* tag) {
-		return Compile(context, code, tag, false);
+	Wg_Obj* Wg_Compile(Wg_Context* context, const char* code, const char* prettyName) {
+		return Compile(context, code, "__main__", prettyName, false);
 	}
 
-	Wg_Obj* Wg_CompileExpression(Wg_Context* context, const char* code, const char* tag) {
-		return Compile(context, code, tag, true);
+	Wg_Obj* Wg_CompileExpression(Wg_Context* context, const char* code, const char* prettyName) {
+		return Compile(context, code, "__main__", prettyName, true);
 	}
 
 	Wg_Obj* Wg_GetGlobal(Wg_Context* context, const char* name) {
 		WASSERT(context && name);
-		const auto& module = context->currentModule.top();
+		auto module = std::string(context->currentModule.top());
 		auto& globals = context->globals.at(module);
 		auto it = globals.find(name);
 		if (it == globals.end()) {
@@ -172,7 +176,7 @@ extern "C" {
 
 	void Wg_SetGlobal(Wg_Context* context, const char* name, Wg_Obj* value) {
 		WASSERT_VOID(context && name && value);
-		const auto& module = context->currentModule.top();
+		const auto& module = std::string(context->currentModule.top());
 		auto& globals = context->globals.at(module);
 		auto it = globals.find(name);
 		if (it != globals.end()) {
@@ -184,12 +188,125 @@ extern "C" {
 
 	void Wg_DeleteGlobal(Wg_Context* context, const char* name) {
 		WASSERT_VOID(context && name);
-		const auto& module = context->currentModule.top();
+		const auto& module = std::string(context->currentModule.top());
 		auto& globals = context->globals.at(module);
 		auto it = globals.find(name);
 		if (it != globals.end()) {
 			globals.erase(it);
 		}
+	}
+
+
+	void Wg_RegisterModule(Wg_Context* context, const char* name, Wg_ModuleLoader loader) {
+		context->moduleLoaders.insert({ std::string(name), loader });
+	}
+
+	static bool ReadFromFile(const std::string& path, std::string& data) {
+		std::ifstream f(path);
+		if (!f.is_open())
+			return false;
+
+		std::stringstream buffer;
+		buffer << f.rdbuf();
+
+		if (!f)
+			return false;
+
+		data = buffer.str();
+		return true;
+	}
+
+	static bool LoadFileModule(Wg_Context* context, const std::string& module) {
+		std::string path = context->importPath + module + ".py";
+		std::string source;
+		if (!ReadFromFile(path, source)) {
+			std::string msg = std::string("No module named '") + module + "'";
+			Wg_RaiseException(context, WG_EXC_IMPORTERROR, msg.c_str());
+			return false;
+		}
+
+		Wg_Obj* fn = Compile(context, source.c_str(), module.c_str(), module.c_str(), false);
+		if (fn == nullptr)
+			return false;
+
+		return Wg_Call(fn, nullptr, 0) != nullptr;
+	}
+
+	static bool LoadModule(Wg_Context* context, const std::string& name) {
+		if (!context->globals.contains(name)) {
+			bool success{};
+			context->globals.insert({ std::string(name), {} });
+			context->currentModule.push(name);
+
+			auto it = context->moduleLoaders.find(name);
+			if (it != context->moduleLoaders.end()) {
+				success = it->second(context);
+			} else {
+				success = LoadFileModule(context, name);
+			}
+
+			context->currentModule.pop();
+			if (!success) {
+				context->globals.erase(name);
+				return false;
+			}
+		}
+		return true;
+	}
+
+	Wg_Obj* Wg_ImportModule(Wg_Context* context, const char* module, const char* alias) {
+		WASSERT(context && module);
+
+		if (!LoadModule(context, module))
+			return nullptr;
+
+		Wg_Obj* moduleObject = Wg_Call(context->builtins.moduleObject, nullptr, 0);
+		if (moduleObject == nullptr)
+			return nullptr;
+		auto& mod = context->globals.at(module);
+		for (auto& [var, val] : mod) {
+			Wg_SetAttribute(moduleObject, var.c_str(), *val);
+		}
+		Wg_SetGlobal(context, alias ? alias : module, moduleObject);
+		return moduleObject;
+	}
+
+	Wg_Obj* Wg_ImportFromModule(Wg_Context* context, const char* module, const char* name, const char* alias) {
+		WASSERT(context && module && name);
+
+		if (!LoadModule(context, module))
+			return nullptr;
+
+		auto& mod = context->globals.at(module);
+		auto it = mod.find(name);
+		if (it == mod.end()) {
+			std::string msg = std::string("Cannot import '") + name
+				+ "' from '" + module + "'";
+			Wg_RaiseException(context, WG_EXC_IMPORTERROR, msg.c_str());
+			return nullptr;
+		}
+
+		Wg_SetGlobal(context, alias ? alias : name, *it->second);
+		return *it->second;
+	}
+
+	bool Wg_ImportAllFromModule(Wg_Context* context, const char* module) {
+		WASSERT(context && module);
+
+		if (!LoadModule(context, module))
+			return false;
+
+		auto& mod = context->globals.at(module);
+		for (auto& [var, val] : mod) {
+			Wg_SetGlobal(context, var.c_str(), *val);
+		}
+		return true;
+	}
+
+	void Wg_SetImportPath(Wg_Context* context, const char* path) {
+		context->importPath = path;
+		if (path[0] != '/' && path[0] != '\\')
+			context->importPath += "/";
 	}
 
 } // extern "C"

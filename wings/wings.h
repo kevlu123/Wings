@@ -20,7 +20,6 @@ typedef struct Wg_FuncDesc {
 	Wg_Function fptr;
 	void* userdata;
 	bool isMethod;
-	const char* tag;
 	const char* prettyName;
 } Wg_FuncDesc;
 
@@ -145,11 +144,11 @@ WG_DLL_EXPORT void Wg_DestroyContext(Wg_Context* context);
 * 
 * @param context The relevant context.
 * @param code A null terminated ASCII string containing the source code.
-* @param tag An optional null terminated ASCII string to be displayed
+* @param prettyName An optional null terminated ASCII string to be displayed
 *            in error messages relating to this script. This parameter may be nullptr.
 * @return A function object, or nullptr on failure. Call Wg_Call() to execute the function object.
 */
-WG_DLL_EXPORT Wg_Obj* Wg_Compile(Wg_Context* context, const char* code, const char* tag WG_DEFAULT_ARG(nullptr));
+WG_DLL_EXPORT Wg_Obj* Wg_Compile(Wg_Context* context, const char* code, const char* prettyName WG_DEFAULT_ARG(nullptr));
 
 /**
 * Compile an expression to a function object.
@@ -159,11 +158,11 @@ WG_DLL_EXPORT Wg_Obj* Wg_Compile(Wg_Context* context, const char* code, const ch
 *
 * @param context The relevant context.
 * @param code A null terminated ASCII string containing the source code.
-* @param tag An optional null terminated ASCII string to be displayed
+* @param prettyName An optional null terminated ASCII string to be displayed
 *            in error messages relating to this script. This parameter may be nullptr.
 * @return A function object, or nullptr on failure. Call Wg_Call() to execute the function object.
 */
-WG_DLL_EXPORT Wg_Obj* Wg_CompileExpression(Wg_Context* context, const char* code, const char* tag WG_DEFAULT_ARG(nullptr));
+WG_DLL_EXPORT Wg_Obj* Wg_CompileExpression(Wg_Context* context, const char* code, const char* prettyName WG_DEFAULT_ARG(nullptr));
 
 /**
 * Set a function to be called when a programmer error occurs.
@@ -999,14 +998,47 @@ WG_DLL_EXPORT void Wg_RegisterModule(Wg_Context* context, const char* name, Wg_M
 * 
 * Remarks:
 * If the module is imported successfully, the module object
-* is bound to a global variable with the same name.
+* is bound to a global variable with the same name (or the alias provided).
 * Call Wg_GetCurrentException() or Wg_GetErrorMessage() to get error information.
 * 
 * @param context The relevant context.
-* @param name The name of the module to import.
+* @param module The name of the module to import.
+* @param alias The alias to import the module under, or nullptr to use the same name.
 * @return The imported module, or nullptr on failure.
 */
-WG_DLL_EXPORT Wg_Obj* Wg_ImportModule(Wg_Context* context, const char* name);
+WG_DLL_EXPORT Wg_Obj* Wg_ImportModule(Wg_Context* context, const char* module, const char* alias WG_DEFAULT_ARG(nullptr));
+
+/**
+* Import a specific name from a module.
+*
+* Remarks:
+* If the name is imported successfully, the object bound to the name
+* is bound to a global variable with the same name (or the alias provided).
+* Call Wg_GetCurrentException() or Wg_GetErrorMessage() to get error information.
+*
+* @param context The relevant context.
+* @param module The name of the module to import from.
+* @param name The name to import.
+* @param alias The alias to import the name under, or nullptr to use the same name.
+* @return The imported object, or nullptr on failure.
+*/
+WG_DLL_EXPORT Wg_Obj* Wg_ImportFromModule(Wg_Context* context, const char* module, const char* name, const char* alias WG_DEFAULT_ARG(nullptr));
+
+/**
+* Import all names from a module.
+*
+* Remarks:
+* If the names are imported successfully, the objects bound to the names
+* are bound to global variables with the same names.
+* Call Wg_GetCurrentException() or Wg_GetErrorMessage() to get error information.
+*
+* @param context The relevant context.
+* @param module The name of the module to import.
+* @return True if the names were imported successfully, otherwise false.
+*/
+WG_DLL_EXPORT bool Wg_ImportAllFromModule(Wg_Context* context, const char* module);
+
+WG_DLL_EXPORT void Wg_SetImportPath(Wg_Context* context, const char* path);
 
 #undef WG_DEFAULT_ARG
 #undef WG_DLL_EXPORT

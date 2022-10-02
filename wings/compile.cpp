@@ -561,6 +561,27 @@ namespace wings {
 		instructions.push_back(std::move(pop));
 	}
 
+	static void CompileImportFrom(const Statement& node, std::vector<Instruction>& instructions) {
+		Instruction instr{};
+		instr.srcPos = node.srcPos;
+		instr.type = Instruction::Type::ImportFrom;
+		instr.importFrom = std::make_unique<ImportFromInstruction>();
+		instr.importFrom->module = node.importFrom.module;
+		instr.importFrom->names = node.importFrom.names;
+		instr.importFrom->alias = node.importFrom.alias;
+		instructions.push_back(std::move(instr));
+	}
+
+	static void CompileImport(const Statement& node, std::vector<Instruction>& instructions) {
+		Instruction instr{};
+		instr.srcPos = node.srcPos;
+		instr.type = Instruction::Type::Import;
+		instr.import = std::make_unique<ImportInstruction>();
+		instr.import->module = node.import.module;
+		instr.import->alias = node.import.alias;
+		instructions.push_back(std::move(instr));
+	}
+
 	static void CompileRaise(const Statement& node, std::vector<Instruction>& instructions) {
 		CompileExpression(node.expr, instructions);
 
@@ -700,6 +721,8 @@ namespace wings {
 		{ Statement::Type::Class, CompileClass },
 		{ Statement::Type::Try, CompileTry },
 		{ Statement::Type::Raise, CompileRaise },
+		{ Statement::Type::Import, CompileImport },
+		{ Statement::Type::ImportFrom, CompileImportFrom },
 		{ Statement::Type::Pass, [](auto, auto) {}},
 		{ Statement::Type::Global, [](auto, auto) {}},
 		{ Statement::Type::Nonlocal, [](auto, auto) {}},

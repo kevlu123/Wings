@@ -45,6 +45,17 @@ namespace wings {
 		size_t finallyJump;
 	};
 
+	struct ImportInstruction {
+		std::string module;
+		std::string alias;
+	};
+
+	struct ImportFromInstruction {
+		std::string module;
+		std::vector<std::string> names;
+		std::string alias;
+	};
+
 	struct Instruction {
 		enum class Type {
 			Literal,
@@ -54,6 +65,8 @@ namespace wings {
 			Class,
 			Variable,
 			Dot,
+			Import,
+			ImportFrom,
 
 			DirectAssign,
 			MemberAssign,
@@ -91,6 +104,8 @@ namespace wings {
 		std::unique_ptr<ClassInstruction> _class;
 		std::unique_ptr<JumpInstruction> jump;
 		std::unique_ptr<TryFrameInstruction> pushTry;
+		std::unique_ptr<ImportInstruction> import;
+		std::unique_ptr<ImportFromInstruction> importFrom;
 
 		SourcePosition srcPos;
 	};

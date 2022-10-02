@@ -3855,6 +3855,7 @@ namespace wings {
 			builtins.defaultIter = getGlobal("__DefaultIter");
 			builtins.defaultReverseIter = getGlobal("__DefaultReverseIter");
 			builtins.codeObject = getGlobal("__CodeObject");
+			builtins.moduleObject = createClass("ModuleObject", nullptr, false);
 			
 			builtins.baseException = getGlobal("BaseException");
 			builtins.systemExit = getGlobal("SystemExit");

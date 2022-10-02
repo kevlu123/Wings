@@ -158,7 +158,7 @@ extern "C" {
 				value->fptr,
 				value->userdata,
 				value->isMethod,
-				std::string(value->tag ? value->tag : wings::DEFAULT_TAG_NAME),
+				std::string(context->currentModule.top()),
 				std::string(value->prettyName ? value->prettyName : wings::DEFAULT_FUNC_NAME)
 			};
 			return v;
@@ -187,6 +187,7 @@ extern "C" {
 		_class->type = "__class";
 		_class->data = new Wg_Obj::Class{ std::string(name) };
 		_class->finalizer.fptr = [](Wg_Obj* obj, void*) { delete (Wg_Obj::Class*)obj->data; };
+		_class->Get<Wg_Obj::Class>().module = context->currentModule.top();
 		_class->Get<Wg_Obj::Class>().instanceAttributes.Set("__class__", _class);
 		_class->attributes.AddParent(context->builtins.object->Get<Wg_Obj::Class>().instanceAttributes);
 
@@ -290,7 +291,6 @@ extern "C" {
 		Wg_Obj* initFn = Wg_CreateFunction(context, &init);
 		if (initFn == nullptr)
 			return nullptr;
-		Wg_LinkReference(initFn, _class);
 		Wg_LinkReference(initFn, _class);
 		Wg_AddAttributeToClass(_class, "__init__", initFn);
 
@@ -596,25 +596,25 @@ extern "C" {
 			Wg_Obj* (*fptr)(Wg_Context*, Wg_Obj**, int);
 			void* userdata = nullptr;
 			Wg_Obj* self = nullptr;
-			std::string prettyName;
+			std::string_view module;
 			if (Wg_IsFunction(callable)) {
 				const auto& func = callable->Get<Wg_Obj::Func>();
 				if (func.self)
 					self = func.self;
 				fptr = func.fptr;
 				userdata = func.userdata;
-				prettyName = func.prettyName;
+				module = func.module;
 
 				context->currentTrace.push_back(wings::TraceFrame{
 					{},
 					"",
-					func.tag,
-					prettyName
+					func.module,
+					func.prettyName
 					});
 			} else {
 				fptr = callable->Get<Wg_Obj::Class>().ctor;
 				userdata = callable->Get<Wg_Obj::Class>().userdata;
-				prettyName = callable->Get<Wg_Obj::Class>().name;
+				module = callable->Get<Wg_Obj::Class>().module;
 			}
 
 			std::vector<Wg_Obj*> argsWithSelf;
@@ -624,11 +624,13 @@ extern "C" {
 			}
 			argsWithSelf.insert(argsWithSelf.end(), argv, argv + argc);
 			
+			context->currentModule.push(module);
 			context->userdata.push_back(userdata);
 			context->kwargs.push_back(kwargsDict);
 			Wg_Obj* ret = fptr(context, argsWithSelf.data(), (int)argsWithSelf.size());
 			context->kwargs.pop_back();
 			context->userdata.pop_back();
+			context->currentModule.pop();
 
 			if (Wg_IsFunction(callable)) {
 				context->currentTrace.pop_back();
@@ -833,35 +835,4 @@ extern "C" {
 		}
 	}
 
-	void Wg_RegisterModule(Wg_Context* context, const char* name, Wg_ModuleLoader loader) {
-		context->moduleLoaders.insert({ std::string(name), loader });
-	}
-
-	Wg_Obj* Wg_ImportModule(Wg_Context* context, const char* name) {
-		// Try to load a module registered with Wg_RegisterModule
-		auto it = context->moduleLoaders.find(name);
-		if (it != context->moduleLoaders.end()) {
-			if (!it->second(context)) {
-				// Failed
-				return nullptr;
-			}
-
-			// Success. Generate a module object.
-			//Wg_Obj* moduleObject = Wg_Call(context->builtins.moduleObject, nullptr, 0);
-			//if (moduleObject == nullptr)
-			//	return nullptr;
-			//auto& module = context->globals.at(name);
-			//for (auto& [var, val] : module) {
-			//	Wg_SetAttribute(moduleObject, var.c_str(), *val);
-			//}
-			//return moduleObject;
-			return nullptr;
-		}
-
-		// Try to load a module from a file
-		// TODO
-		
-		///Wg_RaiseImportError(context);
-		return nullptr;
-	}
 } // extern "C"

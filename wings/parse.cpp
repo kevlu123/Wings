@@ -866,6 +866,96 @@ namespace wings {
 		}
 	}
 
+	static CodeError ParseImportFrom(const LexTree& node, Statement& out) {
+		TokenIter p(node.tokens);
+		out.type = Statement::Type::ImportFrom;
+		++p;
+
+		if (p.EndReached()) {
+			return CodeError::Bad("Expected a module name", (--p)->srcPos);
+		} else if (p->type != Token::Type::Word) {
+			return CodeError::Bad("Expected a module name", p->srcPos);
+		}
+
+		out.importFrom.module = p->text;
+		++p;
+
+		if (p.EndReached()) {
+			return CodeError::Bad("Expected 'import'", (--p)->srcPos);
+		} else if (p->text != "import") {
+			return CodeError::Bad("Expected 'import'", p->srcPos);
+		}
+		++p;
+
+		if (p.EndReached()) {
+			return CodeError::Bad("Expected a name", (--p)->srcPos);
+		}
+		
+		if (p->text == "*") {
+			++p;
+		} else {
+			while (true) {
+				if (p->type != Token::Type::Word) {
+					return CodeError::Bad("Expected a name", p->srcPos);
+				}
+				out.importFrom.names.push_back(p->text);
+				++p;
+
+				if (p.EndReached()) {
+					break;
+				}
+
+				if (p->text == "as") {
+					++p;
+					if (p.EndReached()) {
+						return CodeError::Bad("Expected a name", (--p)->srcPos);
+					} else if (p->type != Token::Type::Word) {
+						return CodeError::Bad("Expected a name", p->srcPos);
+					}
+					out.importFrom.alias = p->text;
+					++p;
+					break;
+				}
+				
+				if (p->text == ",") {
+					++p;
+				} else {
+					return CodeError::Bad("Expected ','", p->srcPos);
+				}
+			}
+		}
+
+		return CheckTrailingTokens(p);
+	}
+
+	static CodeError ParseImport(const LexTree& node, Statement& out) {
+		TokenIter p(node.tokens);
+		out.type = Statement::Type::Import;
+		++p;
+		
+		if (p.EndReached()) {
+			return CodeError::Bad("Expected a module name", (--p)->srcPos);
+		} else if (p->type != Token::Type::Word) {
+			return CodeError::Bad("Expected a module name", p->srcPos);
+		}
+
+		out.import.module = p->text;
+		++p;
+
+		if (!p.EndReached() && p->text == "as") {
+			++p;
+			if (p.EndReached()) {
+				return CodeError::Bad("Expected an alias name", (--p)->srcPos);
+			} else if (p->type != Token::Type::Word) {
+				return CodeError::Bad("Expected an alias name", p->srcPos);
+			}
+			out.import.alias = p->text;
+			++p;
+		}
+		
+		return CheckTrailingTokens(p);
+	}
+
 	using ParseFn = CodeError(*)(const LexTree& node, Statement& out);
 
 	static const std::unordered_map<std::string, ParseFn> STATEMENT_STARTINGS = {
@@ -887,6 +977,8 @@ namespace wings {
 		{ "finally", ParseFinally },
 		{ "raise", ParseRaise },
 		{ "with", ParseWith },
+		{ "from", ParseImportFrom },
+		{ "import", ParseImport },
 	};
 
 	static CodeError ParseStatement(const LexTree& node, Statement& out) {

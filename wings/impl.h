@@ -52,10 +52,10 @@ namespace wings {
 	struct TraceFrame {
 		SourcePosition srcPos;
 		std::string_view lineText;
-		std::string_view tag;
+		std::string_view module;
 		std::string_view func;
 		OwnedTraceFrame ToOwned() const {
-			return { srcPos, lineText.data(), tag.data(), func.data() };
+			return { srcPos, lineText.data(), module.data(), func.data() };
 		}
 	};
 
@@ -95,6 +95,7 @@ namespace wings {
 		Wg_Obj* dictItemsIter;
 		Wg_Obj* setIter;
 		Wg_Obj* codeObject;
+		Wg_Obj* moduleObject;
 
 		// Exception types
 		Wg_Obj* baseException;
@@ -135,7 +136,7 @@ namespace wings {
 				object, noneType, _bool, _int, _float, str, tuple, list,
 				dict, set, func, slice, defaultIter, defaultReverseIter,
 				dictKeysIter, dictValuesIter, dictItemsIter, setIter,
-				codeObject,
+				codeObject, moduleObject,
 
 				baseException, systemExit, exception, stopIteration, arithmeticError,
 				overflowError, zeroDivisionError, attributeError, importError,
@@ -160,12 +161,13 @@ struct Wg_Obj {
 		Wg_Function fptr;
 		void* userdata;
 		bool isMethod;
-		std::string tag;
+		std::string module;
 		std::string prettyName;
 	};
 
 	struct Class {
 		std::string name;
+		std::string module;
 		Wg_Function ctor;
 		void* userdata;
 		std::vector<Wg_Obj*> bases;
@@ -212,8 +214,8 @@ struct Wg_Context {
 	std::vector<Wg_Obj*> kwargs;
 	std::vector<void*> userdata;
 	std::unordered_map<std::string, Wg_ModuleLoader> moduleLoaders;
-	std::stack<std::string> currentModule;
-	
+	std::stack<std::string_view> currentModule;
+	std::string importPath;
 };
 
 #define STRINGIZE_HELPER(x) STRINGIZE2_HELPER(x)

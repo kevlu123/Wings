@@ -18,6 +18,7 @@ namespace wings {
 			Try, Except, Finally, Raise,
 			Break, Continue,
 			Composite,
+			Import, ImportFrom,
 		} type;
 
 		SourcePosition srcPos;
@@ -44,6 +45,15 @@ namespace wings {
 			std::string var;
 			std::optional<Expression> exceptType;
 		} exceptBlock;
+		struct {
+			std::string module;
+			std::string alias;
+		} import;
+		struct {
+			std::string module;
+			std::vector<std::string> names;
+			std::string alias;
+		} importFrom;
 	};
 
 	struct ParseResult {
