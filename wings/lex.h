@@ -14,6 +14,7 @@ namespace wings {
 			String,
 			Symbol,
 			Word,
+			Keyword,
 		} type;
 
 		std::string text;

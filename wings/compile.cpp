@@ -155,7 +155,7 @@ namespace wings {
 			instr.type = Instruction::Type::MemberAssign;
 			break;
 		default:
-			WUNREACHABLE();
+			WG_UNREACHABLE();
 		}
 
 		instructions.push_back(std::move(instr));
@@ -184,7 +184,7 @@ namespace wings {
 			case LiteralValue::Type::Int: *instr.literal = expression.literalValue.i; break;
 			case LiteralValue::Type::Float: *instr.literal = expression.literalValue.f; break;
 			case LiteralValue::Type::String: *instr.literal = expression.literalValue.s; break;
-			default: WUNREACHABLE();
+			default: WG_UNREACHABLE();
 			}
 			instr.type = Instruction::Type::Literal;
 			break;
@@ -204,7 +204,7 @@ namespace wings {
 			case Operation::List: instr.type = Instruction::Type::List; break;
 			case Operation::Map: instr.type = Instruction::Type::Map; break;
 			case Operation::Set: instr.type = Instruction::Type::Set; break;
-			default: WUNREACHABLE();
+			default: WG_UNREACHABLE();
 			}
 			break;
 		}

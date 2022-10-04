@@ -1,5 +1,8 @@
 #include "common.h"
 
+#include <algorithm>
+#include <unordered_set>
+
 namespace wings {
 
 	Wg_ErrorCallback errorCallback;
@@ -127,5 +130,39 @@ namespace wings {
 		if (Wg_Obj* eq = Wg_BinaryOp(WG_BOP_EQ, lhs, rhs))
 			return Wg_GetBool(eq);
 		throw HashException();
+	}
+
+	static const std::unordered_set<std::string_view> RESERVED = {
+		"True", "False", "None",
+		"and", "or", "not",
+		"if", "else", "elif", "while", "for",
+		"class", "def",
+		"try", "except", "finally", "raise", "with", "assert",
+		"return", "break", "continue", "pass",
+		"global", "nonlocal", "del",
+		"from", "import",
+		"lambda", "in", "as", "is",
+		"await", "async", "yield",
+	};
+
+	bool IsKeyword(std::string_view s) {
+		return RESERVED.contains(s);
+	}
+
+	bool IsValidIdentifier(std::string_view s) {
+		if (s.empty())
+			return false;
+
+		auto isalpha = [](char c) {
+			return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || c == '_';
+		};
+
+		auto isalnum = [isalpha](char c) {
+			return isalpha(c) || (c >= '0' && c <= '9');
+		};
+		
+		return isalpha(s[0])
+			&& std::all_of(s.begin() + 1, s.end(), isalnum)
+			&& !IsKeyword(s);
 	}
 }

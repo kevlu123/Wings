@@ -1,7 +1,13 @@
 // Hint files help the Visual Studio IDE interpret Visual C++ identifiers
 // such as names of functions and macros.
 // For more information see https://go.microsoft.com/fwlink/?linkid=865984
-#define WDLL_EXPORT __declspec(dllexport)
-#define WDLL_EXPORT
-#define WDEFAULT_ARG
-#define WUNREACHABLE
+#define WG_DLL_EXPORT __declspec(dllexport)
+#define WG_DLL_EXPORT
+#define WG_DEFAULT_ARG
+#define WG_UNREACHABLE
+#define WG_STRINGIZE_HELPER(x) WG_STRINGIZE2_HELPER(x)
+#define WG_STRINGIZE2_HELPER(x) #x
+#define WG_LINE_AS_STRING WG_STRINGIZE_HELPER(__LINE__)
+#define WG_ASSERT_RET(ret, assertion)
+#define WG_ASSERT(assertion)
+#define WG_ASSERT_VOID(assertion)

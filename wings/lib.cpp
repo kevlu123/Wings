@@ -371,7 +371,7 @@ static bool AbsIndex(Wg_Obj* container, Wg_Obj* index, Wg_int& out) {
 
 template <class F>
 static bool IterateRange(Wg_int start, Wg_int stop, Wg_int step, F f) {
-	WASSERT(step);
+	WG_ASSERT(step);
 	if (step > 0) {
 		for (Wg_int i = (Wg_int)start; i < (Wg_int)stop; i += step)
 			if (!f(i))
@@ -1441,7 +1441,7 @@ namespace wings {
 						case 2: message = "Invalid binary string"; break;
 						case 8: message = "Invalid octal string"; break;
 						case 16: message = "Invalid hexadecimal string"; break;
-						default: WUNREACHABLE();
+						default: WG_UNREACHABLE();
 						}
 						Wg_RaiseException(context, WG_EXC_VALUEERROR, message);
 						return nullptr;
@@ -1477,7 +1477,7 @@ namespace wings {
 				case 8: return c >= '0' && c <= '7';
 				case 10: return c >= '0' && c <= '9';
 				case 16: return (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F');
-				default: WUNREACHABLE();
+				default: WG_UNREACHABLE();
 				}
 			};
 
@@ -1496,7 +1496,7 @@ namespace wings {
 						return c - 'A' + 10;
 					}
 				default:
-					WUNREACHABLE();
+					WG_UNREACHABLE();
 				}
 			};
 
@@ -1520,7 +1520,7 @@ namespace wings {
 					case 2: message = "Invalid binary string"; break;
 					case 8: message = "Invalid octal string"; break;
 					case 16: message = "Invalid hexadecimal string"; break;
-					default: WUNREACHABLE();
+					default: WG_UNREACHABLE();
 					}
 					Wg_RaiseException(context, WG_EXC_VALUEERROR, message);
 					return nullptr;

@@ -26,6 +26,8 @@ namespace wings {
 	void CallErrorCallback(const char* message);
 	Wg_Obj* Alloc(Wg_Context* context);
 	void DestroyAllObjects(Wg_Context* context);
+	bool IsKeyword(std::string_view s);
+	bool IsValidIdentifier(std::string_view s);
 	
 	struct WObjHasher {
 		size_t operator()(Wg_Obj* obj) const;
@@ -230,13 +232,19 @@ struct Wg_Context {
 	std::string importPath;
 };
 
-#define STRINGIZE_HELPER(x) STRINGIZE2_HELPER(x)
-#define STRINGIZE2_HELPER(x) #x
-#define LINE_AS_STRING STRINGIZE_HELPER(__LINE__)
+#define WG_UNREACHABLE() std::abort()
 
-#define WUNREACHABLE() std::abort()
-#define WASSERT_RET(ret, assertion) do { if (!(assertion)) { wings::CallErrorCallback( \
-LINE_AS_STRING " " __FILE__ " " #assertion \
-); return ret; } } while (0)
-#define WASSERT(assertion) WASSERT_RET({}, assertion)
-#define WASSERT_VOID(assertion) WASSERT_RET(void(), assertion)
+#define WG_STRINGIZE_HELPER(x) WG_STRINGIZE2_HELPER(x)
+#define WG_STRINGIZE2_HELPER(x) #x
+#define WG_LINE_AS_STRING WG_STRINGIZE_HELPER(__LINE__)
+
+#ifndef WG_NO_ASSERT
+	#define WG_ASSERT_RET(ret, assertion) do { if (!(assertion)) { wings::CallErrorCallback( \
+	WG_LINE_AS_STRING " " __FILE__ " " #assertion \
+	); return ret; } } while (0)
+#else
+	#define WG_ASSERT_RET(ret, assertion)
+#endif
+
+#define WG_ASSERT(assertion) WG_ASSERT_RET({}, assertion)
+#define WG_ASSERT_VOID(assertion) WG_ASSERT_RET(void(), assertion)

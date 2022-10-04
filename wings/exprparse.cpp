@@ -45,13 +45,6 @@ namespace wings {
 		return index >= tokens->size();
 	}
 
-	static const std::vector<std::string> RESERVED = {
-		"def", "if", "while", "for", "in", "return",
-		"True", "False", "None",
-		"break", "continue", "pass", "else", "elif",
-		"or", "and", "not", "global", "nonlocal",
-	};
-
 	static const std::unordered_map<std::string, Operation> BINARY_OP_STRINGS = {
 		{ "+",  Operation::Add },
 		{ "-",  Operation::Sub },

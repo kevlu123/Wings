@@ -222,7 +222,7 @@ namespace wings {
 			return Wg_CreateTuple(context, buf.data(), (int)buf.size());
 		}
 		default:
-			WUNREACHABLE();
+			WG_UNREACHABLE();
 		}
 	}
 
@@ -398,7 +398,7 @@ namespace wings {
 			} else if (auto* s = std::get_if<std::string>(instr.literal.get())) {
 				value = Wg_CreateString(context, s->c_str());
 			} else {
-				WUNREACHABLE();
+				WG_UNREACHABLE();
 			}
 
 			if (value) {
@@ -783,7 +783,7 @@ namespace wings {
 			break;
 		}
 		default:
-			WUNREACHABLE();
+			WG_UNREACHABLE();
 		}
 	}
 }

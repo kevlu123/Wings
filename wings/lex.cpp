@@ -39,7 +39,7 @@ namespace wings {
 			props.push_back({ "type", "word" });
 			break;
 		default:
-			WUNREACHABLE();
+			WG_UNREACHABLE();
 		}
 
 		std::string s = "{ ";
@@ -74,7 +74,7 @@ namespace wings {
 		case 8: return c >= '0' && c <= '7';
 		case 10: return c >= '0' && c <= '9';
 		case 16: return (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F');
-		default: WUNREACHABLE();
+		default: WG_UNREACHABLE();
 		}
 	}
 
@@ -93,7 +93,7 @@ namespace wings {
 				return c - 'A' + 10;
 			}
 		default:
-			WUNREACHABLE();
+			WG_UNREACHABLE();
 		}
 	}
 
@@ -192,6 +192,8 @@ namespace wings {
 		} else if (t.text == "True" || t.text == "False") {
 			t.type = Token::Type::Bool;
 			t.literal.b = t.text[0] == 'T';
+		} else if (wings::IsKeyword(t.text)) {
+			t.type = Token::Type::Keyword;
 		}
 		return t;
 	}
@@ -219,7 +221,7 @@ namespace wings {
 				case 2: return CodeError::Bad("Invalid binary string");
 				case 8: return CodeError::Bad("Invalid octal string");
 				case 16: return CodeError::Bad("Invalid hexadecimal string");
-				default: WUNREACHABLE();
+				default: WG_UNREACHABLE();
 				}
 			}
 		}
