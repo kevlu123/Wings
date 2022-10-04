@@ -144,30 +144,29 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="attributetable.cpp" />
+    <ClCompile Include="common.cpp" />
     <ClCompile Include="compile.cpp" />
-    <ClCompile Include="exception.cpp" />
     <ClCompile Include="executor.cpp" />
     <ClCompile Include="exprparse.cpp" />
-    <ClCompile Include="gc.cpp" />
     <ClCompile Include="lex.cpp" />
     <ClCompile Include="lib.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="parse.cpp" />
     <ClCompile Include="tests.cpp" />
     <ClCompile Include="wings.cpp" />
-    <ClCompile Include="wobj.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="attributetable.h" />
+    <ClInclude Include="common.h" />
     <ClInclude Include="compile.h" />
     <ClInclude Include="executor.h" />
     <ClInclude Include="exprparse.h" />
-    <ClInclude Include="gc.h" />
-    <ClInclude Include="impl.h" />
     <ClInclude Include="lex.h" />
+    <ClInclude Include="lib.h" />
     <ClInclude Include="parse.h" />
     <ClInclude Include="rcptr.h" />
     <ClInclude Include="hash.h" />
+    <ClInclude Include="tests.h" />
     <ClInclude Include="wings.h" />
   </ItemGroup>
   <ItemGroup>

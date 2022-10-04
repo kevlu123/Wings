@@ -1,6 +1,8 @@
 #pragma once
+#include "wings.h"
 #include "compile.h"
 #include "rcptr.h"
+
 #include <vector>
 #include <string>
 #include <unordered_map>

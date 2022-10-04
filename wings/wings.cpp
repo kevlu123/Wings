@@ -1,20 +1,18 @@
-#include "impl.h"
-#include "gc.h"
+#include "wings.h"
+#include "common.h"
 #include "executor.h"
 #include "compile.h"
+#include "lib.h"
+
 #include <iostream>
 #include <memory>
-#include <string_view>
-#include <atomic>
-#include <mutex>
 #include <fstream>
 #include <vector>
 #include <string>
+#include <string_view>
 #include <sstream>
-
-static Wg_ErrorCallback errorCallback;
-static void* errorCallbackUserdata;
-static std::mutex errorCallbackMutex;
+#include <queue>
+#include <mutex>
 
 extern "C" {
 	void Wg_GetConfig(const Wg_Context* context, Wg_Config* out) {
@@ -49,7 +47,9 @@ extern "C" {
 
 		// Initialise the library without restriction
 		Wg_SetConfig(context, nullptr);
-		wings::InitLibrary(context);
+
+		Wg_RegisterModule(context, "__builtins__", wings::LoadBuiltins);
+		Wg_ImportAllFromModule(context, "__builtins__");
 		
 		// Apply possibly restrictive config now
 		Wg_SetConfig(context, config);
@@ -76,9 +76,9 @@ extern "C" {
 	}
 
 	void Wg_SetErrorCallback(Wg_ErrorCallback callback, void* userdata) {
-		std::scoped_lock lock(errorCallbackMutex);
-		errorCallback = callback;
-		errorCallbackUserdata = userdata;
+		std::scoped_lock lock(wings::errorCallbackMutex);
+		wings::errorCallback = callback;
+		wings::errorCallbackUserdata = userdata;
 	}
 
 	static Wg_Obj* Compile(Wg_Context* context, const char* code, const char* module, const char* prettyName, bool expr) {
@@ -196,7 +196,6 @@ extern "C" {
 		}
 	}
 
-
 	void Wg_RegisterModule(Wg_Context* context, const char* name, Wg_ModuleLoader loader) {
 		context->moduleLoaders.insert({ std::string(name), loader });
 	}
@@ -309,94 +308,1157 @@ extern "C" {
 			context->importPath += "/";
 	}
 
-} // extern "C"
+	Wg_Obj* Wg_CreateNone(Wg_Context* context) {
+		WASSERT(context);
+		return context->builtins.none;
+	}
 
-namespace wings {
-
-	void CallErrorCallback(const char* message) {
-		errorCallbackMutex.lock();
-		auto cb = errorCallback;
-		auto ud = errorCallbackUserdata;
-		errorCallbackMutex.unlock();
-
-		if (cb) {
-			cb(message, ud);
+	Wg_Obj* Wg_CreateBool(Wg_Context* context, bool value) {
+		WASSERT(context);
+		if (value && context->builtins._true) {
+			return context->builtins._true;
+		} else if (!value && context->builtins._false) {
+			return context->builtins._false;
 		} else {
-			std::abort();
+			return value ? context->builtins._true : context->builtins._false;
 		}
 	}
 
-	size_t Guid() {
-		static std::atomic_size_t i = 0;
-		return ++i;
-	}
-
-	std::string WObjTypeToString(const Wg_Obj* obj) {
-		if (Wg_IsNone(obj)) {
-			return "NoneType";
-		} else if (Wg_IsBool(obj)) {
-			return "bool";
-		} else if (Wg_IsInt(obj)) {
-			return "int";
-		} else if (Wg_IsIntOrFloat(obj)) {
-			return "float";
-		} else if (Wg_IsString(obj)) {
-			return "str";
-		} else if (Wg_IsTuple(obj)) {
-			return "tuple";
-		} else if (Wg_IsList(obj)) {
-			return "list";
-		} else if (Wg_IsDictionary(obj)) {
-			return "dict";
-		} else if (Wg_IsSet(obj)) {
-			return "set";
-		} else if (Wg_IsFunction(obj)) {
-			return "function";
-		} else if (Wg_IsClass(obj)) {
-			return "class";
-		} else if (obj->type == "__object") {
-			return "object";
+	Wg_Obj* Wg_CreateInt(Wg_Context* context, Wg_int value) {
+		WASSERT(context);
+		if (Wg_Obj* v = Wg_Call(context->builtins._int, nullptr, 0)) {
+			v->Get<Wg_int>() = value;
+			return v;
 		} else {
-			return obj->type;
+			return nullptr;
 		}
 	}
 
-	std::string CodeError::ToString() const {
-		if (good) {
-			return "Success";
+	Wg_Obj* Wg_CreateFloat(Wg_Context* context, Wg_float value) {
+		WASSERT(context);
+		if (Wg_Obj* v = Wg_Call(context->builtins._float, nullptr, 0)) {
+			v->Get<Wg_float>() = value;
+			return v;
 		} else {
-			return '(' + std::to_string(srcPos.line + 1) + ','
-				+ std::to_string(srcPos.column + 1) + ") "
-				+ message;
+			return nullptr;
 		}
 	}
 
-	CodeError::operator bool() const {
-		return !good;
+	Wg_Obj* Wg_CreateString(Wg_Context* context, const char* value) {
+		WASSERT(context);
+		if (Wg_Obj* v = Wg_Call(context->builtins.str, nullptr, 0)) {
+			v->Get<std::string>() = value ? value : "";
+			return v;
+		} else {
+			return nullptr;
+		}
 	}
 
-	CodeError CodeError::Good() {
-		return CodeError{ true };
+	Wg_Obj* Wg_CreateTuple(Wg_Context* context, Wg_Obj** argv, int argc) {
+		std::vector<wings::Wg_ObjRef> refs;
+		WASSERT(context && argc >= 0);
+		if (argc > 0) {
+			WASSERT(argv);
+			for (int i = 0; i < argc; i++) {
+				refs.emplace_back(argv[i]);
+				WASSERT(argv[i]);
+			}
+		}
+
+		if (Wg_Obj* v = Wg_Call(context->builtins.tuple, nullptr, 0)) {
+			v->Get<std::vector<Wg_Obj*>>() = std::vector<Wg_Obj*>(argv, argv + argc);
+			return v;
+		} else {
+			return nullptr;
+		}
 	}
 
-	CodeError CodeError::Bad(std::string message, SourcePosition srcPos) {
-		return CodeError{
-			.good = false,
-			.srcPos = srcPos,
-			.message = message
+	Wg_Obj* Wg_CreateList(Wg_Context* context, Wg_Obj** argv, int argc) {
+		std::vector<wings::Wg_ObjRef> refs;
+		WASSERT(context && argc >= 0);
+		if (argc > 0) {
+			WASSERT(argv);
+			for (int i = 0; i < argc; i++) {
+				refs.emplace_back(argv[i]);
+				WASSERT(argv[i]);
+			}
+		}
+
+		if (Wg_Obj* v = Wg_Call(context->builtins.list, nullptr, 0)) {
+			v->Get<std::vector<Wg_Obj*>>() = std::vector<Wg_Obj*>(argv, argv + argc);
+			return v;
+		} else {
+			return nullptr;
+		}
+	}
+
+	Wg_Obj* Wg_CreateDictionary(Wg_Context* context, Wg_Obj** keys, Wg_Obj** values, int argc) {
+		std::vector<wings::Wg_ObjRef> refs;
+		WASSERT(context && argc >= 0);
+		if (argc > 0) {
+			WASSERT(keys && values);
+			for (int i = 0; i < argc; i++) {
+				refs.emplace_back(keys[i]);
+				refs.emplace_back(values[i]);
+				WASSERT(keys[i] && values[i]);
+			}
+		}
+
+		// Pass a dummy kwargs to prevent stack overflow from recursion
+		Wg_Obj* dummyKwargs = wings::Alloc(context);
+		if (dummyKwargs == nullptr)
+			return nullptr;
+		dummyKwargs->type = "__map";
+		wings::WDict wd{};
+		dummyKwargs->data = &wd;
+
+		if (Wg_Obj* v = Wg_Call(context->builtins.dict, nullptr, 0, dummyKwargs)) {
+			for (int i = 0; i < argc; i++) {
+				refs.emplace_back(v);
+				try {
+					v->Get<wings::WDict>()[keys[i]] = values[i];
+				} catch (wings::HashException&) {
+					return nullptr;
+				}
+			}
+			return v;
+		} else {
+			return nullptr;
+		}
+	}
+
+	Wg_Obj* Wg_CreateSet(Wg_Context* context, Wg_Obj** argv, int argc) {
+		std::vector<wings::Wg_ObjRef> refs;
+		WASSERT(context && argc >= 0);
+		if (argc > 0) {
+			WASSERT(argv);
+			for (int i = 0; i < argc; i++) {
+				refs.emplace_back(argv[i]);
+				WASSERT(argv[i]);
+			}
+		}
+
+		if (Wg_Obj* v = Wg_Call(context->builtins.set, nullptr, 0, nullptr)) {
+			for (int i = 0; i < argc; i++) {
+				try {
+					v->Get<wings::WSet>().insert(argv[i]);
+				} catch (wings::HashException&) {
+					return nullptr;
+				}
+			}
+			return v;
+		} else {
+			return nullptr;
+		}
+	}
+
+	Wg_Obj* Wg_CreateFunction(Wg_Context* context, const Wg_FuncDesc* value) {
+		WASSERT(context && value);
+		if (Wg_Obj* v = Wg_Call(context->builtins.func, nullptr, 0)) {
+			v->Get<Wg_Obj::Func>() = {
+				nullptr,
+				value->fptr,
+				value->userdata,
+				value->isMethod,
+				std::string(context->currentModule.top()),
+				std::string(value->prettyName ? value->prettyName : wings::DEFAULT_FUNC_NAME)
+			};
+			return v;
+		} else {
+			return nullptr;
+		}
+	}
+
+	Wg_Obj* Wg_CreateClass(Wg_Context* context, const char* name, Wg_Obj** bases, int baseCount) {
+		std::vector<wings::Wg_ObjRef> refs;
+		WASSERT(context && name && baseCount >= 0);
+		if (baseCount > 0) {
+			WASSERT(bases);
+			for (int i = 0; i < baseCount; i++) {
+				WASSERT(bases[i] && Wg_IsClass(bases[i]));
+				refs.emplace_back(bases[i]);
+			}
+		}
+
+		// Allocate class
+		Wg_Obj* _class = wings::Alloc(context);
+		if (_class == nullptr) {
+			return nullptr;
+		}
+		refs.emplace_back(_class);
+		_class->type = "__class";
+		_class->data = new Wg_Obj::Class{ std::string(name) };
+		_class->finalizer.fptr = [](Wg_Obj* obj, void*) { delete (Wg_Obj::Class*)obj->data; };
+		_class->Get<Wg_Obj::Class>().module = context->currentModule.top();
+		_class->Get<Wg_Obj::Class>().instanceAttributes.Set("__class__", _class);
+		_class->attributes.AddParent(context->builtins.object->Get<Wg_Obj::Class>().instanceAttributes);
+
+		// Set bases
+		int actualBaseCount = baseCount ? baseCount : 1;
+		Wg_Obj** actualBases = baseCount ? bases : &context->builtins.object;
+		for (int i = 0; i < actualBaseCount; i++) {
+			_class->Get<Wg_Obj::Class>().instanceAttributes.AddParent(actualBases[i]->Get<Wg_Obj::Class>().instanceAttributes);
+			_class->Get<Wg_Obj::Class>().bases.push_back(actualBases[i]);
+		}
+		if (Wg_Obj* basesTuple = Wg_CreateTuple(context, actualBases, actualBaseCount)) {
+			_class->attributes.Set("__bases__", basesTuple);
+		} else {
+			return nullptr;
+		}
+
+		// Set __str__()
+		Wg_FuncDesc tostr{};
+		tostr.isMethod = true;
+		tostr.prettyName = "__str__";
+		tostr.userdata = context;
+		tostr.fptr = [](Wg_Context* context, Wg_Obj** argv, int argc) -> Wg_Obj* {
+			if (argc != 1) {
+				Wg_RaiseArgumentCountError(context, argc, 1);
+				return nullptr;
+			}
+			std::string s = "<class '" + argv[0]->Get<Wg_Obj::Class>().name + "'>";
+			return Wg_CreateString(argv[0]->context, s.c_str());
 		};
+		if (Wg_Obj* tostrFn = Wg_CreateFunction(context, &tostr)) {
+			Wg_SetAttribute(_class, "__str__", tostrFn);
+		} else {
+			return nullptr;
+		}
+
+		// Set construction function. This function forwards to __init__().
+		_class->Get<Wg_Obj::Class>().userdata = _class;
+		_class->Get<Wg_Obj::Class>().ctor = [](Wg_Context* context, Wg_Obj** argv, int argc) -> Wg_Obj* {
+			Wg_Obj* _classObj = (Wg_Obj*)Wg_GetFunctionUserdata(context);
+
+			Wg_Obj* instance = wings::Alloc(context);
+			if (instance == nullptr)
+				return nullptr;
+			wings::Wg_ObjRef ref(instance);
+
+			instance->attributes = _classObj->Get<Wg_Obj::Class>().instanceAttributes.Copy();
+			instance->type = _classObj->Get<Wg_Obj::Class>().name;
+
+			if (Wg_Obj* init = Wg_HasAttribute(instance, "__init__")) {
+				if (Wg_IsFunction(init)) {
+					Wg_Obj* kwargs = Wg_GetKwargs(context);
+					if (kwargs == nullptr)
+						return nullptr;
+
+					Wg_Obj* ret = Wg_Call(init, argv, argc, kwargs);
+					if (ret == nullptr) {
+						return nullptr;
+					} else if (!Wg_IsNone(ret)) {
+						Wg_RaiseException(context, WG_EXC_TYPEERROR, "__init__() returned a non NoneType type");
+						return nullptr;
+					}
+				}
+			}
+
+			return instance;
+		};
+
+		// Set init method
+		std::string initName = std::string(name) + ".__init__";
+		Wg_FuncDesc init{};
+		init.prettyName = initName.c_str();
+		init.isMethod = true;
+		init.userdata = _class;
+		init.fptr = [](Wg_Context* context, Wg_Obj** argv, int argc) -> Wg_Obj* {
+			Wg_Obj* _class = (Wg_Obj*)Wg_GetFunctionUserdata(context);
+			if (argc < 1) {
+				Wg_RaiseArgumentCountError(_class->context, argc, -1);
+				return nullptr;
+			}
+
+			const auto& bases = _class->Get<Wg_Obj::Class>().bases;
+			if (bases.empty())
+				return nullptr;
+
+			if (Wg_Obj* baseInit = Wg_GetAttributeFromBase(argv[0], "__init__", bases[0])) {
+				Wg_Obj* kwargs = Wg_GetKwargs(context);
+				if (kwargs == nullptr)
+					return nullptr;
+
+				Wg_Obj* ret = Wg_Call(baseInit, argv + 1, argc - 1, kwargs);
+				if (ret == nullptr) {
+					return nullptr;
+				} else if (!Wg_IsNone(ret)) {
+					Wg_RaiseException(context, WG_EXC_TYPEERROR, "__init__() returned a non NoneType type");
+					return nullptr;
+				}
+			}
+
+			return Wg_CreateNone(context);
+		};
+		Wg_Obj* initFn = Wg_CreateFunction(context, &init);
+		if (initFn == nullptr)
+			return nullptr;
+		Wg_LinkReference(initFn, _class);
+		Wg_AddAttributeToClass(_class, "__init__", initFn);
+
+		return _class;
 	}
 
-	size_t WObjHasher::operator()(Wg_Obj* obj) const {
-		if (Wg_Obj* hash = Wg_UnaryOp(WG_UOP_HASH, obj))
-			return (size_t)Wg_GetInt(hash);
-		throw HashException();
+	void Wg_AddAttributeToClass(Wg_Obj* class_, const char* attribute, Wg_Obj* value) {
+		WASSERT_VOID(class_ && attribute && value && Wg_IsClass(class_));
+		class_->Get<Wg_Obj::Class>().instanceAttributes.Set(attribute, value);
 	}
 
-	bool WObjComparer::operator()(Wg_Obj* lhs, Wg_Obj* rhs) const {
-		if (Wg_Obj* eq = Wg_BinaryOp(WG_BOP_EQ, lhs, rhs))
-			return Wg_GetBool(eq);
-		throw HashException();
+	bool Wg_IsNone(const Wg_Obj* obj) {
+		WASSERT(obj);
+		return obj == obj->context->builtins.none;
 	}
 
-} // namespace wings
+	bool Wg_IsBool(const Wg_Obj* obj) {
+		WASSERT(obj);
+		return obj == obj->context->builtins._true
+			|| obj == obj->context->builtins._false;
+	}
+
+	bool Wg_IsInt(const Wg_Obj* obj) {
+		WASSERT(obj);
+		return obj->type == "__int";
+	}
+
+	bool Wg_IsIntOrFloat(const Wg_Obj* obj) {
+		WASSERT(obj);
+		return obj->type == "__int" || obj->type == "__float";
+	}
+
+	bool Wg_IsString(const Wg_Obj* obj) {
+		WASSERT(obj);
+		return obj->type == "__str";
+	}
+
+	bool Wg_IsTuple(const Wg_Obj* obj) {
+		WASSERT(obj);
+		return obj->type == "__tuple";
+	}
+
+	bool Wg_IsList(const Wg_Obj* obj) {
+		WASSERT(obj);
+		return obj->type == "__list";
+	}
+
+	bool Wg_IsDictionary(const Wg_Obj* obj) {
+		WASSERT(obj);
+		return obj->type == "__map";
+	}
+
+	bool Wg_IsSet(const Wg_Obj* obj) {
+		WASSERT(obj);
+		return obj->type == "__set";
+	}
+
+	bool Wg_IsClass(const Wg_Obj* obj) {
+		WASSERT(obj);
+		return obj->type == "__class";
+	}
+
+	bool Wg_IsFunction(const Wg_Obj* obj) {
+		WASSERT(obj);
+		return obj->type == "__func";
+	}
+
+	bool Wg_GetBool(const Wg_Obj* obj) {
+		WASSERT(obj && Wg_IsBool(obj));
+		return obj->Get<bool>();
+	}
+
+	Wg_int Wg_GetInt(const Wg_Obj* obj) {
+		WASSERT(obj && Wg_IsInt(obj));
+		return obj->Get<Wg_int>();
+	}
+
+	Wg_float Wg_GetFloat(const Wg_Obj* obj) {
+		WASSERT(obj && Wg_IsIntOrFloat(obj));
+		if (Wg_IsInt(obj)) return (Wg_float)obj->Get<Wg_int>();
+		else return obj->Get<Wg_float>();
+	}
+
+	const char* Wg_GetString(const Wg_Obj* obj) {
+		WASSERT(obj && Wg_IsString(obj));
+		return obj->Get<std::string>().c_str();
+	}
+
+	void Wg_SetUserdata(Wg_Obj* obj, void* userdata) {
+		WASSERT_VOID(obj);
+		obj->data = userdata;
+	}
+
+	bool Wg_TryGetUserdata(const Wg_Obj* obj, const char* type, void** out) {
+		WASSERT(obj && type);
+		if (obj->type == std::string(type)) {
+			*out = obj->data;
+			return true;
+		} else {
+			return false;
+		}
+	}
+
+	void Wg_GetFinalizer(const Wg_Obj* obj, Wg_FinalizerDesc* out) {
+		WASSERT_VOID(obj && out);
+		*out = obj->finalizer;
+	}
+
+	void Wg_SetFinalizer(Wg_Obj* obj, const Wg_FinalizerDesc* finalizer) {
+		WASSERT_VOID(obj && finalizer);
+		obj->finalizer = *finalizer;
+	}
+
+	Wg_Obj* Wg_HasAttribute(Wg_Obj* obj, const char* member) {
+		WASSERT(obj && member);
+		Wg_Obj* mem = obj->attributes.Get(member);
+		if (mem && Wg_IsFunction(mem) && mem->Get<Wg_Obj::Func>().isMethod) {
+			mem->Get<Wg_Obj::Func>().self = obj;
+		}
+		return mem;
+	}
+
+	bool Wg_DeleteAttribute(Wg_Obj* obj, const char* member) {
+		std::abort(); // TODO
+		//WASSERT(obj && member);
+		//Wg_Obj* mem = obj->attributes.Delete(member);
+		//if (mem == nullptr) {
+		//	Wg_RaiseAttributeError(obj, member);
+		//} else if (Wg_IsFunction(mem) && mem->Get<Wg_Obj::Func>().isMethod) {
+		//	mem->Get<Wg_Obj::Func>().self = obj;
+		//}
+		//return mem;
+	}
+
+	Wg_Obj* Wg_GetAttribute(Wg_Obj* obj, const char* member) {
+		WASSERT(obj && member);
+		Wg_Obj* mem = obj->attributes.Get(member);
+		if (mem == nullptr) {
+			Wg_RaiseAttributeError(obj, member);
+		} else if (Wg_IsFunction(mem) && mem->Get<Wg_Obj::Func>().isMethod) {
+			mem->Get<Wg_Obj::Func>().self = obj;
+		}
+		return mem;
+	}
+
+	void Wg_SetAttribute(Wg_Obj* obj, const char* member, Wg_Obj* value) {
+		WASSERT_VOID(obj && member && value);
+		obj->attributes.Set(member, value);
+	}
+
+	Wg_Obj* Wg_GetAttributeFromBase(Wg_Obj* obj, const char* member, Wg_Obj* baseClass) {
+		WASSERT(obj && member);
+
+		Wg_Obj* mem{};
+		if (baseClass == nullptr) {
+			mem = obj->attributes.GetFromBase(member);
+		} else {
+			mem = baseClass->Get<Wg_Obj::Class>().instanceAttributes.Get(member);
+		}
+
+		if (mem && Wg_IsFunction(mem) && mem->Get<Wg_Obj::Func>().isMethod) {
+			mem->Get<Wg_Obj::Func>().self = obj;
+		}
+		return mem;
+	}
+
+	Wg_Obj* Wg_IsInstance(const Wg_Obj* instance, Wg_Obj* const* types, int typesLen) {
+		WASSERT(instance && typesLen >= 0 && (types || typesLen == 0));
+		for (int i = 0; i < typesLen; i++)
+			WASSERT(types[i] && Wg_IsClass(types[i]));
+
+		// Cannot use Wg_HasAttribute here because instance is a const pointer
+		Wg_Obj* _class = instance->attributes.Get("__class__");
+		if (_class == nullptr)
+			return nullptr;
+		wings::Wg_ObjRef ref(_class);
+
+		std::queue<wings::Wg_ObjRef> toCheck;
+		toCheck.emplace(_class);
+
+		while (!toCheck.empty()) {
+			auto end = types + typesLen;
+			auto it = std::find(types, end, toCheck.front().Get());
+			if (it != end)
+				return *it;
+
+			Wg_Obj* bases = Wg_HasAttribute(toCheck.front().Get(), "__bases__");
+			if (bases && Wg_IsTuple(bases))
+				for (Wg_Obj* base : bases->Get<std::vector<Wg_Obj*>>())
+					toCheck.emplace(base);
+
+			toCheck.pop();
+		}
+		return nullptr;
+	}
+
+	bool Wg_Iterate(Wg_Obj* obj, void* userdata, Wg_IterationCallback callback) {
+		WASSERT(obj && callback);
+		Wg_Context* context = obj->context;
+
+		Wg_Obj* iter = Wg_CallMethod(obj, "__iter__", nullptr, 0);
+		if (iter == nullptr)
+			return false;
+		wings::Wg_ObjRef iterRef(iter);
+
+		while (true) {
+			Wg_Obj* yielded = Wg_CallMethod(iter, "__next__", nullptr, 0);
+
+			Wg_Obj* exc = Wg_GetCurrentException(context);
+			if (exc) {
+				if (Wg_IsInstance(exc, &context->builtins.stopIteration, 1)) {
+					Wg_ClearCurrentException(context);
+					return true;
+				} else {
+					return false;
+				}
+			}
+
+			WASSERT(yielded); // If no exception was thrown then a value must be yielded
+			wings::Wg_ObjRef yieldedRef(yielded);
+			if (!callback(yielded, userdata))
+				return Wg_GetCurrentException(context) == nullptr;
+		}
+	}
+
+	bool Wg_Unpack(Wg_Obj* obj, Wg_Obj** out, int count) {
+		WASSERT(obj && (count == 0 || out));
+
+		Wg_Context* context = obj->context;
+		struct State {
+			Wg_Context* context;
+			Wg_Obj** array;
+			int count;
+			int index;
+		} s = { context, out, count, 0 };
+
+		bool success = Wg_Iterate(obj, &s, [](Wg_Obj* yielded, void* userdata) {
+			State* s = (State*)userdata;
+			if (s->index >= s->count) {
+				Wg_RaiseException(s->context, WG_EXC_VALUEERROR, "Too many values to unpack");
+			} else {
+				Wg_ProtectObject(yielded);
+				s->array[s->index] = yielded;
+				s->index++;
+			}
+			return true;
+			});
+
+		for (int i = s.index; i; i--)
+			Wg_UnprotectObject(out[i - 1]);
+
+		if (!success) {
+			return false;
+		} else if (s.index < count) {
+			Wg_RaiseException(context, WG_EXC_VALUEERROR, "Not enough values to unpack");
+			return false;
+		} else {
+			return true;
+		}
+	}
+
+	Wg_Obj* Wg_GetKwargs(Wg_Context* context) {
+		WASSERT(context && !context->kwargs.empty());
+		if (context->kwargs.back() == nullptr) {
+			context->kwargs.back() = Wg_CreateDictionary(context);
+		}
+		return context->kwargs.back();
+	}
+
+	void* Wg_GetFunctionUserdata(Wg_Context* context) {
+		WASSERT(context && !context->kwargs.empty());
+		return context->userdata.back();
+	}
+
+	Wg_Obj* Wg_Call(Wg_Obj* callable, Wg_Obj** argv, int argc, Wg_Obj* kwargsDict) {
+		WASSERT(callable && argc >= 0 && (argc == 0 || argv));
+		if (Wg_IsFunction(callable) || Wg_IsClass(callable)) {
+			if (argc)
+				WASSERT(argv);
+			for (int i = 0; i < argc; i++)
+				WASSERT(argv[i]);
+
+			Wg_Context* context = callable->context;
+
+			if (kwargsDict) {
+				if (!Wg_IsDictionary(kwargsDict)) {
+					Wg_RaiseException(context, WG_EXC_TYPEERROR, "Keyword arguments must be a dictionary");
+					return nullptr;
+				}
+				for (const auto& [key, value] : kwargsDict->Get<wings::WDict>()) {
+					if (!Wg_IsString(key)) {
+						Wg_RaiseException(context, WG_EXC_TYPEERROR, "Keyword arguments dictionary must only contain string keys");
+						return nullptr;
+					}
+				}
+			}
+
+			std::vector<wings::Wg_ObjRef> refs;
+			refs.emplace_back(callable);
+			for (int i = 0; i < argc; i++)
+				refs.emplace_back(argv[i]);
+
+			Wg_Obj* (*fptr)(Wg_Context*, Wg_Obj**, int);
+			void* userdata = nullptr;
+			Wg_Obj* self = nullptr;
+			std::string_view module;
+			if (Wg_IsFunction(callable)) {
+				const auto& func = callable->Get<Wg_Obj::Func>();
+				if (func.self)
+					self = func.self;
+				fptr = func.fptr;
+				userdata = func.userdata;
+				module = func.module;
+
+				context->currentTrace.push_back(wings::TraceFrame{
+					{},
+					"",
+					func.module,
+					func.prettyName
+					});
+			} else {
+				fptr = callable->Get<Wg_Obj::Class>().ctor;
+				userdata = callable->Get<Wg_Obj::Class>().userdata;
+				module = callable->Get<Wg_Obj::Class>().module;
+			}
+
+			std::vector<Wg_Obj*> argsWithSelf;
+			if (self) {
+				argsWithSelf.push_back(self);
+				refs.emplace_back(self);
+			}
+			argsWithSelf.insert(argsWithSelf.end(), argv, argv + argc);
+
+			context->currentModule.push(module);
+			context->userdata.push_back(userdata);
+			context->kwargs.push_back(kwargsDict);
+			Wg_Obj* ret = fptr(context, argsWithSelf.data(), (int)argsWithSelf.size());
+			context->kwargs.pop_back();
+			context->userdata.pop_back();
+			context->currentModule.pop();
+
+			if (Wg_IsFunction(callable)) {
+				context->currentTrace.pop_back();
+			}
+
+			return ret;
+		} else {
+			return Wg_CallMethod(callable, "__call__", argv, argc);
+		}
+	}
+
+	Wg_Obj* Wg_CallMethod(Wg_Obj* obj, const char* member, Wg_Obj** argv, int argc, Wg_Obj* kwargsDict) {
+		WASSERT(obj && member);
+		if (argc)
+			WASSERT(argv);
+		for (int i = 0; i < argc; i++)
+			WASSERT(argv[i]);
+
+		if (Wg_Obj* method = Wg_GetAttribute(obj, member)) {
+			return Wg_Call(method, argv, argc, kwargsDict);
+		} else {
+			return nullptr;
+		}
+	}
+
+	Wg_Obj* Wg_CallMethodFromBase(Wg_Obj* obj, const char* member, Wg_Obj** argv, int argc, Wg_Obj* kwargsDict, Wg_Obj* baseClass) {
+		WASSERT(obj && member);
+		if (argc)
+			WASSERT(argv);
+		for (int i = 0; i < argc; i++)
+			WASSERT(argv[i]);
+
+		if (Wg_Obj* method = Wg_GetAttributeFromBase(obj, member, baseClass)) {
+			return Wg_Call(method, argv, argc, kwargsDict);
+		} else {
+			Wg_RaiseAttributeError(obj, member);
+			return nullptr;
+		}
+	}
+
+	bool Wg_ParseKwargs(Wg_Obj* kwargs, const char* const* keys, int count, Wg_Obj** out) {
+		WASSERT(kwargs && keys && out && count > 0 && Wg_IsDictionary(kwargs));
+
+		wings::Wg_ObjRef ref(kwargs);
+		auto& buf = kwargs->Get<wings::WDict>();
+		for (int i = 0; i < count; i++) {
+			Wg_Obj* key = Wg_CreateString(kwargs->context, keys[i]);
+			if (key == nullptr)
+				return false;
+
+			wings::WDict::iterator it;
+			try {
+				it = buf.find(key);
+			} catch (wings::HashException&) {
+				return false;
+			}
+
+			if (it != buf.end()) {
+				out[i] = it->second;
+			} else {
+				out[i] = nullptr;
+			}
+		}
+		return true;
+	}
+
+	Wg_Obj* Wg_GetIndex(Wg_Obj* obj, Wg_Obj* index) {
+		WASSERT(obj && index);
+		return Wg_CallMethod(obj, "__getitem__", &index, 1);
+	}
+
+	Wg_Obj* Wg_SetIndex(Wg_Obj* obj, Wg_Obj* index, Wg_Obj* value) {
+		WASSERT(obj && index && value);
+		Wg_Obj* argv[2] = { index, value };
+		return Wg_CallMethod(obj, "__setitem__", argv, 2);
+	}
+
+	Wg_Obj* Wg_UnaryOp(Wg_UnOp op, Wg_Obj* arg) {
+		WASSERT(arg);
+		Wg_Context* context = arg->context;
+		switch (op) {
+		case WG_UOP_POS:
+			return Wg_CallMethod(arg, "__pos__", nullptr, 0);
+		case WG_UOP_NEG:
+			return Wg_CallMethod(arg, "__neg__", nullptr, 0);
+		case WG_UOP_BITNOT:
+			return Wg_CallMethod(arg, "__invert__", nullptr, 0);
+		case WG_UOP_HASH:
+			return Wg_Call(context->builtins.hash, &arg, 1);
+		case WG_UOP_LEN:
+			return Wg_Call(context->builtins.len, &arg, 1);
+		case WG_UOP_BOOL:
+			return Wg_Call(context->builtins._bool, &arg, 1);
+		case WG_UOP_INT:
+			return Wg_Call(context->builtins._int, &arg, 1);
+		case WG_UOP_FLOAT:
+			return Wg_Call(context->builtins._float, &arg, 1);
+		case WG_UOP_STR:
+			return Wg_Call(context->builtins.str, &arg, 1);
+		case WG_UOP_REPR:
+			return Wg_Call(context->builtins.repr, &arg, 1);
+		case WG_UOP_INDEX: {
+			Wg_Obj* index = Wg_CallMethod(arg, "__index__", nullptr, 0);
+			if (index == nullptr) {
+				return nullptr;
+			} else if (!Wg_IsInt(index)) {
+				Wg_RaiseException(context, WG_EXC_TYPEERROR, "__index__() returned a non integer type");
+				return nullptr;
+			} else {
+				return index;
+			}
+		}
+		default:
+			WUNREACHABLE();
+		}
+	}
+
+	static const std::unordered_map<Wg_BinOp, const char*> OP_METHOD_NAMES = {
+		{ WG_BOP_ADD, "__add__" },
+		{ WG_BOP_SUB, "__sub__" },
+		{ WG_BOP_MUL, "__mul__" },
+		{ WG_BOP_DIV, "__truediv__" },
+		{ WG_BOP_FLOORDIV, "__floordiv__" },
+		{ WG_BOP_MOD, "__mod__" },
+		{ WG_BOP_POW, "__pow__" },
+		{ WG_BOP_BITAND, "__and__" },
+		{ WG_BOP_BITOR, "__or__" },
+		{ WG_BOP_BITXOR, "__not__" },
+		{ WG_BOP_SHL, "__lshift__" },
+		{ WG_BOP_SHR, "__rshift__" },
+		{ WG_BOP_IN, "__contains__" },
+		{ WG_BOP_EQ, "__eq__" },
+		{ WG_BOP_NE, "__ne__" },
+		{ WG_BOP_LT, "__lt__" },
+		{ WG_BOP_LE, "__le__" },
+		{ WG_BOP_GT, "__gt__" },
+		{ WG_BOP_GE, "__ge__" },
+	};
+
+	Wg_Obj* Wg_BinaryOp(Wg_BinOp op, Wg_Obj* lhs, Wg_Obj* rhs) {
+		WASSERT(lhs && rhs);
+
+		if (op == WG_BOP_IN)
+			std::swap(lhs, rhs);
+
+		auto method = OP_METHOD_NAMES.find(op);
+
+		switch (op) {
+		case WG_BOP_ADD:
+		case WG_BOP_SUB:
+		case WG_BOP_MUL:
+		case WG_BOP_DIV:
+		case WG_BOP_FLOORDIV:
+		case WG_BOP_MOD:
+		case WG_BOP_POW:
+		case WG_BOP_BITAND:
+		case WG_BOP_BITOR:
+		case WG_BOP_BITXOR:
+		case WG_BOP_SHL:
+		case WG_BOP_SHR:
+			return Wg_CallMethod(lhs, method->second, &rhs, 1);
+		case WG_BOP_EQ:
+		case WG_BOP_NE:
+		case WG_BOP_LT:
+		case WG_BOP_LE:
+		case WG_BOP_GT:
+		case WG_BOP_GE:
+		case WG_BOP_IN: {
+			Wg_Obj* boolResult = Wg_CallMethod(lhs, method->second, &rhs, 1);
+			if (!Wg_IsBool(boolResult)) {
+				std::string message = method->second;
+				message += "() returned a non bool type";
+				Wg_RaiseException(boolResult->context, WG_EXC_TYPEERROR, message.c_str());
+				return nullptr;
+			}
+			return boolResult;
+		}
+		case WG_BOP_NOTIN:
+			if (Wg_Obj* in = Wg_BinaryOp(WG_BOP_IN, lhs, rhs)) {
+				return Wg_UnaryOp(WG_UOP_NOT, in);
+			} else {
+				return nullptr;
+			}
+		case WG_BOP_AND: {
+			Wg_Obj* lhsb = Wg_UnaryOp(WG_UOP_BOOL, lhs);
+			if (lhsb == nullptr)
+				return nullptr;
+			if (!Wg_GetBool(lhsb))
+				return lhsb;
+			return Wg_UnaryOp(WG_UOP_BOOL, rhs);
+		}
+		case WG_BOP_OR: {
+			Wg_Obj* lhsb = Wg_UnaryOp(WG_UOP_BOOL, lhs);
+			if (lhsb == nullptr)
+				return nullptr;
+			if (Wg_GetBool(lhsb))
+				return lhsb;
+			return Wg_UnaryOp(WG_UOP_BOOL, rhs);
+		}
+		default:
+			WUNREACHABLE();
+		}
+	}
+
+	const char* Wg_GetErrorMessage(Wg_Context* context) {
+		WASSERT(context);
+
+		if (context->currentException == nullptr) {
+			return (context->traceMessage = "Ok").c_str();
+		}
+
+		std::stringstream ss;
+		ss << "Traceback (most recent call last):\n";
+
+		for (const auto& frame : context->exceptionTrace) {
+			if (frame.tag == "__builtins__")
+				continue;
+
+			ss << "  ";
+			bool written = false;
+
+			if (frame.tag != wings::DEFAULT_TAG_NAME) {
+				ss << "Module " << frame.tag;
+				written = true;
+			}
+
+			if (frame.srcPos.line != (size_t)-1) {
+				if (written) ss << ", ";
+				ss << "Line " << (frame.srcPos.line + 1);
+				written = true;
+			}
+
+			if (frame.func != wings::DEFAULT_FUNC_NAME) {
+				if (written) ss << ", ";
+				ss << "Function " << frame.func << "()";
+			}
+
+			ss << "\n";
+
+			if (!frame.lineText.empty()) {
+				std::string lineText = frame.lineText;
+				std::replace(lineText.begin(), lineText.end(), '\t', ' ');
+
+				size_t skip = lineText.find_first_not_of(' ');
+				ss << "    " << (lineText.c_str() + skip) << "\n";
+				//if (skip <= frame.srcPos.column)
+				//    ss << std::string(frame.srcPos.column + 4 - skip, ' ') << "^\n";
+			}
+		}
+
+		ss << context->currentException->type;
+		if (Wg_Obj* msg = Wg_HasAttribute(context->currentException, "_message"))
+			if (Wg_IsString(msg))
+				ss << ": " << Wg_GetString(msg);
+		ss << "\n";
+
+		context->traceMessage = ss.str();
+		return context->traceMessage.c_str();
+	}
+
+	Wg_Obj* Wg_GetCurrentException(Wg_Context* context) {
+		WASSERT(context);
+		return context->currentException;
+	}
+
+	void Wg_ClearCurrentException(Wg_Context* context) {
+		WASSERT_VOID(context);
+		context->currentException = nullptr;
+		context->exceptionTrace.clear();
+		context->traceMessage.clear();
+	}
+
+	void Wg_RaiseException(Wg_Context* context, Wg_Exc type, const char* message) {
+		WASSERT_VOID(context);
+		switch (type) {
+		case WG_EXC_BASEEXCEPTION:
+			return Wg_RaiseExceptionClass(context->builtins.baseException, message);
+		case WG_EXC_SYSTEMEXIT:
+			return Wg_RaiseExceptionClass(context->builtins.systemExit, message);
+		case WG_EXC_EXCEPTION:
+			return Wg_RaiseExceptionClass(context->builtins.exception, message);
+		case WG_EXC_STOPITERATION:
+			return Wg_RaiseExceptionClass(context->builtins.stopIteration, message);
+		case WG_EXC_ARITHMETICERROR:
+			return Wg_RaiseExceptionClass(context->builtins.arithmeticError, message);
+		case WG_EXC_OVERFLOWERROR:
+			return Wg_RaiseExceptionClass(context->builtins.overflowError, message);
+		case WG_EXC_ZERODIVISIONERROR:
+			return Wg_RaiseExceptionClass(context->builtins.zeroDivisionError, message);
+		case WG_EXC_ATTRIBUTEERROR:
+			return Wg_RaiseExceptionClass(context->builtins.attributeError, message);
+		case WG_EXC_IMPORTERROR:
+			return Wg_RaiseExceptionClass(context->builtins.importError, message);
+		case WG_EXC_LOOKUPERROR:
+			return Wg_RaiseExceptionClass(context->builtins.lookupError, message);
+		case WG_EXC_INDEXERROR:
+			return Wg_RaiseExceptionClass(context->builtins.indexError, message);
+		case WG_EXC_KEYERROR:
+			return Wg_RaiseExceptionClass(context->builtins.keyError, message);
+		case WG_EXC_MEMORYERROR:
+			return Wg_RaiseExceptionClass(context->builtins.memoryError, message);
+		case WG_EXC_NAMEERROR:
+			return Wg_RaiseExceptionClass(context->builtins.nameError, message);
+		case WG_EXC_RUNTIMEERROR:
+			return Wg_RaiseExceptionClass(context->builtins.runtimeError, message);
+		case WG_EXC_NOTIMPLEMENTEDERROR:
+			return Wg_RaiseExceptionClass(context->builtins.notImplementedError, message);
+		case WG_EXC_RECURSIONERROR:
+			return Wg_RaiseExceptionClass(context->builtins.recursionError, message);
+		case WG_EXC_SYNTAXERROR:
+			return Wg_RaiseExceptionClass(context->builtins.syntaxError, message);
+		case WG_EXC_TYPEERROR:
+			return Wg_RaiseExceptionClass(context->builtins.typeError, message);
+		case WG_EXC_VALUEERROR:
+			return Wg_RaiseExceptionClass(context->builtins.valueError, message);
+		default:
+			WASSERT_VOID(false);
+		}
+	}
+
+	void Wg_RaiseExceptionClass(Wg_Obj* type, const char* message) {
+		WASSERT_VOID(type);
+		wings::Wg_ObjRef ref(type);
+
+		Wg_Obj* msg = Wg_CreateString(type->context, message);
+		if (msg == nullptr) {
+			return;
+		}
+
+		// If exception creation was successful then set the exception.
+		// Otherwise the exception will already be set by some other code.
+		if (Wg_Obj* exceptionObject = Wg_Call(type, &msg, msg ? 1 : 0)) {
+			Wg_RaiseExceptionObject(exceptionObject);
+		}
+	}
+
+	void Wg_RaiseExceptionObject(Wg_Obj* exception) {
+		WASSERT_VOID(exception);
+		Wg_Context* context = exception->context;
+		if (Wg_IsInstance(exception, &context->builtins.baseException, 1)) {
+			context->currentException = exception;
+			context->exceptionTrace.clear();
+			for (const auto& frame : context->currentTrace)
+				context->exceptionTrace.push_back(frame.ToOwned());
+		} else {
+			Wg_RaiseException(context, WG_EXC_TYPEERROR, "exceptions must derive from BaseException");
+		}
+	}
+
+	void Wg_RaiseArgumentCountError(Wg_Context* context, int given, int expected) {
+		WASSERT_VOID(context && given >= 0 && expected >= -1);
+		std::string msg;
+		if (expected != -1) {
+			msg = "Function takes " +
+				std::to_string(expected) +
+				" argument(s) but " +
+				std::to_string(given) +
+				(given == 1 ? " was given" : " were given");
+		} else {
+			msg = "function does not take " +
+				std::to_string(given) +
+				" argument(s)";
+		}
+		Wg_RaiseException(context, WG_EXC_TYPEERROR, msg.c_str());
+	}
+
+	void Wg_RaiseArgumentTypeError(Wg_Context* context, int argIndex, const char* expected) {
+		WASSERT_VOID(context && argIndex >= 0 && expected);
+		std::string msg = "Argument " + std::to_string(argIndex + 1)
+			+ " Expected type " + expected;
+		Wg_RaiseException(context, WG_EXC_TYPEERROR, msg.c_str());
+	}
+
+	void Wg_RaiseAttributeError(const Wg_Obj* obj, const char* attribute) {
+		WASSERT_VOID(obj && attribute);
+		std::string msg = "'" + wings::WObjTypeToString(obj) +
+			"' object has no attribute '" + attribute + "'";
+		Wg_RaiseException(obj->context, WG_EXC_ATTRIBUTEERROR, msg.c_str());
+	}
+
+	void Wg_RaiseZeroDivisionError(Wg_Context* context) {
+		WASSERT_VOID(context);
+		Wg_RaiseException(context, WG_EXC_ZERODIVISIONERROR, "division by zero");
+	}
+
+	void Wg_RaiseIndexError(Wg_Context* context) {
+		WASSERT_VOID(context);
+		Wg_RaiseException(context, WG_EXC_INDEXERROR, "index out of range");
+	}
+
+	void Wg_RaiseKeyError(Wg_Context* context, Wg_Obj* key) {
+		WASSERT_VOID(context);
+
+		if (key == nullptr) {
+			Wg_RaiseException(context, WG_EXC_KEYERROR);
+		} else {
+			std::string s = "<exception str() failed>";
+			if (Wg_Obj* repr = Wg_UnaryOp(WG_UOP_REPR, key))
+				s = Wg_GetString(repr);
+			Wg_RaiseException(context, WG_EXC_KEYERROR, s.c_str());
+		}
+	}
+
+	void Wg_RaiseNameError(Wg_Context* context, const char* name) {
+		WASSERT_VOID(context && name);
+		std::string msg = "The name '";
+		msg += name;
+		msg += "' is not defined";
+		Wg_RaiseException(context, WG_EXC_NAMEERROR, msg.c_str());
+	}
+
+	void Wg_CollectGarbage(Wg_Context* context) {
+		WASSERT_VOID(context);
+
+		std::deque<const Wg_Obj*> inUse;
+		if (context->currentException)
+			inUse.push_back(context->currentException);
+		for (const auto& [obj, _] : context->protectedObjects)
+			inUse.push_back(obj);
+		for (auto& [_, globals] : context->globals)
+			for (auto& var : globals)
+				inUse.push_back(*var.second);
+		for (Wg_Obj* obj : context->kwargs)
+			if (obj)
+				inUse.push_back(obj);
+		for (auto& obj : context->builtins.GetAll())
+			if (obj)
+				inUse.push_back(obj);
+
+		// Recursively find objects in use
+		std::unordered_set<const Wg_Obj*> traversed;
+		while (inUse.size()) {
+			auto obj = inUse.back();
+			inUse.pop_back();
+			if (!traversed.contains(obj)) {
+				traversed.insert(obj);
+
+				if (Wg_IsTuple(obj) || Wg_IsList(obj)) {
+					inUse.insert(
+						inUse.end(),
+						obj->Get<std::vector<Wg_Obj*>>().begin(),
+						obj->Get<std::vector<Wg_Obj*>>().end()
+					);
+				} else if (Wg_IsDictionary(obj)) {
+					for (const auto& [key, value] : obj->Get<wings::WDict>()) {
+						inUse.push_back(key);
+						inUse.push_back(value);
+					}
+				} else if (Wg_IsSet(obj)) {
+					for (Wg_Obj* value : obj->Get<wings::WSet>()) {
+						inUse.push_back(value);
+					}
+				} else if (Wg_IsFunction(obj)) {
+					if (obj->Get<Wg_Obj::Func>().self) {
+						inUse.push_back(obj->Get<Wg_Obj::Func>().self);
+					}
+				} else if (Wg_IsClass(obj)) {
+					inUse.insert(
+						inUse.end(),
+						obj->Get<Wg_Obj::Class>().bases.begin(),
+						obj->Get<Wg_Obj::Class>().bases.end()
+					);
+					obj->Get<Wg_Obj::Class>().instanceAttributes.ForEach([&](auto& entry) {
+						inUse.push_back(entry);
+						});
+				}
+
+				obj->attributes.ForEach([&](auto& entry) {
+					inUse.push_back(entry);
+					});
+
+				for (Wg_Obj* child : obj->references) {
+					inUse.push_back(child);
+				}
+			}
+		}
+
+		// Call finalizers
+		for (auto& obj : context->mem)
+			if (obj->finalizer.fptr && !traversed.contains(obj.get()))
+				obj->finalizer.fptr(obj.get(), obj->finalizer.userdata);
+
+		// Remove unused objects
+		context->mem.erase(
+			std::remove_if(
+				context->mem.begin(),
+				context->mem.end(),
+				[&traversed](const auto& obj) { return !traversed.contains(obj.get()); }
+			),
+			context->mem.end()
+		);
+
+		context->lastObjectCountAfterGC = context->mem.size();
+	}
+
+	void Wg_ProtectObject(const Wg_Obj* obj) {
+		WASSERT_VOID(obj);
+		size_t& refCount = obj->context->protectedObjects[obj];
+		refCount++;
+	}
+
+	void Wg_UnprotectObject(const Wg_Obj* obj) {
+		WASSERT_VOID(obj);
+		auto it = obj->context->protectedObjects.find(obj);
+		WASSERT_VOID(it != obj->context->protectedObjects.end());
+		if (it->second == 1) {
+			obj->context->protectedObjects.erase(it);
+		} else {
+			it->second--;
+		}
+	}
+
+	void Wg_LinkReference(Wg_Obj* parent, Wg_Obj* child) {
+		WASSERT_VOID(parent && child);
+		parent->references.push_back(child);
+	}
+
+	void Wg_UnlinkReference(Wg_Obj* parent, Wg_Obj* child) {
+		WASSERT_VOID(parent && child);
+		auto it = std::find(
+			parent->references.begin(),
+			parent->references.end(),
+			child
+		);
+		WASSERT_VOID(it != parent->references.end());
+		parent->references.erase(it);
+	}
+
+} // extern "C"

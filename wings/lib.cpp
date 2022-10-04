@@ -1,13 +1,14 @@
-#include "impl.h"
-#include "gc.h"
+#include "lib.h"
+#include "common.h"
+
 #include <iostream>
 #include <sstream>
 #include <unordered_set>
-#include <cmath>
-#include <bit>
-#include <algorithm>
 #include <queue>
 #include <optional>
+#include <cmath>
+#include <algorithm>
+#include <bit>
 
 static const char* const LIBRARY_CODE = R"(
 class __DefaultIter:
@@ -385,7 +386,7 @@ static bool IterateRange(Wg_int start, Wg_int stop, Wg_int step, F f) {
 
 static bool AbsSlice(Wg_Obj* container, Wg_Obj* slice, Wg_int& start, Wg_int& stop, Wg_int& step) {
 	std::optional<Wg_int> size;
-	std::vector<wings::WObjRef> refs;
+	std::vector<wings::Wg_ObjRef> refs;
 	refs.emplace_back(container);
 	refs.emplace_back(slice);
 
@@ -702,7 +703,7 @@ namespace wings {
 
 			struct State {
 				std::vector<Wg_Obj*> v;
-				std::vector<WObjRef> refs;
+				std::vector<Wg_ObjRef> refs;
 			} s;
 			if (argc == 1) {
 				auto f = [](Wg_Obj* x, void* u) {
@@ -733,7 +734,7 @@ namespace wings {
 
 			struct State {
 				std::vector<Wg_Obj*> v;
-				std::vector<WObjRef> refs;
+				std::vector<Wg_ObjRef> refs;
 			} s;
 			if (argc == 2) {
 				auto f = [](Wg_Obj* x, void* u) {
@@ -775,7 +776,7 @@ namespace wings {
 					if (!Wg_Unpack(obj, kv, 2))
 						return false;
 
-					wings::WObjRef ref(kv[1]);
+					wings::Wg_ObjRef ref(kv[1]);
 					try {
 						((WDict*)ud)->operator[](kv[0]) = kv[1];
 					} catch (HashException&) {}
@@ -1269,7 +1270,7 @@ namespace wings {
 			EXPECT_ARG_COUNT(1);
 			EXPECT_ARG_TYPE_INT(0);
 
-			wuint n = (wuint)Wg_GetInt(argv[0]);
+			Wg_uint n = (Wg_uint)Wg_GetInt(argv[0]);
 			return Wg_CreateInt(context, (Wg_int)std::bit_width(n));
 		}
 
@@ -1277,7 +1278,7 @@ namespace wings {
 			EXPECT_ARG_COUNT(1);
 			EXPECT_ARG_TYPE_INT(0);
 
-			wuint n = (wuint)Wg_GetInt(argv[0]);
+			Wg_uint n = (Wg_uint)Wg_GetInt(argv[0]);
 			return Wg_CreateInt(context, (Wg_int)std::popcount(n));
 		}
 
@@ -1453,7 +1454,7 @@ namespace wings {
 				value = (base * value) + digitValueOf(*p, base);
 			}
 
-			if (value > std::numeric_limits<wuint>::max()) {
+			if (value > std::numeric_limits<Wg_uint>::max()) {
 				Wg_RaiseException(context, WG_EXC_OVERFLOWERROR, "Integer string is too large");
 				return nullptr;
 			}
@@ -2143,7 +2144,7 @@ namespace wings {
 			Wg_Obj* li = Wg_CreateList(context);
 			if (li == nullptr)
 				return nullptr;
-			WObjRef ref(li);
+			Wg_ObjRef ref(li);
 
 			for (const auto& s : strings) {
 				Wg_Obj* str = Wg_CreateString(context, s.c_str());
@@ -2169,7 +2170,7 @@ namespace wings {
 			Wg_Obj* li = Wg_CreateList(context);
 			if (li == nullptr)
 				return nullptr;
-			WObjRef ref(li);
+			Wg_ObjRef ref(li);
 
 			for (const auto& s : strings) {
 				Wg_Obj* str = Wg_CreateString(context, s.c_str());
@@ -2572,7 +2573,7 @@ namespace wings {
 			}
 
 			std::vector<Wg_Obj*> buf = argv[0]->Get<std::vector<Wg_Obj*>>();
-			std::vector<WObjRef> refs;
+			std::vector<Wg_ObjRef> refs;
 			for (Wg_Obj* v : buf)
 				refs.emplace_back(v);
 
@@ -2799,7 +2800,7 @@ namespace wings {
 				if (!Wg_Unpack(obj, kv, 2))
 					return false;
 				
-				WObjRef ref(kv[1]);
+				Wg_ObjRef ref(kv[1]);
 				try {
 					((Wg_Obj*)ud)->Get<WDict>()[kv[0]] = kv[1];
 				} catch (HashException&) {}
@@ -2971,7 +2972,7 @@ namespace wings {
 			EXPECT_ARG_TYPE_SET(0);
 
 			Wg_Obj* res = Wg_CreateSet(context);
-			WObjRef ref(res);
+			Wg_ObjRef ref(res);
 			
 			auto f = [](Wg_Obj* obj, void* ud) {
 				try {
@@ -2992,7 +2993,7 @@ namespace wings {
 			EXPECT_ARG_TYPE_SET(0);
 
 			Wg_Obj* res = Wg_CreateSet(context);
-			WObjRef ref(res);
+			Wg_ObjRef ref(res);
 
 			struct State {
 				Wg_Obj** other;
@@ -3028,7 +3029,7 @@ namespace wings {
 			EXPECT_ARG_TYPE_SET(0);
 
 			Wg_Obj* res = Wg_CreateSet(context);
-			WObjRef ref(res);
+			Wg_ObjRef ref(res);
 
 			struct State {
 				Wg_Obj** other;
@@ -3064,7 +3065,7 @@ namespace wings {
 			EXPECT_ARG_TYPE_SET(0);
 
 			Wg_Obj* res = Wg_CreateSet(context);
-			WObjRef ref(res);
+			Wg_ObjRef ref(res);
 
 			struct State {
 				Wg_Obj* other;
@@ -3495,7 +3496,7 @@ namespace wings {
 		return _class;
 	}
 
-	void InitLibrary(Wg_Context* context) {
+	bool LoadBuiltins(Wg_Context* context) {
 		try {
 			auto getGlobal = [&](const char* name) {
 				if (Wg_Obj* v = Wg_GetGlobal(context, name))
@@ -3885,5 +3886,6 @@ namespace wings {
 		} catch (LibraryInitException&) {
 			std::abort(); // Internal error
 		}
+		return true;
 	}
 } // namespace wings

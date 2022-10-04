@@ -1,5 +1,9 @@
 #pragma once
+#include "common.h"
 #include "exprparse.h"
+
+#include <string>
+#include <vector>
 #include <optional>
 #include <unordered_set>
 #include <memory>

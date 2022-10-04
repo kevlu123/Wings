@@ -1,5 +1,6 @@
 #include "compile.h"
-#include "impl.h"
+#include "common.h"
+
 #include <unordered_map>
 
 namespace wings {

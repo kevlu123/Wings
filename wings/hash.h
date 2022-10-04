@@ -1,11 +1,9 @@
 #pragma once
-//#include <unordered_map>
-//#include <unordered_set>
-#include <vector>
-#include <utility>
-#include <cstdlib>
+#include <stdint.h>
 #include <optional>
+#include <vector>
 #include <stdexcept>
+#include <utility>
 
 /*
 * The RelaxedSet and RelaxedMap are versions of std::unordered_set
@@ -24,8 +22,6 @@
 * If an exception is thrown from the hash or equality function,
 * the container if left unmodified.
 */
-
-struct Wg_Obj;
 
 namespace wings {
 
@@ -413,18 +409,4 @@ namespace wings {
 			return nullptr;
 		}
 	};
-
-	struct WObjHasher {
-		size_t operator()(Wg_Obj* obj) const;
-	};
-
-	struct WObjComparer {
-		bool operator()(Wg_Obj* lhs, Wg_Obj* rhs) const;
-	};
-
-	using WDict = RelaxedMap<Wg_Obj*, Wg_Obj*, WObjHasher, WObjComparer>;
-	using WSet = RelaxedSet<Wg_Obj*, WObjHasher, WObjComparer>;
-
-	//using WDict = std::unordered_map<Wg_Obj*, Wg_Obj*, WObjHasher, WObjComparer>;
-	//using WSet = std::unordered_set<Wg_Obj*, WObjHasher, WObjComparer>;
 }

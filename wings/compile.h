@@ -1,9 +1,12 @@
 #pragma once
-#include "parse.h"
 #include "wings.h"
+#include "parse.h"
 #include "rcptr.h"
+
+#include <string>
 #include <vector>
 #include <variant>
+#include <memory>
 
 namespace wings {
 	struct Instruction;

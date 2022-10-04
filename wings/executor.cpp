@@ -1,5 +1,5 @@
 #include "executor.h"
-#include "impl.h"
+#include "common.h"
 
 namespace wings {
 
@@ -28,12 +28,12 @@ namespace wings {
 
 		// Set kwargs
 		Wg_Obj* newKwargs = nullptr;
-		WObjRef ref;
+		Wg_ObjRef ref;
 		if (def->kwArgs.has_value()) {
 			newKwargs = Wg_CreateDictionary(context);
 			if (newKwargs == nullptr)
 				return nullptr;
-			ref = WObjRef(newKwargs);
+			ref = Wg_ObjRef(newKwargs);
 			executor.variables.insert({ def->kwArgs.value(), MakeRcPtr<Wg_Obj*>(newKwargs)});
 		}
 
@@ -198,9 +198,9 @@ namespace wings {
 			SetVariable(target.direct, value);
 			return value;
 		case AssignType::Pack: {
-			std::vector<WObjRef> values;
+			std::vector<Wg_ObjRef> values;
 			auto f = [](Wg_Obj* value, void* userdata) {
-				((std::vector<WObjRef>*)userdata)->emplace_back(value);
+				((std::vector<Wg_ObjRef>*)userdata)->emplace_back(value);
 				return true;
 			};
 
@@ -435,7 +435,7 @@ namespace wings {
 				for (size_t i = 0; i < argc / 2; i++) {
 					Wg_Obj* key = start[2 * i];
 					Wg_Obj* val = start[2 * i + 1];
-					WObjRef ref(dict);
+					Wg_ObjRef ref(dict);
 					try {
 						dict->Get<wings::WDict>()[key] = val;
 					} catch (HashException&) {
@@ -672,7 +672,7 @@ namespace wings {
 				exitValue = nullptr;
 				return;
 			}
-			WObjRef ref(list);
+			Wg_ObjRef ref(list);
 
 			struct State {
 				Wg_Obj* expr;

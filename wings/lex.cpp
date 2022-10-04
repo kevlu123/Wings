@@ -1,5 +1,5 @@
 #include "lex.h"
-#include "impl.h"
+
 #include <regex>
 #include <optional>
 #include <stack>
@@ -240,10 +240,10 @@ namespace wings {
 			t.type = Token::Type::Float;
 		} else {
 			// Is an int
-			if (value > std::numeric_limits<wuint>::max()) {
+			if (value > std::numeric_limits<Wg_uint>::max()) {
 				return CodeError::Bad("Integer literal is too large");
 			}
-			wuint u = (wuint)value;
+			Wg_uint u = (Wg_uint)value;
 			static_assert(sizeof(t.literal.i) == sizeof(u));
 			std::memcpy(&t.literal.i, &u, sizeof(u));
 			t.type = Token::Type::Int;

@@ -1,5 +1,7 @@
 #pragma once
+#include "common.h"
 #include "lex.h"
+
 #include <vector>
 #include <optional>
 #include <unordered_set>

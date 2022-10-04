@@ -1,11 +1,10 @@
 #pragma once
+#include "common.h"
+
 #include <vector>
 #include <string>
-#include "wings.h"
-#include "impl.h"
 
 namespace wings {
-
 	struct Token {
 		enum class Type {
 			Null,
@@ -44,5 +43,4 @@ namespace wings {
 	};
 
 	LexResult Lex(std::string code);
-
 }

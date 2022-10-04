@@ -7,6 +7,7 @@
 struct Wg_Context;
 struct Wg_Obj;
 typedef int64_t Wg_int;
+typedef uint64_t Wg_uint;
 typedef double Wg_float;
 
 typedef Wg_Obj* (*Wg_Function)(Wg_Context* context, Wg_Obj** args, int argc);
@@ -37,7 +38,7 @@ typedef struct Wg_Config {
 	void* printUserdata;
 } Wg_Config;
 
-enum Wg_UnOp {
+typedef enum Wg_UnOp {
 	WG_UOP_POS,			// __pos__
 	WG_UOP_NEG,			// __neg__
 	WG_UOP_BITNOT,		// __invert__
@@ -49,10 +50,10 @@ enum Wg_UnOp {
 	WG_UOP_FLOAT,		// __float__									(must return float)
 	WG_UOP_STR,			// __str__										(must return string)
 	WG_UOP_REPR,		// __repr__										(must return string)
-	WG_UOP_INDEX,		// __index__									(must return int)						(must return string)
-};
+	WG_UOP_INDEX,		// __index__									(must return int)
+} Wg_UnOp;
 
-enum Wg_BinOp {
+typedef enum Wg_BinOp {
 	WG_BOP_ADD,			// __add__
 	WG_BOP_SUB,			// __sub__
 	WG_BOP_MUL,			// __mul__
@@ -75,9 +76,9 @@ enum Wg_BinOp {
 	WG_BOP_LE,			// __le__										(must return bool)
 	WG_BOP_GT,			// __gt__										(must return bool)
 	WG_BOP_GE,			// __ge__										(must return bool)
-};
+} Wg_BinOp;
 
-enum Wg_Exc {
+typedef enum Wg_Exc {
 	WG_EXC_BASEEXCEPTION,
 	WG_EXC_SYSTEMEXIT,
 	WG_EXC_EXCEPTION,
@@ -98,7 +99,7 @@ enum Wg_Exc {
 	WG_EXC_SYNTAXERROR,
 	WG_EXC_TYPEERROR,
 	WG_EXC_VALUEERROR,
-};
+} Wg_Exc;
 
 #if defined(_WIN32) && defined(_WINDLL)
 #define WG_DLL_EXPORT __declspec(dllexport)
@@ -1038,6 +1039,15 @@ WG_DLL_EXPORT Wg_Obj* Wg_ImportFromModule(Wg_Context* context, const char* modul
 */
 WG_DLL_EXPORT bool Wg_ImportAllFromModule(Wg_Context* context, const char* module);
 
+/**
+* Set the directory to search in for modules.
+*
+* Remarks:
+* The directory separator at the end of the path is optional.
+*
+* @param context The relevant context.
+* @param path The path to set.
+*/
 WG_DLL_EXPORT void Wg_SetImportPath(Wg_Context* context, const char* path);
 
 #undef WG_DEFAULT_ARG

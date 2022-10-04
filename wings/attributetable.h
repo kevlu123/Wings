@@ -1,10 +1,11 @@
 #pragma once
-#include <string>
-#include <unordered_map>
-#include <cstdlib>
+#include "wings.h"
 #include "rcptr.h"
 
-struct Wg_Obj;
+#include <string>
+#include <vector>
+#include <unordered_map>
+#include <cstdlib>
 
 namespace wings {
 

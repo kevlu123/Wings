@@ -1,4 +1,6 @@
+#include "tests.h"
 #include "wings.h"
+
 #include <iostream>
 #include <string>
 
@@ -557,13 +559,15 @@ void TestSlices() {
 	F("print('12345'[:::])");
 }
 
-void RunTests() {
-	TestPrint();
-	TestConditional();
-	TestWhile();
-	TestExceptions();
-	TestStringMethods();
-	TestSlices();
+namespace wings {
+	void RunTests() {
+		TestPrint();
+		TestConditional();
+		TestWhile();
+		TestExceptions();
+		TestStringMethods();
+		TestSlices();
 
-	std::cout << testsPassed << "/" << testsRun << " tests passed." << std::endl << std::endl;
+		std::cout << testsPassed << "/" << testsRun << " tests passed." << std::endl << std::endl;
+	}
 }

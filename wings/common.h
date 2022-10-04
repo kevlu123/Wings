@@ -1,30 +1,42 @@
 #pragma once
-#include "rcptr.h"
 #include "wings.h"
-#include "attributetable.h"
+#include "rcptr.h"
 #include "hash.h"
+#include "attributetable.h"
+
 #include <string>
 #include <string_view>
 #include <vector>
 #include <deque>
 #include <stack>
-#include <unordered_set>
 #include <unordered_map>
 #include <array>
 #include <memory>
-#include <optional>
 #include <type_traits>
-#include <cstdlib> // std::abort
-
-using wuint = std::make_unsigned_t<Wg_int>;
-
-struct Wg_Context;
+#include <cstdlib>
+#include <mutex>
 
 namespace wings {
+	extern Wg_ErrorCallback errorCallback;
+	extern void* errorCallbackUserdata;
+	extern std::mutex errorCallbackMutex;
+	
 	size_t Guid();
-	void InitLibrary(Wg_Context* context);
 	std::string WObjTypeToString(const Wg_Obj* obj);
 	void CallErrorCallback(const char* message);
+	Wg_Obj* Alloc(Wg_Context* context);
+	void DestroyAllObjects(Wg_Context* context);
+	
+	struct WObjHasher {
+		size_t operator()(Wg_Obj* obj) const;
+	};
+
+	struct WObjComparer {
+		bool operator()(Wg_Obj* lhs, Wg_Obj* rhs) const;
+	};
+
+	using WDict = RelaxedMap<Wg_Obj*, Wg_Obj*, WObjHasher, WObjComparer>;
+	using WSet = RelaxedSet<Wg_Obj*, WObjHasher, WObjComparer>;
 
 	struct SourcePosition {
 		size_t line = (size_t)-1;
@@ -61,14 +73,14 @@ namespace wings {
 
 	struct HashException : public std::exception {};
 
-	struct WObjRef {
-		WObjRef() : obj(nullptr) {}
-		explicit WObjRef(Wg_Obj* obj) : obj(obj) { if (obj) Wg_ProtectObject(obj); }
-		explicit WObjRef(WObjRef&& other) noexcept : obj(other.obj) { other.obj = nullptr; }
-		WObjRef& operator=(WObjRef&& other) noexcept { obj = other.obj; other.obj = nullptr; return *this; }
-		WObjRef(const WObjRef&) = delete;
-		WObjRef& operator=(const WObjRef&) = delete;
-		~WObjRef() { if (obj) Wg_UnprotectObject(obj); }
+	struct Wg_ObjRef {
+		Wg_ObjRef() : obj(nullptr) {}
+		explicit Wg_ObjRef(Wg_Obj* obj) : obj(obj) { if (obj) Wg_ProtectObject(obj); }
+		explicit Wg_ObjRef(Wg_ObjRef&& other) noexcept : obj(other.obj) { other.obj = nullptr; }
+		Wg_ObjRef& operator=(Wg_ObjRef&& other) noexcept { obj = other.obj; other.obj = nullptr; return *this; }
+		Wg_ObjRef(const Wg_ObjRef&) = delete;
+		Wg_ObjRef& operator=(const Wg_ObjRef&) = delete;
+		~Wg_ObjRef() { if (obj) Wg_UnprotectObject(obj); }
 		Wg_Obj* Get() const { return obj; }
 	private:
 		Wg_Obj* obj;
@@ -177,7 +189,7 @@ struct Wg_Obj {
 	std::string type;
 	union {
 		void* data;
-		
+
 		// For debugging only
 		bool* _bool;
 		Wg_int* _int;
