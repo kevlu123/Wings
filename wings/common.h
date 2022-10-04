@@ -59,8 +59,9 @@ namespace wings {
 	struct OwnedTraceFrame {
 		SourcePosition srcPos;
 		std::string lineText;
-		std::string tag;
+		std::string module;
 		std::string func;
+		bool syntaxError;
 	};
 
 	struct TraceFrame {
@@ -68,8 +69,9 @@ namespace wings {
 		std::string_view lineText;
 		std::string_view module;
 		std::string_view func;
+		bool syntaxError = false;
 		OwnedTraceFrame ToOwned() const {
-			return { srcPos, lineText.data(), module.data(), func.data() };
+			return { srcPos, lineText.data(), module.data(), func.data(), syntaxError };
 		}
 	};
 
@@ -164,8 +166,7 @@ namespace wings {
 			};
 		}
 	};
-
-	constexpr const char* DEFAULT_TAG_NAME = "<unnamed>";
+	
 	constexpr const char* DEFAULT_FUNC_NAME = "<unnamed>";
 }
 

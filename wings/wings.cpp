@@ -91,11 +91,16 @@ extern "C" {
 		auto originalSource = wings::MakeRcPtr<std::vector<std::string>>(lexResult.originalSource);
 
 		auto raiseException = [&](const wings::CodeError& error) {
+			std::string_view lineText;
+			if (error.srcPos.line < originalSource->size()) {
+				lineText = (*originalSource)[error.srcPos.line];
+			}
 			context->currentTrace.push_back(wings::TraceFrame{
 				error.srcPos,
-				error.srcPos.line < originalSource->size() ? (*originalSource)[error.srcPos.line] : "",
+				lineText,
 				module,
-				prettyName
+				prettyName,
+				true
 				});
 
 			Wg_RaiseException(context, WG_EXC_SYNTAXERROR, error.message.c_str());
@@ -1159,16 +1164,14 @@ extern "C" {
 		ss << "Traceback (most recent call last):\n";
 
 		for (const auto& frame : context->exceptionTrace) {
-			if (frame.tag == "__builtins__")
+			if (frame.module == "__builtins__")
 				continue;
 
 			ss << "  ";
 			bool written = false;
-
-			if (frame.tag != wings::DEFAULT_TAG_NAME) {
-				ss << "Module " << frame.tag;
-				written = true;
-			}
+			
+			ss << "Module " << frame.module;
+			written = true;
 
 			if (frame.srcPos.line != (size_t)-1) {
 				if (written) ss << ", ";
@@ -1189,8 +1192,8 @@ extern "C" {
 
 				size_t skip = lineText.find_first_not_of(' ');
 				ss << "    " << (lineText.c_str() + skip) << "\n";
-				//if (skip <= frame.srcPos.column)
-				//    ss << std::string(frame.srcPos.column + 4 - skip, ' ') << "^\n";
+				if (frame.syntaxError && skip <= frame.srcPos.column)
+				    ss << std::string(frame.srcPos.column + 4 - skip, ' ') << "^\n";
 			}
 		}
 
