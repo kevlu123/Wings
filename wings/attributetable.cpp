@@ -31,11 +31,7 @@ namespace wings {
 	}
 
 	void AttributeTable::Set(const std::string& name, Wg_Obj* value) {
-		if (!owned) {
-			attributes = MakeRcPtr<Table>(*attributes);
-			owned = true;
-		}
-
+		Mutate();
 		attributes->entries[name] = value;
 	}
 
@@ -50,7 +46,10 @@ namespace wings {
 		return copy;
 	}
 
-	bool AttributeTable::Empty() const {
-		return attributes->entries.empty() && attributes->parents.empty();
+	void AttributeTable::Mutate() {
+		if (!owned) {
+			attributes = MakeRcPtr<Table>(*attributes);
+			owned = true;
+		}
 	}
 }

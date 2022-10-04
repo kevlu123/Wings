@@ -341,21 +341,6 @@ WG_DLL_EXPORT Wg_Obj* Wg_GetGlobal(Wg_Context* context, const char* name);
 WG_DLL_EXPORT void Wg_SetGlobal(Wg_Context* context, const char* name, Wg_Obj* value);
 
 /**
-* Delete a global variable.
-*
-* Remarks:
-* This function only unbinds a value from a global name
-* and does not free the associated value nor call __del__().
-* If the previously bound value has no references, Wg_CollectGarbage()
-* can be used to destroy the object and free the memory.
-* 
-* @param context The relevant context.
-* @param name A null terminated ASCII string containing the name of the
-*        global variable to set.
-*/
-WG_DLL_EXPORT void Wg_DeleteGlobal(Wg_Context* context, const char* name);
-
-/**
 * Print a message.
 * 
 * Remarks:
@@ -775,19 +760,6 @@ WG_DLL_EXPORT Wg_Obj* Wg_GetAttribute(Wg_Obj* obj, const char* member);
 * @param value The value to set the attribute to.
 */
 WG_DLL_EXPORT void Wg_SetAttribute(Wg_Obj* obj, const char* member, Wg_Obj* value);
-
-/**
-* Delete an attribute of an object.
-* 
-* remarks:
-* If the attribute does not exist, an AttributeError is raised.
-* Call Wg_GetCurrentException() or Wg_GetErrorMessage() to get error information.
-*
-* @param obj The object to delete the attribute from.
-* @param member A null terminated ASCII string containing the attribute name to delete.
-* @return True if the attribute was found, otherwise false.
-*/
-WG_DLL_EXPORT bool Wg_DeleteAttribute(Wg_Obj* obj, const char* member);
 
 /**
 * Get an attribute from the base class of an object.

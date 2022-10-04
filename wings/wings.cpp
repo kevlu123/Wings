@@ -191,16 +191,6 @@ extern "C" {
 		}
 	}
 
-	void Wg_DeleteGlobal(Wg_Context* context, const char* name) {
-		WG_ASSERT_VOID(context && name && wings::IsValidIdentifier(name));
-		const auto& module = std::string(context->currentModule.top());
-		auto& globals = context->globals.at(module);
-		auto it = globals.find(name);
-		if (it != globals.end()) {
-			globals.erase(it);
-		}
-	}
-
 	void Wg_RegisterModule(Wg_Context* context, const char* name, Wg_ModuleLoader loader) {
 		WG_ASSERT_VOID(context && name && loader && wings::IsValidIdentifier(name));
 		context->moduleLoaders.insert({ std::string(name), loader });
@@ -729,18 +719,6 @@ extern "C" {
 			mem->Get<Wg_Obj::Func>().self = obj;
 		}
 		return mem;
-	}
-
-	bool Wg_DeleteAttribute(Wg_Obj* obj, const char* member) {
-		std::abort(); // TODO
-		//WG_ASSERT(obj && member && wings::IsValidIdentifier(member));
-		//Wg_Obj* mem = obj->attributes.Delete(member);
-		//if (mem == nullptr) {
-		//	Wg_RaiseAttributeError(obj, member);
-		//} else if (Wg_IsFunction(mem) && mem->Get<Wg_Obj::Func>().isMethod) {
-		//	mem->Get<Wg_Obj::Func>().self = obj;
-		//}
-		//return mem;
 	}
 
 	Wg_Obj* Wg_GetAttribute(Wg_Obj* obj, const char* member) {

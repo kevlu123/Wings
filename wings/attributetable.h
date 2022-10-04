@@ -11,21 +11,27 @@ namespace wings {
 
 	struct AttributeTable {
 		AttributeTable();
+		AttributeTable(const AttributeTable&) = delete;
+		AttributeTable(AttributeTable&&) = default;
+		AttributeTable& operator=(const AttributeTable&) = delete;
+		AttributeTable& operator=(AttributeTable&&) = default;
+		
 		Wg_Obj* Get(const std::string& name) const;
-		void Set(const std::string& name, Wg_Obj* value);
 		Wg_Obj* GetFromBase(const std::string& name) const;
+		void Set(const std::string& name, Wg_Obj* value);
+		
 		void AddParent(AttributeTable& parent);
 		AttributeTable Copy();
-		bool Empty() const;
 		template <class Fn> void ForEach(Fn fn) const;
-	private:
+	private:		
 		struct Table {
-			std::unordered_map<std::string, Wg_Obj*> entries;
-			std::vector<RcPtr<Table>> parents;
-
 			Wg_Obj* Get(const std::string& name) const;
 			template <class Fn> void ForEach(Fn fn) const;
+			std::unordered_map<std::string, Wg_Obj*> entries;
+			std::vector<RcPtr<Table>> parents;
 		};
+
+		void Mutate();
 
 		RcPtr<Table> attributes;
 		bool owned;

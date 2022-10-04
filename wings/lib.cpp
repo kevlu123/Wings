@@ -3323,14 +3323,6 @@ namespace wings {
 			return Wg_Call(context->builtins.codeObject, &fn, 1);
 		}
 
-		static Wg_Obj* delattr(Wg_Context* context, Wg_Obj** argv, int argc) {
-			EXPECT_ARG_COUNT(2);
-			EXPECT_ARG_TYPE_STRING(1);
-
-			const char* name = Wg_GetString(argv[1]);
-			return Wg_DeleteAttribute(argv[0], name) ? Wg_CreateNone(context) : nullptr;
-		}
-
 		static Wg_Obj* eval(Wg_Context* context, Wg_Obj** argv, int argc) {
 			EXPECT_ARG_COUNT(1);
 			
@@ -3831,7 +3823,6 @@ namespace wings {
 			RegisterFunction<lib::callable>(context, "callable");
 			RegisterFunction<lib::chr>(context, "chr");
 			RegisterFunction<lib::compile>(context, "compile");
-			RegisterFunction<lib::delattr>(context, "delattr");
 			RegisterFunction<lib::eval>(context, "eval");
 			RegisterFunction<lib::exec>(context, "exec");
 			RegisterFunction<lib::getattr>(context, "getattr");
