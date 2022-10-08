@@ -145,7 +145,7 @@ extern "C" {
 		func.fptr = &wings::DefObject::Run;
 		func.userdata = def;
 		func.prettyName = wings::DEFAULT_FUNC_NAME;
-		Wg_Obj* obj = Wg_CreateFunction(context, &func);
+		Wg_Obj* obj = Wg_NewFunction(context, &func);
 		if (obj == nullptr) {
 			delete def;
 			return nullptr;
@@ -314,12 +314,12 @@ extern "C" {
 			context->importPath += "/";
 	}
 
-	Wg_Obj* Wg_CreateNone(Wg_Context* context) {
+	Wg_Obj* Wg_None(Wg_Context* context) {
 		WG_ASSERT(context);
 		return context->builtins.none;
 	}
 
-	Wg_Obj* Wg_CreateBool(Wg_Context* context, bool value) {
+	Wg_Obj* Wg_NewBool(Wg_Context* context, bool value) {
 		WG_ASSERT(context);
 		if (value && context->builtins._true) {
 			return context->builtins._true;
@@ -330,7 +330,7 @@ extern "C" {
 		}
 	}
 
-	Wg_Obj* Wg_CreateInt(Wg_Context* context, Wg_int value) {
+	Wg_Obj* Wg_NewInt(Wg_Context* context, Wg_int value) {
 		WG_ASSERT(context);
 		if (Wg_Obj* v = Wg_Call(context->builtins._int, nullptr, 0)) {
 			v->Get<Wg_int>() = value;
@@ -340,7 +340,7 @@ extern "C" {
 		}
 	}
 
-	Wg_Obj* Wg_CreateFloat(Wg_Context* context, Wg_float value) {
+	Wg_Obj* Wg_NewFloat(Wg_Context* context, Wg_float value) {
 		WG_ASSERT(context);
 		if (Wg_Obj* v = Wg_Call(context->builtins._float, nullptr, 0)) {
 			v->Get<Wg_float>() = value;
@@ -350,7 +350,7 @@ extern "C" {
 		}
 	}
 
-	Wg_Obj* Wg_CreateString(Wg_Context* context, const char* value) {
+	Wg_Obj* Wg_NewString(Wg_Context* context, const char* value) {
 		WG_ASSERT(context);
 		if (Wg_Obj* v = Wg_Call(context->builtins.str, nullptr, 0)) {
 			v->Get<std::string>() = value ? value : "";
@@ -360,7 +360,7 @@ extern "C" {
 		}
 	}
 
-	Wg_Obj* Wg_CreateTuple(Wg_Context* context, Wg_Obj** argv, int argc) {
+	Wg_Obj* Wg_NewTuple(Wg_Context* context, Wg_Obj** argv, int argc) {
 		std::vector<wings::Wg_ObjRef> refs;
 		WG_ASSERT(context && argc >= 0);
 		if (argc > 0) {
@@ -379,7 +379,7 @@ extern "C" {
 		}
 	}
 
-	Wg_Obj* Wg_CreateList(Wg_Context* context, Wg_Obj** argv, int argc) {
+	Wg_Obj* Wg_NewList(Wg_Context* context, Wg_Obj** argv, int argc) {
 		std::vector<wings::Wg_ObjRef> refs;
 		WG_ASSERT(context && argc >= 0);
 		if (argc > 0) {
@@ -398,7 +398,7 @@ extern "C" {
 		}
 	}
 
-	Wg_Obj* Wg_CreateDictionary(Wg_Context* context, Wg_Obj** keys, Wg_Obj** values, int argc) {
+	Wg_Obj* Wg_NewDictionary(Wg_Context* context, Wg_Obj** keys, Wg_Obj** values, int argc) {
 		std::vector<wings::Wg_ObjRef> refs;
 		WG_ASSERT(context && argc >= 0);
 		if (argc > 0) {
@@ -433,7 +433,7 @@ extern "C" {
 		}
 	}
 
-	Wg_Obj* Wg_CreateSet(Wg_Context* context, Wg_Obj** argv, int argc) {
+	Wg_Obj* Wg_NewSet(Wg_Context* context, Wg_Obj** argv, int argc) {
 		std::vector<wings::Wg_ObjRef> refs;
 		WG_ASSERT(context && argc >= 0);
 		if (argc > 0) {
@@ -458,7 +458,7 @@ extern "C" {
 		}
 	}
 
-	Wg_Obj* Wg_CreateFunction(Wg_Context* context, const Wg_FuncDesc* value) {
+	Wg_Obj* Wg_NewFunction(Wg_Context* context, const Wg_FuncDesc* value) {
 		WG_ASSERT(context && value);
 		if (Wg_Obj* v = Wg_Call(context->builtins.func, nullptr, 0)) {
 			v->Get<Wg_Obj::Func>() = {
@@ -475,7 +475,7 @@ extern "C" {
 		}
 	}
 
-	Wg_Obj* Wg_CreateClass(Wg_Context* context, const char* name, Wg_Obj** bases, int baseCount) {
+	Wg_Obj* Wg_NewClass(Wg_Context* context, const char* name, Wg_Obj** bases, int baseCount) {
 		std::vector<wings::Wg_ObjRef> refs;
 		WG_ASSERT(context && name && baseCount >= 0);
 		if (baseCount > 0) {
@@ -506,7 +506,7 @@ extern "C" {
 			_class->Get<Wg_Obj::Class>().instanceAttributes.AddParent(actualBases[i]->Get<Wg_Obj::Class>().instanceAttributes);
 			_class->Get<Wg_Obj::Class>().bases.push_back(actualBases[i]);
 		}
-		if (Wg_Obj* basesTuple = Wg_CreateTuple(context, actualBases, actualBaseCount)) {
+		if (Wg_Obj* basesTuple = Wg_NewTuple(context, actualBases, actualBaseCount)) {
 			_class->attributes.Set("__bases__", basesTuple);
 		} else {
 			return nullptr;
@@ -523,9 +523,9 @@ extern "C" {
 				return nullptr;
 			}
 			std::string s = "<class '" + argv[0]->Get<Wg_Obj::Class>().name + "'>";
-			return Wg_CreateString(argv[0]->context, s.c_str());
+			return Wg_NewString(argv[0]->context, s.c_str());
 		};
-		if (Wg_Obj* tostrFn = Wg_CreateFunction(context, &tostr)) {
+		if (Wg_Obj* tostrFn = Wg_NewFunction(context, &tostr)) {
 			Wg_SetAttribute(_class, "__str__", tostrFn);
 		} else {
 			return nullptr;
@@ -594,9 +594,9 @@ extern "C" {
 				}
 			}
 
-			return Wg_CreateNone(context);
+			return Wg_None(context);
 		};
-		Wg_Obj* initFn = Wg_CreateFunction(context, &init);
+		Wg_Obj* initFn = Wg_NewFunction(context, &init);
 		if (initFn == nullptr)
 			return nullptr;
 		Wg_LinkReference(initFn, _class);
@@ -851,7 +851,7 @@ extern "C" {
 	Wg_Obj* Wg_GetKwargs(Wg_Context* context) {
 		WG_ASSERT(context && !context->kwargs.empty());
 		if (context->kwargs.back() == nullptr) {
-			context->kwargs.back() = Wg_CreateDictionary(context);
+			context->kwargs.back() = Wg_NewDictionary(context);
 		}
 		return context->kwargs.back();
 	}
@@ -973,7 +973,7 @@ extern "C" {
 		wings::Wg_ObjRef ref(kwargs);
 		auto& buf = kwargs->Get<wings::WDict>();
 		for (int i = 0; i < count; i++) {
-			Wg_Obj* key = Wg_CreateString(kwargs->context, keys[i]);
+			Wg_Obj* key = Wg_NewString(kwargs->context, keys[i]);
 			if (key == nullptr)
 				return false;
 
@@ -1249,7 +1249,7 @@ extern "C" {
 		WG_ASSERT_VOID(type);
 		wings::Wg_ObjRef ref(type);
 
-		Wg_Obj* msg = Wg_CreateString(type->context, message);
+		Wg_Obj* msg = Wg_NewString(type->context, message);
 		if (msg == nullptr) {
 			return;
 		}

@@ -15,7 +15,7 @@ namespace wings {
 
 		// Create local variables
 		for (const auto& localVar : def->localVariables) {
-			Wg_Obj* null = Wg_CreateNone(def->context);
+			Wg_Obj* null = Wg_None(def->context);
 			executor.variables.insert({ localVar, MakeRcPtr<Wg_Obj*>(null) });
 		}
 
@@ -30,7 +30,7 @@ namespace wings {
 		Wg_Obj* newKwargs = nullptr;
 		Wg_ObjRef ref;
 		if (def->kwArgs.has_value()) {
-			newKwargs = Wg_CreateDictionary(context);
+			newKwargs = Wg_NewDictionary(context);
 			if (newKwargs == nullptr)
 				return nullptr;
 			ref = Wg_ObjRef(newKwargs);
@@ -73,7 +73,7 @@ namespace wings {
 		// Set positional args
 		Wg_Obj* listArgs = nullptr;
 		if (def->listArgs.has_value()) {
-			listArgs = Wg_CreateTuple(context, nullptr, 0);
+			listArgs = Wg_NewTuple(context, nullptr, 0);
 			if (listArgs == nullptr)
 				return nullptr;
 			executor.variables.insert({ def->listArgs.value(), MakeRcPtr<Wg_Obj*>(listArgs) });
@@ -219,7 +219,7 @@ namespace wings {
 			std::vector<Wg_Obj*> buf;
 			for (const auto& v : values)
 				buf.push_back(v.Get());
-			return Wg_CreateTuple(context, buf.data(), (int)buf.size());
+			return Wg_NewTuple(context, buf.data(), (int)buf.size());
 		}
 		default:
 			WG_UNREACHABLE();
@@ -274,7 +274,7 @@ namespace wings {
 		if (exitValue.has_value()) {
 			return exitValue.value();
 		} else {
-			return Wg_CreateNone(context);
+			return Wg_None(context);
 		}
 	}
 
@@ -324,7 +324,7 @@ namespace wings {
 					def->captures.insert({ capture, variables[capture] });
 				} else {
 					if (!globals.contains(capture))
-						Wg_SetGlobal(context, capture.c_str(), Wg_CreateNone(context));
+						Wg_SetGlobal(context, capture.c_str(), Wg_None(context));
 					
 					def->captures.insert({ capture, globals.at(capture) });
 				}
@@ -339,7 +339,7 @@ namespace wings {
 			func.userdata = def;
 			func.isMethod = instr.def->isMethod;
 			func.prettyName = instr.def->prettyName.c_str();
-			Wg_Obj* obj = Wg_CreateFunction(context, &func);
+			Wg_Obj* obj = Wg_NewFunction(context, &func);
 			if (obj == nullptr) {
 				delete def;
 				exitValue = nullptr;
@@ -366,7 +366,7 @@ namespace wings {
 			Wg_Obj** bases = stackEnd - baseCount;
 			Wg_Obj** methods = stackEnd - methodCount - baseCount;
 
-			Wg_Obj* _class = Wg_CreateClass(context, instr._class->prettyName.c_str(), bases, (int)baseCount);
+			Wg_Obj* _class = Wg_NewClass(context, instr._class->prettyName.c_str(), bases, (int)baseCount);
 			if (_class == nullptr) {
 				exitValue = nullptr;
 				return;
@@ -388,15 +388,15 @@ namespace wings {
 		case Instruction::Type::Literal: {
 			Wg_Obj* value{};
 			if (auto* n = std::get_if<std::nullptr_t>(instr.literal.get())) {
-				value = Wg_CreateNone(context);
+				value = Wg_None(context);
 			} else if (auto* b = std::get_if<bool>(instr.literal.get())) {
-				value = Wg_CreateBool(context, *b);
+				value = Wg_NewBool(context, *b);
 			} else if (auto* i = std::get_if<Wg_int>(instr.literal.get())) {
-				value = Wg_CreateInt(context, *i);
+				value = Wg_NewInt(context, *i);
 			} else if (auto* f = std::get_if<Wg_float>(instr.literal.get())) {
-				value = Wg_CreateFloat(context, *f);
+				value = Wg_NewFloat(context, *f);
 			} else if (auto* s = std::get_if<std::string>(instr.literal.get())) {
-				value = Wg_CreateString(context, s->c_str());
+				value = Wg_NewString(context, s->c_str());
 			} else {
 				WG_UNREACHABLE();
 			}
@@ -413,9 +413,9 @@ namespace wings {
 		case Instruction::Type::Set: {
 			Wg_Obj* (*creator)(Wg_Context*, Wg_Obj**, int) = nullptr;
 			switch (instr.type) {
-			case Instruction::Type::Tuple: creator = Wg_CreateTuple; break;
-			case Instruction::Type::List: creator = Wg_CreateList; break;
-			case Instruction::Type::Set: creator = Wg_CreateSet; break;
+			case Instruction::Type::Tuple: creator = Wg_NewTuple; break;
+			case Instruction::Type::List: creator = Wg_NewList; break;
+			case Instruction::Type::Set: creator = Wg_NewSet; break;
 			}
 			size_t argc = PopArgFrame();
 			Wg_Obj** argv = stack.data() + stack.size() - argc;
@@ -429,7 +429,7 @@ namespace wings {
 			break;
 		}
 		case Instruction::Type::Map:
-			if (Wg_Obj* dict = Wg_CreateDictionary(context)) {
+			if (Wg_Obj* dict = Wg_NewDictionary(context)) {
 				size_t argc = PopArgFrame();
 				Wg_Obj** start = stack.data() + stack.size() - argc;
 				for (size_t i = 0; i < argc / 2; i++) {
@@ -486,7 +486,7 @@ namespace wings {
 			Wg_Obj** args = stack.data() + stack.size() - argc - kwargc;
 			Wg_Obj** kwargsv = stack.data() + stack.size() - kwargc;
 
-			Wg_Obj* kwargs = Wg_CreateDictionary(context, kwargsStack.top().data(), kwargsv, (int)kwargc);
+			Wg_Obj* kwargs = Wg_NewDictionary(context, kwargsStack.top().data(), kwargsv, (int)kwargc);
 			if (kwargs == nullptr) {
 				exitValue = nullptr;
 				return;
@@ -570,7 +570,7 @@ namespace wings {
 
 			if (!Wg_GetBool(arg1)) {
 				// Short circuit
-				if (Wg_Obj* value = Wg_CreateBool(context, false)) {
+				if (Wg_Obj* value = Wg_NewBool(context, false)) {
 					PushStack(value);
 				} else {
 					exitValue = nullptr;
@@ -584,7 +584,7 @@ namespace wings {
 				break;
 			}
 			
-			if (Wg_Obj* value = Wg_CreateBool(context, Wg_GetBool(arg2))) {
+			if (Wg_Obj* value = Wg_NewBool(context, Wg_GetBool(arg2))) {
 				PushStack(value);
 			} else {
 				exitValue = nullptr;
@@ -600,7 +600,7 @@ namespace wings {
 
 			if (Wg_GetBool(arg1)) {
 				// Short circuit
-				if (Wg_Obj* value = Wg_CreateBool(context, true)) {
+				if (Wg_Obj* value = Wg_NewBool(context, true)) {
 					PushStack(value);
 				} else {
 					exitValue = nullptr;
@@ -614,7 +614,7 @@ namespace wings {
 				break;
 			}
 
-			if (Wg_Obj* value = Wg_CreateBool(context, Wg_GetBool(arg2))) {
+			if (Wg_Obj* value = Wg_NewBool(context, Wg_GetBool(arg2))) {
 				PushStack(value);
 			} else {
 				exitValue = nullptr;
@@ -628,7 +628,7 @@ namespace wings {
 				break;
 			}
 
-			if (Wg_Obj* value = Wg_CreateBool(context, !Wg_GetBool(arg))) {
+			if (Wg_Obj* value = Wg_NewBool(context, !Wg_GetBool(arg))) {
 				PushStack(value);
 			} else {
 				exitValue = nullptr;
@@ -656,10 +656,10 @@ namespace wings {
 			break;
 		}
 		case Instruction::Type::Is:
-			PushStack(Wg_CreateBool(context, PopStack() == PopStack()));
+			PushStack(Wg_NewBool(context, PopStack() == PopStack()));
 			break;
 		case Instruction::Type::IsNot:
-			PushStack(Wg_CreateBool(context, PopStack() != PopStack()));
+			PushStack(Wg_NewBool(context, PopStack() != PopStack()));
 			break;
 		case Instruction::Type::ListComprehension: {
 			Wg_Obj* expr = stack[stack.size() - 4];
@@ -667,7 +667,7 @@ namespace wings {
 			Wg_Obj* iterable = stack[stack.size() - 2];
 			Wg_Obj* condition = stack[stack.size() - 1];
 
-			Wg_Obj* list = Wg_CreateList(context);
+			Wg_Obj* list = Wg_NewList(context);
 			if (list == nullptr) {
 				exitValue = nullptr;
 				return;

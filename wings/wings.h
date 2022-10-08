@@ -414,27 +414,22 @@ WG_DLL_EXPORT void Wg_UnlinkReference(Wg_Obj* parent, Wg_Obj* child);
 /**
 * Get the None singleton value.
 * 
-* Remarks:
-* Unlike the other WCreateXXX() functions, this function always succeeds
-* since None is a singleton value which is already allocated.
-* 
 * @param context The relevant context.
-* @return The None singleton value.
+* @return The None singleton object.
 */
-WG_DLL_EXPORT Wg_Obj* Wg_CreateNone(Wg_Context* context);
+WG_DLL_EXPORT Wg_Obj* Wg_None(Wg_Context* context);
 
 /**
 * Instantiate a boolean object.
 * 
 * Remarks:
-* Unlike the other WCreateXXX() functions, this function always succeeds
-* due to interning.
+* Unlike the other Wg_NewXXX() functions, this function always succeeds due to interning.
 * 
 * @param context The relevant context.
 * @param value The value of the object.
 * @return The instantiated object.
 */
-WG_DLL_EXPORT Wg_Obj* Wg_CreateBool(Wg_Context* context, bool value WG_DEFAULT_ARG(false));
+WG_DLL_EXPORT Wg_Obj* Wg_NewBool(Wg_Context* context, bool value WG_DEFAULT_ARG(false));
 
 /**
 * Instantiate an integer object.
@@ -446,7 +441,7 @@ WG_DLL_EXPORT Wg_Obj* Wg_CreateBool(Wg_Context* context, bool value WG_DEFAULT_A
 * @param value The value of the object.
 * @return The instantiated object, or nullptr on failure.
 */
-WG_DLL_EXPORT Wg_Obj* Wg_CreateInt(Wg_Context* context, Wg_int value WG_DEFAULT_ARG(0));
+WG_DLL_EXPORT Wg_Obj* Wg_NewInt(Wg_Context* context, Wg_int value WG_DEFAULT_ARG(0));
 
 /**
 * Instantiate a float object.
@@ -458,7 +453,7 @@ WG_DLL_EXPORT Wg_Obj* Wg_CreateInt(Wg_Context* context, Wg_int value WG_DEFAULT_
 * @param value The value of the object.
 * @return The instantiated object, or nullptr on failure.
 */
-WG_DLL_EXPORT Wg_Obj* Wg_CreateFloat(Wg_Context* context, Wg_float value WG_DEFAULT_ARG(0));
+WG_DLL_EXPORT Wg_Obj* Wg_NewFloat(Wg_Context* context, Wg_float value WG_DEFAULT_ARG(0));
 
 /**
 * Instantiate a string object.
@@ -470,7 +465,7 @@ WG_DLL_EXPORT Wg_Obj* Wg_CreateFloat(Wg_Context* context, Wg_float value WG_DEFA
 * @param value A null terminated ASCII string, or nullptr for an empty string.
 * @return The instantiated object, or nullptr on failure.
 */
-WG_DLL_EXPORT Wg_Obj* Wg_CreateString(Wg_Context* context, const char* value WG_DEFAULT_ARG(nullptr));
+WG_DLL_EXPORT Wg_Obj* Wg_NewString(Wg_Context* context, const char* value WG_DEFAULT_ARG(nullptr));
 
 /**
 * Instantiate a tuple object.
@@ -484,7 +479,7 @@ WG_DLL_EXPORT Wg_Obj* Wg_CreateString(Wg_Context* context, const char* value WG_
 * @param argc The number of objects to initialise the tuple with.
 * @return The instantiated object, or nullptr on failure.
 */
-WG_DLL_EXPORT Wg_Obj* Wg_CreateTuple(Wg_Context* context, Wg_Obj** argv, int argc);
+WG_DLL_EXPORT Wg_Obj* Wg_NewTuple(Wg_Context* context, Wg_Obj** argv, int argc);
 
 /**
 * Instantiate a list object.
@@ -498,7 +493,7 @@ WG_DLL_EXPORT Wg_Obj* Wg_CreateTuple(Wg_Context* context, Wg_Obj** argv, int arg
 * @param argc The number of objects to initialise the list with.
 * @return The instantiated object, or nullptr on failure.
 */
-WG_DLL_EXPORT Wg_Obj* Wg_CreateList(Wg_Context* context, Wg_Obj** argv WG_DEFAULT_ARG(nullptr), int argc WG_DEFAULT_ARG(0));
+WG_DLL_EXPORT Wg_Obj* Wg_NewList(Wg_Context* context, Wg_Obj** argv WG_DEFAULT_ARG(nullptr), int argc WG_DEFAULT_ARG(0));
 
 /**
 * Instantiate a dictionary object.
@@ -514,7 +509,7 @@ WG_DLL_EXPORT Wg_Obj* Wg_CreateList(Wg_Context* context, Wg_Obj** argv WG_DEFAUL
 * @param argc The number of key value pairs to initialise the dictionary with.
 * @return The instantiated object, or nullptr on failure.
 */
-WG_DLL_EXPORT Wg_Obj* Wg_CreateDictionary(Wg_Context* context, Wg_Obj** keys WG_DEFAULT_ARG(nullptr), Wg_Obj** values WG_DEFAULT_ARG(nullptr), int argc WG_DEFAULT_ARG(0));
+WG_DLL_EXPORT Wg_Obj* Wg_NewDictionary(Wg_Context* context, Wg_Obj** keys WG_DEFAULT_ARG(nullptr), Wg_Obj** values WG_DEFAULT_ARG(nullptr), int argc WG_DEFAULT_ARG(0));
 
 /**
 * Instantiate a set object.
@@ -528,7 +523,7 @@ WG_DLL_EXPORT Wg_Obj* Wg_CreateDictionary(Wg_Context* context, Wg_Obj** keys WG_
 * @param argc The number of objects to initialise the set with.
 * @return The instantiated object, or nullptr on failure.
 */
-WG_DLL_EXPORT Wg_Obj* Wg_CreateSet(Wg_Context* context, Wg_Obj** argv WG_DEFAULT_ARG(nullptr), int argc WG_DEFAULT_ARG(0));
+WG_DLL_EXPORT Wg_Obj* Wg_NewSet(Wg_Context* context, Wg_Obj** argv WG_DEFAULT_ARG(nullptr), int argc WG_DEFAULT_ARG(0));
 
 /**
 * Instantiate a function object.
@@ -540,7 +535,7 @@ WG_DLL_EXPORT Wg_Obj* Wg_CreateSet(Wg_Context* context, Wg_Obj** argv WG_DEFAULT
 * @param value A function description.
 * @return The instantiated object, or nullptr on failure.
 */
-WG_DLL_EXPORT Wg_Obj* Wg_CreateFunction(Wg_Context* context, const Wg_FuncDesc* value);
+WG_DLL_EXPORT Wg_Obj* Wg_NewFunction(Wg_Context* context, const Wg_FuncDesc* value);
 
 /**
 * Instantiate a class object.
@@ -557,7 +552,7 @@ WG_DLL_EXPORT Wg_Obj* Wg_CreateFunction(Wg_Context* context, const Wg_FuncDesc* 
 * @param baseCount The length of the bases array.
 * @return The instantiated object, or nullptr on failure.
 */
-WG_DLL_EXPORT Wg_Obj* Wg_CreateClass(Wg_Context* context, const char* name, Wg_Obj** bases, int baseCount);
+WG_DLL_EXPORT Wg_Obj* Wg_NewClass(Wg_Context* context, const char* name, Wg_Obj** bases, int baseCount);
 
 /**
 * Add an attribute to a class.

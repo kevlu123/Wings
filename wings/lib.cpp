@@ -650,7 +650,7 @@ namespace wings {
 			argv[0]->data = new Wg_int(v);
 			argv[0]->finalizer.fptr = [](Wg_Obj* obj, void*) { delete (Wg_int*)obj->data; };
 
-			return Wg_CreateNone(context);
+			return Wg_None(context);
 		}
 
 		static Wg_Obj* _float(Wg_Context* context, Wg_Obj** argv, int argc) {
@@ -673,7 +673,7 @@ namespace wings {
 			argv[0]->data = new Wg_float(v);
 			argv[0]->finalizer.fptr = [](Wg_Obj* obj, void*) { delete (Wg_float*)obj->data; };
 
-			return Wg_CreateNone(context);
+			return Wg_None(context);
 		}
 
 		static Wg_Obj* str(Wg_Context* context, Wg_Obj** argv, int argc) {
@@ -695,7 +695,7 @@ namespace wings {
 			argv[0]->data = new std::string(v);
 			argv[0]->finalizer.fptr = [](Wg_Obj* obj, void*) { delete (std::string*)obj->data; };
 
-			return Wg_CreateNone(context);
+			return Wg_None(context);
 		}
 
 		static Wg_Obj* tuple(Wg_Context* context, Wg_Obj** argv, int argc) { // Excludes self
@@ -753,7 +753,7 @@ namespace wings {
 			argv[0]->data = new std::vector<Wg_Obj*>(std::move(s.v));
 			argv[0]->finalizer.fptr = [](Wg_Obj* obj, void*) { delete (std::vector<Wg_Obj*>*)obj->data; };
 
-			return Wg_CreateNone(context);
+			return Wg_None(context);
 		}
 
 		static Wg_Obj* map(Wg_Context* context, Wg_Obj** argv, int argc) {
@@ -795,7 +795,7 @@ namespace wings {
 				}
 			}
 
-			return Wg_CreateNone(context);
+			return Wg_None(context);
 		}
 
 		static Wg_Obj* set(Wg_Context* context, Wg_Obj** argv, int argc) {
@@ -820,7 +820,7 @@ namespace wings {
 					return nullptr;
 			}
 
-			return Wg_CreateNone(context);
+			return Wg_None(context);
 		}
 
 		static Wg_Obj* func(Wg_Context* context, Wg_Obj** argv, int argc) { // Excludes self
@@ -842,10 +842,10 @@ namespace wings {
 			EXPECT_ARG_COUNT_BETWEEN(1, 2);
 			if (argc == 2) {
 				Wg_SetAttribute(argv[0], "_message", argv[1]);
-				return Wg_CreateNone(context);
-			} else if (Wg_Obj* msg = Wg_CreateString(context)) {
+				return Wg_None(context);
+			} else if (Wg_Obj* msg = Wg_NewString(context)) {
 				Wg_SetAttribute(argv[0], "_message", msg);
-				return Wg_CreateNone(context);
+				return Wg_None(context);
 			} else {
 				return nullptr;
 			}
@@ -858,7 +858,7 @@ namespace wings {
 			Wg_SetUserdata(argv[0], it);
 			argv[0]->finalizer.fptr = [](Wg_Obj* obj, void*) { delete (WDict::iterator*)obj->data; };
 			Wg_LinkReference(argv[0], argv[1]);
-			return Wg_CreateNone(context);
+			return Wg_None(context);
 		}
 
 		static Wg_Obj* SetIter(Wg_Context* context, Wg_Obj** argv, int argc) {
@@ -868,7 +868,7 @@ namespace wings {
 			Wg_SetUserdata(argv[0], it);
 			argv[0]->finalizer.fptr = [](Wg_Obj* obj, void*) { delete (WSet::iterator*)obj->data; };
 			Wg_LinkReference(argv[0], argv[1]);
-			return Wg_CreateNone(context);
+			return Wg_None(context);
 		}
 		
 	} // namespace ctors
@@ -878,12 +878,12 @@ namespace wings {
 		static Wg_Obj* object_str(Wg_Context* context, Wg_Obj** argv, int argc) {
 			EXPECT_ARG_COUNT(1);
 			std::string s = "<" + WObjTypeToString(argv[0]) + " object at 0x" + PtrToString(argv[0]) + ">";
-			return Wg_CreateString(context, s.c_str());
+			return Wg_NewString(context, s.c_str());
 		}
 
 		static Wg_Obj* object_nonzero(Wg_Context* context, Wg_Obj** argv, int argc) {
 			EXPECT_ARG_COUNT(1);
-			return Wg_CreateBool(context, true);
+			return Wg_NewBool(context, true);
 		}
 
 		static Wg_Obj* object_repr(Wg_Context* context, Wg_Obj** argv, int argc) {
@@ -893,7 +893,7 @@ namespace wings {
 
 		static Wg_Obj* object_eq(Wg_Context* context, Wg_Obj** argv, int argc) {
 			EXPECT_ARG_COUNT(2);
-			return Wg_CreateBool(context, argv[0] == argv[1]);
+			return Wg_NewBool(context, argv[0] == argv[1]);
 		}
 
 		static Wg_Obj* object_ne(Wg_Context* context, Wg_Obj** argv, int argc) {
@@ -901,7 +901,7 @@ namespace wings {
 			Wg_Obj* eq = Wg_BinaryOp(WG_BOP_EQ, argv[0], argv[1]);
 			if (eq == nullptr)
 				return nullptr;
-			return Wg_CreateBool(context, !Wg_GetBool(eq));
+			return Wg_NewBool(context, !Wg_GetBool(eq));
 		}
 
 		static Wg_Obj* object_le(Wg_Context* context, Wg_Obj** argv, int argc) {
@@ -910,7 +910,7 @@ namespace wings {
 			if (lt == nullptr)
 				return nullptr;
 			if (Wg_GetBool(lt))
-				return Wg_CreateBool(context, true);			
+				return Wg_NewBool(context, true);			
 			return Wg_BinaryOp(WG_BOP_EQ, argv[0], argv[1]);
 		}
 
@@ -919,7 +919,7 @@ namespace wings {
 			Wg_Obj* lt = Wg_BinaryOp(WG_BOP_LT, argv[0], argv[1]);
 			if (lt == nullptr)
 				return nullptr;
-			return Wg_CreateBool(context, !Wg_GetBool(lt));
+			return Wg_NewBool(context, !Wg_GetBool(lt));
 		}
 
 		static Wg_Obj* object_gt(Wg_Context* context, Wg_Obj** argv, int argc) {
@@ -928,18 +928,18 @@ namespace wings {
 			if (lt == nullptr)
 				return nullptr;
 			if (Wg_GetBool(lt))
-				return Wg_CreateBool(context, false);
+				return Wg_NewBool(context, false);
 
 			Wg_Obj* eq = Wg_BinaryOp(WG_BOP_EQ, argv[0], argv[1]);
 			if (eq == nullptr)
 				return nullptr;
-			return Wg_CreateBool(context, !Wg_GetBool(eq));
+			return Wg_NewBool(context, !Wg_GetBool(eq));
 		}
 
 		static Wg_Obj* object_hash(Wg_Context* context, Wg_Obj** argv, int argc) {
 			EXPECT_ARG_COUNT(1);
 			Wg_int hash = (Wg_int)std::hash<Wg_Obj*>()(argv[0]);
-			return Wg_CreateInt(context, hash);
+			return Wg_NewInt(context, hash);
 		}
 
 		static Wg_Obj* object_iadd(Wg_Context* context, Wg_Obj** argv, int argc) {
@@ -1015,81 +1015,81 @@ namespace wings {
 		static Wg_Obj* null_nonzero(Wg_Context* context, Wg_Obj** argv, int argc) {
 			EXPECT_ARG_COUNT(1);
 			EXPECT_ARG_TYPE_NULL(0);
-			return Wg_CreateNone(context);
+			return Wg_None(context);
 		}
 
 		static Wg_Obj* null_str(Wg_Context* context, Wg_Obj** argv, int argc) {
 			EXPECT_ARG_COUNT(1);
 			EXPECT_ARG_TYPE_NULL(0);
-			return Wg_CreateString(context, "None");
+			return Wg_NewString(context, "None");
 		}
 
 		static Wg_Obj* bool_int(Wg_Context* context, Wg_Obj** argv, int argc) {
 			EXPECT_ARG_COUNT(1);
 			EXPECT_ARG_TYPE_BOOL(0);
-			return Wg_CreateInt(context, Wg_GetBool(argv[0]) ? 1 : 0);
+			return Wg_NewInt(context, Wg_GetBool(argv[0]) ? 1 : 0);
 		}
 
 		static Wg_Obj* bool_float(Wg_Context* context, Wg_Obj** argv, int argc) {
 			EXPECT_ARG_COUNT(1);
 			EXPECT_ARG_TYPE_BOOL(0);
-			return Wg_CreateFloat(context, Wg_GetBool(argv[0]) ? (Wg_float)1 : (Wg_float)0);
+			return Wg_NewFloat(context, Wg_GetBool(argv[0]) ? (Wg_float)1 : (Wg_float)0);
 		}
 
 		static Wg_Obj* bool_str(Wg_Context* context, Wg_Obj** argv, int argc) {
 			EXPECT_ARG_COUNT(1);
 			EXPECT_ARG_TYPE_BOOL(0);
-			return Wg_CreateString(context, Wg_GetBool(argv[0]) ? "True" : "False");
+			return Wg_NewString(context, Wg_GetBool(argv[0]) ? "True" : "False");
 		}
 
 		static Wg_Obj* bool_eq(Wg_Context* context, Wg_Obj** argv, int argc) {
 			EXPECT_ARG_COUNT(2);
 			EXPECT_ARG_TYPE_BOOL(0);
-			return Wg_CreateBool(context, Wg_IsBool(argv[1]) && Wg_GetBool(argv[0]) == Wg_GetBool(argv[1]));
+			return Wg_NewBool(context, Wg_IsBool(argv[1]) && Wg_GetBool(argv[0]) == Wg_GetBool(argv[1]));
 		}
 
 		static Wg_Obj* bool_hash(Wg_Context* context, Wg_Obj** argv, int argc) {
 			EXPECT_ARG_COUNT(1);
 			EXPECT_ARG_TYPE_BOOL(0);
 			Wg_int hash = (Wg_int)std::hash<bool>()(Wg_GetBool(argv[0]));
-			return Wg_CreateInt(context, hash);
+			return Wg_NewInt(context, hash);
 		}
 
 		static Wg_Obj* bool_abs(Wg_Context* context, Wg_Obj** argv, int argc) {
 			EXPECT_ARG_COUNT(1);
 			EXPECT_ARG_TYPE_BOOL(0);
-			return Wg_CreateInt(context, Wg_GetBool(argv[0]) ? 1 : 0);
+			return Wg_NewInt(context, Wg_GetBool(argv[0]) ? 1 : 0);
 		}
 
 		static Wg_Obj* int_nonzero(Wg_Context* context, Wg_Obj** argv, int argc) {
 			EXPECT_ARG_COUNT(1);
 			EXPECT_ARG_TYPE_INT(0);
-			return Wg_CreateBool(context, Wg_GetInt(argv[0]) != 0);
+			return Wg_NewBool(context, Wg_GetInt(argv[0]) != 0);
 		}
 
 		static Wg_Obj* int_float(Wg_Context* context, Wg_Obj** argv, int argc) {
 			EXPECT_ARG_COUNT(1);
 			EXPECT_ARG_TYPE_INT(0);
-			return Wg_CreateFloat(context, Wg_GetFloat(argv[0]));
+			return Wg_NewFloat(context, Wg_GetFloat(argv[0]));
 		}
 
 		static Wg_Obj* int_str(Wg_Context* context, Wg_Obj** argv, int argc) {
 			EXPECT_ARG_COUNT(1);
 			EXPECT_ARG_TYPE_INT(0);
-			return Wg_CreateString(context, std::to_string(argv[0]->Get<Wg_int>()).c_str());
+			return Wg_NewString(context, std::to_string(argv[0]->Get<Wg_int>()).c_str());
 		}
 
 		static Wg_Obj* int_eq(Wg_Context* context, Wg_Obj** argv, int argc) {
 			EXPECT_ARG_COUNT(2);
 			EXPECT_ARG_TYPE_INT(0);
-			return Wg_CreateBool(context, Wg_IsInt(argv[1]) && Wg_GetInt(argv[0]) == Wg_GetInt(argv[1]));
+			return Wg_NewBool(context, Wg_IsInt(argv[1]) && Wg_GetInt(argv[0]) == Wg_GetInt(argv[1]));
 		}
 
 		static Wg_Obj* int_lt(Wg_Context* context, Wg_Obj** argv, int argc) {
 			EXPECT_ARG_COUNT(2);
 			EXPECT_ARG_TYPE_INT(0);
 			EXPECT_ARG_TYPE_INT_OR_FLOAT(1);
-			return Wg_CreateBool(context, Wg_GetFloat(argv[0]) < Wg_GetFloat(argv[1]));
+			return Wg_NewBool(context, Wg_GetFloat(argv[0]) < Wg_GetFloat(argv[1]));
 		}
 
 		static Wg_Obj* int_hash(Wg_Context* context, Wg_Obj** argv, int argc) {
@@ -1097,19 +1097,19 @@ namespace wings {
 			EXPECT_ARG_TYPE_INT(0);
 			//Wg_int hash = (Wg_int)std::hash<Wg_int>()(Wg_GetInt(argv[0]));
 			Wg_int hash = Wg_GetInt(argv[0]);
-			return Wg_CreateInt(context, hash);
+			return Wg_NewInt(context, hash);
 		}
 
 		static Wg_Obj* int_abs(Wg_Context* context, Wg_Obj** argv, int argc) {
 			EXPECT_ARG_COUNT(1);
 			EXPECT_ARG_TYPE_INT(0);
-			return Wg_CreateInt(context, std::abs(Wg_GetInt(argv[0])));
+			return Wg_NewInt(context, std::abs(Wg_GetInt(argv[0])));
 		}
 
 		static Wg_Obj* int_neg(Wg_Context* context, Wg_Obj** argv, int argc) {
 			EXPECT_ARG_COUNT(1);
 			EXPECT_ARG_TYPE_INT(0);
-			return Wg_CreateInt(context, -Wg_GetInt(argv[0]));
+			return Wg_NewInt(context, -Wg_GetInt(argv[0]));
 		}
 
 		static Wg_Obj* int_add(Wg_Context* context, Wg_Obj** argv, int argc) {
@@ -1117,9 +1117,9 @@ namespace wings {
 			EXPECT_ARG_TYPE_INT(0);
 			EXPECT_ARG_TYPE_INT_OR_FLOAT(1);
 			if (Wg_IsInt(argv[1])) {
-				return Wg_CreateInt(context, Wg_GetInt(argv[0]) + Wg_GetInt(argv[1]));
+				return Wg_NewInt(context, Wg_GetInt(argv[0]) + Wg_GetInt(argv[1]));
 			} else {
-				return Wg_CreateFloat(context, Wg_GetFloat(argv[0]) + Wg_GetFloat(argv[1]));
+				return Wg_NewFloat(context, Wg_GetFloat(argv[0]) + Wg_GetFloat(argv[1]));
 			}
 		}
 
@@ -1128,9 +1128,9 @@ namespace wings {
 			EXPECT_ARG_TYPE_INT(0);
 			EXPECT_ARG_TYPE_INT_OR_FLOAT(1);
 			if (Wg_IsInt(argv[1])) {
-				return Wg_CreateInt(context, Wg_GetInt(argv[0]) - Wg_GetInt(argv[1]));
+				return Wg_NewInt(context, Wg_GetInt(argv[0]) - Wg_GetInt(argv[1]));
 			} else {
-				return Wg_CreateFloat(context, Wg_GetFloat(argv[0]) - Wg_GetFloat(argv[1]));
+				return Wg_NewFloat(context, Wg_GetFloat(argv[0]) - Wg_GetFloat(argv[1]));
 			}
 		}
 
@@ -1143,11 +1143,11 @@ namespace wings {
 				std::string s;
 				for (Wg_int i = 0; i < multiplier; i++)
 					s += Wg_GetString(argv[1]);
-				return Wg_CreateString(context, s.c_str());
+				return Wg_NewString(context, s.c_str());
 			} else if (Wg_IsInt(argv[1])) {
-				return Wg_CreateInt(context, Wg_GetInt(argv[0]) * Wg_GetInt(argv[1]));
+				return Wg_NewInt(context, Wg_GetInt(argv[0]) * Wg_GetInt(argv[1]));
 			} else if (Wg_IsIntOrFloat(argv[1])) {
-				return Wg_CreateFloat(context, Wg_GetFloat(argv[0]) * Wg_GetFloat(argv[1]));
+				return Wg_NewFloat(context, Wg_GetFloat(argv[0]) * Wg_GetFloat(argv[1]));
 			} else {
 				EXPECT_ARG_TYPE_INT_OR_FLOAT(1);
 				return nullptr;
@@ -1163,7 +1163,7 @@ namespace wings {
 				Wg_RaiseException(context, WG_EXC_ZERODIVISIONERROR);
 				return nullptr;
 			}
-			return Wg_CreateFloat(context, Wg_GetFloat(argv[0]) / Wg_GetFloat(argv[1]));
+			return Wg_NewFloat(context, Wg_GetFloat(argv[0]) / Wg_GetFloat(argv[1]));
 		}
 
 		static Wg_Obj* int_floordiv(Wg_Context* context, Wg_Obj** argv, int argc) {
@@ -1177,9 +1177,9 @@ namespace wings {
 			}
 
 			if (Wg_IsInt(argv[1])) {
-				return Wg_CreateInt(context, (Wg_int)std::floor(Wg_GetFloat(argv[0]) / Wg_GetFloat(argv[1])));
+				return Wg_NewInt(context, (Wg_int)std::floor(Wg_GetFloat(argv[0]) / Wg_GetFloat(argv[1])));
 			} else {
-				return Wg_CreateFloat(context, std::floor(Wg_GetFloat(argv[0]) / Wg_GetFloat(argv[1])));
+				return Wg_NewFloat(context, std::floor(Wg_GetFloat(argv[0]) / Wg_GetFloat(argv[1])));
 			}
 		}
 
@@ -1198,9 +1198,9 @@ namespace wings {
 				Wg_int m = Wg_GetInt(argv[0]) % mod;
 				if (m < 0)
 					m += mod;
-				return Wg_CreateInt(context, m);
+				return Wg_NewInt(context, m);
 			} else {
-				return Wg_CreateFloat(context, std::fmod(Wg_GetFloat(argv[0]), Wg_GetFloat(argv[1])));
+				return Wg_NewFloat(context, std::fmod(Wg_GetFloat(argv[0]), Wg_GetFloat(argv[1])));
 			}
 		}
 
@@ -1208,34 +1208,34 @@ namespace wings {
 			EXPECT_ARG_COUNT(2);
 			EXPECT_ARG_TYPE_INT(0);
 			EXPECT_ARG_TYPE_INT_OR_FLOAT(1);
-			return Wg_CreateFloat(context, std::pow(Wg_GetFloat(argv[0]), Wg_GetFloat(argv[1])));
+			return Wg_NewFloat(context, std::pow(Wg_GetFloat(argv[0]), Wg_GetFloat(argv[1])));
 		}
 
 		static Wg_Obj* int_and(Wg_Context* context, Wg_Obj** argv, int argc) {
 			EXPECT_ARG_COUNT(2);
 			EXPECT_ARG_TYPE_INT(0);
 			EXPECT_ARG_TYPE_INT(1);
-			return Wg_CreateInt(context, Wg_GetInt(argv[0]) & Wg_GetInt(argv[1]));
+			return Wg_NewInt(context, Wg_GetInt(argv[0]) & Wg_GetInt(argv[1]));
 		}
 
 		static Wg_Obj* int_or(Wg_Context* context, Wg_Obj** argv, int argc) {
 			EXPECT_ARG_COUNT(2);
 			EXPECT_ARG_TYPE_INT(0);
 			EXPECT_ARG_TYPE_INT(1);
-			return Wg_CreateInt(context, Wg_GetInt(argv[0]) | Wg_GetInt(argv[1]));
+			return Wg_NewInt(context, Wg_GetInt(argv[0]) | Wg_GetInt(argv[1]));
 		}
 
 		static Wg_Obj* int_xor(Wg_Context* context, Wg_Obj** argv, int argc) {
 			EXPECT_ARG_COUNT(2);
 			EXPECT_ARG_TYPE_INT(0);
 			EXPECT_ARG_TYPE_INT(1);
-			return Wg_CreateInt(context, Wg_GetInt(argv[0]) ^ Wg_GetInt(argv[1]));
+			return Wg_NewInt(context, Wg_GetInt(argv[0]) ^ Wg_GetInt(argv[1]));
 		}
 
 		static Wg_Obj* int_invert(Wg_Context* context, Wg_Obj** argv, int argc) {
 			EXPECT_ARG_COUNT(1);
 			EXPECT_ARG_TYPE_INT(0);
-			return Wg_CreateInt(context, ~Wg_GetInt(argv[0]));
+			return Wg_NewInt(context, ~Wg_GetInt(argv[0]));
 		}
 
 		static Wg_Obj* int_lshift(Wg_Context* context, Wg_Obj** argv, int argc) {
@@ -1249,7 +1249,7 @@ namespace wings {
 				return nullptr;
 			}
 			shift = std::min(shift, (Wg_int)sizeof(Wg_int) * 8);
-			return Wg_CreateInt(context, Wg_GetInt(argv[0]) << shift);
+			return Wg_NewInt(context, Wg_GetInt(argv[0]) << shift);
 		}
 
 		static Wg_Obj* int_rshift(Wg_Context* context, Wg_Obj** argv, int argc) {
@@ -1263,7 +1263,7 @@ namespace wings {
 				return nullptr;
 			}
 			shift = std::min(shift, (Wg_int)sizeof(Wg_int) * 8);
-			return Wg_CreateInt(context, Wg_GetInt(argv[0]) >> shift);
+			return Wg_NewInt(context, Wg_GetInt(argv[0]) >> shift);
 		}
 
 		static Wg_Obj* int_bit_length(Wg_Context* context, Wg_Obj** argv, int argc) {
@@ -1271,7 +1271,7 @@ namespace wings {
 			EXPECT_ARG_TYPE_INT(0);
 
 			Wg_uint n = (Wg_uint)Wg_GetInt(argv[0]);
-			return Wg_CreateInt(context, (Wg_int)std::bit_width(n));
+			return Wg_NewInt(context, (Wg_int)std::bit_width(n));
 		}
 
 		static Wg_Obj* int_bit_count(Wg_Context* context, Wg_Obj** argv, int argc) {
@@ -1279,19 +1279,19 @@ namespace wings {
 			EXPECT_ARG_TYPE_INT(0);
 
 			Wg_uint n = (Wg_uint)Wg_GetInt(argv[0]);
-			return Wg_CreateInt(context, (Wg_int)std::popcount(n));
+			return Wg_NewInt(context, (Wg_int)std::popcount(n));
 		}
 
 		static Wg_Obj* float_nonzero(Wg_Context* context, Wg_Obj** argv, int argc) {
 			EXPECT_ARG_COUNT(1);
 			EXPECT_ARG_TYPE_INT_OR_FLOAT(0);
-			return Wg_CreateBool(context, Wg_GetFloat(argv[0]) != 0);
+			return Wg_NewBool(context, Wg_GetFloat(argv[0]) != 0);
 		}
 
 		static Wg_Obj* float_int(Wg_Context* context, Wg_Obj** argv, int argc) {
 			EXPECT_ARG_COUNT(1);
 			EXPECT_ARG_TYPE_INT_OR_FLOAT(0);
-			return Wg_CreateInt(context, (Wg_int)Wg_GetFloat(argv[0]));
+			return Wg_NewInt(context, (Wg_int)Wg_GetFloat(argv[0]));
 		}
 
 		static Wg_Obj* float_str(Wg_Context* context, Wg_Obj** argv, int argc) {
@@ -1301,88 +1301,88 @@ namespace wings {
 			s.erase(s.find_last_not_of('0') + 1, std::string::npos);
 			if (s.ends_with('.'))
 				s.push_back('0');
-			return Wg_CreateString(context, s.c_str());
+			return Wg_NewString(context, s.c_str());
 		}
 
 		static Wg_Obj* float_eq(Wg_Context* context, Wg_Obj** argv, int argc) {
 			EXPECT_ARG_COUNT(2);
 			EXPECT_ARG_TYPE_INT_OR_FLOAT(0);
-			return Wg_CreateBool(context, Wg_IsIntOrFloat(argv[1]) && Wg_GetFloat(argv[0]) == Wg_GetFloat(argv[1]));
+			return Wg_NewBool(context, Wg_IsIntOrFloat(argv[1]) && Wg_GetFloat(argv[0]) == Wg_GetFloat(argv[1]));
 		}
 
 		static Wg_Obj* float_lt(Wg_Context* context, Wg_Obj** argv, int argc) {
 			EXPECT_ARG_COUNT(2);
 			EXPECT_ARG_TYPE_INT_OR_FLOAT(0);
 			EXPECT_ARG_TYPE_INT_OR_FLOAT(1);
-			return Wg_CreateBool(context, Wg_GetFloat(argv[0]) < Wg_GetFloat(argv[1]));
+			return Wg_NewBool(context, Wg_GetFloat(argv[0]) < Wg_GetFloat(argv[1]));
 		}
 
 		static Wg_Obj* float_hash(Wg_Context* context, Wg_Obj** argv, int argc) {
 			EXPECT_ARG_COUNT(1);
 			EXPECT_ARG_TYPE_FLOAT(0);
 			Wg_int hash = (Wg_int)std::hash<Wg_float>()(Wg_GetFloat(argv[0]));
-			return Wg_CreateInt(context, hash);
+			return Wg_NewInt(context, hash);
 		}
 
 		static Wg_Obj* float_abs(Wg_Context* context, Wg_Obj** argv, int argc) {
 			EXPECT_ARG_COUNT(1);
 			EXPECT_ARG_TYPE_FLOAT(0);
-			return Wg_CreateFloat(context, std::abs(Wg_GetFloat(argv[0])));
+			return Wg_NewFloat(context, std::abs(Wg_GetFloat(argv[0])));
 		}
 
 		static Wg_Obj* float_neg(Wg_Context* context, Wg_Obj** argv, int argc) {
 			EXPECT_ARG_COUNT(1);
 			EXPECT_ARG_TYPE_INT_OR_FLOAT(0);
-			return Wg_CreateFloat(context, -Wg_GetFloat(argv[0]));
+			return Wg_NewFloat(context, -Wg_GetFloat(argv[0]));
 		}
 
 		static Wg_Obj* float_add(Wg_Context* context, Wg_Obj** argv, int argc) {
 			EXPECT_ARG_COUNT(2);
 			EXPECT_ARG_TYPE_INT_OR_FLOAT(0);
 			EXPECT_ARG_TYPE_INT_OR_FLOAT(1);
-			return Wg_CreateFloat(context, Wg_GetFloat(argv[0]) + Wg_GetFloat(argv[1]));
+			return Wg_NewFloat(context, Wg_GetFloat(argv[0]) + Wg_GetFloat(argv[1]));
 		}
 
 		static Wg_Obj* float_sub(Wg_Context* context, Wg_Obj** argv, int argc) {
 			EXPECT_ARG_COUNT(2);
 			EXPECT_ARG_TYPE_INT_OR_FLOAT(0);
 			EXPECT_ARG_TYPE_INT_OR_FLOAT(1);
-			return Wg_CreateFloat(context, Wg_GetFloat(argv[0]) - Wg_GetFloat(argv[1]));
+			return Wg_NewFloat(context, Wg_GetFloat(argv[0]) - Wg_GetFloat(argv[1]));
 		}
 
 		static Wg_Obj* float_mul(Wg_Context* context, Wg_Obj** argv, int argc) {
 			EXPECT_ARG_COUNT(2);
 			EXPECT_ARG_TYPE_INT_OR_FLOAT(0);
 			EXPECT_ARG_TYPE_INT_OR_FLOAT(1);
-			return Wg_CreateFloat(context, Wg_GetFloat(argv[0]) * Wg_GetFloat(argv[1]));
+			return Wg_NewFloat(context, Wg_GetFloat(argv[0]) * Wg_GetFloat(argv[1]));
 		}
 
 		static Wg_Obj* float_truediv(Wg_Context* context, Wg_Obj** argv, int argc) {
 			EXPECT_ARG_COUNT(2);
 			EXPECT_ARG_TYPE_INT_OR_FLOAT(0);
 			EXPECT_ARG_TYPE_INT_OR_FLOAT(1);
-			return Wg_CreateFloat(context, Wg_GetFloat(argv[0]) / Wg_GetFloat(argv[1]));
+			return Wg_NewFloat(context, Wg_GetFloat(argv[0]) / Wg_GetFloat(argv[1]));
 		}
 
 		static Wg_Obj* float_floordiv(Wg_Context* context, Wg_Obj** argv, int argc) {
 			EXPECT_ARG_COUNT(2);
 			EXPECT_ARG_TYPE_INT_OR_FLOAT(0);
 			EXPECT_ARG_TYPE_INT_OR_FLOAT(1);
-			return Wg_CreateFloat(context, std::floor(Wg_GetFloat(argv[0]) / Wg_GetFloat(argv[1])));
+			return Wg_NewFloat(context, std::floor(Wg_GetFloat(argv[0]) / Wg_GetFloat(argv[1])));
 		}
 
 		static Wg_Obj* float_mod(Wg_Context* context, Wg_Obj** argv, int argc) {
 			EXPECT_ARG_COUNT(2);
 			EXPECT_ARG_TYPE_INT_OR_FLOAT(0);
 			EXPECT_ARG_TYPE_INT_OR_FLOAT(1);
-			return Wg_CreateFloat(context, std::fmod(Wg_GetFloat(argv[0]), Wg_GetFloat(argv[1])));
+			return Wg_NewFloat(context, std::fmod(Wg_GetFloat(argv[0]), Wg_GetFloat(argv[1])));
 		}
 
 		static Wg_Obj* float_pow(Wg_Context* context, Wg_Obj** argv, int argc) {
 			EXPECT_ARG_COUNT(2);
 			EXPECT_ARG_TYPE_INT_OR_FLOAT(0);
 			EXPECT_ARG_TYPE_INT_OR_FLOAT(1);
-			return Wg_CreateFloat(context, std::pow(Wg_GetFloat(argv[0]), Wg_GetFloat(argv[1])));
+			return Wg_NewFloat(context, std::pow(Wg_GetFloat(argv[0]), Wg_GetFloat(argv[1])));
 		}
 
 		static Wg_Obj* float_is_integer(Wg_Context* context, Wg_Obj** argv, int argc) {
@@ -1390,14 +1390,14 @@ namespace wings {
 			EXPECT_ARG_TYPE_FLOAT(0);
 
 			Wg_float f = Wg_GetFloat(argv[0]);
-			return Wg_CreateBool(context, std::floor(f) == f);
+			return Wg_NewBool(context, std::floor(f) == f);
 		}
 
 		static Wg_Obj* str_nonzero(Wg_Context* context, Wg_Obj** argv, int argc) {
 			EXPECT_ARG_COUNT(1);
 			EXPECT_ARG_TYPE_STRING(0);
 			std::string s = Wg_GetString(argv[0]);
-			return Wg_CreateBool(context, !s.empty());
+			return Wg_NewBool(context, !s.empty());
 		}
 
 		static Wg_Obj* str_int(Wg_Context* context, Wg_Obj** argv, int argc) {
@@ -1464,7 +1464,7 @@ namespace wings {
 				return nullptr;
 			}
 
-			return Wg_CreateInt(context, (Wg_int)value);
+			return Wg_NewInt(context, (Wg_int)value);
 		}
 
 		static Wg_Obj* str_float(Wg_Context* context, Wg_Obj** argv, int argc) {
@@ -1545,7 +1545,7 @@ namespace wings {
 				return nullptr;
 			}
 
-			return Wg_CreateFloat(context, fvalue);
+			return Wg_NewFloat(context, fvalue);
 		}
 
 		static Wg_Obj* str_repr(Wg_Context* context, Wg_Obj** argv, int argc) {
@@ -1553,33 +1553,33 @@ namespace wings {
 			EXPECT_ARG_TYPE_STRING(0);
 
 			std::string s = Wg_GetString(argv[0]);
-			return Wg_CreateString(context, ("'" + s + "'").c_str());
+			return Wg_NewString(context, ("'" + s + "'").c_str());
 		}
 
 		static Wg_Obj* str_len(Wg_Context* context, Wg_Obj** argv, int argc) {
 			EXPECT_ARG_COUNT(1);
 			EXPECT_ARG_TYPE_STRING(0);
-			return Wg_CreateInt(context, (Wg_int)argv[0]->Get<std::string>().size());
+			return Wg_NewInt(context, (Wg_int)argv[0]->Get<std::string>().size());
 		}
 
 		static Wg_Obj* str_eq(Wg_Context* context, Wg_Obj** argv, int argc) {
 			EXPECT_ARG_COUNT(2);
 			EXPECT_ARG_TYPE_STRING(0);
-			return Wg_CreateBool(context, Wg_IsString(argv[1]) && std::strcmp(Wg_GetString(argv[0]), Wg_GetString(argv[1])) == 0);
+			return Wg_NewBool(context, Wg_IsString(argv[1]) && std::strcmp(Wg_GetString(argv[0]), Wg_GetString(argv[1])) == 0);
 		}
 
 		static Wg_Obj* str_lt(Wg_Context* context, Wg_Obj** argv, int argc) {
 			EXPECT_ARG_COUNT(2);
 			EXPECT_ARG_TYPE_STRING(0);
 			EXPECT_ARG_TYPE_STRING(1);
-			return Wg_CreateBool(context, std::strcmp(Wg_GetString(argv[0]), Wg_GetString(argv[1])) < 0);
+			return Wg_NewBool(context, std::strcmp(Wg_GetString(argv[0]), Wg_GetString(argv[1])) < 0);
 		}
 
 		static Wg_Obj* str_hash(Wg_Context* context, Wg_Obj** argv, int argc) {
 			EXPECT_ARG_COUNT(1);
 			EXPECT_ARG_TYPE_STRING(0);
 			Wg_int hash = (Wg_int)std::hash<std::string_view>()(Wg_GetString(argv[0]));
-			return Wg_CreateInt(context, hash);
+			return Wg_NewInt(context, hash);
 		}
 
 		static Wg_Obj* str_add(Wg_Context* context, Wg_Obj** argv, int argc) {
@@ -1588,7 +1588,7 @@ namespace wings {
 			EXPECT_ARG_TYPE_STRING(1);
 			std::string s = Wg_GetString(argv[0]);
 			s += Wg_GetString(argv[1]);
-			return Wg_CreateString(context, s.c_str());
+			return Wg_NewString(context, s.c_str());
 		}
 
 		static Wg_Obj* str_mul(Wg_Context* context, Wg_Obj** argv, int argc) {
@@ -1601,14 +1601,14 @@ namespace wings {
 			s.reserve(arg.size() * (size_t)multiplier);
 			for (Wg_int i = 0; i < multiplier; i++)
 				s += arg;
-			return Wg_CreateString(context, s.c_str());
+			return Wg_NewString(context, s.c_str());
 		}
 
 		static Wg_Obj* str_contains(Wg_Context* context, Wg_Obj** argv, int argc) {
 			EXPECT_ARG_COUNT(2);
 			EXPECT_ARG_TYPE_STRING(0);
 			EXPECT_ARG_TYPE_STRING(1);
-			return Wg_CreateBool(context, std::strstr(Wg_GetString(argv[0]), Wg_GetString(argv[1])));
+			return Wg_NewBool(context, std::strstr(Wg_GetString(argv[0]), Wg_GetString(argv[1])));
 		}
 
 		static Wg_Obj* str_getitem(Wg_Context* context, Wg_Obj** argv, int argc) {
@@ -1631,7 +1631,7 @@ namespace wings {
 				if (!success)
 					return nullptr;
 
-				return Wg_CreateString(context, sliced.c_str());
+				return Wg_NewString(context, sliced.c_str());
 			}
 
 			Wg_Obj* idx = Wg_UnaryOp(WG_UOP_INDEX, argv[1]);
@@ -1650,7 +1650,7 @@ namespace wings {
 				}
 
 				char buf[2] = { s[index], '\0' };
-				return Wg_CreateString(context, buf);
+				return Wg_NewString(context, buf);
 			}
 			
 			Wg_RaiseArgumentTypeError(context, 1, "int or slice");
@@ -1663,7 +1663,7 @@ namespace wings {
 			std::string s = Wg_GetString(argv[0]);
 			if (!s.empty())
 				s[0] = (char)std::toupper(s[0]);
-			return Wg_CreateString(context, s.c_str());
+			return Wg_NewString(context, s.c_str());
 		}
 
 		static Wg_Obj* str_lower(Wg_Context* context, Wg_Obj** argv, int argc) {
@@ -1672,7 +1672,7 @@ namespace wings {
 
 			std::string s = Wg_GetString(argv[0]);
 			std::transform(s.begin(), s.end(), s.begin(), std::tolower);
-			return Wg_CreateString(context, s.c_str());
+			return Wg_NewString(context, s.c_str());
 		}
 
 		static Wg_Obj* str_upper(Wg_Context* context, Wg_Obj** argv, int argc) {
@@ -1681,7 +1681,7 @@ namespace wings {
 
 			std::string s = Wg_GetString(argv[0]);
 			std::transform(s.begin(), s.end(), s.begin(), std::toupper);
-			return Wg_CreateString(context, s.c_str());
+			return Wg_NewString(context, s.c_str());
 		}
 
 		static Wg_Obj* str_casefold(Wg_Context* context, Wg_Obj** argv, int argc) {
@@ -1711,7 +1711,7 @@ namespace wings {
 				s.insert(s.begin(), fill[0]);
 			}
 
-			return Wg_CreateString(context, s.c_str());
+			return Wg_NewString(context, s.c_str());
 		}
 
 		static Wg_Obj* str_count(Wg_Context* context, Wg_Obj** argv, int argc) {
@@ -1728,7 +1728,7 @@ namespace wings {
 				pos += search.size();
 			}
 
-			return Wg_CreateInt(context, count);
+			return Wg_NewInt(context, count);
 		}
 
 		static Wg_Obj* str_format(Wg_Context* context, Wg_Obj** argv, int argc) {
@@ -1794,7 +1794,7 @@ namespace wings {
 				s += Wg_GetString(item);
 			}
 
-			return Wg_CreateString(context, s.c_str());
+			return Wg_NewString(context, s.c_str());
 		}
 
 		static Wg_Obj* str_startswith(Wg_Context* context, Wg_Obj** argv, int argc) {
@@ -1804,7 +1804,7 @@ namespace wings {
 
 			std::string_view s = Wg_GetString(argv[0]);
 			std::string_view end = Wg_GetString(argv[1]);
-			return Wg_CreateBool(context, s.starts_with(end));
+			return Wg_NewBool(context, s.starts_with(end));
 		}
 
 		static Wg_Obj* str_endswith(Wg_Context* context, Wg_Obj** argv, int argc) {
@@ -1814,7 +1814,7 @@ namespace wings {
 
 			std::string_view s = Wg_GetString(argv[0]);
 			std::string_view end = Wg_GetString(argv[1]);
-			return Wg_CreateBool(context, s.ends_with(end));
+			return Wg_NewBool(context, s.ends_with(end));
 		}
 
 		template <bool reverse>
@@ -1860,9 +1860,9 @@ namespace wings {
 			}
 			
 			if (location == std::string_view::npos) {
-				return Wg_CreateInt(context, -1);
+				return Wg_NewInt(context, -1);
 			} else {
-				return Wg_CreateInt(context, (Wg_int)location);
+				return Wg_NewInt(context, (Wg_int)location);
 			}
 		}
 
@@ -1902,7 +1902,7 @@ namespace wings {
 			EXPECT_ARG_TYPE_STRING(0);
 
 			std::string_view s = Wg_GetString(argv[0]);
-			return Wg_CreateBool(context, std::all_of(s.begin(), s.end(), F));
+			return Wg_NewBool(context, std::all_of(s.begin(), s.end(), F));
 		}
 
 		static Wg_Obj* str_isalnum(Wg_Context* context, Wg_Obj** argv, int argc) {
@@ -1959,7 +1959,7 @@ namespace wings {
 			std::string_view s = Wg_GetString(argv[0]);
 			constexpr auto f = [](char c) { return ('a' <= c && c <= 'z') || ('A' <= c && c <= 'Z') || ('0' <= c && c <= '9') || c == '_'; };
 			bool allAlphaNum = std::all_of(s.begin(), s.end(), f);
-			return Wg_CreateBool(context, allAlphaNum && (s.empty() || s[0] < '0' || s[0] > '9'));
+			return Wg_NewBool(context, allAlphaNum && (s.empty() || s[0] < '0' || s[0] > '9'));
 		}
 
 		static Wg_Obj* str_join(Wg_Context* context, Wg_Obj** argv, int argc) {
@@ -1991,7 +1991,7 @@ namespace wings {
 			if (!state.s.empty())
 				state.s.erase(state.s.end() - state.sep.size(), state.s.end());
 
-			return Wg_CreateString(context, state.s.c_str());
+			return Wg_NewString(context, state.s.c_str());
 		}
 
 		static Wg_Obj* str_replace(Wg_Context* context, Wg_Obj** argv, int argc) {
@@ -2010,7 +2010,7 @@ namespace wings {
 			std::string_view find = Wg_GetString(argv[1]);
 			std::string_view repl = Wg_GetString(argv[2]);
 			StringReplace(s, find, repl, count);
-			return Wg_CreateString(context, s.c_str());
+			return Wg_NewString(context, s.c_str());
 		}
 
 		template <bool left, bool zfill = false>
@@ -2049,7 +2049,7 @@ namespace wings {
 			} else {
 				s = s + std::string((size_t)len - s.size(), fill);
 			}
-			return Wg_CreateString(context, s.c_str());
+			return Wg_NewString(context, s.c_str());
 		}
 
 		static Wg_Obj* str_ljust(Wg_Context* context, Wg_Obj** argv, int argc) {
@@ -2077,8 +2077,8 @@ namespace wings {
 			std::string_view s = Wg_GetString(argv[0]);
 			size_t pos = s.find_first_not_of(chars);
 			if (pos == std::string::npos)
-				return Wg_CreateString(context);
-			return Wg_CreateString(context, s.data() + pos);
+				return Wg_NewString(context);
+			return Wg_NewString(context, s.data() + pos);
 		}
 
 		static Wg_Obj* str_rstrip(Wg_Context* context, Wg_Obj** argv, int argc) {
@@ -2094,9 +2094,9 @@ namespace wings {
 			std::string s = Wg_GetString(argv[0]);
 			size_t pos = s.find_last_not_of(chars);
 			if (pos == std::string::npos)
-				return Wg_CreateString(context);
+				return Wg_NewString(context);
 			s.erase(s.begin() + pos + 1, s.end());
-			return Wg_CreateString(context, s.c_str());
+			return Wg_NewString(context, s.c_str());
 		}
 
 		static Wg_Obj* str_strip(Wg_Context* context, Wg_Obj** argv, int argc) {
@@ -2112,13 +2112,13 @@ namespace wings {
 			std::string s = Wg_GetString(argv[0]);
 			size_t pos = s.find_last_not_of(chars);
 			if (pos == std::string::npos)
-				return Wg_CreateString(context);
+				return Wg_NewString(context);
 			s.erase(s.begin() + pos + 1, s.end());
 
 			pos = s.find_first_not_of(chars);
 			if (pos == std::string::npos)
-				return Wg_CreateString(context);
-			return Wg_CreateString(context, s.data() + pos);
+				return Wg_NewString(context);
+			return Wg_NewString(context, s.data() + pos);
 		}
 
 		static Wg_Obj* str_split(Wg_Context* context, Wg_Obj** argv, int argc) {
@@ -2141,13 +2141,13 @@ namespace wings {
 				strings = StringSplitChar(Wg_GetString(argv[0]), " \t\n\r\v\f", maxSplit);
 			}
 
-			Wg_Obj* li = Wg_CreateList(context);
+			Wg_Obj* li = Wg_NewList(context);
 			if (li == nullptr)
 				return nullptr;
 			Wg_ObjRef ref(li);
 
 			for (const auto& s : strings) {
-				Wg_Obj* str = Wg_CreateString(context, s.c_str());
+				Wg_Obj* str = Wg_NewString(context, s.c_str());
 				if (str == nullptr)
 					return nullptr;
 				li->Get<std::vector<Wg_Obj*>>().push_back(str);
@@ -2167,13 +2167,13 @@ namespace wings {
 
 			std::vector<std::string> strings = StringSplitLines(Wg_GetString(argv[0]), keepLineBreaks);
 
-			Wg_Obj* li = Wg_CreateList(context);
+			Wg_Obj* li = Wg_NewList(context);
 			if (li == nullptr)
 				return nullptr;
 			Wg_ObjRef ref(li);
 
 			for (const auto& s : strings) {
-				Wg_Obj* str = Wg_CreateString(context, s.c_str());
+				Wg_Obj* str = Wg_NewString(context, s.c_str());
 				if (str == nullptr)
 					return nullptr;
 				li->Get<std::vector<Wg_Obj*>>().push_back(str);
@@ -2193,7 +2193,7 @@ namespace wings {
 
 			auto it = std::find(context->reprStack.rbegin(), context->reprStack.rend(), argv[0]);
 			if (it != context->reprStack.rend()) {
-				return Wg_CreateString(context, isTuple ? "(...)" : "[...]");
+				return Wg_NewString(context, isTuple ? "(...)" : "[...]");
 			} else {
 				context->reprStack.push_back(argv[0]);
 				const auto& buf = argv[0]->Get<std::vector<Wg_Obj*>>();
@@ -2214,7 +2214,7 @@ namespace wings {
 				if (isTuple && buf.size() == 1)
 					s.push_back(',');
 				s += (isTuple ? ')' : ']');
-				return Wg_CreateString(context, s.c_str());
+				return Wg_NewString(context, s.c_str());
 			}
 		}
 
@@ -2227,7 +2227,7 @@ namespace wings {
 				EXPECT_ARG_TYPE_TUPLE(0);
 			}
 
-			return Wg_CreateBool(context, !argv[0]->Get<std::vector<Wg_Obj*>>().empty());
+			return Wg_NewBool(context, !argv[0]->Get<std::vector<Wg_Obj*>>().empty());
 		}
 
 		template <Collection collection>
@@ -2259,10 +2259,10 @@ namespace wings {
 					return nullptr;
 
 				if (Wg_GetBool(gt))
-					return Wg_CreateBool(context, false);
+					return Wg_NewBool(context, false);
 			}
 
-			return Wg_CreateBool(context, buf1.size() < buf2.size());
+			return Wg_NewBool(context, buf1.size() < buf2.size());
 		}
 
 		template <Collection collection>
@@ -2271,18 +2271,18 @@ namespace wings {
 			if constexpr (collection == Collection::List) {
 				EXPECT_ARG_TYPE_LIST(0);
 				if (!Wg_IsInstance(argv[1], &context->builtins.list, 1))
-					return Wg_CreateBool(context, false);
+					return Wg_NewBool(context, false);
 			} else {
 				EXPECT_ARG_TYPE_TUPLE(0);
 				if (!Wg_IsInstance(argv[1], &context->builtins.tuple, 1))
-					return Wg_CreateBool(context, false);
+					return Wg_NewBool(context, false);
 			}
 
 			auto& buf1 = argv[0]->Get<std::vector<Wg_Obj*>>();
 			auto& buf2 = argv[1]->Get<std::vector<Wg_Obj*>>();
 
 			if (buf1.size() != buf2.size())
-				return Wg_CreateBool(context, false);
+				return Wg_NewBool(context, false);
 
 			for (size_t i = 0; i < buf1.size(); i++) {
 				if (Wg_Obj* eq = Wg_BinaryOp(WG_BOP_EQ, buf1[i], buf2[i])) {
@@ -2293,7 +2293,7 @@ namespace wings {
 				}
 			}
 
-			return Wg_CreateBool(context, true);
+			return Wg_NewBool(context, true);
 		}
 
 		template <Collection collection>
@@ -2315,7 +2315,7 @@ namespace wings {
 				}
 			}
 
-			return Wg_CreateBool(context, false);
+			return Wg_NewBool(context, false);
 		}
 
 		template <Collection collection>
@@ -2327,7 +2327,7 @@ namespace wings {
 				EXPECT_ARG_TYPE_TUPLE(0);
 			}
 
-			return Wg_CreateInt(context, (Wg_int)argv[0]->Get<std::vector<Wg_Obj*>>().size());
+			return Wg_NewInt(context, (Wg_int)argv[0]->Get<std::vector<Wg_Obj*>>().size());
 		}
 
 		template <Collection collection>
@@ -2349,7 +2349,7 @@ namespace wings {
 					count++;
 			}
 
-			return Wg_CreateInt(context, count);
+			return Wg_NewInt(context, count);
 		}
 
 		template <Collection collection>
@@ -2367,7 +2367,7 @@ namespace wings {
 				if (eq == nullptr)
 					return nullptr;
 				if (Wg_GetBool(eq))
-					return Wg_CreateInt(context, (Wg_int)i);
+					return Wg_NewInt(context, (Wg_int)i);
 			}
 
 			Wg_RaiseException(context, WG_EXC_VALUEERROR, "Value was not found");
@@ -2400,9 +2400,9 @@ namespace wings {
 					return nullptr;
 
 				if constexpr (collection == Collection::List) {
-					return Wg_CreateList(context, sliced.data(), (int)sliced.size());
+					return Wg_NewList(context, sliced.data(), (int)sliced.size());
 				} else {
-					return Wg_CreateTuple(context, sliced.data(), (int)sliced.size());
+					return Wg_NewTuple(context, sliced.data(), (int)sliced.size());
 				}
 			}
 
@@ -2444,7 +2444,7 @@ namespace wings {
 			}
 
 			buf[index] = argv[2];
-			return Wg_CreateNone(context);
+			return Wg_None(context);
 		}
 		
 		static Wg_Obj* list_append(Wg_Context* context, Wg_Obj** argv, int argc) {
@@ -2452,7 +2452,7 @@ namespace wings {
 			EXPECT_ARG_TYPE_LIST(0);
 
 			argv[0]->Get<std::vector<Wg_Obj*>>().push_back(argv[1]);
-			return Wg_CreateNone(context);
+			return Wg_None(context);
 		}
 
 		static Wg_Obj* list_insert(Wg_Context* context, Wg_Obj** argv, int argc) {
@@ -2467,7 +2467,7 @@ namespace wings {
 			auto& buf = argv[0]->Get<std::vector<Wg_Obj*>>();			
 			index = std::clamp(index, (Wg_int)0, (Wg_int)buf.size() + 1);
 			buf.insert(buf.begin() + index, argv[2]);
-			return Wg_CreateNone(context);
+			return Wg_None(context);
 		}
 
 		static Wg_Obj* list_pop(Wg_Context* context, Wg_Obj** argv, int argc) {
@@ -2505,7 +2505,7 @@ namespace wings {
 				if (Wg_GetBool(eq)) {
 					if (i < buf.size())
 						buf.erase(buf.begin() + i);
-					return Wg_CreateNone(context);
+					return Wg_None(context);
 				}
 			}
 
@@ -2518,7 +2518,7 @@ namespace wings {
 			EXPECT_ARG_TYPE_LIST(0);
 
 			argv[0]->Get<std::vector<Wg_Obj*>>().clear();
-			return Wg_CreateNone(context);
+			return Wg_None(context);
 		}
 
 		static Wg_Obj* list_copy(Wg_Context* context, Wg_Obj** argv, int argc) {
@@ -2526,7 +2526,7 @@ namespace wings {
 			EXPECT_ARG_TYPE_LIST(0);
 
 			auto& buf = argv[0]->Get<std::vector<Wg_Obj*>>();
-			return Wg_CreateList(context, buf.data(), !buf.size());
+			return Wg_NewList(context, buf.data(), !buf.size());
 		}
 
 		static Wg_Obj* list_extend(Wg_Context* context, Wg_Obj** argv, int argc) {
@@ -2548,7 +2548,7 @@ namespace wings {
 					return nullptr;
 			}
 			
-			return Wg_CreateNone(context);
+			return Wg_None(context);
 		}
 
 		static Wg_Obj* list_sort(Wg_Context* context, Wg_Obj** argv, int argc) {
@@ -2585,7 +2585,7 @@ namespace wings {
 			
 			argv[0]->Get<std::vector<Wg_Obj*>>() = std::move(buf);
 
-			return Wg_CreateNone(context);
+			return Wg_None(context);
 		}
 
 		static Wg_Obj* list_reverse(Wg_Context* context, Wg_Obj** argv, int argc) {
@@ -2594,7 +2594,7 @@ namespace wings {
 
 			auto& buf = argv[0]->Get<std::vector<Wg_Obj*>>();
 			std::reverse(buf.begin(), buf.end());
-			return Wg_CreateNone(context);
+			return Wg_None(context);
 		}
 
 		static Wg_Obj* map_str(Wg_Context* context, Wg_Obj** argv, int argc) {
@@ -2603,7 +2603,7 @@ namespace wings {
 
 			auto it = std::find(context->reprStack.rbegin(), context->reprStack.rend(), argv[0]);
 			if (it != context->reprStack.rend()) {
-				return Wg_CreateString(context, "{...}");
+				return Wg_NewString(context, "{...}");
 			} else {
 				context->reprStack.push_back(argv[0]);
 				const auto& buf = argv[0]->Get<wings::WDict>();
@@ -2628,27 +2628,27 @@ namespace wings {
 					s.pop_back();
 					s.pop_back();
 				}
-				return Wg_CreateString(context, (s + "}").c_str());
+				return Wg_NewString(context, (s + "}").c_str());
 			}
 		}
 
 		static Wg_Obj* map_nonzero(Wg_Context* context, Wg_Obj** argv, int argc) {
 			EXPECT_ARG_COUNT(1);
 			EXPECT_ARG_TYPE_MAP(0);
-			return Wg_CreateBool(context, !argv[0]->Get<WDict>().empty());
+			return Wg_NewBool(context, !argv[0]->Get<WDict>().empty());
 		}
 
 		static Wg_Obj* map_len(Wg_Context* context, Wg_Obj** argv, int argc) {
 			EXPECT_ARG_COUNT(1);
 			EXPECT_ARG_TYPE_MAP(0);
-			return Wg_CreateInt(context, (Wg_int)argv[0]->Get<WDict>().size());
+			return Wg_NewInt(context, (Wg_int)argv[0]->Get<WDict>().size());
 		}
 
 		static Wg_Obj* map_contains(Wg_Context* context, Wg_Obj** argv, int argc) {
 			EXPECT_ARG_COUNT(2);
 			EXPECT_ARG_TYPE_MAP(0);
 			try {
-				return Wg_CreateBool(context, argv[0]->Get<WDict>().contains(argv[1]));
+				return Wg_NewBool(context, argv[0]->Get<WDict>().contains(argv[1]));
 			} catch (HashException&) {
 				return nullptr;
 			}
@@ -2685,7 +2685,7 @@ namespace wings {
 			}
 
 			if (it == buf.end()) {
-				return argc == 3 ? argv[2] : Wg_CreateNone(context);
+				return argc == 3 ? argv[2] : Wg_None(context);
 			}
 
 			return it->second;
@@ -2720,14 +2720,14 @@ namespace wings {
 			} catch (HashException&) {
 				return nullptr;
 			}
-			return Wg_CreateNone(context);
+			return Wg_None(context);
 		}
 
 		static Wg_Obj* map_clear(Wg_Context* context, Wg_Obj** argv, int argc) {
 			EXPECT_ARG_COUNT(1);
 			EXPECT_ARG_TYPE_MAP(0);
 			argv[0]->Get<WDict>().clear();
-			return Wg_CreateNone(context);
+			return Wg_None(context);
 		}
 
 		static Wg_Obj* map_copy(Wg_Context* context, Wg_Obj** argv, int argc) {
@@ -2740,7 +2740,7 @@ namespace wings {
 				keys.push_back(k);
 				values.push_back(v);
 			}
-			return Wg_CreateDictionary(context, keys.data(), values.data(), (int)keys.size());
+			return Wg_NewDictionary(context, keys.data(), values.data(), (int)keys.size());
 		}
 
 		static Wg_Obj* map_pop(Wg_Context* context, Wg_Obj** argv, int argc) {
@@ -2769,7 +2769,7 @@ namespace wings {
 
 			auto popped = buf.pop();
 			Wg_Obj* tupElems[2] = { popped.first, popped.second };
-			return Wg_CreateTuple(context, tupElems, 2);
+			return Wg_NewTuple(context, tupElems, 2);
 		}
 
 		static Wg_Obj* map_setdefault(Wg_Context* context, Wg_Obj** argv, int argc) {
@@ -2779,7 +2779,7 @@ namespace wings {
 			try {
 				auto& entry = argv[0]->Get<WDict>()[argv[1]];
 				if (entry == nullptr)
-					entry = argc == 3 ? argv[2] : Wg_CreateNone(context);
+					entry = argc == 3 ? argv[2] : Wg_None(context);
 				return entry;
 			} catch (HashException&) {
 				return nullptr;
@@ -2808,7 +2808,7 @@ namespace wings {
 			};
 			
 			if (Wg_Iterate(iterable, argv[0], f)) {
-				return Wg_CreateNone(context);
+				return Wg_None(context);
 			} else {
 				return nullptr;
 			}
@@ -2817,7 +2817,7 @@ namespace wings {
 		static Wg_Obj* set_nonzero(Wg_Context* context, Wg_Obj** argv, int argc) {
 			EXPECT_ARG_COUNT(1);
 			EXPECT_ARG_TYPE_SET(0);
-			return Wg_CreateBool(context, !argv[0]->Get<WSet>().empty());
+			return Wg_NewBool(context, !argv[0]->Get<WSet>().empty());
 		}
 
 		static Wg_Obj* set_str(Wg_Context* context, Wg_Obj** argv, int argc) {
@@ -2826,14 +2826,14 @@ namespace wings {
 
 			auto it = std::find(context->reprStack.rbegin(), context->reprStack.rend(), argv[0]);
 			if (it != context->reprStack.rend()) {
-				return Wg_CreateString(context, "{...}");
+				return Wg_NewString(context, "{...}");
 			} else {
 				context->reprStack.push_back(argv[0]);
 				const auto& buf = argv[0]->Get<wings::WSet>();
 
 				if (buf.empty()) {
 					context->reprStack.pop_back();
-					return Wg_CreateString(context, "set()");
+					return Wg_NewString(context, "set()");
 				}
 
 				std::string s = "{";
@@ -2850,7 +2850,7 @@ namespace wings {
 					s.pop_back();
 					s.pop_back();
 				}
-				return Wg_CreateString(context, (s + "}").c_str());
+				return Wg_NewString(context, (s + "}").c_str());
 			}
 		}
 
@@ -2864,24 +2864,24 @@ namespace wings {
 			EXPECT_ARG_COUNT(2);
 			EXPECT_ARG_TYPE_SET(0);
 			try {
-				return Wg_CreateBool(context, argv[0]->Get<WSet>().contains(argv[1]));
+				return Wg_NewBool(context, argv[0]->Get<WSet>().contains(argv[1]));
 			} catch (HashException&) {
 				Wg_ClearCurrentException(context);
-				return Wg_CreateBool(context, false);
+				return Wg_NewBool(context, false);
 			}
 		}
 
 		static Wg_Obj* set_len(Wg_Context* context, Wg_Obj** argv, int argc) {
 			EXPECT_ARG_COUNT(1);
 			EXPECT_ARG_TYPE_SET(0);
-			return Wg_CreateInt(context, (int)argv[0]->Get<WSet>().size());
+			return Wg_NewInt(context, (int)argv[0]->Get<WSet>().size());
 		}
 
 		static Wg_Obj* set_clear(Wg_Context* context, Wg_Obj** argv, int argc) {
 			EXPECT_ARG_COUNT(1);
 			EXPECT_ARG_TYPE_SET(0);
 			argv[0]->Get<WSet>().clear();
-			return Wg_CreateNone(context);
+			return Wg_None(context);
 		}
 
 		static Wg_Obj* set_copy(Wg_Context* context, Wg_Obj** argv, int argc) {
@@ -2894,7 +2894,7 @@ namespace wings {
 			EXPECT_ARG_COUNT(2);
 			EXPECT_ARG_TYPE_SET(0);
 			argv[0]->Get<WSet>().insert(argv[1]);
-			return Wg_CreateNone(context);
+			return Wg_None(context);
 		}
 
 		static Wg_Obj* set_remove(Wg_Context* context, Wg_Obj** argv, int argc) {
@@ -2914,7 +2914,7 @@ namespace wings {
 				return nullptr;
 			} else {
 				set.erase(it);
-				return Wg_CreateNone(context);
+				return Wg_None(context);
 			}
 		}
 
@@ -2932,7 +2932,7 @@ namespace wings {
 
 			if (it != WSet::const_iterator{})
 				set.erase(it);
-			return Wg_CreateNone(context);
+			return Wg_None(context);
 		}
 
 		static Wg_Obj* set_pop(Wg_Context* context, Wg_Obj** argv, int argc) {
@@ -2964,14 +2964,14 @@ namespace wings {
 			if (!Wg_Iterate(argv[1], &argv[0]->Get<WSet>(), f))
 				return nullptr;
 			
-			return Wg_CreateNone(context);
+			return Wg_None(context);
 		}
 
 		static Wg_Obj* set_union(Wg_Context* context, Wg_Obj** argv, int argc) {
 			EXPECT_ARG_COUNT_AT_LEAST(1);
 			EXPECT_ARG_TYPE_SET(0);
 
-			Wg_Obj* res = Wg_CreateSet(context);
+			Wg_Obj* res = Wg_NewSet(context);
 			Wg_ObjRef ref(res);
 			
 			auto f = [](Wg_Obj* obj, void* ud) {
@@ -2992,7 +2992,7 @@ namespace wings {
 			EXPECT_ARG_COUNT_AT_LEAST(1);
 			EXPECT_ARG_TYPE_SET(0);
 
-			Wg_Obj* res = Wg_CreateSet(context);
+			Wg_Obj* res = Wg_NewSet(context);
 			Wg_ObjRef ref(res);
 
 			struct State {
@@ -3028,7 +3028,7 @@ namespace wings {
 			EXPECT_ARG_COUNT_AT_LEAST(1);
 			EXPECT_ARG_TYPE_SET(0);
 
-			Wg_Obj* res = Wg_CreateSet(context);
+			Wg_Obj* res = Wg_NewSet(context);
 			Wg_ObjRef ref(res);
 
 			struct State {
@@ -3064,7 +3064,7 @@ namespace wings {
 			EXPECT_ARG_COUNT(2);
 			EXPECT_ARG_TYPE_SET(0);
 
-			Wg_Obj* res = Wg_CreateSet(context);
+			Wg_Obj* res = Wg_NewSet(context);
 			Wg_ObjRef ref(res);
 
 			struct State {
@@ -3119,10 +3119,10 @@ namespace wings {
 				return nullptr;
 			
 			if (!Wg_IsSet(inters)) {
-				return Wg_CreateBool(context, false);
+				return Wg_NewBool(context, false);
 			}
 
-			return Wg_CreateBool(context, inters->Get<WSet>().size() == size);
+			return Wg_NewBool(context, inters->Get<WSet>().size() == size);
 		}
 
 		static Wg_Obj* set_issuperset(Wg_Context* context, Wg_Obj** argv, int argc) {
@@ -3147,14 +3147,14 @@ namespace wings {
 			if (!Wg_Iterate(argv[1], &s, f) && s.result)
 				return nullptr;
 			
-			return Wg_CreateBool(context, s.result);
+			return Wg_NewBool(context, s.result);
 		}
 
 		static Wg_Obj* func_str(Wg_Context* context, Wg_Obj** argv, int argc) {
 			EXPECT_ARG_COUNT(1);
 			EXPECT_ARG_TYPE_FUNC(0);
 			std::string s = "<function at " + PtrToString(argv[0]) + ">";
-			return Wg_CreateString(context, s.c_str());
+			return Wg_NewString(context, s.c_str());
 		}
 
 		static Wg_Obj* BaseException_str(Wg_Context* context, Wg_Obj** argv, int argc) {
@@ -3219,7 +3219,7 @@ namespace wings {
 
 			Wg_Obj* tup[2] = { it->first, it->second };
 			++it;
-			return Wg_CreateTuple(context, tup, 2);
+			return Wg_NewTuple(context, tup, 2);
 		}
 
 		static Wg_Obj* SetIter_next(Wg_Context* context, Wg_Obj** argv, int argc) {
@@ -3276,16 +3276,16 @@ namespace wings {
 			}
 			while (i > 0);
 
-			return Wg_CreateString(context, s.c_str());
+			return Wg_NewString(context, s.c_str());
 		}
 
 		static Wg_Obj* callable(Wg_Context* context, Wg_Obj** argv, int argc) {
 			EXPECT_ARG_COUNT(1);
 			
 			if (Wg_IsFunction(argv[0])) {
-				return Wg_CreateBool(context, true);
+				return Wg_NewBool(context, true);
 			} else {
-				return Wg_CreateBool(context, Wg_HasAttribute(argv[0], "__call__"));
+				return Wg_NewBool(context, Wg_HasAttribute(argv[0], "__call__"));
 			}
 		}
 
@@ -3295,7 +3295,7 @@ namespace wings {
 			
 			Wg_int i = Wg_GetInt(argv[0]);
 			char s[2] = { (char)i, 0 };
-			return Wg_CreateString(context, s);
+			return Wg_NewString(context, s);
 		}
 
 		static Wg_Obj* compile(Wg_Context* context, Wg_Obj** argv, int argc) {
@@ -3353,7 +3353,7 @@ namespace wings {
 				if (Wg_Call(fn, nullptr, 0) == nullptr)
 					return nullptr;
 			}
-			return Wg_CreateNone(context);
+			return Wg_None(context);
 		}
 
 		static Wg_Obj* getattr(Wg_Context* context, Wg_Obj** argv, int argc) {
@@ -3366,7 +3366,7 @@ namespace wings {
 		
 		static Wg_Obj* id(Wg_Context* context, Wg_Obj** argv, int argc) {
 			EXPECT_ARG_COUNT(1);
-			return Wg_CreateInt(context, (Wg_int)argv[0]);
+			return Wg_NewInt(context, (Wg_int)argv[0]);
 		}
 
 		static Wg_Obj* input(Wg_Context* context, Wg_Obj** argv, int argc) {
@@ -3383,7 +3383,7 @@ namespace wings {
 			std::string s;
 			std::getline(std::cin, s);
 			
-			return Wg_CreateString(context, s.c_str());
+			return Wg_NewString(context, s.c_str());
 		}
 
 		static Wg_Obj* isinstance(Wg_Context* context, Wg_Obj** argv, int argc) {
@@ -3395,7 +3395,7 @@ namespace wings {
 			} else {
 				ret = Wg_IsInstance(argv[0], argv + 1, 1) != nullptr;
 			}
-			return Wg_CreateBool(context, ret);
+			return Wg_NewBool(context, ret);
 		}
 
 		static Wg_Obj* ord(Wg_Context* context, Wg_Obj** argv, int argc) {
@@ -3407,7 +3407,7 @@ namespace wings {
 				Wg_RaiseException(context, WG_EXC_VALUEERROR, "ord() arg is an empty string");
 				return nullptr;
 			} else if (s[1] == 0) {
-				return Wg_CreateInt(context, (int)s[0]);
+				return Wg_NewInt(context, (int)s[0]);
 			} else {
 				Wg_RaiseException(context, WG_EXC_VALUEERROR, "ord() arg is not a single character");
 				return nullptr;
@@ -3429,7 +3429,7 @@ namespace wings {
 			}
 			text += '\n';
 			Wg_Print(context, text.c_str(), (int)text.size());
-			return Wg_CreateNone(context);
+			return Wg_None(context);
 		}
 
 		static Wg_Obj* setattr(Wg_Context* context, Wg_Obj** argv, int argc) {
@@ -3438,7 +3438,7 @@ namespace wings {
 
 			const char* name = Wg_GetString(argv[1]);
 			Wg_SetAttribute(argv[0], name, argv[2]);
-			return Wg_CreateNone(context);
+			return Wg_None(context);
 		}
 
 	} // namespace lib
@@ -3455,7 +3455,7 @@ namespace wings {
 		wfn.userdata = _class->context;
 		wfn.fptr = fn;
 
-		Wg_Obj* method = Wg_CreateFunction(_class->context, &wfn);
+		Wg_Obj* method = Wg_NewFunction(_class->context, &wfn);
 		if (method == nullptr)
 			throw LibraryInitException();
 
@@ -3474,7 +3474,7 @@ namespace wings {
 		wfn.userdata = context;
 		wfn.fptr = fn;
 
-		Wg_Obj* obj = Wg_CreateFunction(context, &wfn);
+		Wg_Obj* obj = Wg_NewFunction(context, &wfn);
 		if (obj == nullptr)
 			throw LibraryInitException();
 		Wg_SetGlobal(context, name, obj);
@@ -3482,7 +3482,7 @@ namespace wings {
 	}
 
 	Wg_Obj* CreateClass(Wg_Context* context, const char* name) {
-		Wg_Obj* _class = Wg_CreateClass(context, name, nullptr, 0);
+		Wg_Obj* _class = Wg_NewClass(context, name, nullptr, 0);
 		if (_class == nullptr)
 			throw LibraryInitException();
 		return _class;
@@ -3497,7 +3497,7 @@ namespace wings {
 			};
 
 			auto createClass = [&](const char* name, Wg_Obj* base = nullptr, bool assign = true) {
-				if (Wg_Obj* v = Wg_CreateClass(context, name, &base, base ? 1 : 0)) {
+				if (Wg_Obj* v = Wg_NewClass(context, name, &base, base ? 1 : 0)) {
 					if (assign)
 						Wg_SetGlobal(context, name, v);
 					return v;
@@ -3573,7 +3573,7 @@ namespace wings {
 			RegisterMethod<methods::null_str>(builtins.none, "__str__");
 
 			// Add __bases__ tuple to the classes created before
-			Wg_Obj* emptyTuple = Wg_CreateTuple(context, nullptr, 0);
+			Wg_Obj* emptyTuple = Wg_NewTuple(context, nullptr, 0);
 			if (emptyTuple == nullptr)
 				throw LibraryInitException();
 			Wg_SetAttribute(builtins.object, "__bases__", emptyTuple);
