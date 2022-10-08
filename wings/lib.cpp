@@ -3432,6 +3432,28 @@ namespace wings {
 			return Wg_None(context);
 		}
 
+		static Wg_Obj* round(Wg_Context* context, Wg_Obj** argv, int argc) {
+			EXPECT_ARG_COUNT_BETWEEN(1, 2);
+			EXPECT_ARG_TYPE_INT_OR_FLOAT(0);
+
+			Wg_float f = Wg_GetFloat(argv[0]);
+			
+			Wg_float m = 1;
+			bool dpSpecified = false;
+			if (argc == 2 && !Wg_IsNone(argv[1])) {
+				EXPECT_ARG_TYPE_INT(1);
+				m = std::pow(10, Wg_GetInt(argv[1]));
+				dpSpecified = true;
+			}
+			
+			auto r = std::lrint(f * m) / m;
+			if (!dpSpecified || Wg_IsInt(argv[0])) {
+				return Wg_NewInt(context, (Wg_int)r);
+			} else {
+				return Wg_NewFloat(context, (Wg_float)r);
+			}
+		}
+
 		static Wg_Obj* setattr(Wg_Context* context, Wg_Obj** argv, int argc) {
 			EXPECT_ARG_COUNT(3);
 			EXPECT_ARG_TYPE_STRING(1);
@@ -3831,6 +3853,7 @@ namespace wings {
 			builtins.isinstance = RegisterFunction<lib::isinstance>(context, "isinstance");
 			RegisterFunction<lib::ord>(context, "ord");
 			RegisterFunction<lib::print>(context, "print");
+			RegisterFunction<lib::round>(context, "round");
 			RegisterFunction<lib::setattr>(context, "setattr");
 			
 			// Initialize the rest with a script
