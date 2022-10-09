@@ -260,6 +260,21 @@ namespace wings {
 		return CodeError::Good();
 	}
 
+	static bool IsHexDigit(char c, int& val) {
+		if (c >= '0' && c <= '9') {
+			val = c - '0';
+			return true;
+		} else if (c >= 'a' && c <= 'f') {
+			val = c - 'a' + 10;
+			return true;
+		} else if (c >= 'A' && c <= 'F') {
+			val = c - 'A' + 10;
+			return true;
+		} else {
+			return false;
+		}
+	}
+
 	static CodeError ConsumeString(StringIter& p, Token& out) {
 		char quote = *p;
 		++p;
@@ -275,23 +290,40 @@ namespace wings {
 					return CodeError::Bad("Missing closing quote");
 				}
 
-				char esc = 0;
-				switch (*p) {
-				case '0': esc = '\0'; break;
-				case 'n': esc = '\n'; break;
-				case 'r': esc = '\r'; break;
-				case 't': esc = '\t'; break;
-				case 'v': esc = '\v'; break;
-				case 'b': esc = '\b'; break;
-				case 'f': esc = '\f'; break;
-				case '"': esc = '"'; break;
-				case '\'': esc = '\''; break;
-				case '\\': esc = '\\'; break;
-				default: return CodeError::Bad("Invalid escape sequence");
+				if (*p == 'x') {
+					++p;
+					int	d1 = 0;
+					if (!IsHexDigit(*p, d1)) {
+						return CodeError::Bad("Invalid hex escape sequence");
+					}
+					t.text += *p;
+					
+					++p;
+					int d2 = 0;
+					if (!IsHexDigit(*p, d2)) {
+						return CodeError::Bad("Invalid hex escape sequence");
+					}
+					t.text += *p;
+					
+					t.literal.s += (char)((d1 << 4) | d2);
+				} else {
+					char esc = 0;
+					switch (*p) {
+					case '0': esc = '\0'; break;
+					case 'n': esc = '\n'; break;
+					case 'r': esc = '\r'; break;
+					case 't': esc = '\t'; break;
+					case 'v': esc = '\v'; break;
+					case 'b': esc = '\b'; break;
+					case 'f': esc = '\f'; break;
+					case '"': esc = '"'; break;
+					case '\'': esc = '\''; break;
+					case '\\': esc = '\\'; break;
+					default: return CodeError::Bad("Invalid escape sequence");
+					}
+					t.text += *p;
+					t.literal.s += esc;
 				}
-
-				t.text += *p;
-				t.literal.s += esc;
 			} else {
 				t.literal.s += *p;
 			}
