@@ -93,6 +93,7 @@ typedef enum Wg_Exc {
 	WG_EXC_KEYERROR,
 	WG_EXC_MEMORYERROR,
 	WG_EXC_NAMEERROR,
+	WG_EXC_OSERROR,
 	WG_EXC_RUNTIMEERROR,
 	WG_EXC_NOTIMPLEMENTEDERROR,
 	WG_EXC_RECURSIONERROR,
@@ -468,6 +469,19 @@ WG_DLL_EXPORT Wg_Obj* Wg_NewFloat(Wg_Context* context, Wg_float value WG_DEFAULT
 WG_DLL_EXPORT Wg_Obj* Wg_NewString(Wg_Context* context, const char* value WG_DEFAULT_ARG(nullptr));
 
 /**
+* Instantiate a string object from a buffer.
+*
+* Remarks:
+* Call Wg_GetCurrentException() or Wg_GetErrorMessage() to get error information.
+*
+* @param context The relevant context.
+* @param buffer The buffer to set the string to.
+* @param len The length of the buffer.
+* @return The instantiated object, or nullptr on failure.
+*/
+WG_DLL_EXPORT Wg_Obj* Wg_NewStringBuffer(Wg_Context* context, const char* buffer, int len);
+
+/**
 * Instantiate a tuple object.
 *
 * Remarks:
@@ -682,10 +696,12 @@ WG_DLL_EXPORT Wg_float Wg_GetFloat(const Wg_Obj* obj);
 * Get the value from a string object.
 *
 * @param obj The object to get the value from.
+* @param length A pointer to an integer to store the length of the string in.
+*				This parameter may be nullptr.
 * @return The string value of the object. This string is
 *         owned by the function and should not be freed.
 */
-WG_DLL_EXPORT const char* Wg_GetString(const Wg_Obj* obj);
+WG_DLL_EXPORT const char* Wg_GetString(const Wg_Obj* obj, int* length WG_DEFAULT_ARG(nullptr));
 
 /**
 * Set the userdata for an object.
@@ -701,7 +717,7 @@ WG_DLL_EXPORT void Wg_SetUserdata(Wg_Obj* obj, void* userdata);
 * @param obj The object to get the value from.
 * @param type A null terminated ASCII string containing the name of
 *             the type to query.
-* @param out A pointer to a void* to receive the userdata.
+* @param out A pointer to a void* to receive the userdata. This parameter may be nullptr.
 * @return True if obj matches the type given, otherwise false.
 */
 WG_DLL_EXPORT bool Wg_TryGetUserdata(const Wg_Obj* obj, const char* type, void** out);

@@ -28,6 +28,11 @@ namespace wings {
 	void DestroyAllObjects(Wg_Context* context);
 	bool IsKeyword(std::string_view s);
 	bool IsValidIdentifier(std::string_view s);
+
+	template <class T>
+	bool TryGetUserdata(Wg_Obj* obj, const char* type, T** out) {
+		return Wg_TryGetUserdata(obj, type, (void**)out);
+	}
 	
 	struct WObjHasher {
 		size_t operator()(Wg_Obj* obj) const;
@@ -112,6 +117,8 @@ namespace wings {
 		Wg_Obj* setIter;
 		Wg_Obj* codeObject;
 		Wg_Obj* moduleObject;
+		Wg_Obj* file;
+		Wg_Obj* readlineIter;
 
 		// Exception types
 		Wg_Obj* baseException;
@@ -129,6 +136,7 @@ namespace wings {
 		Wg_Obj* keyError;
 		Wg_Obj* memoryError;
 		Wg_Obj* nameError;
+		Wg_Obj* osError;
 		Wg_Obj* runtimeError;
 		Wg_Obj* notImplementedError;
 		Wg_Obj* recursionError;
@@ -152,12 +160,12 @@ namespace wings {
 				object, noneType, _bool, _int, _float, str, tuple, list,
 				dict, set, func, slice, defaultIter, defaultReverseIter,
 				dictKeysIter, dictValuesIter, dictItemsIter, setIter,
-				codeObject, moduleObject,
+				codeObject, moduleObject, file, readlineIter,
 
 				baseException, systemExit, exception, stopIteration, arithmeticError,
 				overflowError, zeroDivisionError, attributeError, importError,
 				syntaxError, lookupError, indexError, keyError, memoryError,
-				nameError, runtimeError, notImplementedError, recursionError,
+				osError, nameError, runtimeError, notImplementedError, recursionError,
 				typeError, valueError,
 
 				isinstance, repr,

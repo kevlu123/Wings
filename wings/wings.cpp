@@ -360,6 +360,16 @@ extern "C" {
 		}
 	}
 
+	Wg_Obj* Wg_NewStringBuffer(Wg_Context* context, const char* buffer, int length) {
+		WG_ASSERT(context && buffer && length >= 0);
+		if (Wg_Obj* v = Wg_Call(context->builtins.str, nullptr, 0)) {
+			v->Get<std::string>() = std::string(buffer, length);
+			return v;
+		} else {
+			return nullptr;
+		}
+	}
+
 	Wg_Obj* Wg_NewTuple(Wg_Context* context, Wg_Obj** argv, int argc) {
 		std::vector<wings::Wg_ObjRef> refs;
 		WG_ASSERT(context && argc >= 0);
@@ -682,9 +692,12 @@ extern "C" {
 		else return obj->Get<Wg_float>();
 	}
 
-	const char* Wg_GetString(const Wg_Obj* obj) {
+	const char* Wg_GetString(const Wg_Obj* obj, int* length) {
 		WG_ASSERT(obj && Wg_IsString(obj));
-		return obj->Get<std::string>().c_str();
+		const auto& s = obj->Get<std::string>();
+		if (length)
+			*length = (int)s.size();
+		return s.c_str();
 	}
 
 	void Wg_SetUserdata(Wg_Obj* obj, void* userdata) {
@@ -695,7 +708,8 @@ extern "C" {
 	bool Wg_TryGetUserdata(const Wg_Obj* obj, const char* type, void** out) {
 		WG_ASSERT(obj && type);
 		if (obj->type == std::string(type)) {
-			*out = obj->data;
+			if (out)
+				*out = obj->data;
 			return true;
 		} else {
 			return false;
@@ -1228,6 +1242,8 @@ extern "C" {
 			return Wg_RaiseExceptionClass(context->builtins.memoryError, message);
 		case WG_EXC_NAMEERROR:
 			return Wg_RaiseExceptionClass(context->builtins.nameError, message);
+		case WG_EXC_OSERROR:
+			return Wg_RaiseExceptionClass(context->builtins.osError, message);
 		case WG_EXC_RUNTIMEERROR:
 			return Wg_RaiseExceptionClass(context->builtins.runtimeError, message);
 		case WG_EXC_NOTIMPLEMENTEDERROR:

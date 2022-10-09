@@ -3,6 +3,9 @@
 
 #include <iostream>
 #include <sstream>
+#include <fstream>
+#include <cstdio>
+#include <array>
 #include <unordered_set>
 #include <queue>
 #include <optional>
@@ -59,6 +62,17 @@ class __RangeIter:
 class __CodeObject:
 	def __init__(self, f):
 		self.f = f
+
+class __ReadLineIter:
+	def __init__(self, f):
+		self.f = f
+	def __next__(self):
+		line = self.f.readline()
+		if line == "":
+			raise StopIteration
+		return line
+	def __iter__(self):
+		return self
 
 def abs(x):
 	return x.__abs__()
@@ -310,6 +324,9 @@ class MemoryError(Exception):
 	pass
 
 class NameError(Exception):
+	pass
+
+class OSError(Exception):
 	pass
 
 class RuntimeError(Exception):
@@ -868,6 +885,63 @@ namespace wings {
 			Wg_SetUserdata(argv[0], it);
 			argv[0]->finalizer.fptr = [](Wg_Obj* obj, void*) { delete (WSet::iterator*)obj->data; };
 			Wg_LinkReference(argv[0], argv[1]);
+			return Wg_None(context);
+		}
+
+		static Wg_Obj* File(Wg_Context* context, Wg_Obj** argv, int argc) {
+			EXPECT_ARG_COUNT_BETWEEN(2, 3);
+			EXPECT_ARG_TYPE_STRING(1);
+
+			const char* filename = Wg_GetString(argv[1]);
+
+			std::ios::openmode mode{};
+			if (argc == 3) {
+				EXPECT_ARG_TYPE_STRING(2);
+				std::string m = Wg_GetString(argv[2]);
+	
+				size_t b;
+				if ((b = m.find('b')) != std::string::npos) {
+					mode |= std::ios::binary;
+					m.erase(b);
+				}
+				
+				if (m == "r") {
+					mode = std::ios::in;
+				} else if (m == "w") {
+					mode = std::ios::out;
+				} else if (m == "a") {
+					mode = std::ios::app;
+				} else if (m == "r+") {
+					mode = std::ios::in | std::ios::out;
+				} else if (m == "w+") {
+					mode = std::ios::in | std::ios::out | std::ios::trunc;
+				} else if (m == "a+") {
+					mode = std::ios::in | std::ios::app;
+				} else {
+					Wg_RaiseException(context, WG_EXC_VALUEERROR, "Invalid file mode");
+					return nullptr;
+				}
+			} else {
+				mode = std::ios::in;
+			}
+
+			auto* f = new std::fstream(filename, mode);
+			if (!f->is_open()) {
+				Wg_RaiseException(context, WG_EXC_OSERROR, "Failed to open file");
+				return nullptr;
+			}
+			Wg_SetUserdata(argv[0], f);
+
+			Wg_FinalizerDesc fd{};
+			fd.fptr = [](Wg_Obj* obj, void*) { delete (std::fstream*)obj->data; };
+			Wg_SetFinalizer(argv[0], &fd);
+
+			bool readable = mode & std::ios::in;
+			bool writable = mode & std::ios::out;
+			
+			Wg_SetAttribute(argv[0], "_readable", Wg_NewBool(context, readable));
+			Wg_SetAttribute(argv[0], "_writable", Wg_NewBool(context, writable));
+			
 			return Wg_None(context);
 		}
 		
@@ -1551,9 +1625,34 @@ namespace wings {
 		static Wg_Obj* str_repr(Wg_Context* context, Wg_Obj** argv, int argc) {
 			EXPECT_ARG_COUNT(1);
 			EXPECT_ARG_TYPE_STRING(0);
-
-			std::string s = Wg_GetString(argv[0]);
-			return Wg_NewString(context, ("'" + s + "'").c_str());
+			
+			std::string s = "'";
+			for (const char* p = Wg_GetString(argv[0]); *p; ++p) {
+				if (*p == '\'') {
+					s += "\\\\";
+				} else if (*p == '\'') {
+					s += "\\'";
+				} else if (*p == '\n') {
+					s += "\\n";
+				} else if (*p == '\r') {
+					s += "\\r";
+				} else if (*p == '\t') {
+					s += "\\t";
+				} else if (*p == '\b') {
+					s += "\\b";
+				} else if (*p == '\f') {
+					s += "\\f";
+				} else if (*p >= 32 && *p <= 126) {
+					s.push_back(*p);
+				} else {
+					s += "\\x";
+					s.push_back("0123456789abcdef"[(*p >> 4) & 0xF]);
+					s.push_back("0123456789abcdef"[*p & 0xF]);
+				}
+			}
+			s.push_back('\'');
+			
+			return Wg_NewString(context, s.c_str());
 		}
 
 		static Wg_Obj* str_len(Wg_Context* context, Wg_Obj** argv, int argc) {
@@ -3164,82 +3263,268 @@ namespace wings {
 
 		static Wg_Obj* DictKeysIter_next(Wg_Context* context, Wg_Obj** argv, int argc) {
 			EXPECT_ARG_COUNT(1);
-			void* data{};
-			if (!Wg_TryGetUserdata(argv[0], "__DictKeysIter", &data)) {
+			WDict::iterator* it{};
+			if (!TryGetUserdata(argv[0], "__DictKeysIter", &it)) {
 				Wg_RaiseArgumentTypeError(context, 0, "__DictKeysIter");
 				return nullptr;
 			}
 			
-			auto& it = *(WDict::iterator*)data;
-			it.Revalidate();
-			if (it == WDict::iterator{}) {
+			it->Revalidate();
+			if (*it == WDict::iterator{}) {
 				Wg_RaiseException(context, WG_EXC_STOPITERATION);
 				return nullptr;
 			}
 			
-			Wg_Obj* key = it->first;
+			Wg_Obj* key = (*it)->first;
 			++it;
 			return key;
 		}
 
 		static Wg_Obj* DictValuesIter_next(Wg_Context* context, Wg_Obj** argv, int argc) {
 			EXPECT_ARG_COUNT(1);
-			void* data{};
-			if (!Wg_TryGetUserdata(argv[0], "__DictValuesIter", &data)) {
+			WDict::iterator* it{};
+			if (!TryGetUserdata(argv[0], "__DictValuesIter", &it)) {
 				Wg_RaiseArgumentTypeError(context, 0, "__DictValuesIter");
 				return nullptr;
 			}
 
-			auto& it = *(WDict::iterator*)data;
-			it.Revalidate();
-			if (it == WDict::iterator{}) {
+			it->Revalidate();
+			if (*it == WDict::iterator{}) {
 				Wg_RaiseException(context, WG_EXC_STOPITERATION);
 				return nullptr;
 			}
 
-			Wg_Obj* value = it->second;
+			Wg_Obj* value = (*it)->second;
 			++it;
 			return value;
 		}
 
 		static Wg_Obj* DictItemsIter_next(Wg_Context* context, Wg_Obj** argv, int argc) {
 			EXPECT_ARG_COUNT(1);
-			void* data{};
-			if (!Wg_TryGetUserdata(argv[0], "__DictItemsIter", &data)) {
+			WDict::iterator* it{};
+			if (!TryGetUserdata(argv[0], "__DictItemsIter", &it)) {
 				Wg_RaiseArgumentTypeError(context, 0, "__DictItemsIter");
 				return nullptr;
 			}
-
-			auto& it = *(WDict::iterator*)data;
-			it.Revalidate();
-			if (it == WDict::iterator{}) {
+			
+			it->Revalidate();
+			if (*it == WDict::iterator{}) {
 				Wg_RaiseException(context, WG_EXC_STOPITERATION);
 				return nullptr;
 			}
 
-			Wg_Obj* tup[2] = { it->first, it->second };
+			Wg_Obj* tup[2] = { (*it)->first, (*it)->second };
 			++it;
 			return Wg_NewTuple(context, tup, 2);
 		}
 
 		static Wg_Obj* SetIter_next(Wg_Context* context, Wg_Obj** argv, int argc) {
 			EXPECT_ARG_COUNT(1);
-			void* data{};
-			if (!Wg_TryGetUserdata(argv[0], "__SetIter", &data)) {
+			WSet::iterator* it{};
+			if (!TryGetUserdata(argv[0], "__SetIter", &it)) {
 				Wg_RaiseArgumentTypeError(context, 0, "__SetIter");
 				return nullptr;
 			}
-
-			auto& it = *(WSet::iterator*)data;
-			it.Revalidate();
-			if (it == WSet::iterator{}) {
+			
+			it->Revalidate();
+			if (*it == WSet::iterator{}) {
 				Wg_RaiseException(context, WG_EXC_STOPITERATION);
 				return nullptr;
 			}
 			
-			Wg_Obj* obj = *it;
+			Wg_Obj* obj = **it;
 			++it;
 			return obj;
+		}
+
+		static Wg_Obj* File_iter(Wg_Context* context, Wg_Obj** argv, int argc) {
+			EXPECT_ARG_COUNT(1);
+			if (!Wg_TryGetUserdata(argv[0], "__File", nullptr)) {
+				Wg_RaiseArgumentTypeError(context, 0, "__File");
+				return nullptr;
+			}
+
+			return Wg_Call(context->builtins.readlineIter, argv, 1);
+		}
+
+		static Wg_Obj* File_read(Wg_Context* context, Wg_Obj** argv, int argc) {
+			EXPECT_ARG_COUNT_BETWEEN(1, 2);
+			std::fstream* f{};
+			if (!TryGetUserdata(argv[0], "__File", &f)) {
+				Wg_RaiseArgumentTypeError(context, 0, "__File");
+				return nullptr;
+			}
+
+			Wg_int size = -1;
+			if (argc == 2) {
+				EXPECT_ARG_TYPE_INT(1);
+				size = Wg_GetInt(argv[1]);
+			}
+
+			if (size < 0) {
+				auto cur = f->tellg();
+				f->seekg(0, std::ios::end);
+				size = (Wg_int)(f->tellg() - cur);
+				f->seekg(cur);
+			}
+			
+			std::vector<char> buf((size_t)size);
+			f->read(buf.data(), size);
+			return Wg_NewStringBuffer(context, buf.data(), (int)buf.size());
+		}
+
+		static Wg_Obj* File_readline(Wg_Context* context, Wg_Obj** argv, int argc) {
+			EXPECT_ARG_COUNT(1);
+			std::fstream* f{};
+			if (!TryGetUserdata(argv[0], "__File", &f)) {
+				Wg_RaiseArgumentTypeError(context, 0, "__File");
+				return nullptr;
+			}
+			
+			if (f->eof()) {
+				return Wg_NewString(context);
+			}
+
+			std::string s;
+			std::getline(*f, s);
+			if (f->good())
+				s += '\n';
+			return Wg_NewString(context, s.c_str());
+		}
+
+		static Wg_Obj* File_readlines(Wg_Context* context, Wg_Obj** argv, int argc) {
+			EXPECT_ARG_COUNT(1);
+			if (!Wg_TryGetUserdata(argv[0], "__File", nullptr)) {
+				Wg_RaiseArgumentTypeError(context, 0, "__File");
+				return nullptr;
+			}
+
+			return Wg_Call(context->builtins.list, argv, 1);
+		}
+
+		static Wg_Obj* File_closex(Wg_Context* context, Wg_Obj** argv, int argc) {
+			std::fstream* f{};
+			if (!TryGetUserdata(argv[0], "__File", &f)) {
+				Wg_RaiseArgumentTypeError(context, 0, "__File");
+				return nullptr;
+			}
+
+			if (f->is_open())
+				f->close();
+
+			return Wg_None(context);
+		}
+
+		static Wg_Obj* File_close(Wg_Context* context, Wg_Obj** argv, int argc) {
+			EXPECT_ARG_COUNT(1);
+			return File_closex(context, argv, argc);
+		}
+
+		static Wg_Obj* File_exit(Wg_Context* context, Wg_Obj** argv, int argc) {
+			EXPECT_ARG_COUNT(4);
+			return File_closex(context, argv, argc);
+		}
+
+		static Wg_Obj* File_seekable(Wg_Context* context, Wg_Obj** argv, int argc) {
+			EXPECT_ARG_COUNT(1);
+			if (!Wg_TryGetUserdata(argv[0], "__File", nullptr)) {
+				Wg_RaiseArgumentTypeError(context, 0, "__File");
+				return nullptr;
+			}
+			
+			return Wg_NewBool(context, true);
+		}
+
+		static Wg_Obj* File_readable(Wg_Context* context, Wg_Obj** argv, int argc) {
+			EXPECT_ARG_COUNT(1);
+			if (!Wg_TryGetUserdata(argv[0], "__File", nullptr)) {
+				Wg_RaiseArgumentTypeError(context, 0, "__File");
+				return nullptr;
+			}
+
+			return Wg_GetAttribute(argv[0], "_readable");
+		}
+
+		static Wg_Obj* File_writable(Wg_Context* context, Wg_Obj** argv, int argc) {
+			EXPECT_ARG_COUNT(1);
+			if (!Wg_TryGetUserdata(argv[0], "__File", nullptr)) {
+				Wg_RaiseArgumentTypeError(context, 0, "__File");
+				return nullptr;
+			}
+
+			return Wg_GetAttribute(argv[0], "_writable");
+		}
+
+		static Wg_Obj* File_seek(Wg_Context* context, Wg_Obj** argv, int argc) {
+			EXPECT_ARG_COUNT(2);
+			EXPECT_ARG_TYPE_INT(1);
+			std::fstream* f{};
+			if (!TryGetUserdata(argv[0], "__File", &f)) {
+				Wg_RaiseArgumentTypeError(context, 0, "__File");
+				return nullptr;
+			}
+			
+			f->seekg((std::streampos)Wg_GetInt(argv[1]));
+
+			return Wg_None(context);
+		}
+
+		static Wg_Obj* File_tell(Wg_Context* context, Wg_Obj** argv, int argc) {
+			EXPECT_ARG_COUNT(1);
+			std::fstream* f{};
+			if (!TryGetUserdata(argv[0], "__File", &f)) {
+				Wg_RaiseArgumentTypeError(context, 0, "__File");
+				return nullptr;
+			}
+
+			return Wg_NewInt(context, (Wg_int)f->tellg());
+		}
+
+		static Wg_Obj* File_flush(Wg_Context* context, Wg_Obj** argv, int argc) {
+			EXPECT_ARG_COUNT(1);
+			std::fstream* f{};
+			if (!TryGetUserdata(argv[0], "__File", &f)) {
+				Wg_RaiseArgumentTypeError(context, 0, "__File");
+				return nullptr;
+			}
+
+			f->flush();
+
+			return Wg_None(context);
+		}
+
+		static Wg_Obj* File_write(Wg_Context* context, Wg_Obj** argv, int argc) {
+			EXPECT_ARG_COUNT(2);
+			EXPECT_ARG_TYPE_STRING(1);
+			std::fstream* f{};
+			if (!TryGetUserdata(argv[0], "__File", &f)) {
+				Wg_RaiseArgumentTypeError(context, 0, "__File");
+				return nullptr;
+			}
+
+			int len{};
+			const char* s = Wg_GetString(argv[1], &len);
+			f->write(s, (std::streamsize)len);
+
+			return Wg_None(context);
+		}
+
+		static Wg_Obj* File_writelines(Wg_Context* context, Wg_Obj** argv, int argc) {
+			EXPECT_ARG_COUNT(2);
+			if (!Wg_TryGetUserdata(argv[0], "__File", nullptr)) {
+				Wg_RaiseArgumentTypeError(context, 0, "__File");
+				return nullptr;
+			}
+
+			auto fn = [](Wg_Obj* obj, void* ud) {
+				auto* file = (Wg_Obj*)ud;
+				return Wg_CallMethod(file, "write", &obj, 1) != nullptr;
+			};
+
+			if (!Wg_Iterate(argv[1], argv[0], fn))
+				return nullptr;
+
+			return Wg_None(context);
 		}
 		
 		static Wg_Obj* self(Wg_Context* context, Wg_Obj** argv, int argc) {
@@ -3838,6 +4123,24 @@ namespace wings {
 			RegisterMethod<methods::SetIter_next>(builtins.setIter, "__next__");
 			RegisterMethod<methods::self>(builtins.setIter, "__iter__");
 
+			builtins.file = createClass("__File", nullptr, false);
+			RegisterMethod<ctors::File>(builtins.file, "__init__");
+			RegisterMethod<methods::File_iter>(builtins.file, "__iter__");
+			RegisterMethod<methods::self>(builtins.file, "__enter__");
+			RegisterMethod<methods::File_exit>(builtins.file, "__exit__");
+			RegisterMethod<methods::File_close>(builtins.file, "close");
+			RegisterMethod<methods::File_read>(builtins.file, "read");
+			RegisterMethod<methods::File_readline>(builtins.file, "readline");
+			RegisterMethod<methods::File_readlines>(builtins.file, "readlines");
+			RegisterMethod<methods::File_write>(builtins.file, "write");
+			RegisterMethod<methods::File_writelines>(builtins.file, "writelines");
+			RegisterMethod<methods::File_readable>(builtins.file, "readable");
+			RegisterMethod<methods::File_writable>(builtins.file, "writable");
+			RegisterMethod<methods::File_seekable>(builtins.file, "seekable");
+			RegisterMethod<methods::File_seek>(builtins.file, "seek");
+			RegisterMethod<methods::File_tell>(builtins.file, "tell");
+			Wg_SetGlobal(context, "open", builtins.file);
+
 			// Add native free functions
 			RegisterFunction<lib::base_str<2>>(context, "bin");
 			RegisterFunction<lib::base_str<8>>(context, "oct");
@@ -3871,6 +4174,7 @@ namespace wings {
 			builtins.defaultReverseIter = getGlobal("__DefaultReverseIter");
 			builtins.codeObject = getGlobal("__CodeObject");
 			builtins.moduleObject = createClass("ModuleObject", nullptr, false);
+			builtins.readlineIter = getGlobal("__ReadLineIter");
 			
 			builtins.baseException = getGlobal("BaseException");
 			builtins.systemExit = getGlobal("SystemExit");
@@ -3887,6 +4191,7 @@ namespace wings {
 			builtins.keyError = getGlobal("KeyError");
 			builtins.memoryError = getGlobal("MemoryError");
 			builtins.nameError = getGlobal("NameError");
+			builtins.osError = getGlobal("OSError");
 			builtins.runtimeError = getGlobal("RuntimeError");
 			builtins.notImplementedError = getGlobal("NotImplementedError");
 			builtins.recursionError = getGlobal("RecursionError");
