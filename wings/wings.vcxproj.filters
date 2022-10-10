@@ -32,7 +32,7 @@
     <ClCompile Include="executor.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="lib.cpp">
+    <ClCompile Include="builtins.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="attributetable.cpp">
@@ -79,7 +79,7 @@
     <ClInclude Include="tests.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="lib.h">
+    <ClInclude Include="builtins.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

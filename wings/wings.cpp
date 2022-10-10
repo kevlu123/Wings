@@ -2,7 +2,7 @@
 #include "common.h"
 #include "executor.h"
 #include "compile.h"
-#include "lib.h"
+#include "builtins.h"
 
 #include <iostream>
 #include <memory>
