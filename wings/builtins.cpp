@@ -1321,7 +1321,10 @@ namespace wings {
 				return nullptr;
 			}
 			shift = std::min(shift, (Wg_int)sizeof(Wg_int) * 8);
-			return Wg_NewInt(context, Wg_GetInt(argv[0]) >> shift);
+			Wg_uint shifted = (Wg_uint)Wg_GetInt(argv[0]) >> shift;
+			Wg_int i{};
+			std::memcpy(&i, &shifted, sizeof(Wg_int));
+			return Wg_NewInt(context, i);
 		}
 
 		static Wg_Obj* int_bit_length(Wg_Context* context, Wg_Obj** argv, int argc) {

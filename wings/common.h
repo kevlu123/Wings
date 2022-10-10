@@ -16,6 +16,8 @@
 #include <cstdlib>
 #include <mutex>
 
+static_assert(sizeof(Wg_int) == sizeof(Wg_uint));
+
 namespace wings {
 	extern Wg_ErrorCallback errorCallback;
 	extern void* errorCallbackUserdata;
