@@ -3683,6 +3683,11 @@ namespace wings {
 			}
 		}
 
+		static Wg_Obj* pow(Wg_Context* context, Wg_Obj** argv, int argc) {
+			WG_EXPECT_ARG_COUNT(2);
+			return Wg_BinaryOp(WG_BOP_POW, argv[0], argv[1]);
+		}
+
 		static Wg_Obj* print(Wg_Context* context, Wg_Obj** argv, int argc) {
 			std::string text;
 			for (int i = 0; i < argc; i++) {
@@ -4139,6 +4144,7 @@ namespace wings {
 			RegisterFunction<lib::input>(context, "input");
 			builtins.isinstance = RegisterFunction<lib::isinstance>(context, "isinstance");
 			RegisterFunction<lib::ord>(context, "ord");
+			RegisterFunction<lib::pow>(context, "pow");
 			RegisterFunction<lib::print>(context, "print");
 			RegisterFunction<lib::round>(context, "round");
 			RegisterFunction<lib::setattr>(context, "setattr");
