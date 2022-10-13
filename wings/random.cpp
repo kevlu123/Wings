@@ -18,9 +18,6 @@ def getrandbits(n):
 			x |= 1
 	return x
 
-def randint(a, b):
-	return int((b - a + 1) * random()) + a
-
 def randrange(*args):
 	return choice(range(*args))
 		)";
@@ -36,10 +33,6 @@ def randrange(*args):
 
 		Wg_float Rand() {
 			return dist(engine);
-		}
-
-		bool Bool() {
-			return dist(engine) < 0.5f;
 		}
 
 		Wg_int Int(Wg_int minIncl, Wg_int maxIncl) {
@@ -76,6 +69,15 @@ def randrange(*args):
 		Rng* gen{};
 		TryGetUserdata(rng, "__Rng", &gen);
 		return *gen;
+	}
+
+	static Wg_Obj* randint(Wg_Context* context, Wg_Obj** argv, int argc) {
+		WG_EXPECT_ARG_COUNT(2);
+		WG_EXPECT_ARG_TYPE_INT(0);
+		WG_EXPECT_ARG_TYPE_INT(1);
+		Wg_int lower = Wg_GetInt(argv[0]);
+		Wg_int upper = Wg_GetInt(argv[1]);
+		return Wg_NewInt(context, GetGen(context).Int(lower, upper));
 	}
 
 	static Wg_Obj* random(Wg_Context* context, Wg_Obj** argv, int argc) {
@@ -126,6 +128,7 @@ def randrange(*args):
 		
 			RegisterFunction(context, "seed", seed);
 			RegisterFunction(context, "shuffle", shuffle);
+			RegisterFunction(context, "randint", randint);
 			RegisterFunction(context, "random", random);
 			RegisterFunction(context, "uniform", uniform);
 
