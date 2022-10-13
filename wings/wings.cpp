@@ -1,9 +1,8 @@
 #include "wings.h"
 #include "common.h"
-#include "executor.h"
-#include "compile.h"
 
 #include "builtins.h"
+#include "math.h"
 #include "random.h"
 
 #include <iostream>
@@ -14,7 +13,7 @@
 #include <string_view>
 #include <sstream>
 #include <queue>
-#include <mutex>
+#include <unordered_set>
 
 extern "C" {
 	void Wg_GetConfig(const Wg_Context* context, Wg_Config* out) {
@@ -51,6 +50,7 @@ extern "C" {
 		Wg_SetConfig(context, nullptr);
 
 		Wg_RegisterModule(context, "__builtins__", wings::ImportBuiltins);
+		Wg_RegisterModule(context, "math", wings::ImportMath);
 		Wg_RegisterModule(context, "random", wings::ImportRandom);
 
 		Wg_ImportAllFromModule(context, "__builtins__");
@@ -85,88 +85,13 @@ extern "C" {
 		wings::errorCallbackUserdata = userdata;
 	}
 
-	static Wg_Obj* Compile(Wg_Context* context, const char* code, const char* module, const char* prettyName, bool expr) {
-		WG_ASSERT(context && code);
-
-		if (prettyName == nullptr)
-			prettyName = wings::DEFAULT_FUNC_NAME;
-
-		auto lexResult = wings::Lex(code);
-		auto originalSource = wings::MakeRcPtr<std::vector<std::string>>(lexResult.originalSource);
-
-		auto raiseException = [&](const wings::CodeError& error) {
-			std::string_view lineText;
-			if (error.srcPos.line < originalSource->size()) {
-				lineText = (*originalSource)[error.srcPos.line];
-			}
-			context->currentTrace.push_back(wings::TraceFrame{
-				error.srcPos,
-				lineText,
-				module,
-				prettyName,
-				true
-				});
-
-			Wg_RaiseException(context, WG_EXC_SYNTAXERROR, error.message.c_str());
-		};
-
-		if (lexResult.error) {
-			raiseException(lexResult.error);
-			return nullptr;
-		}
-
-		auto parseResult = Parse(lexResult.lexTree);
-		if (parseResult.error) {
-			raiseException(parseResult.error);
-			return nullptr;
-		}
-
-		if (expr) {
-			std::vector<wings::Statement> body = std::move(parseResult.parseTree.expr.def.body);
-			if (body.size() != 1 || body[0].type != wings::Statement::Type::Expr) {
-				raiseException(wings::CodeError::Bad("Invalid syntax"));
-				return nullptr;
-			}
-			
-			wings::Statement ret{};
-			ret.srcPos = body[0].srcPos;
-			ret.type = wings::Statement::Type::Return;
-			ret.expr = std::move(body[0].expr);
-			
-			parseResult.parseTree.expr.def.body.clear();
-			parseResult.parseTree.expr.def.body.push_back(std::move(ret));
-		}
-
-		auto* def = new wings::DefObject();
-		def->context = context;
-		def->module = module;
-		def->prettyName = prettyName;
-		def->originalSource = std::move(originalSource);
-		auto instructions = Compile(parseResult.parseTree);
-		def->instructions = MakeRcPtr<std::vector<wings::Instruction>>(std::move(instructions));
-
-		Wg_Obj* obj = Wg_NewFunction(context, &wings::DefObject::Run, def);
-		if (obj == nullptr) {
-			delete def;
-			return nullptr;
-		}
-
-		Wg_FinalizerDesc finalizer{};
-		finalizer.fptr = [](Wg_Obj* obj, void* userdata) { delete (wings::DefObject*)userdata; };
-		finalizer.userdata = def;
-		Wg_SetFinalizer(obj, &finalizer);
-
-		return obj;
-	}
-
 	Wg_Obj* Wg_Compile(Wg_Context* context, const char* code, const char* prettyName) {
-		return Compile(context, code, "__main__", prettyName, false);
+		return wings::Compile(context, code, "__main__", prettyName, false);
 	}
 
 	Wg_Obj* Wg_CompileExpression(Wg_Context* context, const char* code, const char* prettyName) {
-		return Compile(context, code, "__main__", prettyName, true);
+		return wings::Compile(context, code, "__main__", prettyName, true);
 	}
-
 
 	Wg_Obj* Wg_Execute(Wg_Context* context, const char* code, const char* prettyName) {
 		if (Wg_Obj* fn = Wg_Compile(context, code, prettyName)) {
@@ -235,7 +160,7 @@ extern "C" {
 			return false;
 		}
 
-		Wg_Obj* fn = Compile(context, source.c_str(), module.c_str(), module.c_str(), false);
+		Wg_Obj* fn = wings::Compile(context, source.c_str(), module.c_str(), module.c_str(), false);
 		if (fn == nullptr)
 			return false;
 
@@ -1179,8 +1104,13 @@ extern "C" {
 		ss << "Traceback (most recent call last):\n";
 
 		for (const auto& frame : context->exceptionTrace) {
-			if (frame.module == "__builtins__")
-				continue;
+			//if (frame.module == "__builtins__" ||
+			//	frame.module == "math" ||
+			//	frame.module == "random"
+			//	)
+			//{
+			//	continue;
+			//}
 
 			ss << "  ";
 			bool written = false;

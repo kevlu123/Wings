@@ -13,7 +13,7 @@
 #include <algorithm>
 #include <bit>
 
-static const char* const LIBRARY_CODE = R"(
+static const char* const CODE = R"(
 class __DefaultIter:
 	def __init__(self, iterable):
 		self.iterable = iterable
@@ -1265,8 +1265,13 @@ namespace wings {
 		static Wg_Obj* int_pow(Wg_Context* context, Wg_Obj** argv, int argc) {
 			WG_EXPECT_ARG_COUNT(2);
 			WG_EXPECT_ARG_TYPE_INT(0);
-			WG_EXPECT_ARG_TYPE_INT_OR_FLOAT(1);
-			return Wg_NewFloat(context, std::pow(Wg_GetFloat(argv[0]), Wg_GetFloat(argv[1])));
+			
+			if (Wg_IsInt(argv[1])) {
+				return Wg_NewInt(context, (Wg_int)std::pow(Wg_GetFloat(argv[0]), Wg_GetFloat(argv[1])));
+			} else {
+				WG_EXPECT_ARG_TYPE_INT_OR_FLOAT(1);
+				return Wg_NewFloat(context, std::pow(Wg_GetFloat(argv[0]), Wg_GetFloat(argv[1])));
+			}
 		}
 
 		static Wg_Obj* int_and(Wg_Context* context, Wg_Obj** argv, int argc) {
@@ -1563,6 +1568,14 @@ namespace wings {
 
 			std::string s = Wg_GetString(argv[0]);
 			const char* p = s.c_str();
+
+			if (s == "inf") {
+				return Wg_NewFloat(context, std::numeric_limits<Wg_float>::infinity());
+			} else if (s == "-inf") {
+				return Wg_NewFloat(context, -std::numeric_limits<Wg_float>::infinity());
+			} else if (s == "nan") {
+				return Wg_NewFloat(context, std::numeric_limits<Wg_float>::quiet_NaN());
+			}
 
 			int base = 10;
 			if (*p == '0') {
@@ -4101,7 +4114,7 @@ namespace wings {
 			RegisterFunction(context, "setattr", lib::setattr);
 			
 			// Initialize the rest with a script
-			if (Wg_Execute(context, LIBRARY_CODE, "__builtins__") == nullptr)
+			if (Execute(context, CODE, "__builtins__") == nullptr)
 				throw LibraryInitException();
 
 			b.len = getGlobal("len");

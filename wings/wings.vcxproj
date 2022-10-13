@@ -151,6 +151,7 @@
     <ClCompile Include="lex.cpp" />
     <ClCompile Include="builtins.cpp" />
     <ClCompile Include="main.cpp" />
+    <ClCompile Include="math.cpp" />
     <ClCompile Include="parse.cpp" />
     <ClCompile Include="random.cpp" />
     <ClCompile Include="tests.cpp" />
@@ -164,6 +165,7 @@
     <ClInclude Include="exprparse.h" />
     <ClInclude Include="lex.h" />
     <ClInclude Include="builtins.h" />
+    <ClInclude Include="math.h" />
     <ClInclude Include="parse.h" />
     <ClInclude Include="random.h" />
     <ClInclude Include="rcptr.h" />

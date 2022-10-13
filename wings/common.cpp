@@ -1,4 +1,7 @@
 #include "common.h"
+#include "lex.h"
+#include "parse.h"
+#include "executor.h"
 
 #include <algorithm>
 #include <unordered_set>
@@ -185,5 +188,87 @@ namespace wings {
 			throw LibraryInitException();
 		Wg_SetGlobal(context, name, obj);
 		return obj;
+	}
+
+	Wg_Obj* Compile(Wg_Context* context, const char* code, const char* module, const char* prettyName, bool expr) {
+		WG_ASSERT(context && code);
+
+		if (prettyName == nullptr)
+			prettyName = wings::DEFAULT_FUNC_NAME;
+
+		auto lexResult = wings::Lex(code);
+		auto originalSource = wings::MakeRcPtr<std::vector<std::string>>(lexResult.originalSource);
+
+		auto raiseException = [&](const wings::CodeError& error) {
+			std::string_view lineText;
+			if (error.srcPos.line < originalSource->size()) {
+				lineText = (*originalSource)[error.srcPos.line];
+			}
+			context->currentTrace.push_back(wings::TraceFrame{
+				error.srcPos,
+				lineText,
+				module,
+				prettyName,
+				true
+				});
+
+			Wg_RaiseException(context, WG_EXC_SYNTAXERROR, error.message.c_str());
+		};
+
+		if (lexResult.error) {
+			raiseException(lexResult.error);
+			return nullptr;
+		}
+
+		auto parseResult = Parse(lexResult.lexTree);
+		if (parseResult.error) {
+			raiseException(parseResult.error);
+			return nullptr;
+		}
+
+		if (expr) {
+			std::vector<wings::Statement> body = std::move(parseResult.parseTree.expr.def.body);
+			if (body.size() != 1 || body[0].type != wings::Statement::Type::Expr) {
+				raiseException(wings::CodeError::Bad("Invalid syntax"));
+				return nullptr;
+			}
+
+			wings::Statement ret{};
+			ret.srcPos = body[0].srcPos;
+			ret.type = wings::Statement::Type::Return;
+			ret.expr = std::move(body[0].expr);
+
+			parseResult.parseTree.expr.def.body.clear();
+			parseResult.parseTree.expr.def.body.push_back(std::move(ret));
+		}
+
+		auto* def = new wings::DefObject();
+		def->context = context;
+		def->module = module;
+		def->prettyName = prettyName;
+		def->originalSource = std::move(originalSource);
+		auto instructions = Compile(parseResult.parseTree);
+		def->instructions = MakeRcPtr<std::vector<wings::Instruction>>(std::move(instructions));
+
+		Wg_Obj* obj = Wg_NewFunction(context, &wings::DefObject::Run, def);
+		if (obj == nullptr) {
+			delete def;
+			return nullptr;
+		}
+
+		Wg_FinalizerDesc finalizer{};
+		finalizer.fptr = [](Wg_Obj* obj, void* userdata) { delete (wings::DefObject*)userdata; };
+		finalizer.userdata = def;
+		Wg_SetFinalizer(obj, &finalizer);
+
+		return obj;
+	}
+
+	Wg_Obj* Execute(Wg_Context* context, const char* code, const char* module) {
+		if (Wg_Obj* fn = Compile(context, code, module, module, false)) {
+			return Wg_Call(fn, nullptr, 0);
+		} else {
+			return nullptr;
+		}
 	}
 }

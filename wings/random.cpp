@@ -132,7 +132,7 @@ def randrange(*args):
 			RegisterFunction(context, "random", random);
 			RegisterFunction(context, "uniform", uniform);
 
-			if (!Wg_Execute(context, CODE))
+			if (!Execute(context, CODE, "random"))
 				throw LibraryInitException();
 			
 			return true;

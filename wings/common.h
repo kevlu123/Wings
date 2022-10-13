@@ -32,6 +32,8 @@ namespace wings {
 	bool IsValidIdentifier(std::string_view s);
 	void RegisterMethod(Wg_Obj* klass, const char* name, Wg_Function fptr);
 	Wg_Obj* RegisterFunction(Wg_Context* context, const char* name, Wg_Function fptr);
+	Wg_Obj* Compile(Wg_Context* context, const char* code, const char* module, const char* prettyName, bool expr);
+	Wg_Obj* Execute(Wg_Context* context, const char* code, const char* module);
 
 	template <class T>
 	bool TryGetUserdata(Wg_Obj* obj, const char* type, T** out) {
