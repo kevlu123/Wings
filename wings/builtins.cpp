@@ -3603,10 +3603,7 @@ namespace wings {
 			} else {
 				WG_EXPECT_ARG_TYPE_STRING(0);
 				const char* source = Wg_GetString(argv[0]);
-				Wg_Obj* fn = Wg_CompileExpression(context, source, "<string>");
-				if (fn == nullptr)
-					return nullptr;
-				return Wg_Call(fn, nullptr, 0);
+				return Wg_ExecuteExpression(context, source, "<string>");
 			}
 		}
 
@@ -3619,11 +3616,7 @@ namespace wings {
 			} else {
 				WG_EXPECT_ARG_TYPE_STRING(0);
 				const char* source = Wg_GetString(argv[0]);
-				Wg_Obj* fn = Wg_Compile(context, source, "<string>");
-				if (fn == nullptr)
-					return nullptr;
-				if (Wg_Call(fn, nullptr, 0) == nullptr)
-					return nullptr;
+				return Wg_Execute(context, source, "<string>");
 			}
 			return Wg_None(context);
 		}
@@ -3742,52 +3735,7 @@ namespace wings {
 
 	} // namespace lib
 
-	struct LibraryInitException : std::exception {};
-
-	using WFuncSignature = Wg_Obj * (*)(Wg_Context*, Wg_Obj**, int);
-
-	template <WFuncSignature fn>
-	void RegisterMethod(Wg_Obj* _class, const char* name) {
-		Wg_FuncDesc wfn{};
-		wfn.isMethod = true;
-		wfn.prettyName = name;
-		wfn.userdata = _class->context;
-		wfn.fptr = fn;
-
-		Wg_Obj* method = Wg_NewFunction(_class->context, &wfn);
-		if (method == nullptr)
-			throw LibraryInitException();
-
-		if (Wg_IsClass(_class)) {
-			Wg_AddAttributeToClass(_class, name, method);
-		} else {
-			Wg_SetAttribute(_class, name, method);
-		}
-	}
-
-	template <WFuncSignature fn>
-	Wg_Obj* RegisterFunction(Wg_Context* context, const char* name) {
-		Wg_FuncDesc wfn{};
-		wfn.isMethod = true;
-		wfn.prettyName = name;
-		wfn.userdata = context;
-		wfn.fptr = fn;
-
-		Wg_Obj* obj = Wg_NewFunction(context, &wfn);
-		if (obj == nullptr)
-			throw LibraryInitException();
-		Wg_SetGlobal(context, name, obj);
-		return obj;
-	}
-
-	Wg_Obj* CreateClass(Wg_Context* context, const char* name) {
-		Wg_Obj* _class = Wg_NewClass(context, name, nullptr, 0);
-		if (_class == nullptr)
-			throw LibraryInitException();
-		return _class;
-	}
-
-	bool LoadBuiltins(Wg_Context* context) {
+	bool ImportBuiltins(Wg_Context* context) {
 		try {
 			auto getGlobal = [&](const char* name) {
 				if (Wg_Obj* v = Wg_GetGlobal(context, name))
@@ -3804,395 +3752,392 @@ namespace wings {
 				throw LibraryInitException();
 			};
 
-			auto& builtins = context->builtins;
+			auto& b = context->builtins;
 
 			// Create object class
-			builtins.object = Alloc(context);
-			if (builtins.object == nullptr)
+			b.object = Alloc(context);
+			if (b.object == nullptr)
 				throw LibraryInitException();
-			builtins.object->type = "__class";
-			builtins.object->data = new Wg_Obj::Class{ std::string("object") };
-			builtins.object->finalizer.fptr = [](Wg_Obj* obj, void*) { delete (Wg_Obj::Class*)obj->data; };
-			builtins.object->Get<Wg_Obj::Class>().instanceAttributes.Set("__class__", builtins.object);
-			builtins.object->attributes.AddParent(builtins.object->Get<Wg_Obj::Class>().instanceAttributes);
-			builtins.object->Get<Wg_Obj::Class>().userdata = context;
-			builtins.object->Get<Wg_Obj::Class>().ctor = ctors::object;
-			Wg_SetGlobal(context, "object", builtins.object);
+			b.object->type = "__class";
+			b.object->data = new Wg_Obj::Class{ std::string("object") };
+			b.object->finalizer.fptr = [](Wg_Obj* obj, void*) { delete (Wg_Obj::Class*)obj->data; };
+			b.object->Get<Wg_Obj::Class>().instanceAttributes.Set("__class__", b.object);
+			b.object->attributes.AddParent(b.object->Get<Wg_Obj::Class>().instanceAttributes);
+			b.object->Get<Wg_Obj::Class>().userdata = context;
+			b.object->Get<Wg_Obj::Class>().ctor = ctors::object;
+			Wg_SetGlobal(context, "object", b.object);
 
 			// Create function class
-			builtins.func = Alloc(context);
-			if (builtins.func == nullptr)
+			b.func = Alloc(context);
+			if (b.func == nullptr)
 				throw LibraryInitException();
-			builtins.func->type = "__class";
-			builtins.func->data = new Wg_Obj::Class{ std::string("function") };
-			builtins.func->finalizer.fptr = [](Wg_Obj* obj, void*) { delete (Wg_Obj::Class*)obj->data; };
-			builtins.func->Get<Wg_Obj::Class>().instanceAttributes.Set("__class__", builtins.func);
-			builtins.func->attributes.AddParent(builtins.object->Get<Wg_Obj::Class>().instanceAttributes);
-			builtins.func->Get<Wg_Obj::Class>().userdata = context;
-			builtins.func->Get<Wg_Obj::Class>().ctor = ctors::func;
-			RegisterMethod<methods::func_str>(builtins.func, "__str__");
+			b.func->type = "__class";
+			b.func->data = new Wg_Obj::Class{ std::string("function") };
+			b.func->finalizer.fptr = [](Wg_Obj* obj, void*) { delete (Wg_Obj::Class*)obj->data; };
+			b.func->Get<Wg_Obj::Class>().instanceAttributes.Set("__class__", b.func);
+			b.func->attributes.AddParent(b.object->Get<Wg_Obj::Class>().instanceAttributes);
+			b.func->Get<Wg_Obj::Class>().userdata = context;
+			b.func->Get<Wg_Obj::Class>().ctor = ctors::func;
+			RegisterMethod(b.func, "__str__", methods::func_str);
 
 			// Create tuple class
-			builtins.tuple = Alloc(context);
-			builtins.tuple->type = "__class";
-			builtins.tuple->data = new Wg_Obj::Class{ std::string("tuple") };
-			builtins.tuple->finalizer.fptr = [](Wg_Obj* obj, void*) { delete (Wg_Obj::Class*)obj->data; };
-			builtins.tuple->Get<Wg_Obj::Class>().instanceAttributes.Set("__class__", builtins.tuple);
-			builtins.tuple->attributes.AddParent(builtins.object->Get<Wg_Obj::Class>().instanceAttributes);
-			builtins.tuple->Get<Wg_Obj::Class>().userdata = context;
-			builtins.tuple->Get<Wg_Obj::Class>().ctor = ctors::tuple;
-			Wg_SetGlobal(context, "tuple", builtins.tuple);
-			RegisterMethod<methods::collection_str<Collection::Tuple>>(builtins.tuple, "__str__");
-			RegisterMethod<methods::collection_getitem<Collection::Tuple>>(builtins.tuple, "__getitem__");
-			RegisterMethod<methods::collection_len<Collection::Tuple>>(builtins.tuple, "__len__");
-			RegisterMethod<methods::collection_contains<Collection::Tuple>>(builtins.tuple, "__contains__");
-			RegisterMethod<methods::collection_eq<Collection::Tuple>>(builtins.tuple, "__eq__");
-			RegisterMethod<methods::collection_lt<Collection::Tuple>>(builtins.tuple, "__lt__");
-			RegisterMethod<methods::collection_nonzero<Collection::Tuple>>(builtins.tuple, "__nonzero__");
-			RegisterMethod<methods::object_iter>(builtins.tuple, "__iter__");
-			RegisterMethod<methods::collection_count<Collection::Tuple>>(builtins.tuple, "count");
-			RegisterMethod<methods::collection_index<Collection::Tuple>>(builtins.tuple, "index");
+			b.tuple = Alloc(context);
+			b.tuple->type = "__class";
+			b.tuple->data = new Wg_Obj::Class{ std::string("tuple") };
+			b.tuple->finalizer.fptr = [](Wg_Obj* obj, void*) { delete (Wg_Obj::Class*)obj->data; };
+			b.tuple->Get<Wg_Obj::Class>().instanceAttributes.Set("__class__", b.tuple);
+			b.tuple->attributes.AddParent(b.object->Get<Wg_Obj::Class>().instanceAttributes);
+			b.tuple->Get<Wg_Obj::Class>().userdata = context;
+			b.tuple->Get<Wg_Obj::Class>().ctor = ctors::tuple;
+			Wg_SetGlobal(context, "tuple", b.tuple);
+			RegisterMethod(b.tuple, "__iter__", methods::object_iter);
+			RegisterMethod(b.tuple, "__str__", methods::collection_str<Collection::Tuple>);
+			RegisterMethod(b.tuple, "__getitem__", methods::collection_getitem<Collection::Tuple>);
+			RegisterMethod(b.tuple, "__len__", methods::collection_len<Collection::Tuple>);
+			RegisterMethod(b.tuple, "__contains__", methods::collection_contains<Collection::Tuple>);
+			RegisterMethod(b.tuple, "__eq__", methods::collection_eq<Collection::Tuple>);
+			RegisterMethod(b.tuple, "__lt__", methods::collection_lt<Collection::Tuple>);
+			RegisterMethod(b.tuple, "__nonzero__", methods::collection_nonzero<Collection::Tuple>);
+			RegisterMethod(b.tuple, "count", methods::collection_count<Collection::Tuple>);
+			RegisterMethod(b.tuple, "index", methods::collection_index<Collection::Tuple>);
 
 			// Create NoneType class
-			builtins.none = Alloc(context);
-			builtins.none->type = "__class";
-			builtins.none->data = new Wg_Obj::Class{ std::string("NoneType") };
-			builtins.none->finalizer.fptr = [](Wg_Obj* obj, void*) { delete (Wg_Obj::Class*)obj->data; };
-			builtins.none->Get<Wg_Obj::Class>().instanceAttributes.Set("__class__", builtins.none);
-			builtins.none->attributes.AddParent(builtins.object->Get<Wg_Obj::Class>().instanceAttributes);
-			builtins.none->Get<Wg_Obj::Class>().userdata = context;
-			builtins.none->Get<Wg_Obj::Class>().ctor = ctors::none;
+			b.none = Alloc(context);
+			b.none->type = "__class";
+			b.none->data = new Wg_Obj::Class{ std::string("NoneType") };
+			b.none->finalizer.fptr = [](Wg_Obj* obj, void*) { delete (Wg_Obj::Class*)obj->data; };
+			b.none->Get<Wg_Obj::Class>().instanceAttributes.Set("__class__", b.none);
+			b.none->attributes.AddParent(b.object->Get<Wg_Obj::Class>().instanceAttributes);
+			b.none->Get<Wg_Obj::Class>().userdata = context;
+			b.none->Get<Wg_Obj::Class>().ctor = ctors::none;
 
 			// Create None singleton
-			builtins.none = Alloc(context);
-			builtins.none->type = "__null";
-			Wg_SetAttribute(builtins.none, "__class__", builtins.none);
-			builtins.none->attributes.AddParent(builtins.object->Get<Wg_Obj::Class>().instanceAttributes);
-			RegisterMethod<methods::null_nonzero>(builtins.none, "__nonzero__");
-			RegisterMethod<methods::null_str>(builtins.none, "__str__");
+			b.none = Alloc(context);
+			b.none->type = "__null";
+			Wg_SetAttribute(b.none, "__class__", b.none);
+			b.none->attributes.AddParent(b.object->Get<Wg_Obj::Class>().instanceAttributes);
+			RegisterMethod(b.none, "__nonzero__", methods::null_nonzero);
+			RegisterMethod(b.none, "__str__", methods::null_str);
 
 			// Add __bases__ tuple to the classes created before
 			Wg_Obj* emptyTuple = Wg_NewTuple(context, nullptr, 0);
 			if (emptyTuple == nullptr)
 				throw LibraryInitException();
-			Wg_SetAttribute(builtins.object, "__bases__", emptyTuple);
-			Wg_SetAttribute(builtins.none, "__bases__", emptyTuple);
-			Wg_SetAttribute(builtins.func, "__bases__", emptyTuple);
-			Wg_SetAttribute(builtins.tuple, "__bases__", emptyTuple);
+			Wg_SetAttribute(b.object, "__bases__", emptyTuple);
+			Wg_SetAttribute(b.none, "__bases__", emptyTuple);
+			Wg_SetAttribute(b.func, "__bases__", emptyTuple);
+			Wg_SetAttribute(b.tuple, "__bases__", emptyTuple);
 
 			// Add methods
-			RegisterMethod<methods::self>(builtins.object, "__pos__");
-			RegisterMethod<methods::object_str>(builtins.object, "__str__");
-			RegisterMethod<methods::object_nonzero>(builtins.object, "__nonzero__");
-			RegisterMethod<methods::object_repr>(builtins.object, "__repr__");
-			RegisterMethod<methods::object_eq>(builtins.object, "__eq__");
-			RegisterMethod<methods::object_ne>(builtins.object, "__ne__");
-			RegisterMethod<methods::object_le>(builtins.object, "__le__");
-			RegisterMethod<methods::object_gt>(builtins.object, "__gt__");
-			RegisterMethod<methods::object_ge>(builtins.object, "__ge__");
-			RegisterMethod<methods::object_iadd>(builtins.object, "__iadd__");
-			RegisterMethod<methods::object_isub>(builtins.object, "__isub__");
-			RegisterMethod<methods::object_imul>(builtins.object, "__imul__");
-			RegisterMethod<methods::object_itruediv>(builtins.object, "__itruediv__");
-			RegisterMethod<methods::object_ifloordiv>(builtins.object, "__ifloordiv__");
-			RegisterMethod<methods::object_imod>(builtins.object, "__imod__");
-			RegisterMethod<methods::object_ipow>(builtins.object, "__ipow__");
-			RegisterMethod<methods::object_iand>(builtins.object, "__iand__");
-			RegisterMethod<methods::object_ior>(builtins.object, "__ior__");
-			RegisterMethod<methods::object_ixor>(builtins.object, "__ixor__");
-			RegisterMethod<methods::object_ilshift>(builtins.object, "__ilshift__");
-			RegisterMethod<methods::object_irshift>(builtins.object, "__irshift__");
-			RegisterMethod<methods::object_hash>(builtins.object, "__hash__");
-			RegisterMethod<methods::object_iter>(builtins.object, "__iter__");
-			RegisterMethod<methods::object_reversed>(builtins.object, "__reversed__");
+			RegisterMethod(b.object, "__pos__", methods::self);
+			RegisterMethod(b.object, "__str__", methods::object_str);
+			RegisterMethod(b.object, "__nonzero__", methods::object_nonzero);
+			RegisterMethod(b.object, "__repr__", methods::object_repr);
+			RegisterMethod(b.object, "__eq__", methods::object_eq);
+			RegisterMethod(b.object, "__ne__", methods::object_ne);
+			RegisterMethod(b.object, "__le__", methods::object_le);
+			RegisterMethod(b.object, "__gt__", methods::object_gt);
+			RegisterMethod(b.object, "__ge__", methods::object_ge);
+			RegisterMethod(b.object, "__iadd__", methods::object_iadd);
+			RegisterMethod(b.object, "__isub__", methods::object_isub);
+			RegisterMethod(b.object, "__imul__", methods::object_imul);
+			RegisterMethod(b.object, "__itruediv__", methods::object_itruediv);
+			RegisterMethod(b.object, "__ifloordiv__", methods::object_ifloordiv);
+			RegisterMethod(b.object, "__imod__", methods::object_imod);
+			RegisterMethod(b.object, "__ipow__", methods::object_ipow);
+			RegisterMethod(b.object, "__iand__", methods::object_iand);
+			RegisterMethod(b.object, "__ior__", methods::object_ior);
+			RegisterMethod(b.object, "__ixor__", methods::object_ixor);
+			RegisterMethod(b.object, "__ilshift__", methods::object_ilshift);
+			RegisterMethod(b.object, "__irshift__", methods::object_irshift);
+			RegisterMethod(b.object, "__hash__", methods::object_hash);
+			RegisterMethod(b.object, "__iter__", methods::object_iter);
+			RegisterMethod(b.object, "__reversed__", methods::object_reversed);
 
-			builtins._bool = createClass("bool");
-			builtins._bool->Get<Wg_Obj::Class>().ctor = ctors::_bool;
-			RegisterMethod<methods::self>(builtins._bool, "__nonzero__");
-			RegisterMethod<methods::bool_int>(builtins._bool, "__int__");
-			RegisterMethod<methods::bool_float>(builtins._bool, "__float__");
-			RegisterMethod<methods::bool_str>(builtins._bool, "__str__");
-			RegisterMethod<methods::bool_eq>(builtins._bool, "__eq__");
-			RegisterMethod<methods::bool_hash>(builtins._bool, "__hash__");
-			RegisterMethod<methods::bool_abs>(builtins._bool, "__abs__");
+			b._bool = createClass("bool");
+			b._bool->Get<Wg_Obj::Class>().ctor = ctors::_bool;
+			RegisterMethod(b._bool, "__nonzero__", methods::self);
+			RegisterMethod(b._bool, "__int__", methods::bool_int);
+			RegisterMethod(b._bool, "__float__", methods::bool_float);
+			RegisterMethod(b._bool, "__str__", methods::bool_str);
+			RegisterMethod(b._bool, "__eq__", methods::bool_eq);
+			RegisterMethod(b._bool, "__hash__", methods::bool_hash);
+			RegisterMethod(b._bool, "__abs__", methods::bool_abs);
 
 			Wg_Obj* _false = Alloc(context);
 			if (_false == nullptr)
 				throw LibraryInitException();
-			_false->attributes = builtins._bool->Get<Wg_Obj::Class>().instanceAttributes.Copy();
+			_false->attributes = b._bool->Get<Wg_Obj::Class>().instanceAttributes.Copy();
 			_false->type = "__bool";
 			_false->data = new bool(false);
 			_false->finalizer.fptr = [](Wg_Obj* obj, void*) { delete (bool*)obj->data; };
-			builtins._false = _false;
+			b._false = _false;
 			Wg_Obj* _true = Alloc(context);
 			if (_true == nullptr)
 				throw LibraryInitException();
-			_true->attributes = builtins._bool->Get<Wg_Obj::Class>().instanceAttributes.Copy();
+			_true->attributes = b._bool->Get<Wg_Obj::Class>().instanceAttributes.Copy();
 			_true->type = "__bool";
 			_true->data = new bool(true);
 			_true->finalizer.fptr = [](Wg_Obj* obj, void*) { delete (bool*)obj->data; };
-			builtins._true = _true;
+			b._true = _true;
 
-			builtins._int = createClass("int");
-			RegisterMethod<ctors::_int>(builtins._int, "__init__");
-			RegisterMethod<methods::int_nonzero>(builtins._int, "__nonzero__");
-			RegisterMethod<methods::self>(builtins._int, "__int__");
-			RegisterMethod<methods::int_float>(builtins._int, "__float__");
-			RegisterMethod<methods::int_str>(builtins._int, "__str__");
-			RegisterMethod<methods::self>(builtins._int, "__index__");
-			RegisterMethod<methods::int_neg>(builtins._int, "__neg__");
-			RegisterMethod<methods::int_add>(builtins._int, "__add__");
-			RegisterMethod<methods::int_sub>(builtins._int, "__sub__");
-			RegisterMethod<methods::int_mul>(builtins._int, "__mul__");
-			RegisterMethod<methods::int_truediv>(builtins._int, "__truediv__");
-			RegisterMethod<methods::int_floordiv>(builtins._int, "__floordiv__");
-			RegisterMethod<methods::int_mod>(builtins._int, "__mod__");
-			RegisterMethod<methods::int_pow>(builtins._int, "__pow__");
-			RegisterMethod<methods::int_and>(builtins._int, "__and__");
-			RegisterMethod<methods::int_or>(builtins._int, "__or__");
-			RegisterMethod<methods::int_xor>(builtins._int, "__xor__");
-			RegisterMethod<methods::int_invert>(builtins._int, "__invert__");
-			RegisterMethod<methods::int_lshift>(builtins._int, "__lshift__");
-			RegisterMethod<methods::int_rshift>(builtins._int, "__rshift__");
-			RegisterMethod<methods::int_lt>(builtins._int, "__lt__");
-			RegisterMethod<methods::int_eq>(builtins._int, "__eq__");
-			RegisterMethod<methods::int_hash>(builtins._int, "__hash__");
-			RegisterMethod<methods::int_abs>(builtins._int, "__abs__");
-			RegisterMethod<methods::int_bit_length>(builtins._int, "bit_length");
-			RegisterMethod<methods::int_bit_count>(builtins._int, "bit_count");
+			b._int = createClass("int");
+			RegisterMethod(b._int, "__init__", ctors::_int);
+			RegisterMethod(b._int, "__nonzero__", methods::int_nonzero);
+			RegisterMethod(b._int, "__int__", methods::self);
+			RegisterMethod(b._int, "__float__", methods::int_float);
+			RegisterMethod(b._int, "__str__", methods::int_str);
+			RegisterMethod(b._int, "__index__", methods::self);
+			RegisterMethod(b._int, "__neg__", methods::int_neg);
+			RegisterMethod(b._int, "__add__", methods::int_add);
+			RegisterMethod(b._int, "__sub__", methods::int_sub);
+			RegisterMethod(b._int, "__mul__", methods::int_mul);
+			RegisterMethod(b._int, "__truediv__", methods::int_truediv);
+			RegisterMethod(b._int, "__floordiv__", methods::int_floordiv);
+			RegisterMethod(b._int, "__mod__", methods::int_mod);
+			RegisterMethod(b._int, "__pow__", methods::int_pow);
+			RegisterMethod(b._int, "__and__", methods::int_and);
+			RegisterMethod(b._int, "__or__", methods::int_or);
+			RegisterMethod(b._int, "__xor__", methods::int_xor);
+			RegisterMethod(b._int, "__invert__", methods::int_invert);
+			RegisterMethod(b._int, "__lshift__", methods::int_lshift);
+			RegisterMethod(b._int, "__rshift__", methods::int_rshift);
+			RegisterMethod(b._int, "__lt__", methods::int_lt);
+			RegisterMethod(b._int, "__eq__", methods::int_eq);
+			RegisterMethod(b._int, "__hash__", methods::int_hash);
+			RegisterMethod(b._int, "__abs__", methods::int_abs);
+			RegisterMethod(b._int, "bit_length", methods::int_bit_length);
+			RegisterMethod(b._int, "bit_count", methods::int_bit_count);
 
-			builtins._float = createClass("float");
-			RegisterMethod<ctors::_float>(builtins._float, "__init__");
-			RegisterMethod<methods::float_nonzero>(builtins._float, "__nonzero__");
-			RegisterMethod<methods::float_int>(builtins._float, "__int__");
-			RegisterMethod<methods::self>(builtins._float, "__float__");
-			RegisterMethod<methods::float_str>(builtins._float, "__str__");
-			RegisterMethod<methods::float_neg>(builtins._float, "__neg__");
-			RegisterMethod<methods::float_add>(builtins._float, "__add__");
-			RegisterMethod<methods::float_sub>(builtins._float, "__sub__");
-			RegisterMethod<methods::float_mul>(builtins._float, "__mul__");
-			RegisterMethod<methods::float_truediv>(builtins._float, "__truediv__");
-			RegisterMethod<methods::float_floordiv>(builtins._float, "__floordiv__");
-			RegisterMethod<methods::float_mod>(builtins._float, "__mod__");
-			RegisterMethod<methods::float_pow>(builtins._float, "__pow__");
-			RegisterMethod<methods::float_lt>(builtins._float, "__lt__");
-			RegisterMethod<methods::float_eq>(builtins._float, "__eq__");
-			RegisterMethod<methods::float_hash>(builtins._float, "__hash__");
-			RegisterMethod<methods::float_abs>(builtins._float, "__abs__");
-			RegisterMethod<methods::float_is_integer>(builtins._float, "is_integer");
+			b._float = createClass("float");
+			RegisterMethod(b._float, "__init__", ctors::_float);
+			RegisterMethod(b._float, "__nonzero__", methods::float_nonzero);
+			RegisterMethod(b._float, "__int__", methods::float_int);
+			RegisterMethod(b._float, "__float__", methods::self);
+			RegisterMethod(b._float, "__str__", methods::float_str);
+			RegisterMethod(b._float, "__neg__", methods::float_neg);
+			RegisterMethod(b._float, "__add__", methods::float_add);
+			RegisterMethod(b._float, "__sub__", methods::float_sub);
+			RegisterMethod(b._float, "__mul__", methods::float_mul);
+			RegisterMethod(b._float, "__truediv__", methods::float_truediv);
+			RegisterMethod(b._float, "__floordiv__", methods::float_floordiv);
+			RegisterMethod(b._float, "__mod__", methods::float_mod);
+			RegisterMethod(b._float, "__pow__", methods::float_pow);
+			RegisterMethod(b._float, "__lt__", methods::float_lt);
+			RegisterMethod(b._float, "__eq__", methods::float_eq);
+			RegisterMethod(b._float, "__hash__", methods::float_hash);
+			RegisterMethod(b._float, "__abs__", methods::float_abs);
+			RegisterMethod(b._float, "is_integer", methods::float_is_integer);
 
-			builtins.str = createClass("str");
-			RegisterMethod<ctors::str>(builtins.str, "__init__");
-			RegisterMethod<methods::str_nonzero>(builtins.str, "__nonzero__");
-			RegisterMethod<methods::str_int>(builtins.str, "__int__");
-			RegisterMethod<methods::str_float>(builtins.str, "__float__");
-			RegisterMethod<methods::self>(builtins.str, "__str__");
-			RegisterMethod<methods::str_repr>(builtins.str, "__repr__");
-			RegisterMethod<methods::str_len>(builtins.str, "__len__");
-			RegisterMethod<methods::str_add>(builtins.str, "__add__");
-			RegisterMethod<methods::str_mul>(builtins.str, "__mul__");
-			RegisterMethod<methods::str_getitem>(builtins.str, "__getitem__");
-			RegisterMethod<methods::str_contains>(builtins.str, "__contains__");
-			RegisterMethod<methods::str_lt>(builtins.str, "__lt__");
-			RegisterMethod<methods::str_eq>(builtins.str, "__eq__");
-			RegisterMethod<methods::str_hash>(builtins.str, "__hash__");
-			RegisterMethod<methods::str_capitalize>(builtins.str, "capitalize");
-			RegisterMethod<methods::str_casefold>(builtins.str, "casefold");
-			RegisterMethod<methods::str_lower>(builtins.str, "lower");
-			RegisterMethod<methods::str_upper>(builtins.str, "upper");
-			RegisterMethod<methods::str_center>(builtins.str, "center");
-			RegisterMethod<methods::str_count>(builtins.str, "count");
-			RegisterMethod<methods::str_format>(builtins.str, "format");
-			RegisterMethod<methods::str_find>(builtins.str, "find");
-			RegisterMethod<methods::str_index>(builtins.str, "index");
-			RegisterMethod<methods::str_startswith>(builtins.str, "startswith");
-			RegisterMethod<methods::str_endswith>(builtins.str, "endswith");
-			RegisterMethod<methods::str_isalnum>(builtins.str, "isalnum");
-			RegisterMethod<methods::str_isalpha>(builtins.str, "isalpha");
-			RegisterMethod<methods::str_isascii>(builtins.str, "isascii");
-			RegisterMethod<methods::str_isdecimal>(builtins.str, "isdecimal");
-			RegisterMethod<methods::str_isdigit>(builtins.str, "isdigit");
-			RegisterMethod<methods::str_isidentifier>(builtins.str, "isidentifier");
-			RegisterMethod<methods::str_islower>(builtins.str, "islower");
-			RegisterMethod<methods::str_isupper>(builtins.str, "isupper");
-			RegisterMethod<methods::str_isnumeric>(builtins.str, "isnumeric");
-			RegisterMethod<methods::str_isprintable>(builtins.str, "isprintable");
-			RegisterMethod<methods::str_isspace>(builtins.str, "isspace");
-			RegisterMethod<methods::str_join>(builtins.str, "join");
-			RegisterMethod<methods::str_ljust>(builtins.str, "ljust");
-			RegisterMethod<methods::str_lstrip>(builtins.str, "lstrip");
-			RegisterMethod<methods::str_replace>(builtins.str, "replace");
-			RegisterMethod<methods::str_rfind>(builtins.str, "rfind");
-			RegisterMethod<methods::str_rindex>(builtins.str, "rindex");
-			RegisterMethod<methods::str_rjust>(builtins.str, "rjust");
-			RegisterMethod<methods::str_rstrip>(builtins.str, "rstrip");
-			RegisterMethod<methods::str_split>(builtins.str, "split");
-			RegisterMethod<methods::str_splitlines>(builtins.str, "splitlines");
-			RegisterMethod<methods::str_strip>(builtins.str, "strip");
-			RegisterMethod<methods::str_zfill>(builtins.str, "zfill");
+			b.str = createClass("str");
+			RegisterMethod(b.str, "__init__", ctors::str);
+			RegisterMethod(b.str, "__nonzero__", methods::str_nonzero);
+			RegisterMethod(b.str, "__int__", methods::str_int);
+			RegisterMethod(b.str, "__float__", methods::str_float);
+			RegisterMethod(b.str, "__str__", methods::self);
+			RegisterMethod(b.str, "__repr__", methods::str_repr);
+			RegisterMethod(b.str, "__len__", methods::str_len);
+			RegisterMethod(b.str, "__add__", methods::str_add);
+			RegisterMethod(b.str, "__mul__", methods::str_mul);
+			RegisterMethod(b.str, "__getitem__", methods::str_getitem);
+			RegisterMethod(b.str, "__contains__", methods::str_contains);
+			RegisterMethod(b.str, "__lt__", methods::str_lt);
+			RegisterMethod(b.str, "__eq__", methods::str_eq);
+			RegisterMethod(b.str, "__hash__", methods::str_hash);
+			RegisterMethod(b.str, "capitalize", methods::str_capitalize);
+			RegisterMethod(b.str, "casefold", methods::str_casefold);
+			RegisterMethod(b.str, "lower", methods::str_lower);
+			RegisterMethod(b.str, "upper", methods::str_upper);
+			RegisterMethod(b.str, "center", methods::str_center);
+			RegisterMethod(b.str, "count", methods::str_count);
+			RegisterMethod(b.str, "format", methods::str_format);
+			RegisterMethod(b.str, "find", methods::str_find);
+			RegisterMethod(b.str, "index", methods::str_index);
+			RegisterMethod(b.str, "startswith", methods::str_startswith);
+			RegisterMethod(b.str, "endswith", methods::str_endswith);
+			RegisterMethod(b.str, "isalnum", methods::str_isalnum);
+			RegisterMethod(b.str, "isalpha", methods::str_isalpha);
+			RegisterMethod(b.str, "isascii", methods::str_isascii);
+			RegisterMethod(b.str, "isdecimal", methods::str_isdecimal);
+			RegisterMethod(b.str, "isdigit", methods::str_isdigit);
+			RegisterMethod(b.str, "isidentifier", methods::str_isidentifier);
+			RegisterMethod(b.str, "islower", methods::str_islower);
+			RegisterMethod(b.str, "isupper", methods::str_isupper);
+			RegisterMethod(b.str, "isnumeric", methods::str_isnumeric);
+			RegisterMethod(b.str, "isprintable", methods::str_isprintable);
+			RegisterMethod(b.str, "isspace", methods::str_isspace);
+			RegisterMethod(b.str, "join", methods::str_join);
+			RegisterMethod(b.str, "ljust", methods::str_ljust);
+			RegisterMethod(b.str, "lstrip", methods::str_lstrip);
+			RegisterMethod(b.str, "replace", methods::str_replace);
+			RegisterMethod(b.str, "rfind", methods::str_rfind);
+			RegisterMethod(b.str, "rindex", methods::str_rindex);
+			RegisterMethod(b.str, "rjust", methods::str_rjust);
+			RegisterMethod(b.str, "rstrip", methods::str_rstrip);
+			RegisterMethod(b.str, "split", methods::str_split);
+			RegisterMethod(b.str, "splitlines", methods::str_splitlines);
+			RegisterMethod(b.str, "strip", methods::str_strip);
+			RegisterMethod(b.str, "zfill", methods::str_zfill);
 
-			builtins.list = createClass("list");
-			RegisterMethod<ctors::list>(builtins.list, "__init__");
-			RegisterMethod<methods::collection_nonzero<Collection::List>>(builtins.list, "__nonzero__");
-			RegisterMethod<methods::collection_str<Collection::List>>(builtins.list, "__str__");
-			RegisterMethod<methods::collection_len<Collection::List>>(builtins.list, "__len__");
-			RegisterMethod<methods::collection_getitem<Collection::List>>(builtins.list, "__getitem__");
-			RegisterMethod<methods::list_setitem>(builtins.list, "__setitem__");
-			RegisterMethod<methods::collection_contains<Collection::List>>(builtins.list, "__contains__");
-			RegisterMethod<methods::collection_eq<Collection::List>>(builtins.list, "__eq__");
-			RegisterMethod<methods::collection_lt<Collection::List>>(builtins.list, "__lt__");
-			RegisterMethod<methods::collection_count<Collection::List>>(builtins.list, "count");
-			RegisterMethod<methods::collection_index<Collection::List>>(builtins.list, "index");
-			RegisterMethod<methods::list_append>(builtins.list, "append");
-			RegisterMethod<methods::list_clear>(builtins.list, "clear");
-			RegisterMethod<methods::list_copy>(builtins.list, "copy");
-			RegisterMethod<methods::list_extend>(builtins.list, "extend");
-			RegisterMethod<methods::list_insert>(builtins.list, "insert");
-			RegisterMethod<methods::list_pop>(builtins.list, "pop");
-			RegisterMethod<methods::list_remove>(builtins.list, "remove");
-			RegisterMethod<methods::list_reverse>(builtins.list, "reverse");
-			RegisterMethod<methods::list_sort>(builtins.list, "sort");
+			b.list = createClass("list");
+			RegisterMethod(b.list, "__init__", ctors::list);
+			RegisterMethod(b.list, "__nonzero__", methods::collection_nonzero<Collection::List>);
+			RegisterMethod(b.list, "__str__", methods::collection_str<Collection::List>);
+			RegisterMethod(b.list, "__len__", methods::collection_len<Collection::List>);
+			RegisterMethod(b.list, "__getitem__", methods::collection_getitem<Collection::List>);
+			RegisterMethod(b.list, "__setitem__", methods::list_setitem);
+			RegisterMethod(b.list, "__contains__", methods::collection_contains<Collection::List>);
+			RegisterMethod(b.list, "__eq__", methods::collection_eq<Collection::List>);
+			RegisterMethod(b.list, "__lt__", methods::collection_lt<Collection::List>);
+			RegisterMethod(b.list, "count", methods::collection_count<Collection::List>);
+			RegisterMethod(b.list, "index", methods::collection_index<Collection::List>);
+			RegisterMethod(b.list, "append", methods::list_append);
+			RegisterMethod(b.list, "clear", methods::list_clear);
+			RegisterMethod(b.list, "copy", methods::list_copy);
+			RegisterMethod(b.list, "extend", methods::list_extend);
+			RegisterMethod(b.list, "insert", methods::list_insert);
+			RegisterMethod(b.list, "pop", methods::list_pop);
+			RegisterMethod(b.list, "remove", methods::list_remove);
+			RegisterMethod(b.list, "reverse", methods::list_reverse);
+			RegisterMethod(b.list, "sort", methods::list_sort);
 
-			builtins.dict = createClass("dict");
-			RegisterMethod<ctors::map>(builtins.dict, "__init__");
-			RegisterMethod<methods::map_nonzero>(builtins.dict, "__nonzero__");
-			RegisterMethod<methods::map_str>(builtins.dict, "__str__");
-			RegisterMethod<methods::map_contains>(builtins.dict, "__contains__");
-			RegisterMethod<methods::map_getitem>(builtins.dict, "__getitem__");
-			RegisterMethod<methods::map_iter>(builtins.dict, "__iter__");
-			RegisterMethod<methods::map_len>(builtins.dict, "__len__");
-			RegisterMethod<methods::map_setitem>(builtins.dict, "__setitem__");
-			RegisterMethod<methods::map_clear>(builtins.dict, "clear");
-			RegisterMethod<methods::map_copy>(builtins.dict, "copy");
-			RegisterMethod<methods::map_get>(builtins.dict, "get");
-			RegisterMethod<methods::map_iter>(builtins.dict, "keys");
-			RegisterMethod<methods::map_values>(builtins.dict, "values");
-			RegisterMethod<methods::map_items>(builtins.dict, "items");
-			RegisterMethod<methods::map_pop>(builtins.dict, "pop");
-			RegisterMethod<methods::map_popitem>(builtins.dict, "popitem");
-			RegisterMethod<methods::map_setdefault>(builtins.dict, "setdefault");
-			RegisterMethod<methods::map_update>(builtins.dict, "update");
+			b.dict = createClass("dict");
+			RegisterMethod(b.dict, "__init__", ctors::map);
+			RegisterMethod(b.dict, "__nonzero__", methods::map_nonzero);
+			RegisterMethod(b.dict, "__str__", methods::map_str);
+			RegisterMethod(b.dict, "__contains__", methods::map_contains);
+			RegisterMethod(b.dict, "__getitem__", methods::map_getitem);
+			RegisterMethod(b.dict, "__iter__", methods::map_iter);
+			RegisterMethod(b.dict, "__len__", methods::map_len);
+			RegisterMethod(b.dict, "__setitem__", methods::map_setitem);
+			RegisterMethod(b.dict, "clear", methods::map_clear);
+			RegisterMethod(b.dict, "copy", methods::map_copy);
+			RegisterMethod(b.dict, "get", methods::map_get);
+			RegisterMethod(b.dict, "keys", methods::map_iter);
+			RegisterMethod(b.dict, "values", methods::map_values);
+			RegisterMethod(b.dict, "items", methods::map_items);
+			RegisterMethod(b.dict, "pop", methods::map_pop);
+			RegisterMethod(b.dict, "popitem", methods::map_popitem);
+			RegisterMethod(b.dict, "setdefault", methods::map_setdefault);
+			RegisterMethod(b.dict, "update", methods::map_update);
 
-			builtins.set = createClass("set");
-			RegisterMethod<ctors::set>(builtins.set, "__init__");
-			RegisterMethod<methods::set_nonzero>(builtins.set, "__nonzero__");
-			RegisterMethod<methods::set_str>(builtins.set, "__str__");
-			RegisterMethod<methods::set_contains>(builtins.set, "__contains__");
-			RegisterMethod<methods::set_iter>(builtins.set, "__iter__");
-			RegisterMethod<methods::set_len>(builtins.set, "__len__");
-			RegisterMethod<methods::set_add>(builtins.set, "add");
-			RegisterMethod<methods::set_clear>(builtins.set, "clear");
-			RegisterMethod<methods::set_copy>(builtins.set, "copy");
-			RegisterMethod<methods::set_difference>(builtins.set, "difference");
-			RegisterMethod<methods::set_discard>(builtins.set, "discard");
-			RegisterMethod<methods::set_intersection>(builtins.set, "intersection");
-			RegisterMethod<methods::set_isdisjoint>(builtins.set, "isdisjoint");
-			RegisterMethod<methods::set_issubset>(builtins.set, "issubset");
-			RegisterMethod<methods::set_issuperset>(builtins.set, "issuperset");
-			RegisterMethod<methods::set_pop>(builtins.set, "pop");
-			RegisterMethod<methods::set_remove>(builtins.set, "remove");
-			RegisterMethod<methods::set_symmetric_difference>(builtins.set, "symmetric_difference");
-			RegisterMethod<methods::set_union>(builtins.set, "union");
-			RegisterMethod<methods::set_update>(builtins.set, "update");
+			b.set = createClass("set");
+			RegisterMethod(b.set, "__init__", ctors::set);
+			RegisterMethod(b.set, "__nonzero__", methods::set_nonzero);
+			RegisterMethod(b.set, "__str__", methods::set_str);
+			RegisterMethod(b.set, "__contains__", methods::set_contains);
+			RegisterMethod(b.set, "__iter__", methods::set_iter);
+			RegisterMethod(b.set, "__len__", methods::set_len);
+			RegisterMethod(b.set, "add", methods::set_add);
+			RegisterMethod(b.set, "clear", methods::set_clear);
+			RegisterMethod(b.set, "copy", methods::set_copy);
+			RegisterMethod(b.set, "difference", methods::set_difference);
+			RegisterMethod(b.set, "discard", methods::set_discard);
+			RegisterMethod(b.set, "intersection", methods::set_intersection);
+			RegisterMethod(b.set, "isdisjoint", methods::set_isdisjoint);
+			RegisterMethod(b.set, "issubset", methods::set_issubset);
+			RegisterMethod(b.set, "issuperset", methods::set_issuperset);
+			RegisterMethod(b.set, "pop", methods::set_pop);
+			RegisterMethod(b.set, "remove", methods::set_remove);
+			RegisterMethod(b.set, "symmetric_difference", methods::set_symmetric_difference);
+			RegisterMethod(b.set, "union", methods::set_union);
+			RegisterMethod(b.set, "update", methods::set_update);
 
-			builtins.dictKeysIter = createClass("__DictKeysIter", nullptr, false);
-			RegisterMethod<ctors::DictIter>(builtins.dictKeysIter, "__init__");
-			RegisterMethod<methods::DictKeysIter_next>(builtins.dictKeysIter, "__next__");
-			RegisterMethod<methods::self>(builtins.dictKeysIter, "__iter__");
+			b.dictKeysIter = createClass("__DictKeysIter", nullptr, false);
+			RegisterMethod(b.dictKeysIter, "__init__", ctors::DictIter);
+			RegisterMethod(b.dictKeysIter, "__next__", methods::DictKeysIter_next);
+			RegisterMethod(b.dictKeysIter, "__iter__", methods::self);
 
-			builtins.dictValuesIter = createClass("__DictValuesIter", nullptr, false);
-			RegisterMethod<ctors::DictIter>(builtins.dictValuesIter, "__init__");
-			RegisterMethod<methods::DictValuesIter_next>(builtins.dictValuesIter, "__next__");
-			RegisterMethod<methods::self>(builtins.dictValuesIter, "__iter__");
+			b.dictValuesIter = createClass("__DictValuesIter", nullptr, false);
+			RegisterMethod(b.dictValuesIter, "__init__", ctors::DictIter);
+			RegisterMethod(b.dictValuesIter, "__next__", methods::DictValuesIter_next);
+			RegisterMethod(b.dictValuesIter, "__iter__", methods::self);
 
-			builtins.dictItemsIter = createClass("__DictItemsIter", nullptr, false);
-			RegisterMethod<ctors::DictIter>(builtins.dictItemsIter, "__init__");
-			RegisterMethod<methods::DictItemsIter_next>(builtins.dictItemsIter, "__next__");
-			RegisterMethod<methods::self>(builtins.dictItemsIter, "__iter__");
+			b.dictItemsIter = createClass("__DictItemsIter", nullptr, false);
+			RegisterMethod(b.dictItemsIter, "__init__", ctors::DictIter);
+			RegisterMethod(b.dictItemsIter, "__next__", methods::DictItemsIter_next);
+			RegisterMethod(b.dictItemsIter, "__iter__", methods::self);
 
-			builtins.setIter = createClass("__SetIter", nullptr, false);
-			RegisterMethod<ctors::SetIter>(builtins.setIter, "__init__");
-			RegisterMethod<methods::SetIter_next>(builtins.setIter, "__next__");
-			RegisterMethod<methods::self>(builtins.setIter, "__iter__");
+			b.setIter = createClass("__SetIter", nullptr, false);
+			RegisterMethod(b.setIter, "__init__", ctors::SetIter);
+			RegisterMethod(b.setIter, "__next__", methods::SetIter_next);
+			RegisterMethod(b.setIter, "__iter__", methods::self);
 
-			builtins.file = createClass("__File", nullptr, false);
-			RegisterMethod<ctors::File>(builtins.file, "__init__");
-			RegisterMethod<methods::File_iter>(builtins.file, "__iter__");
-			RegisterMethod<methods::self>(builtins.file, "__enter__");
-			RegisterMethod<methods::File_exit>(builtins.file, "__exit__");
-			RegisterMethod<methods::File_close>(builtins.file, "close");
-			RegisterMethod<methods::File_read>(builtins.file, "read");
-			RegisterMethod<methods::File_readline>(builtins.file, "readline");
-			RegisterMethod<methods::File_readlines>(builtins.file, "readlines");
-			RegisterMethod<methods::File_write>(builtins.file, "write");
-			RegisterMethod<methods::File_writelines>(builtins.file, "writelines");
-			RegisterMethod<methods::File_readable>(builtins.file, "readable");
-			RegisterMethod<methods::File_writable>(builtins.file, "writable");
-			RegisterMethod<methods::File_seekable>(builtins.file, "seekable");
-			RegisterMethod<methods::File_seek>(builtins.file, "seek");
-			RegisterMethod<methods::File_tell>(builtins.file, "tell");
-			Wg_SetGlobal(context, "open", builtins.file);
+			b.file = createClass("__File", nullptr, false);
+			RegisterMethod(b.file, "__init__", ctors::File);
+			RegisterMethod(b.file, "__iter__", methods::File_iter);
+			RegisterMethod(b.file, "__enter__", methods::self);
+			RegisterMethod(b.file, "__exit__", methods::File_exit);
+			RegisterMethod(b.file, "close", methods::File_close);
+			RegisterMethod(b.file, "read", methods::File_read);
+			RegisterMethod(b.file, "readline", methods::File_readline);
+			RegisterMethod(b.file, "readlines", methods::File_readlines);
+			RegisterMethod(b.file, "write", methods::File_write);
+			RegisterMethod(b.file, "writelines", methods::File_writelines);
+			RegisterMethod(b.file, "readable", methods::File_readable);
+			RegisterMethod(b.file, "writable", methods::File_writable);
+			RegisterMethod(b.file, "seekable", methods::File_seekable);
+			RegisterMethod(b.file, "seek", methods::File_seek);
+			RegisterMethod(b.file, "tell", methods::File_tell);
+			Wg_SetGlobal(context, "open", b.file);
 
 			// Add native free functions
-			RegisterFunction<lib::base_str<2>>(context, "bin");
-			RegisterFunction<lib::base_str<8>>(context, "oct");
-			RegisterFunction<lib::base_str<16>>(context, "hex");
-			RegisterFunction<lib::callable>(context, "callable");
-			RegisterFunction<lib::chr>(context, "chr");
-			RegisterFunction<lib::compile>(context, "compile");
-			RegisterFunction<lib::eval>(context, "eval");
-			RegisterFunction<lib::exec>(context, "exec");
-			RegisterFunction<lib::getattr>(context, "getattr");
-			RegisterFunction<lib::id>(context, "id");
-			RegisterFunction<lib::input>(context, "input");
-			builtins.isinstance = RegisterFunction<lib::isinstance>(context, "isinstance");
-			RegisterFunction<lib::ord>(context, "ord");
-			RegisterFunction<lib::pow>(context, "pow");
-			RegisterFunction<lib::print>(context, "print");
-			RegisterFunction<lib::round>(context, "round");
-			RegisterFunction<lib::setattr>(context, "setattr");
+			b.isinstance = RegisterFunction(context, "isinstance", lib::isinstance);
+			RegisterFunction(context, "bin", lib::base_str<2>);
+			RegisterFunction(context, "oct", lib::base_str<8>);
+			RegisterFunction(context, "hex", lib::base_str<16>);
+			RegisterFunction(context, "callable", lib::callable);
+			RegisterFunction(context, "chr", lib::chr);
+			RegisterFunction(context, "compile", lib::compile);
+			RegisterFunction(context, "eval", lib::eval);
+			RegisterFunction(context, "exec", lib::exec);
+			RegisterFunction(context, "getattr", lib::getattr);
+			RegisterFunction(context, "id", lib::id);
+			RegisterFunction(context, "input", lib::input);
+			RegisterFunction(context, "ord", lib::ord);
+			RegisterFunction(context, "pow", lib::pow);
+			RegisterFunction(context, "print", lib::print);
+			RegisterFunction(context, "round", lib::round);
+			RegisterFunction(context, "setattr", lib::setattr);
 			
 			// Initialize the rest with a script
-			Wg_Obj* lib = Wg_Compile(context, LIBRARY_CODE, "__builtins__");
-			if (lib == nullptr)
-				throw LibraryInitException();
-			if (Wg_Call(lib, nullptr, 0) == nullptr)
+			if (Wg_Execute(context, LIBRARY_CODE, "__builtins__") == nullptr)
 				throw LibraryInitException();
 
-			builtins.len = getGlobal("len");
-			builtins.repr = getGlobal("repr");
-			builtins.hash = getGlobal("hash");
-			builtins.slice = getGlobal("slice");
-			builtins.defaultIter = getGlobal("__DefaultIter");
-			builtins.defaultReverseIter = getGlobal("__DefaultReverseIter");
-			builtins.codeObject = getGlobal("__CodeObject");
-			builtins.moduleObject = createClass("ModuleObject", nullptr, false);
-			builtins.readlineIter = getGlobal("__ReadLineIter");
+			b.len = getGlobal("len");
+			b.repr = getGlobal("repr");
+			b.hash = getGlobal("hash");
+			b.slice = getGlobal("slice");
+			b.defaultIter = getGlobal("__DefaultIter");
+			b.defaultReverseIter = getGlobal("__DefaultReverseIter");
+			b.codeObject = getGlobal("__CodeObject");
+			b.moduleObject = createClass("ModuleObject", nullptr, false);
+			b.readlineIter = getGlobal("__ReadLineIter");
 			
-			builtins.baseException = getGlobal("BaseException");
-			builtins.systemExit = getGlobal("SystemExit");
-			builtins.exception = getGlobal("Exception");
-			builtins.stopIteration = getGlobal("StopIteration");
-			builtins.arithmeticError = getGlobal("ArithmeticError");
-			builtins.overflowError = getGlobal("OverflowError");
-			builtins.zeroDivisionError = getGlobal("ZeroDivisionError");
-			builtins.attributeError = getGlobal("AttributeError");
-			builtins.importError = getGlobal("ImportError");
-			builtins.syntaxError = getGlobal("SyntaxError");
-			builtins.lookupError = getGlobal("LookupError");
-			builtins.indexError = getGlobal("IndexError");
-			builtins.keyError = getGlobal("KeyError");
-			builtins.memoryError = getGlobal("MemoryError");
-			builtins.nameError = getGlobal("NameError");
-			builtins.osError = getGlobal("OSError");
-			builtins.runtimeError = getGlobal("RuntimeError");
-			builtins.notImplementedError = getGlobal("NotImplementedError");
-			builtins.recursionError = getGlobal("RecursionError");
-			builtins.typeError = getGlobal("TypeError");
-			builtins.valueError = getGlobal("ValueError");
+			b.baseException = getGlobal("BaseException");
+			b.systemExit = getGlobal("SystemExit");
+			b.exception = getGlobal("Exception");
+			b.stopIteration = getGlobal("StopIteration");
+			b.arithmeticError = getGlobal("ArithmeticError");
+			b.overflowError = getGlobal("OverflowError");
+			b.zeroDivisionError = getGlobal("ZeroDivisionError");
+			b.attributeError = getGlobal("AttributeError");
+			b.importError = getGlobal("ImportError");
+			b.syntaxError = getGlobal("SyntaxError");
+			b.lookupError = getGlobal("LookupError");
+			b.indexError = getGlobal("IndexError");
+			b.keyError = getGlobal("KeyError");
+			b.memoryError = getGlobal("MemoryError");
+			b.nameError = getGlobal("NameError");
+			b.osError = getGlobal("OSError");
+			b.runtimeError = getGlobal("RuntimeError");
+			b.notImplementedError = getGlobal("NotImplementedError");
+			b.recursionError = getGlobal("RecursionError");
+			b.typeError = getGlobal("TypeError");
+			b.valueError = getGlobal("ValueError");
 
-			builtins.memoryErrorInstance = Wg_Call(builtins.memoryError, nullptr, 0);
-			if (builtins.memoryErrorInstance == nullptr)
+			b.memoryErrorInstance = Wg_Call(b.memoryError, nullptr, 0);
+			if (b.memoryErrorInstance == nullptr)
 				throw LibraryInitException();
 			
 		} catch (LibraryInitException&) {

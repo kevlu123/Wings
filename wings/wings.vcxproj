@@ -152,6 +152,7 @@
     <ClCompile Include="builtins.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="parse.cpp" />
+    <ClCompile Include="random.cpp" />
     <ClCompile Include="tests.cpp" />
     <ClCompile Include="wings.cpp" />
   </ItemGroup>
@@ -164,6 +165,7 @@
     <ClInclude Include="lex.h" />
     <ClInclude Include="builtins.h" />
     <ClInclude Include="parse.h" />
+    <ClInclude Include="random.h" />
     <ClInclude Include="rcptr.h" />
     <ClInclude Include="hash.h" />
     <ClInclude Include="tests.h" />

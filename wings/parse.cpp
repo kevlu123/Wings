@@ -427,8 +427,8 @@ namespace wings {
 					}
 					break;
 				case Statement::Type::Class:
-					writeVars.insert(child._class.name);
-					allVars.insert(child._class.name);
+					writeVars.insert(child.klass.name);
+					allVars.insert(child.klass.name);
 					break;
 				case Statement::Type::Def:
 					writeVars.insert(child.expr.def.name);
@@ -517,14 +517,14 @@ namespace wings {
 		} else if (p->type != Token::Type::Word) {
 			return CodeError::Bad("Expected a class name", p->srcPos);
 		}
-		out._class.name = p->text;
+		out.klass.name = p->text;
 		++p;
 
 		if (p.EndReached()) {
 			return CodeError::Bad("Expected a ':'", (--p)->srcPos);
 		} else if (p->text == "(") {
 			++p;
-			if (auto error = ParseExpressionList(p, ")", out._class.bases)) {
+			if (auto error = ParseExpressionList(p, ")", out.klass.bases)) {
 				return error;
 			}
 			++p;
@@ -546,7 +546,7 @@ namespace wings {
 				return error;
 			}
 			stat.srcPos = method.tokens[0].srcPos;
-			out._class.methodNames.push_back(stat.expr.def.name);
+			out.klass.methodNames.push_back(stat.expr.def.name);
 			out.body.push_back(std::move(stat));
 		}
 

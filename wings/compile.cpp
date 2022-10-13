@@ -536,24 +536,24 @@ namespace wings {
 		argFrame.type = Instruction::Type::PushArgFrame;
 		instructions.push_back(std::move(argFrame));
 
-		for (const auto& base : node._class.bases) {
+		for (const auto& base : node.klass.bases) {
 			CompileExpression(base, instructions);
 		}
 
-		Instruction _class{};
-		_class.srcPos = node.srcPos;
-		_class.type = Instruction::Type::Class;
-		_class._class = std::make_unique<ClassInstruction>();
-		_class._class->methodNames = node._class.methodNames;
-		_class._class->prettyName = node._class.name;
-		instructions.push_back(std::move(_class));
+		Instruction klass{};
+		klass.srcPos = node.srcPos;
+		klass.type = Instruction::Type::Class;
+		klass.klass = std::make_unique<ClassInstruction>();
+		klass.klass->methodNames = node.klass.methodNames;
+		klass.klass->prettyName = node.klass.name;
+		instructions.push_back(std::move(klass));
 
 		Instruction assign{};
 		assign.srcPos = node.srcPos;
 		assign.type = Instruction::Type::DirectAssign;
 		assign.directAssign = std::make_unique<DirectAssignInstruction>();
 		assign.directAssign->assignTarget.type = AssignType::Direct;
-		assign.directAssign->assignTarget.direct = node._class.name;
+		assign.directAssign->assignTarget.direct = node.klass.name;
 		instructions.push_back(std::move(assign));
 
 		Instruction pop{};

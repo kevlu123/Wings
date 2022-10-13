@@ -40,7 +40,7 @@ namespace wings {
 			std::string name;
 			std::vector<std::string> methodNames;
 			std::vector<Expression> bases;
-		} _class;
+		} klass;
 		struct {
 			std::vector<Statement> exceptClauses;
 			std::vector<Statement> finallyClause;

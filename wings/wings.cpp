@@ -2,7 +2,9 @@
 #include "common.h"
 #include "executor.h"
 #include "compile.h"
+
 #include "builtins.h"
+#include "random.h"
 
 #include <iostream>
 #include <memory>
@@ -48,7 +50,9 @@ extern "C" {
 		// Initialise the library without restriction
 		Wg_SetConfig(context, nullptr);
 
-		Wg_RegisterModule(context, "__builtins__", wings::LoadBuiltins);
+		Wg_RegisterModule(context, "__builtins__", wings::ImportBuiltins);
+		Wg_RegisterModule(context, "random", wings::ImportRandom);
+
 		Wg_ImportAllFromModule(context, "__builtins__");
 		
 		// Apply possibly restrictive config now
@@ -141,11 +145,7 @@ extern "C" {
 		auto instructions = Compile(parseResult.parseTree);
 		def->instructions = MakeRcPtr<std::vector<wings::Instruction>>(std::move(instructions));
 
-		Wg_FuncDesc func{};
-		func.fptr = &wings::DefObject::Run;
-		func.userdata = def;
-		func.prettyName = wings::DEFAULT_FUNC_NAME;
-		Wg_Obj* obj = Wg_NewFunction(context, &func);
+		Wg_Obj* obj = Wg_NewFunction(context, &wings::DefObject::Run, def);
 		if (obj == nullptr) {
 			delete def;
 			return nullptr;
@@ -165,6 +165,21 @@ extern "C" {
 
 	Wg_Obj* Wg_CompileExpression(Wg_Context* context, const char* code, const char* prettyName) {
 		return Compile(context, code, "__main__", prettyName, true);
+	}
+
+
+	Wg_Obj* Wg_Execute(Wg_Context* context, const char* code, const char* prettyName) {
+		if (Wg_Obj* fn = Wg_Compile(context, code, prettyName)) {
+			return Wg_Call(fn, nullptr, 0);
+		}
+		return nullptr;
+	}
+	
+	Wg_Obj* Wg_ExecuteExpression(Wg_Context* context, const char* code, const char* prettyName) {
+		if (Wg_Obj* fn = Wg_CompileExpression(context, code, prettyName)) {
+			return Wg_Call(fn, nullptr, 0);
+		}
+		return nullptr;
 	}
 
 	Wg_Obj* Wg_GetGlobal(Wg_Context* context, const char* name) {
@@ -232,6 +247,9 @@ extern "C" {
 			bool success{};
 			context->globals.insert({ std::string(name), {} });
 			context->currentModule.push(name);
+
+			if (name != "__builtins__")
+				Wg_ImportAllFromModule(context, "__builtins__");
 
 			auto it = context->moduleLoaders.find(name);
 			if (it != context->moduleLoaders.end()) {
@@ -468,21 +486,33 @@ extern "C" {
 		}
 	}
 
-	Wg_Obj* Wg_NewFunction(Wg_Context* context, const Wg_FuncDesc* value) {
-		WG_ASSERT(context && value);
+	Wg_Obj* Wg_NewFunction(Wg_Context* context, Wg_Function fptr, void* userdata, const char* prettyName) {
+		WG_ASSERT(context && fptr);
 		if (Wg_Obj* v = Wg_Call(context->builtins.func, nullptr, 0)) {
 			v->Get<Wg_Obj::Func>() = {
 				nullptr,
-				value->fptr,
-				value->userdata,
-				value->isMethod,
+				fptr,
+				userdata,
+				false,
 				std::string(context->currentModule.top()),
-				std::string(value->prettyName ? value->prettyName : wings::DEFAULT_FUNC_NAME)
+				std::string(prettyName ? prettyName : wings::DEFAULT_FUNC_NAME)
 			};
 			return v;
 		} else {
 			return nullptr;
 		}
+	}
+
+	Wg_Obj* Wg_BindMethod(Wg_Obj* klass, const char* name, Wg_Function fptr, void* userdata) {
+		WG_ASSERT(klass && fptr);
+		Wg_Context* context = klass->context;
+		wings::Wg_ObjRef ref(klass);
+		Wg_Obj* fn = Wg_NewFunction(context, fptr, userdata, name);
+		if (fn == nullptr)
+			return nullptr;
+		fn->Get<Wg_Obj::Func>().isMethod = true;
+		klass->Get<Wg_Obj::Class>().instanceAttributes.Set(name, fn);
+		return fn;
 	}
 
 	Wg_Obj* Wg_NewClass(Wg_Context* context, const char* name, Wg_Obj** bases, int baseCount) {
@@ -497,37 +527,33 @@ extern "C" {
 		}
 
 		// Allocate class
-		Wg_Obj* _class = wings::Alloc(context);
-		if (_class == nullptr) {
+		Wg_Obj* klass = wings::Alloc(context);
+		if (klass == nullptr) {
 			return nullptr;
 		}
-		refs.emplace_back(_class);
-		_class->type = "__class";
-		_class->data = new Wg_Obj::Class{ std::string(name) };
-		_class->finalizer.fptr = [](Wg_Obj* obj, void*) { delete (Wg_Obj::Class*)obj->data; };
-		_class->Get<Wg_Obj::Class>().module = context->currentModule.top();
-		_class->Get<Wg_Obj::Class>().instanceAttributes.Set("__class__", _class);
-		_class->attributes.AddParent(context->builtins.object->Get<Wg_Obj::Class>().instanceAttributes);
+		refs.emplace_back(klass);
+		klass->type = "__class";
+		klass->data = new Wg_Obj::Class{ std::string(name) };
+		klass->finalizer.fptr = [](Wg_Obj* obj, void*) { delete (Wg_Obj::Class*)obj->data; };
+		klass->Get<Wg_Obj::Class>().module = context->currentModule.top();
+		klass->Get<Wg_Obj::Class>().instanceAttributes.Set("__class__", klass);
+		klass->attributes.AddParent(context->builtins.object->Get<Wg_Obj::Class>().instanceAttributes);
 
 		// Set bases
 		int actualBaseCount = baseCount ? baseCount : 1;
 		Wg_Obj** actualBases = baseCount ? bases : &context->builtins.object;
 		for (int i = 0; i < actualBaseCount; i++) {
-			_class->Get<Wg_Obj::Class>().instanceAttributes.AddParent(actualBases[i]->Get<Wg_Obj::Class>().instanceAttributes);
-			_class->Get<Wg_Obj::Class>().bases.push_back(actualBases[i]);
+			klass->Get<Wg_Obj::Class>().instanceAttributes.AddParent(actualBases[i]->Get<Wg_Obj::Class>().instanceAttributes);
+			klass->Get<Wg_Obj::Class>().bases.push_back(actualBases[i]);
 		}
 		if (Wg_Obj* basesTuple = Wg_NewTuple(context, actualBases, actualBaseCount)) {
-			_class->attributes.Set("__bases__", basesTuple);
+			klass->attributes.Set("__bases__", basesTuple);
 		} else {
 			return nullptr;
 		}
 
 		// Set __str__()
-		Wg_FuncDesc tostr{};
-		tostr.isMethod = true;
-		tostr.prettyName = "__str__";
-		tostr.userdata = context;
-		tostr.fptr = [](Wg_Context* context, Wg_Obj** argv, int argc) -> Wg_Obj* {
+		auto tostr = [](Wg_Context* context, Wg_Obj** argv, int argc) -> Wg_Obj* {
 			if (argc != 1) {
 				Wg_RaiseArgumentCountError(context, argc, 1);
 				return nullptr;
@@ -535,15 +561,16 @@ extern "C" {
 			std::string s = "<class '" + argv[0]->Get<Wg_Obj::Class>().name + "'>";
 			return Wg_NewString(argv[0]->context, s.c_str());
 		};
-		if (Wg_Obj* tostrFn = Wg_NewFunction(context, &tostr)) {
-			Wg_SetAttribute(_class, "__str__", tostrFn);
+		if (Wg_Obj* tostrFn = Wg_NewFunction(context, tostr, nullptr, "__str__")) {
+			tostrFn->Get<Wg_Obj::Func>().isMethod = true;
+			Wg_SetAttribute(klass, "__str__", tostrFn);
 		} else {
 			return nullptr;
 		}
 
 		// Set construction function. This function forwards to __init__().
-		_class->Get<Wg_Obj::Class>().userdata = _class;
-		_class->Get<Wg_Obj::Class>().ctor = [](Wg_Context* context, Wg_Obj** argv, int argc) -> Wg_Obj* {
+		klass->Get<Wg_Obj::Class>().userdata = klass;
+		klass->Get<Wg_Obj::Class>().ctor = [](Wg_Context* context, Wg_Obj** argv, int argc) -> Wg_Obj* {
 			Wg_Obj* _classObj = (Wg_Obj*)Wg_GetFunctionUserdata(context);
 
 			Wg_Obj* instance = wings::Alloc(context);
@@ -574,19 +601,14 @@ extern "C" {
 		};
 
 		// Set init method
-		std::string initName = std::string(name) + ".__init__";
-		Wg_FuncDesc init{};
-		init.prettyName = initName.c_str();
-		init.isMethod = true;
-		init.userdata = _class;
-		init.fptr = [](Wg_Context* context, Wg_Obj** argv, int argc) -> Wg_Obj* {
-			Wg_Obj* _class = (Wg_Obj*)Wg_GetFunctionUserdata(context);
+		auto init = [](Wg_Context* context, Wg_Obj** argv, int argc) -> Wg_Obj* {
+			Wg_Obj* klass = (Wg_Obj*)Wg_GetFunctionUserdata(context);
 			if (argc < 1) {
-				Wg_RaiseArgumentCountError(_class->context, argc, -1);
+				Wg_RaiseArgumentCountError(klass->context, argc, -1);
 				return nullptr;
 			}
 
-			const auto& bases = _class->Get<Wg_Obj::Class>().bases;
+			const auto& bases = klass->Get<Wg_Obj::Class>().bases;
 			if (bases.empty())
 				return nullptr;
 
@@ -606,13 +628,14 @@ extern "C" {
 
 			return Wg_None(context);
 		};
-		Wg_Obj* initFn = Wg_NewFunction(context, &init);
+		std::string initName = std::string(name) + ".__init__";
+		Wg_Obj* initFn = Wg_BindMethod(klass, initName.c_str(), init, klass);
 		if (initFn == nullptr)
 			return nullptr;
-		Wg_LinkReference(initFn, _class);
-		Wg_AddAttributeToClass(_class, "__init__", initFn);
+		Wg_LinkReference(initFn, klass);
+		Wg_AddAttributeToClass(klass, "__init__", initFn);
 
-		return _class;
+		return klass;
 	}
 
 	void Wg_AddAttributeToClass(Wg_Obj* class_, const char* attribute, Wg_Obj* value) {
@@ -773,13 +796,13 @@ extern "C" {
 			WG_ASSERT(types[i] && Wg_IsClass(types[i]));
 
 		// Cannot use Wg_HasAttribute here because instance is a const pointer
-		Wg_Obj* _class = instance->attributes.Get("__class__");
-		if (_class == nullptr)
+		Wg_Obj* klass = instance->attributes.Get("__class__");
+		if (klass == nullptr)
 			return nullptr;
-		wings::Wg_ObjRef ref(_class);
+		wings::Wg_ObjRef ref(klass);
 
 		std::queue<wings::Wg_ObjRef> toCheck;
-		toCheck.emplace(_class);
+		toCheck.emplace(klass);
 
 		while (!toCheck.empty()) {
 			auto end = types + typesLen;

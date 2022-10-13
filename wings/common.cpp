@@ -165,4 +165,25 @@ namespace wings {
 			&& std::all_of(s.begin() + 1, s.end(), isalnum)
 			&& !IsKeyword(s);
 	}
+	
+	void RegisterMethod(Wg_Obj* klass, const char* name, Wg_Function fptr) {
+		Wg_Obj* method = Wg_NewFunction(klass->context, fptr, nullptr, name);
+		if (method == nullptr)
+			throw LibraryInitException();
+
+		method->Get<Wg_Obj::Func>().isMethod = true;
+		if (Wg_IsClass(klass)) {
+			Wg_AddAttributeToClass(klass, name, method);
+		} else {
+			Wg_SetAttribute(klass, name, method);
+		}
+	}
+
+	Wg_Obj* RegisterFunction(Wg_Context* context, const char* name, Wg_Function fptr) {
+		Wg_Obj* obj = Wg_NewFunction(context, fptr, nullptr, name);
+		if (obj == nullptr)
+			throw LibraryInitException();
+		Wg_SetGlobal(context, name, obj);
+		return obj;
+	}
 }

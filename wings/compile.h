@@ -104,7 +104,7 @@ namespace wings {
 		std::unique_ptr<LiteralInstruction> literal;
 		std::unique_ptr<StringArgInstruction> string;
 		std::unique_ptr<DefInstruction> def;
-		std::unique_ptr<ClassInstruction> _class;
+		std::unique_ptr<ClassInstruction> klass;
 		std::unique_ptr<JumpInstruction> jump;
 		std::unique_ptr<TryFrameInstruction> pushTry;
 		std::unique_ptr<ImportInstruction> import;

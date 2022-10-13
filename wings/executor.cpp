@@ -334,17 +334,13 @@ namespace wings {
 			}
 			def->localVariables = instr.def->variables;
 
-			Wg_FuncDesc func{};
-			func.fptr = &DefObject::Run;
-			func.userdata = def;
-			func.isMethod = instr.def->isMethod;
-			func.prettyName = instr.def->prettyName.c_str();
-			Wg_Obj* obj = Wg_NewFunction(context, &func);
+			Wg_Obj* obj = Wg_NewFunction(context, &DefObject::Run, def, instr.def->prettyName.c_str());
 			if (obj == nullptr) {
 				delete def;
 				exitValue = nullptr;
 				return;
 			}
+			obj->Get<Wg_Obj::Func>().isMethod = instr.def->isMethod;
 
 			Wg_FinalizerDesc finalizer{};
 			finalizer.fptr = [](Wg_Obj* obj, void* userdata) { delete (DefObject*)userdata; };
@@ -355,33 +351,33 @@ namespace wings {
 			break;
 		}
 		case Instruction::Type::Class: {
-			size_t methodCount = instr._class->methodNames.size();
+			size_t methodCount = instr.klass->methodNames.size();
 			size_t baseCount = PopArgFrame();
 			auto stackEnd = stack.data() + stack.size();
 
 			std::vector<const char*> methodNames;
-			for (const auto& methodName : instr._class->methodNames)
+			for (const auto& methodName : instr.klass->methodNames)
 				methodNames.push_back(methodName.c_str());
 
 			Wg_Obj** bases = stackEnd - baseCount;
 			Wg_Obj** methods = stackEnd - methodCount - baseCount;
 
-			Wg_Obj* _class = Wg_NewClass(context, instr._class->prettyName.c_str(), bases, (int)baseCount);
-			if (_class == nullptr) {
+			Wg_Obj* klass = Wg_NewClass(context, instr.klass->prettyName.c_str(), bases, (int)baseCount);
+			if (klass == nullptr) {
 				exitValue = nullptr;
 				return;
 			}
 
 			for (size_t i = 0; i < methodCount; i++)
-				Wg_AddAttributeToClass(_class, instr._class->methodNames[i].c_str(), methods[i]);
+				Wg_AddAttributeToClass(klass, instr.klass->methodNames[i].c_str(), methods[i]);
 
 			for (size_t i = 0; i < methodCount + baseCount; i++)
 				PopStack();
 
-			if (_class == nullptr) {
+			if (klass == nullptr) {
 				exitValue = nullptr;
 			} else {
-				PushStack(_class);
+				PushStack(klass);
 			}
 			break;
 		}

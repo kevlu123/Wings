@@ -138,6 +138,9 @@ WG_DLL_EXPORT Wg_Context* Wg_CreateContext(const Wg_Config* config WG_DEFAULT_AR
 */
 WG_DLL_EXPORT void Wg_DestroyContext(Wg_Context* context);
 
+WG_DLL_EXPORT Wg_Obj* Wg_Execute(Wg_Context* context, const char* code, const char* prettyName WG_DEFAULT_ARG(nullptr));
+WG_DLL_EXPORT Wg_Obj* Wg_ExecuteExpression(Wg_Context* context, const char* code, const char* prettyName WG_DEFAULT_ARG(nullptr));
+
 /**
 * Compile a script to a function object.
 * 
@@ -539,17 +542,9 @@ WG_DLL_EXPORT Wg_Obj* Wg_NewDictionary(Wg_Context* context, Wg_Obj** keys WG_DEF
 */
 WG_DLL_EXPORT Wg_Obj* Wg_NewSet(Wg_Context* context, Wg_Obj** argv WG_DEFAULT_ARG(nullptr), int argc WG_DEFAULT_ARG(0));
 
-/**
-* Instantiate a function object.
-*
-* Remarks:
-* Call Wg_GetCurrentException() or Wg_GetErrorMessage() to get error information.
-*
-* @param context The relevant context.
-* @param value A function description.
-* @return The instantiated object, or nullptr on failure.
-*/
-WG_DLL_EXPORT Wg_Obj* Wg_NewFunction(Wg_Context* context, const Wg_FuncDesc* value);
+WG_DLL_EXPORT Wg_Obj* Wg_NewFunction(Wg_Context* context, Wg_Function fptr, void* userdata, const char* prettyName WG_DEFAULT_ARG(nullptr));
+
+WG_DLL_EXPORT Wg_Obj* Wg_BindMethod(Wg_Obj* klass, const char* name, Wg_Function fptr, void* userdata);
 
 /**
 * Instantiate a class object.

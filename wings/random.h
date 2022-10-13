@@ -2,5 +2,5 @@
 #include "wings.h"
 
 namespace wings {
-	bool ImportBuiltins(Wg_Context* context);
+	bool ImportRandom(Wg_Context* context);
 }

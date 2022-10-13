@@ -30,11 +30,15 @@ namespace wings {
 	void DestroyAllObjects(Wg_Context* context);
 	bool IsKeyword(std::string_view s);
 	bool IsValidIdentifier(std::string_view s);
+	void RegisterMethod(Wg_Obj* klass, const char* name, Wg_Function fptr);
+	Wg_Obj* RegisterFunction(Wg_Context* context, const char* name, Wg_Function fptr);
 
 	template <class T>
 	bool TryGetUserdata(Wg_Obj* obj, const char* type, T** out) {
 		return Wg_TryGetUserdata(obj, type, (void**)out);
 	}
+
+	struct LibraryInitException : std::exception {};
 	
 	struct WObjHasher {
 		size_t operator()(Wg_Obj* obj) const;
@@ -212,7 +216,7 @@ struct Wg_Obj {
 		wings::WDict* _map;
 		wings::WSet* _set;
 		Func* _func;
-		Class* _class;
+		Class* klass;
 	};
 	template <class T> const T& Get() const { return *(const T*)data; }
 	template <class T> T& Get() { return *(T*)data; }
