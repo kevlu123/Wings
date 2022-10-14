@@ -2,7 +2,7 @@
 #include "common.h"
 
 namespace wings {
-	static Wg_Obj* exit(Wg_Context* context, Wg_Obj**, int argc) {
+	static Wg_Obj* exit(Wg_Context* context, Wg_Obj** argv, int argc) {
 		Wg_RaiseException(context, WG_EXC_SYSTEMEXIT);
 		return nullptr;
 	}

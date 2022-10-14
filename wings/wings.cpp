@@ -3,6 +3,7 @@
 
 #include "builtinsmodule.h"
 #include "mathmodule.h"
+#include "osmodule.h"
 #include "randommodule.h"
 #include "sysmodule.h"
 #include "timemodule.h"
@@ -30,6 +31,7 @@ extern "C" {
 		out->printUserdata = nullptr;
 		out->argv = nullptr;
 		out->argc = 0;
+		out->enableOsModule = false;
 	}
 
 	Wg_Context* Wg_CreateContext(const Wg_Config* config) {
@@ -40,13 +42,22 @@ extern "C" {
 
 		// Initialise the library without restriction
 		Wg_DefaultConfig(&context->config);
-
+		
 		Wg_RegisterModule(context, "__builtins__", wings::ImportBuiltins);
 		Wg_RegisterModule(context, "math", wings::ImportMath);
 		Wg_RegisterModule(context, "random", wings::ImportRandom);
 		Wg_RegisterModule(context, "sys", wings::ImportSys);
 		Wg_RegisterModule(context, "time", wings::ImportTime);
 		Wg_ImportAllFromModule(context, "__builtins__");
+
+		Wg_Config defCfg = context->config;
+		if (config == nullptr) {
+			config = &defCfg;
+		}
+		
+		if (config->enableOsModule) {
+			Wg_RegisterModule(context, "os", wings::ImportOs);
+		}
 
 		// Apply possibly restrictive config now
 		if (config) {
@@ -55,6 +66,12 @@ extern "C" {
 			WG_ASSERT(config->maxRecursion >= 0);
 			WG_ASSERT(config->maxCollectionSize >= 0);
 			WG_ASSERT(config->gcRunFactor >= 1.0f);
+			WG_ASSERT(config->argc >= 0);
+			if (config->argc) {
+				WG_ASSERT(config->argv);
+				for (int i = 0; i < config->argc; i++)
+					WG_ASSERT(config->argv[i]);
+			}
 			context->config = *config;
 		}
 		
@@ -1200,6 +1217,8 @@ extern "C" {
 			return Wg_RaiseExceptionClass(context->builtins.nameError, message);
 		case WG_EXC_OSERROR:
 			return Wg_RaiseExceptionClass(context->builtins.osError, message);
+		case WG_EXC_ISADIRECTORYERROR:
+			return Wg_RaiseExceptionClass(context->builtins.isADirectoryError, message);
 		case WG_EXC_RUNTIMEERROR:
 			return Wg_RaiseExceptionClass(context->builtins.runtimeError, message);
 		case WG_EXC_NOTIMPLEMENTEDERROR:

@@ -304,10 +304,6 @@ namespace wings {
 	}
 	
 	bool InitArgv(Wg_Context* context, const char* const* argv, int argc) {
-		WG_ASSERT(context && (argv || argc == 0) && argc >= 0);
-		for (int i = 0; i < argc; i++)
-			WG_ASSERT(argv[i]);
-
 		Wg_Obj* list = Wg_NewList(context);
 		if (list == nullptr)
 			return false;

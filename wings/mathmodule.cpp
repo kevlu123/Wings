@@ -249,13 +249,6 @@ def radians(x):
 		WG_EXPECT_ARG_TYPE_INT_OR_FLOAT(1);
 		return Wg_NewFloat(context, std::atan2(Wg_GetFloat(argv[0]), Wg_GetFloat(argv[1])));
 	}
-
-	static void RegisterConstant(Wg_Context* context, const char* name, Wg_float f) {
-		Wg_Obj* obj = Wg_NewFloat(context, f);
-		if (obj == nullptr)
-			throw LibraryInitException();
-		Wg_SetGlobal(context, name, obj);
-	}
 	
 	bool ImportMath(Wg_Context* context) {
 		try {
@@ -283,11 +276,11 @@ def radians(x):
 			RegisterFunction(context, "gamma", gamma);
 			RegisterFunction(context, "lgamma", lgamma);
 
-			RegisterConstant(context, "e", std::numbers::e_v<Wg_float>);
-			RegisterConstant(context, "inf", std::numeric_limits<Wg_float>::infinity());
-			RegisterConstant(context, "nan", std::numeric_limits<Wg_float>::quiet_NaN());
-			RegisterConstant(context, "pi", std::numbers::pi_v<Wg_float>);
-			RegisterConstant(context, "tau", 2 * std::numbers::pi_v<Wg_float>);
+			RegisterConstant(context, "e", Wg_NewFloat, std::numbers::e_v<Wg_float>);
+			RegisterConstant(context, "inf", Wg_NewFloat, std::numeric_limits<Wg_float>::infinity());
+			RegisterConstant(context, "nan", Wg_NewFloat, std::numeric_limits<Wg_float>::quiet_NaN());
+			RegisterConstant(context, "pi", Wg_NewFloat, std::numbers::pi_v<Wg_float>);
+			RegisterConstant(context, "tau", Wg_NewFloat, 2 * std::numbers::pi_v<Wg_float>);
 
 			if (Execute(context, CODE, "math") == nullptr)
 				throw LibraryInitException();

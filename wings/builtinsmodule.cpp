@@ -326,6 +326,9 @@ class NameError(Exception):
 class OSError(Exception):
 	pass
 
+class IsADirectoryError(OSError):
+	pass
+
 class RuntimeError(Exception):
 	pass
 
@@ -4089,7 +4092,8 @@ namespace wings {
 			RegisterMethod(b.file, "seekable", methods::File_seekable);
 			RegisterMethod(b.file, "seek", methods::File_seek);
 			RegisterMethod(b.file, "tell", methods::File_tell);
-			Wg_SetGlobal(context, "open", b.file);
+			if (context->config.enableOsModule)
+				Wg_SetGlobal(context, "open", b.file);
 
 			// Add native free functions
 			b.isinstance = RegisterFunction(context, "isinstance", lib::isinstance);
@@ -4140,6 +4144,7 @@ namespace wings {
 			b.memoryError = getGlobal("MemoryError");
 			b.nameError = getGlobal("NameError");
 			b.osError = getGlobal("OSError");
+			b.isADirectoryError = getGlobal("IsADirectoryError");
 			b.runtimeError = getGlobal("RuntimeError");
 			b.notImplementedError = getGlobal("NotImplementedError");
 			b.recursionError = getGlobal("RecursionError");

@@ -31,18 +31,26 @@ namespace wings {
 	void DestroyAllObjects(Wg_Context* context);
 	bool IsKeyword(std::string_view s);
 	bool IsValidIdentifier(std::string_view s);
-	void RegisterMethod(Wg_Obj* klass, const char* name, Wg_Function fptr);
-	Wg_Obj* RegisterFunction(Wg_Context* context, const char* name, Wg_Function fptr);
 	Wg_Obj* Compile(Wg_Context* context, const char* code, const char* module, const char* prettyName, bool expr);
 	Wg_Obj* Execute(Wg_Context* context, const char* code, const char* module);
 	bool InitArgv(Wg_Context* context, const char* const* argv, int argc);
+	void RegisterMethod(Wg_Obj* klass, const char* name, Wg_Function fptr);
+	Wg_Obj* RegisterFunction(Wg_Context* context, const char* name, Wg_Function fptr);
+
+	struct LibraryInitException : std::exception {};
+
+	template <class F, class T>
+	void RegisterConstant(Wg_Context* context, const char* name, F f, T v) {
+		Wg_Obj* obj = f(context, v);
+		if (obj == nullptr)
+			throw LibraryInitException();
+		Wg_SetGlobal(context, name, obj);
+	}
 
 	template <class T>
 	bool TryGetUserdata(Wg_Obj* obj, const char* type, T** out) {
 		return Wg_TryGetUserdata(obj, type, (void**)out);
 	}
-
-	struct LibraryInitException : std::exception {};
 
 	struct Rng {
 		Rng();
@@ -159,6 +167,7 @@ namespace wings {
 		Wg_Obj* memoryError;
 		Wg_Obj* nameError;
 		Wg_Obj* osError;
+		Wg_Obj* isADirectoryError;
 		Wg_Obj* runtimeError;
 		Wg_Obj* notImplementedError;
 		Wg_Obj* recursionError;
@@ -187,7 +196,7 @@ namespace wings {
 				baseException, systemExit, exception, stopIteration, arithmeticError,
 				overflowError, zeroDivisionError, attributeError, importError,
 				syntaxError, lookupError, indexError, keyError, memoryError,
-				osError, nameError, runtimeError, notImplementedError, recursionError,
+				osError, isADirectoryError, nameError, runtimeError, notImplementedError, recursionError,
 				typeError, valueError,
 
 				isinstance, repr,

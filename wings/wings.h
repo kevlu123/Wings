@@ -38,6 +38,7 @@ typedef struct Wg_Config {
 	void* printUserdata;
 	const char* const* argv;
 	int argc;
+	bool enableOsModule;
 } Wg_Config;
 
 typedef enum Wg_UnOp {
@@ -96,6 +97,7 @@ typedef enum Wg_Exc {
 	WG_EXC_MEMORYERROR,
 	WG_EXC_NAMEERROR,
 	WG_EXC_OSERROR,
+	WG_EXC_ISADIRECTORYERROR,
 	WG_EXC_RUNTIMEERROR,
 	WG_EXC_NOTIMPLEMENTEDERROR,
 	WG_EXC_RECURSIONERROR,

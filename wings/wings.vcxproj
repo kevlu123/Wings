@@ -152,6 +152,7 @@
     <ClCompile Include="builtinsmodule.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="mathmodule.cpp" />
+    <ClCompile Include="osmodule.cpp" />
     <ClCompile Include="parse.cpp" />
     <ClCompile Include="randommodule.cpp" />
     <ClCompile Include="sysmodule.cpp" />
@@ -168,6 +169,7 @@
     <ClInclude Include="lex.h" />
     <ClInclude Include="builtinsmodule.h" />
     <ClInclude Include="mathmodule.h" />
+    <ClInclude Include="osmodule.h" />
     <ClInclude Include="parse.h" />
     <ClInclude Include="randommodule.h" />
     <ClInclude Include="rcptr.h" />
