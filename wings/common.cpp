@@ -271,4 +271,35 @@ namespace wings {
 			return nullptr;
 		}
 	}
+
+	Rng::Rng()
+		: engine(std::random_device()())
+	{
+	}
+
+	void Rng::Seed(Wg_int seed) {
+		engine.seed((unsigned long long)seed);
+		dist.reset();
+	}
+
+	Wg_float Rng::Rand() {
+		return dist(engine);
+	}
+
+	Wg_int Rng::Int(Wg_int minIncl, Wg_int maxIncl) {
+		auto i = (Wg_int)((maxIncl - minIncl + 1) * Rand() + minIncl);
+
+		if (i > maxIncl) // Just in case
+			return maxIncl;
+
+		return i;
+	}
+
+	Wg_float Rng::Float(Wg_float minIncl, Wg_float maxIncl) {
+		return (maxIncl - minIncl) * Rand() + minIncl;
+	}
+
+	std::mt19937_64& Rng::Engine() {
+		return engine;
+	}
 }

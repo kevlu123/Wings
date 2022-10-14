@@ -15,6 +15,7 @@
 #include <type_traits>
 #include <cstdlib>
 #include <mutex>
+#include <random>
 
 static_assert(sizeof(Wg_int) == sizeof(Wg_uint));
 
@@ -41,6 +42,18 @@ namespace wings {
 	}
 
 	struct LibraryInitException : std::exception {};
+
+	struct Rng {
+		Rng();
+		void Seed(Wg_int seed);
+		Wg_float Rand();
+		Wg_int Int(Wg_int minIncl, Wg_int maxIncl);
+		Wg_float Float(Wg_float minIncl, Wg_float maxIncl);
+		std::mt19937_64& Engine();
+	private:
+		std::mt19937_64 engine;
+		std::uniform_real_distribution<Wg_float> dist;
+	};
 	
 	struct WObjHasher {
 		size_t operator()(Wg_Obj* obj) const;
@@ -247,6 +260,7 @@ struct Wg_Context {
 	std::unordered_map<std::string, Wg_ModuleLoader> moduleLoaders;
 	std::stack<std::string_view> currentModule;
 	std::string importPath;
+	wings::Rng rng;
 };
 
 #define WG_UNREACHABLE() std::abort()
