@@ -35,6 +35,7 @@ namespace wings {
 	Wg_Obj* RegisterFunction(Wg_Context* context, const char* name, Wg_Function fptr);
 	Wg_Obj* Compile(Wg_Context* context, const char* code, const char* module, const char* prettyName, bool expr);
 	Wg_Obj* Execute(Wg_Context* context, const char* code, const char* module);
+	bool InitArgv(Wg_Context* context, const char* const* argv, int argc);
 
 	template <class T>
 	bool TryGetUserdata(Wg_Obj* obj, const char* type, T** out) {
@@ -261,6 +262,7 @@ struct Wg_Context {
 	std::stack<std::string_view> currentModule;
 	std::string importPath;
 	wings::Rng rng;
+	Wg_Obj* argv;
 };
 
 #define WG_UNREACHABLE() std::abort()

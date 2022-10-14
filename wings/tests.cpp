@@ -14,16 +14,15 @@ static void Expect(const char* code, const char* expected, size_t line) {
 
 	Wg_Context* context{};
 	try {
-		context = Wg_CreateContext();
-		if (context == nullptr)
-			throw std::string("Context creation failed");
-
 		Wg_Config cfg{};
-		Wg_GetConfig(context, &cfg);
+		Wg_DefaultConfig(&cfg);
 		cfg.print = [](const char* message, int len, void*) {
 			output += std::string(message, len);
 		};
-		Wg_SetConfig(context, &cfg);
+		
+		context = Wg_CreateContext(&cfg);
+		if (context == nullptr)
+			throw std::string("Context creation failed");
 
 		Wg_Obj* exe = Wg_Compile(context, code);
 		if (exe == nullptr)
@@ -57,16 +56,15 @@ static void ExpectFailure(const char* code, size_t line) {
 	
 	Wg_Context* context{};
 	try {
-		context = Wg_CreateContext();
-		if (context == nullptr)
-			throw std::string("Context creation failed");
-
 		Wg_Config cfg{};
-		Wg_GetConfig(context, &cfg);
+		Wg_DefaultConfig(&cfg);
 		cfg.print = [](const char* message, int len, void*) {
 			output += std::string(message, len);
 		};
-		Wg_SetConfig(context, &cfg);
+		
+		context = Wg_CreateContext(&cfg);
+		if (context == nullptr)
+			throw std::string("Context creation failed");
 
 		Wg_Obj* exe = Wg_Compile(context, code);
 		if (exe == nullptr)

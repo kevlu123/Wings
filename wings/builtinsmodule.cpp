@@ -103,9 +103,6 @@ class enumerate:
 		self.i += 1
 		return (i, next(self.iter))
 
-def exit(*args):
-	raise SystemExit
-
 class filter:
 	def __init__(self, f, iterable):
 		self.f = f
@@ -1628,7 +1625,7 @@ namespace wings {
 			
 			std::string s = "'";
 			for (const char* p = Wg_GetString(argv[0]); *p; ++p) {
-				if (*p == '\'') {
+				if (*p == '\\') {
 					s += "\\\\";
 				} else if (*p == '\'') {
 					s += "\\'";

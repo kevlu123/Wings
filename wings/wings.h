@@ -36,6 +36,8 @@ typedef struct Wg_Config {
 	float gcRunFactor;
 	Wg_PrintFunction print;
 	void* printUserdata;
+	const char* const* argv;
+	int argc;
 } Wg_Config;
 
 typedef enum Wg_UnOp {
@@ -122,12 +124,11 @@ extern "C" {
 * Create a context (an instance of an interpreter).
 * 
 * Remarks:
-* This function always succeeds.
 * The returned context must be freed with Wg_DestroyContext().
 * 
 * @param config A pointer to a Wg_Config struct containing configuration information,
 *               or nullptr for the default configuration.
-* @return A newly created context.
+* @return A newly created context, or nullptr on failure.
 */
 WG_DLL_EXPORT Wg_Context* Wg_CreateContext(const Wg_Config* config WG_DEFAULT_ARG(nullptr));
 
@@ -308,21 +309,7 @@ WG_DLL_EXPORT Wg_Obj* Wg_IsInstance(const Wg_Obj* instance, Wg_Obj*const* types,
 */
 WG_DLL_EXPORT void Wg_ClearCurrentException(Wg_Context* context);
 
-/**
-* Get the current configuration.
-* 
-* @param context The relevant context.
-* @param out A pointer to a Wg_Config struct to receive the configuration information.
-*/
-WG_DLL_EXPORT void Wg_GetConfig(const Wg_Context* context, Wg_Config* out);
-
-/**
-* Set the current configuration.
-* 
-* @param context The relevant context.
-* @param config The configuration information.
-*/
-WG_DLL_EXPORT void Wg_SetConfig(Wg_Context* context, const Wg_Config* config);
+WG_DLL_EXPORT void Wg_DefaultConfig(Wg_Config* out);
 
 /**
 * Get a global variable.

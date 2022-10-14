@@ -4,6 +4,7 @@
 #include "builtinsmodule.h"
 #include "mathmodule.h"
 #include "randommodule.h"
+#include "sysmodule.h"
 #include "timemodule.h"
 
 #include <iostream>
@@ -17,28 +18,18 @@
 #include <unordered_set>
 
 extern "C" {
-	void Wg_GetConfig(const Wg_Context* context, Wg_Config* out) {
-		WG_ASSERT_VOID(context && out);
-		*out = context->config;
-	}
-
-	void Wg_SetConfig(Wg_Context* context, const Wg_Config* config) {
-		WG_ASSERT_VOID(context);
-		if (config) {
-			WG_ASSERT_VOID(config->maxAlloc >= 0);
-			WG_ASSERT_VOID(config->maxRecursion >= 0);
-			WG_ASSERT_VOID(config->maxCollectionSize >= 0);
-			WG_ASSERT_VOID(config->gcRunFactor >= 1.0f);
-			context->config = *config;
-		} else {
-			context->config.maxAlloc = 100'000;
-			context->config.maxRecursion = 100;
-			context->config.maxCollectionSize = 1'000'000'000;
-			context->config.gcRunFactor = 2.0f;
-			context->config.print = [](const char* message, int len, void*) {
-				std::cout << std::string_view(message, (size_t)len);
-			};
-		}
+	void Wg_DefaultConfig(Wg_Config* out) {
+		WG_ASSERT_VOID(out);
+		out->maxAlloc = 100'000;
+		out->maxRecursion = 100;
+		out->maxCollectionSize = 1'000'000'000;
+		out->gcRunFactor = 2.0f;
+		out->print = [](const char* message, int len, void*) {
+			std::cout << std::string_view(message, (size_t)len);
+		};
+		out->printUserdata = nullptr;
+		out->argv = nullptr;
+		out->argc = 0;
 	}
 
 	Wg_Context* Wg_CreateContext(const Wg_Config* config) {
@@ -48,17 +39,27 @@ extern "C" {
 		context->globals.insert({ std::string("__main__"), {} });
 
 		// Initialise the library without restriction
-		Wg_SetConfig(context, nullptr);
+		Wg_DefaultConfig(&context->config);
 
 		Wg_RegisterModule(context, "__builtins__", wings::ImportBuiltins);
 		Wg_RegisterModule(context, "math", wings::ImportMath);
 		Wg_RegisterModule(context, "random", wings::ImportRandom);
+		Wg_RegisterModule(context, "sys", wings::ImportSys);
 		Wg_RegisterModule(context, "time", wings::ImportTime);
-
 		Wg_ImportAllFromModule(context, "__builtins__");
-		
+
 		// Apply possibly restrictive config now
-		Wg_SetConfig(context, config);
+		if (config) {
+			WG_ASSERT(context);
+			WG_ASSERT(config->maxAlloc >= 0);
+			WG_ASSERT(config->maxRecursion >= 0);
+			WG_ASSERT(config->maxCollectionSize >= 0);
+			WG_ASSERT(config->gcRunFactor >= 1.0f);
+			context->config = *config;
+		}
+		
+		if (!wings::InitArgv(context, context->config.argv, context->config.argc))
+			return nullptr;
 		
 		return context;
 	}
@@ -1146,7 +1147,7 @@ extern "C" {
 
 		ss << context->currentException->type;
 		if (Wg_Obj* msg = Wg_HasAttribute(context->currentException, "_message"))
-			if (Wg_IsString(msg))
+			if (Wg_IsString(msg) && *Wg_GetString(msg))
 				ss << ": " << Wg_GetString(msg);
 		ss << "\n";
 
@@ -1324,6 +1325,8 @@ extern "C" {
 		for (auto& obj : context->builtins.GetAll())
 			if (obj)
 				inUse.push_back(obj);
+		if (context->argv)
+			inUse.push_back(context->argv);
 
 		// Recursively find objects in use
 		std::unordered_set<const Wg_Obj*> traversed;

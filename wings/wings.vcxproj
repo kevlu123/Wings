@@ -154,6 +154,7 @@
     <ClCompile Include="mathmodule.cpp" />
     <ClCompile Include="parse.cpp" />
     <ClCompile Include="randommodule.cpp" />
+    <ClCompile Include="sysmodule.cpp" />
     <ClCompile Include="tests.cpp" />
     <ClCompile Include="timemodule.cpp" />
     <ClCompile Include="wings.cpp" />
@@ -171,6 +172,7 @@
     <ClInclude Include="randommodule.h" />
     <ClInclude Include="rcptr.h" />
     <ClInclude Include="hash.h" />
+    <ClInclude Include="sysmodule.h" />
     <ClInclude Include="tests.h" />
     <ClInclude Include="timemodule.h" />
     <ClInclude Include="wings.h" />
