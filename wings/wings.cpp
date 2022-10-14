@@ -4,6 +4,7 @@
 #include "builtinsmodule.h"
 #include "mathmodule.h"
 #include "randommodule.h"
+#include "timemodule.h"
 
 #include <iostream>
 #include <memory>
@@ -52,6 +53,7 @@ extern "C" {
 		Wg_RegisterModule(context, "__builtins__", wings::ImportBuiltins);
 		Wg_RegisterModule(context, "math", wings::ImportMath);
 		Wg_RegisterModule(context, "random", wings::ImportRandom);
+		Wg_RegisterModule(context, "time", wings::ImportTime);
 
 		Wg_ImportAllFromModule(context, "__builtins__");
 		

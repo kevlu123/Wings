@@ -50,6 +50,9 @@
     <ClCompile Include="mathmodule.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="timemodule.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="wings.h">
@@ -92,6 +95,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="mathmodule.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="timemodule.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

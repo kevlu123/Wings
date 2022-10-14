@@ -270,14 +270,14 @@ struct Wg_Context {
 #define WG_EXPECT_ARG_COUNT_AT_LEAST(n) do if (argc < n) { Wg_RaiseArgumentCountError(context, argc, n); return nullptr; } while (0)
 #define WG_EXPECT_ARG_COUNT_BETWEEN(min, max) do if (argc < min || argc > max) { Wg_RaiseArgumentCountError(context, argc, -1); return nullptr; } while (0)
 #define WG_EXPECT_ARG_TYPE(index, check, expect) do if (!(check)(argv[index])) { Wg_RaiseArgumentTypeError(context, index, expect); return nullptr; } while (0)
-#define WG_EXPECT_ARG_TYPE_NULL(index) WG_EXPECT_ARG_TYPE(index, Wg_IsNone, "NoneType");
-#define WG_EXPECT_ARG_TYPE_BOOL(index) WG_EXPECT_ARG_TYPE(index, Wg_IsBool, "bool");
-#define WG_EXPECT_ARG_TYPE_INT(index) WG_EXPECT_ARG_TYPE(index, Wg_IsInt, "int");
-#define WG_EXPECT_ARG_TYPE_FLOAT(index) WG_EXPECT_ARG_TYPE(index, [](const Wg_Obj* v) { return Wg_IsIntOrFloat(v) && !Wg_IsInt(v); }, "int or float");
-#define WG_EXPECT_ARG_TYPE_INT_OR_FLOAT(index) WG_EXPECT_ARG_TYPE(index, Wg_IsIntOrFloat, "int or float");
-#define WG_EXPECT_ARG_TYPE_STRING(index) WG_EXPECT_ARG_TYPE(index, Wg_IsString, "str");
-#define WG_EXPECT_ARG_TYPE_LIST(index) WG_EXPECT_ARG_TYPE(index, Wg_IsList, "list");
-#define WG_EXPECT_ARG_TYPE_TUPLE(index) WG_EXPECT_ARG_TYPE(index, Wg_IsTuple, "tuple");
-#define WG_EXPECT_ARG_TYPE_MAP(index) WG_EXPECT_ARG_TYPE(index, Wg_IsDictionary, "dict");
-#define WG_EXPECT_ARG_TYPE_SET(index) WG_EXPECT_ARG_TYPE(index, Wg_IsSet, "set");
-#define WG_EXPECT_ARG_TYPE_FUNC(index) WG_EXPECT_ARG_TYPE(index, Wg_IsFunction, "function");
+#define WG_EXPECT_ARG_TYPE_NULL(index) WG_EXPECT_ARG_TYPE(index, Wg_IsNone, "NoneType")
+#define WG_EXPECT_ARG_TYPE_BOOL(index) WG_EXPECT_ARG_TYPE(index, Wg_IsBool, "bool")
+#define WG_EXPECT_ARG_TYPE_INT(index) WG_EXPECT_ARG_TYPE(index, Wg_IsInt, "int")
+#define WG_EXPECT_ARG_TYPE_FLOAT(index) WG_EXPECT_ARG_TYPE(index, [](const Wg_Obj* v) { return Wg_IsIntOrFloat(v) && !Wg_IsInt(v); }, "int or float")
+#define WG_EXPECT_ARG_TYPE_INT_OR_FLOAT(index) WG_EXPECT_ARG_TYPE(index, Wg_IsIntOrFloat, "int or float")
+#define WG_EXPECT_ARG_TYPE_STRING(index) WG_EXPECT_ARG_TYPE(index, Wg_IsString, "str")
+#define WG_EXPECT_ARG_TYPE_LIST(index) WG_EXPECT_ARG_TYPE(index, Wg_IsList, "list")
+#define WG_EXPECT_ARG_TYPE_TUPLE(index) WG_EXPECT_ARG_TYPE(index, Wg_IsTuple, "tuple")
+#define WG_EXPECT_ARG_TYPE_MAP(index) WG_EXPECT_ARG_TYPE(index, Wg_IsDictionary, "dict")
+#define WG_EXPECT_ARG_TYPE_SET(index) WG_EXPECT_ARG_TYPE(index, Wg_IsSet, "set")
+#define WG_EXPECT_ARG_TYPE_FUNC(index) WG_EXPECT_ARG_TYPE(index, Wg_IsFunction, "function")
