@@ -1,9 +1,9 @@
 #include "wings.h"
 #include "common.h"
 
-#include "builtins.h"
-#include "math.h"
-#include "random.h"
+#include "builtinsmodule.h"
+#include "mathmodule.h"
+#include "randommodule.h"
 
 #include <iostream>
 #include <memory>

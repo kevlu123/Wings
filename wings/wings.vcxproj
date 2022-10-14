@@ -149,11 +149,11 @@
     <ClCompile Include="executor.cpp" />
     <ClCompile Include="exprparse.cpp" />
     <ClCompile Include="lex.cpp" />
-    <ClCompile Include="builtins.cpp" />
+    <ClCompile Include="builtinsmodule.cpp" />
     <ClCompile Include="main.cpp" />
-    <ClCompile Include="math.cpp" />
+    <ClCompile Include="mathmodule.cpp" />
     <ClCompile Include="parse.cpp" />
-    <ClCompile Include="random.cpp" />
+    <ClCompile Include="randommodule.cpp" />
     <ClCompile Include="tests.cpp" />
     <ClCompile Include="wings.cpp" />
   </ItemGroup>
@@ -164,10 +164,10 @@
     <ClInclude Include="executor.h" />
     <ClInclude Include="exprparse.h" />
     <ClInclude Include="lex.h" />
-    <ClInclude Include="builtins.h" />
-    <ClInclude Include="math.h" />
+    <ClInclude Include="builtinsmodule.h" />
+    <ClInclude Include="mathmodule.h" />
     <ClInclude Include="parse.h" />
-    <ClInclude Include="random.h" />
+    <ClInclude Include="randommodule.h" />
     <ClInclude Include="rcptr.h" />
     <ClInclude Include="hash.h" />
     <ClInclude Include="tests.h" />

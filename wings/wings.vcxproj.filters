@@ -32,7 +32,7 @@
     <ClCompile Include="executor.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="builtins.cpp">
+    <ClCompile Include="builtinsmodule.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="attributetable.cpp">
@@ -44,10 +44,10 @@
     <ClCompile Include="common.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="random.cpp">
+    <ClCompile Include="randommodule.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="math.cpp">
+    <ClCompile Include="mathmodule.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
@@ -85,13 +85,13 @@
     <ClInclude Include="tests.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="builtins.h">
+    <ClInclude Include="builtinsmodule.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="random.h">
+    <ClInclude Include="randommodule.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="math.h">
+    <ClInclude Include="mathmodule.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
