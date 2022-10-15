@@ -69,5 +69,8 @@ namespace wings {
 
 	std::unordered_set<std::string> GetReferencedVariables(const Expression& expr);
 	CodeError ParseParameterList(TokenIter& p, std::vector<Parameter>& out);
+	CodeError ParseForLoopVariableList(TokenIter& p, std::vector<std::string>& vars, bool& isTuple);
+	Statement TransformForToWhile(Statement forLoop);
+	void ExpandCompositeStatements(std::vector<Statement>& statements);
 
 }

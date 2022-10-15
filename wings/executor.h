@@ -31,6 +31,7 @@ namespace wings {
 		size_t exceptJump;
 		size_t finallyJump;
 		bool isHandlingException;
+		size_t stackSize;
 	};
 
 	struct Executor {
@@ -38,6 +39,7 @@ namespace wings {
 
 		void PushStack(Wg_Obj* obj);
 		Wg_Obj* PopStack();
+		void PopStackUntil(size_t size);
 		Wg_Obj* PeekStack();
 		void ClearStack();
 		size_t PopArgFrame();

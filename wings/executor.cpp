@@ -152,6 +152,11 @@ namespace wings {
 		return obj;
 	}
 
+	void Executor::PopStackUntil(size_t size) {
+		while (stack.size() > size)
+			PopStack();
+	}
+
 	Wg_Obj* Executor::PeekStack() {
 		return stack.back();
 	}
@@ -251,11 +256,13 @@ namespace wings {
 				break;
 
 			// New exception thrown
-			ClearStack();
 			if (tryFrames.empty()) {
 				// No handlers. Propagate to next function.
 				break;
-			} else if (tryFrames.top().isHandlingException) {
+			}
+			
+			PopStackUntil(tryFrames.top().stackSize);
+			if (tryFrames.top().isHandlingException) {
 				// Was already handling an exception. Jump to finally.
 				pc = tryFrames.top().finallyJump - 1;
 				exitValue.reset();
@@ -657,60 +664,6 @@ namespace wings {
 		case Instruction::Type::IsNot:
 			PushStack(Wg_NewBool(context, PopStack() != PopStack()));
 			break;
-		case Instruction::Type::ListComprehension: {
-			Wg_Obj* expr = stack[stack.size() - 4];
-			Wg_Obj* assign = stack[stack.size() - 3];
-			Wg_Obj* iterable = stack[stack.size() - 2];
-			Wg_Obj* condition = stack[stack.size() - 1];
-
-			Wg_Obj* list = Wg_NewList(context);
-			if (list == nullptr) {
-				exitValue = nullptr;
-				return;
-			}
-			Wg_ObjRef ref(list);
-
-			struct State {
-				Wg_Obj* expr;
-				Wg_Obj* assign;
-				Wg_Obj* list;
-				Wg_Obj* condition;
-			} state = { expr, assign, list, condition };
-
-			bool success = Wg_Iterate(iterable, &state, [](Wg_Obj* value, void* userdata) {
-				State& state = *(State*)userdata;
-
-				if (Wg_Call(state.assign, &value, 1) == nullptr)
-					return false;
-
-				Wg_Obj* condition = Wg_Call(state.condition, nullptr, 0);
-				if (condition == nullptr)
-					return false;
-
-				condition = Wg_UnaryOp(WG_UOP_BOOL, condition);
-				if (condition == nullptr)
-					return false;
-
-				if (Wg_GetBool(condition)) {
-					Wg_Obj* entry = Wg_Call(state.expr, nullptr, 0);
-					if (entry == nullptr)
-						return false;
-
-					state.list->Get<std::vector<Wg_Obj*>>().push_back(entry);
-				}
-				return true;
-				});
-
-			for (int i = 0; i < 4; i++)
-				PopStack();
-
-			if (!success) {
-				exitValue = nullptr;
-			} else {
-				PushStack(list);
-			}
-			break;
-		}
 		case Instruction::Type::Raise: {
 			Wg_Obj* expr = PopStack();
 			if (Wg_IsClass(expr)) {
@@ -722,7 +675,12 @@ namespace wings {
 			break;
 		}
 		case Instruction::Type::PushTry:
-			tryFrames.push({ instr.pushTry->exceptJump, instr.pushTry->finallyJump });
+			tryFrames.push({
+				instr.pushTry->exceptJump,
+				instr.pushTry->finallyJump,
+				false,
+				stack.size()
+				});
 			break;
 		case Instruction::Type::PopTry:
 			tryFrames.pop();

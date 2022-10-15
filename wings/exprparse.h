@@ -90,6 +90,11 @@ namespace wings {
 			std::vector<Statement> body;
 		} def;
 
+		struct {
+			std::string listName;
+			std::vector<Statement> forBody;
+		} listComp;
+
 		Expression() = default;
 		Expression(Expression&&) = default;
 		Expression& operator=(Expression&&) = default;

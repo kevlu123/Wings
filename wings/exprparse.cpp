@@ -588,20 +588,24 @@ namespace wings {
 		isListComp = true;
 		++p;
 
-		Expression var{};
-		AssignTarget assignTarget{};
-		if (p.EndReached()) {
-			return CodeError::Bad("Expected a variable name", (--p)->srcPos);
-		} else if (auto error = ParseExpression(p, var, true)) {
+		std::vector<std::string> vars;
+		bool isTuple{};
+		if (auto error = ParseForLoopVariableList(p, vars, isTuple)) {
 			return error;
-		} else if (!IsAssignableExpression(var, assignTarget, true)) {
-			return CodeError::Bad("Expression is not assignable", (--p)->srcPos);
 		}
 
-		if (p.EndReached()) {
-			return CodeError::Bad("Expected a 'in'", (--p)->srcPos);
-		} else if (p->text != "in") {
-			return CodeError::Bad("Expected a 'in'", p->srcPos);
+		AssignTarget assignTarget{};
+		if (!isTuple) {
+			assignTarget.type = AssignType::Direct;
+			assignTarget.direct = vars[0];
+		} else {
+			assignTarget.type = AssignType::Pack;
+			for (auto& var : vars) {
+				AssignTarget elem{};
+				elem.type = AssignType::Direct;
+				elem.direct = std::move(var);
+				assignTarget.pack.push_back(std::move(elem));
+			}
 		}
 		++p;
 
@@ -632,57 +636,47 @@ namespace wings {
 		}
 		++p;
 
-		auto assignCaptures = GetReferencedVariables(var);
-		Expression loadParam{};
-		loadParam.srcPos = var.srcPos;
-		loadParam.operation = Operation::Variable;
-		loadParam.variableName = "_Arg";
-		Expression assignExpr{};
-		assignExpr.srcPos = var.srcPos;
-		assignExpr.operation = Operation::Assign;
-		assignExpr.assignTarget = assignTarget;
-		assignExpr.children.push_back(std::move(var));
-		assignExpr.children.push_back(std::move(loadParam));
-		Statement assignStat{};
-		assignStat.srcPos = var.srcPos;
-		assignStat.type = Statement::Type::Expr;
-		assignStat.expr = std::move(assignExpr);
-		Expression assignFn{};
-		assignFn.srcPos = var.srcPos;
-		assignFn.operation = Operation::Function;
-		assignFn.def.name = "<lambda>";
-		assignFn.def.localCaptures = std::move(assignCaptures);
-		assignFn.def.parameters.push_back(Parameter{ "_Arg", {} });
-		assignFn.def.body.push_back(std::move(assignStat));
+		std::string listName = "__ListComp" + std::to_string(Guid());
 
-		auto exprCaptures = GetReferencedVariables(value);
-		Statement exprRet{};
-		exprRet.srcPos = value.srcPos;
-		exprRet.type = Statement::Type::Return;
-		exprRet.expr = std::move(value);
-		Expression exprFn{};
-		exprFn.srcPos = value.srcPos;
-		exprFn.operation = Operation::Function;
-		exprFn.def.name = "<lambda>";
-		exprFn.def.localCaptures = std::move(exprCaptures);
-		exprFn.def.body.push_back(std::move(exprRet));
+		Expression loadList{};
+		loadList.srcPos = out.srcPos;
+		loadList.operation = Operation::Variable;
+		loadList.variableName = listName;
 		
-		auto conditionCaptures = GetReferencedVariables(condition);
-		Statement conditionRet{};
-		conditionRet.srcPos = condition.srcPos;
-		conditionRet.type = Statement::Type::Return;
-		conditionRet.expr = std::move(condition);
-		Expression conditionFn{};
-		conditionFn.srcPos = condition.srcPos;
-		conditionFn.operation = Operation::Function;
-		conditionFn.def.name = "<lambda>";
-		conditionFn.def.localCaptures = std::move(conditionCaptures);
-		conditionFn.def.body.push_back(std::move(conditionRet));
+		Expression append{};
+		append.srcPos = out.srcPos;
+		append.operation = Operation::Dot;
+		append.children.push_back(std::move(loadList));
+		append.variableName = "append";
 
-		out.children.push_back(std::move(exprFn));
-		out.children.push_back(std::move(assignFn));
-		out.children.push_back(std::move(iterable));
-		out.children.push_back(std::move(conditionFn));
+		Expression appendCall{};
+		appendCall.srcPos = out.srcPos;
+		appendCall.operation = Operation::Call;
+		appendCall.children.push_back(std::move(append));
+		appendCall.children.push_back(std::move(value));
+
+		Statement appendStat{};
+		appendStat.srcPos = out.srcPos;
+		appendStat.type = Statement::Type::Expr;
+		appendStat.expr = std::move(appendCall);
+
+		Statement ifStat{};
+		ifStat.srcPos = out.srcPos;
+		ifStat.type = Statement::Type::If;
+		ifStat.expr = std::move(condition);
+		ifStat.body.push_back(std::move(appendStat));
+
+		Statement forLoop{};
+		forLoop.srcPos = out.srcPos;
+		forLoop.type = Statement::Type::For;
+		forLoop.forLoop.assignTarget = std::move(assignTarget);
+		forLoop.expr = std::move(iterable);
+		forLoop.body.push_back(std::move(ifStat));
+
+		out.listComp.listName = listName;
+		out.listComp.forBody.push_back(TransformForToWhile(std::move(forLoop)));
+		ExpandCompositeStatements(out.listComp.forBody);
+		
 		return CodeError::Good();
 	}
 

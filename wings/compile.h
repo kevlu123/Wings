@@ -97,7 +97,6 @@ namespace wings {
 			And, Or, Not,
 			In, NotIn,
 			Is, IsNot,
-			ListComprehension,
 		} type{};
 
 		std::unique_ptr<DirectAssignInstruction> directAssign;

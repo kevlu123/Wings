@@ -305,10 +305,28 @@ namespace wings {
 			instr.type = Instruction::Type::Call;
 			break;
 		}
-		case Operation::ListComprehension:
-			compileChildExpressions();
-			instr.type = Instruction::Type::ListComprehension;
-			break;
+		case Operation::ListComprehension: {
+			Instruction argFrame{};
+			argFrame.srcPos = expression.srcPos;
+			argFrame.type = Instruction::Type::PushArgFrame;
+			instructions.push_back(std::move(argFrame));
+			
+			Instruction list{};
+			list.srcPos = expression.srcPos;
+			list.type = Instruction::Type::List;
+			instructions.push_back(std::move(list));
+			
+			Instruction assign{};
+			assign.srcPos = expression.srcPos;
+			assign.type = Instruction::Type::DirectAssign;
+			assign.directAssign = std::make_unique<DirectAssignInstruction>();
+			assign.directAssign->assignTarget.type = AssignType::Direct;
+			assign.directAssign->assignTarget.direct = expression.listComp.listName;
+			instructions.push_back(std::move(assign));
+			
+			CompileBody(expression.listComp.forBody, instructions);
+			return;
+		}
 		case Operation::Function:
 			CompileFunction(expression, instructions);
 			return;

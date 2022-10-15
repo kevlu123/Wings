@@ -97,7 +97,7 @@ namespace wings {
 		}
 	}
 
-	static Statement TransformForToWhile(Statement forLoop) {
+	Statement TransformForToWhile(Statement forLoop) {
 		// __VarXXX = expression.__iter__()
 		std::string rangeVarName = "__For" + std::to_string(Guid());
 
@@ -201,7 +201,7 @@ namespace wings {
 		return out;
 	}
 
-	static CodeError ParseForLoopVariableList(TokenIter& p, std::vector<std::string>& vars, bool& isTuple) {
+	CodeError ParseForLoopVariableList(TokenIter& p, std::vector<std::string>& vars, bool& isTuple) {
 		bool mustTerminate = false;
 		isTuple = false;
 		while (true) {
@@ -997,6 +997,18 @@ namespace wings {
 		return CodeError::Good();
 	}
 
+	void ExpandCompositeStatements(std::vector<Statement>& statements) {
+		for (size_t i = 0; i < statements.size(); i++) {
+			if (statements[i].type == Statement::Type::Composite) {
+				for (size_t j = 0; j < statements[i].body.size(); j++) {
+					auto& child = statements[i].body[j];
+					statements.insert(statements.begin() + i + j + 1, std::move(child));
+				}
+				statements.erase(statements.begin() + i);
+			}
+		}
+	}
+
 	static CodeError ParseBody(const LexTree& node, Statement::Type statType, std::vector<Statement>& out) {
 		out.clear();
 
@@ -1015,16 +1027,7 @@ namespace wings {
 		}
 		statementHierarchy.pop_back();
 
-		// Expand composite statements
-		for (size_t i = 0; i < out.size(); i++) {
-			if (out[i].type == Statement::Type::Composite) {
-				for (size_t j = 0; j < out[i].body.size(); j++) {
-					auto& child = out[i].body[j];
-					out.insert(out.begin() + i + j + 1, std::move(child));
-				}
-				out.erase(out.begin() + i);
-			}
-		}
+		ExpandCompositeStatements(out);
 
 		// Validate elif and else
 		for (size_t i = 0; i < out.size(); i++) {
