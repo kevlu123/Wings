@@ -38,7 +38,8 @@ typedef struct Wg_Config {
 	void* printUserdata;
 	const char* const* argv;
 	int argc;
-	bool enableOsModule;
+	bool enableOSAccess;
+	bool isatty;
 } Wg_Config;
 
 typedef enum Wg_UnOp {

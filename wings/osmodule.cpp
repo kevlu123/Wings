@@ -154,7 +154,12 @@ namespace wings {
 		return Wg_NewString(context, path.c_str());
 	}
 
-	bool ImportOs(Wg_Context* context) {
+	static Wg_Obj* isatty(Wg_Context* context, Wg_Obj** argv, int argc) {
+		WG_EXPECT_ARG_COUNT(0);
+		return Wg_NewBool(context, context->config.isatty);
+	}
+
+	bool ImportOS(Wg_Context* context) {
 		try {
 			RegisterFunction(context, "system", system);
 			RegisterFunction(context, "chdir", chdir);
@@ -166,6 +171,7 @@ namespace wings {
 			RegisterFunction(context, "rename", rename);
 			RegisterFunction(context, "listdir", listdir);
 			RegisterFunction(context, "abort", abort);
+			RegisterFunction(context, "isatty", isatty);
 			
 			Wg_SetGlobal(context, "error", Wg_GetGlobal(context, "OSError"));
 

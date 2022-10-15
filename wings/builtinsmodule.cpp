@@ -3634,6 +3634,11 @@ namespace wings {
 			return Wg_None(context);
 		}
 
+		static Wg_Obj* exit(Wg_Context* context, Wg_Obj** argv, int argc) {
+			Wg_RaiseException(context, WG_EXC_SYSTEMEXIT);
+			return nullptr;
+		}
+
 		static Wg_Obj* getattr(Wg_Context* context, Wg_Obj** argv, int argc) {
 			WG_EXPECT_ARG_COUNT(2);
 			WG_EXPECT_ARG_TYPE_STRING(1);
@@ -4092,7 +4097,7 @@ namespace wings {
 			RegisterMethod(b.file, "seekable", methods::File_seekable);
 			RegisterMethod(b.file, "seek", methods::File_seek);
 			RegisterMethod(b.file, "tell", methods::File_tell);
-			if (context->config.enableOsModule)
+			if (context->config.enableOSAccess)
 				Wg_SetGlobal(context, "open", b.file);
 
 			// Add native free functions
@@ -4113,6 +4118,10 @@ namespace wings {
 			RegisterFunction(context, "print", lib::print);
 			RegisterFunction(context, "round", lib::round);
 			RegisterFunction(context, "setattr", lib::setattr);
+			if (context->config.isatty) {
+				RegisterFunction(context, "exit", lib::exit);
+				RegisterFunction(context, "quit", lib::exit);
+			}
 			
 			// Initialize the rest with a script
 			if (Execute(context, CODE, "__builtins__") == nullptr)

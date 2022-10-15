@@ -31,7 +31,8 @@ extern "C" {
 		out->printUserdata = nullptr;
 		out->argv = nullptr;
 		out->argc = 0;
-		out->enableOsModule = false;
+		out->enableOSAccess = false;
+		out->isatty = false;
 	}
 
 	Wg_Context* Wg_CreateContext(const Wg_Config* config) {
@@ -55,8 +56,8 @@ extern "C" {
 			config = &defCfg;
 		}
 		
-		if (config->enableOsModule) {
-			Wg_RegisterModule(context, "os", wings::ImportOs);
+		if (config->enableOSAccess) {
+			Wg_RegisterModule(context, "os", wings::ImportOS);
 		}
 
 		// Apply possibly restrictive config now

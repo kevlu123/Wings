@@ -2,5 +2,5 @@
 #include "wings.h"
 
 namespace wings {
-	bool ImportOs(Wg_Context* context);
+	bool ImportOS(Wg_Context* context);
 }
