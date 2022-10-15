@@ -648,8 +648,10 @@ namespace wings {
 
 			argv[0]->attributes = context->builtins._int->Get<Wg_Obj::Class>().instanceAttributes.Copy();
 			argv[0]->type = "__int";
-			argv[0]->data = new Wg_int(v);
-			argv[0]->finalizer.fptr = [](Wg_Obj* obj, void*) { delete (Wg_int*)obj->data; };
+			
+			auto data = new Wg_int(v);
+			Wg_SetUserdata(argv[0], data);
+			Wg_RegisterFinalizer(argv[0], [](void* ud) { delete (Wg_int*)ud; }, data);
 
 			return Wg_None(context);
 		}
@@ -671,8 +673,10 @@ namespace wings {
 
 			argv[0]->attributes = context->builtins._float->Get<Wg_Obj::Class>().instanceAttributes.Copy();
 			argv[0]->type = "__float";
-			argv[0]->data = new Wg_float(v);
-			argv[0]->finalizer.fptr = [](Wg_Obj* obj, void*) { delete (Wg_float*)obj->data; };
+
+			auto data = new Wg_float(v);
+			Wg_SetUserdata(argv[0], data);
+			Wg_RegisterFinalizer(argv[0], [](void* ud) { delete (Wg_float*)ud; }, data);
 
 			return Wg_None(context);
 		}
@@ -693,8 +697,10 @@ namespace wings {
 			}
 			argv[0]->attributes = context->builtins.str->Get<Wg_Obj::Class>().instanceAttributes.Copy();
 			argv[0]->type = "__str";
-			argv[0]->data = new std::string(v);
-			argv[0]->finalizer.fptr = [](Wg_Obj* obj, void*) { delete (std::string*)obj->data; };
+
+			auto data = new std::string(v);
+			Wg_SetUserdata(argv[0], data);
+			Wg_RegisterFinalizer(argv[0], [](void* ud) { delete (std::string*)ud; }, data);
 
 			return Wg_None(context);
 		}
@@ -724,8 +730,10 @@ namespace wings {
 			
 			obj->attributes = context->builtins.tuple->Get<Wg_Obj::Class>().instanceAttributes.Copy();
 			obj->type = "__tuple";
-			obj->data = new std::vector<Wg_Obj*>(std::move(s.v));
-			obj->finalizer.fptr = [](Wg_Obj* obj, void*) { delete (std::vector<Wg_Obj*>*)obj->data; };
+
+			auto data = new std::vector<Wg_Obj*>(std::move(s.v));
+			Wg_SetUserdata(obj, data);
+			Wg_RegisterFinalizer(obj, [](void* ud) { delete (std::vector<Wg_Obj*>*)ud; }, data);
 
 			return obj;
 		}
@@ -751,20 +759,23 @@ namespace wings {
 
 			argv[0]->attributes = context->builtins.list->Get<Wg_Obj::Class>().instanceAttributes.Copy();
 			argv[0]->type = "__list";
-			argv[0]->data = new std::vector<Wg_Obj*>(std::move(s.v));
-			argv[0]->finalizer.fptr = [](Wg_Obj* obj, void*) { delete (std::vector<Wg_Obj*>*)obj->data; };
+
+			auto data = new std::vector<Wg_Obj*>(std::move(s.v));
+			Wg_SetUserdata(argv[0], data);
+			Wg_RegisterFinalizer(argv[0], [](void* ud) { delete (std::vector<Wg_Obj*>*)ud; }, data);
 
 			return Wg_None(context);
 		}
 
 		static Wg_Obj* map(Wg_Context* context, Wg_Obj** argv, int argc) {
 			WG_EXPECT_ARG_COUNT_BETWEEN(1, 2);
-
-			WDict* buf{};
+			
 			argv[0]->attributes = context->builtins.dict->Get<Wg_Obj::Class>().instanceAttributes.Copy();
 			argv[0]->type = "__map";
-			argv[0]->data = buf = new wings::WDict();
-			argv[0]->finalizer.fptr = [](Wg_Obj* obj, void*) { delete (wings::WDict*)obj->data; };
+
+			auto data = new wings::WDict();
+			Wg_SetUserdata(argv[0], data);
+			Wg_RegisterFinalizer(argv[0], [](void* ud) { delete (wings::WDict*)ud; }, data);
 
 			if (argc == 2) {
 				Wg_Obj* iterable = argv[1];
@@ -784,13 +795,13 @@ namespace wings {
 					return true;
 				};
 
-				if (!Wg_Iterate(iterable, buf, f))
+				if (!Wg_Iterate(iterable, data, f))
 					return nullptr;
 			}
 
 			for (const auto& [k, v] : Wg_GetKwargs(context)->Get<WDict>()) {
 				try {
-					buf->operator[](k) = v;
+					data->operator[](k) = v;
 				} catch (HashException&) {
 					return nullptr;
 				}
@@ -801,12 +812,13 @@ namespace wings {
 
 		static Wg_Obj* set(Wg_Context* context, Wg_Obj** argv, int argc) {
 			WG_EXPECT_ARG_COUNT_BETWEEN(1, 2);
-
-			WSet* buf{};
+			
 			argv[0]->attributes = context->builtins.set->Get<Wg_Obj::Class>().instanceAttributes.Copy();
 			argv[0]->type = "__set";
-			argv[0]->data = buf = new wings::WSet();
-			argv[0]->finalizer.fptr = [](Wg_Obj* obj, void*) { delete (wings::WSet*)obj->data; };
+
+			auto data = new wings::WSet();
+			Wg_SetUserdata(argv[0], data);
+			Wg_RegisterFinalizer(argv[0], [](void* ud) { delete (wings::WSet*)ud; }, data);
 
 			if (argc == 2) {
 				Wg_Obj* iterable = argv[1];
@@ -817,26 +829,11 @@ namespace wings {
 					return true;
 				};
 
-				if (!Wg_Iterate(iterable, buf, f))
+				if (!Wg_Iterate(iterable, data, f))
 					return nullptr;
 			}
 
 			return Wg_None(context);
-		}
-
-		static Wg_Obj* func(Wg_Context* context, Wg_Obj** argv, int argc) { // Excludes self
-			// Not callable from user code
-
-			Wg_Obj* obj = Alloc(context);
-			if (obj == nullptr)
-				return nullptr;
-
-			//obj->attributes = ((Wg_Context*)ud)->builtins.func->Get<Wg_Obj::Class>().instanceAttributes.Copy();
-			obj->type = "__func";
-			obj->data = new Wg_Obj::Func();
-			obj->finalizer.fptr = [](Wg_Obj* obj, void*) { delete (Wg_Obj::Func*)obj->data; };
-
-			return obj;
 		}
 
 		static Wg_Obj* BaseException(Wg_Context* context, Wg_Obj** argv, int argc) {
@@ -857,7 +854,7 @@ namespace wings {
 			WG_EXPECT_ARG_TYPE_MAP(1);
 			auto* it = new WDict::iterator(argv[1]->Get<WDict>().begin());
 			Wg_SetUserdata(argv[0], it);
-			argv[0]->finalizer.fptr = [](Wg_Obj* obj, void*) { delete (WDict::iterator*)obj->data; };
+			Wg_RegisterFinalizer(argv[0], [](void* ud) { delete (WDict::iterator*)ud; }, it);
 			Wg_LinkReference(argv[0], argv[1]);
 			return Wg_None(context);
 		}
@@ -867,7 +864,7 @@ namespace wings {
 			WG_EXPECT_ARG_TYPE_SET(1);
 			auto* it = new WSet::iterator(argv[1]->Get<WSet>().begin());
 			Wg_SetUserdata(argv[0], it);
-			argv[0]->finalizer.fptr = [](Wg_Obj* obj, void*) { delete (WSet::iterator*)obj->data; };
+			Wg_RegisterFinalizer(argv[0], [](void* ud) { delete (WSet::iterator*)ud; }, it);
 			Wg_LinkReference(argv[0], argv[1]);
 			return Wg_None(context);
 		}
@@ -914,11 +911,9 @@ namespace wings {
 				Wg_RaiseException(context, WG_EXC_OSERROR, "Failed to open file");
 				return nullptr;
 			}
-			Wg_SetUserdata(argv[0], f);
 
-			Wg_FinalizerDesc fd{};
-			fd.fptr = [](Wg_Obj* obj, void*) { delete (std::fstream*)obj->data; };
-			Wg_SetFinalizer(argv[0], &fd);
+			Wg_SetUserdata(argv[0], f);
+			Wg_RegisterFinalizer(argv[0], [](void* ud) { delete (std::fstream*)ud; }, f);
 
 			bool readable = mode & std::ios::in;
 			bool writable = mode & std::ios::out;
@@ -3771,14 +3766,16 @@ namespace wings {
 			};
 
 			auto& b = context->builtins;
+			Wg_Obj::Class* klass = nullptr;
 
 			// Create object class
 			b.object = Alloc(context);
 			if (b.object == nullptr)
 				throw LibraryInitException();
 			b.object->type = "__class";
-			b.object->data = new Wg_Obj::Class{ std::string("object") };
-			b.object->finalizer.fptr = [](Wg_Obj* obj, void*) { delete (Wg_Obj::Class*)obj->data; };
+			klass = new Wg_Obj::Class{ std::string("object") };
+			Wg_SetUserdata(b.object, klass);
+			Wg_RegisterFinalizer(b.object, [](void* ud) { delete (Wg_Obj::Class*)ud; }, klass);
 			b.object->Get<Wg_Obj::Class>().instanceAttributes.Set("__class__", b.object);
 			b.object->attributes.AddParent(b.object->Get<Wg_Obj::Class>().instanceAttributes);
 			b.object->Get<Wg_Obj::Class>().userdata = context;
@@ -3790,19 +3787,24 @@ namespace wings {
 			if (b.func == nullptr)
 				throw LibraryInitException();
 			b.func->type = "__class";
-			b.func->data = new Wg_Obj::Class{ std::string("function") };
-			b.func->finalizer.fptr = [](Wg_Obj* obj, void*) { delete (Wg_Obj::Class*)obj->data; };
+			klass = new Wg_Obj::Class{ std::string("function") };
+			Wg_SetUserdata(b.func, klass);
+			Wg_RegisterFinalizer(b.func, [](void* ud) { delete (Wg_Obj::Class*)ud; }, klass);
 			b.func->Get<Wg_Obj::Class>().instanceAttributes.Set("__class__", b.func);
 			b.func->attributes.AddParent(b.object->Get<Wg_Obj::Class>().instanceAttributes);
 			b.func->Get<Wg_Obj::Class>().userdata = context;
-			b.func->Get<Wg_Obj::Class>().ctor = ctors::func;
+			b.func->Get<Wg_Obj::Class>().ctor = [](Wg_Context* context, Wg_Obj**, int) -> Wg_Obj* {
+				Wg_RaiseException(context, WG_EXC_TYPEERROR, "A function cannot be created directly");
+				return nullptr;
+			};
 			RegisterMethod(b.func, "__str__", methods::func_str);
 
 			// Create tuple class
 			b.tuple = Alloc(context);
 			b.tuple->type = "__class";
-			b.tuple->data = new Wg_Obj::Class{ std::string("tuple") };
-			b.tuple->finalizer.fptr = [](Wg_Obj* obj, void*) { delete (Wg_Obj::Class*)obj->data; };
+			klass = new Wg_Obj::Class{ std::string("tuple") };
+			Wg_SetUserdata(b.tuple, klass);
+			Wg_RegisterFinalizer(b.tuple, [](void* ud) { delete (Wg_Obj::Class*)ud; }, klass);
 			b.tuple->Get<Wg_Obj::Class>().instanceAttributes.Set("__class__", b.tuple);
 			b.tuple->attributes.AddParent(b.object->Get<Wg_Obj::Class>().instanceAttributes);
 			b.tuple->Get<Wg_Obj::Class>().userdata = context;
@@ -3820,14 +3822,14 @@ namespace wings {
 			RegisterMethod(b.tuple, "index", methods::collection_index<Collection::Tuple>);
 
 			// Create NoneType class
-			b.none = Alloc(context);
-			b.none->type = "__class";
-			b.none->data = new Wg_Obj::Class{ std::string("NoneType") };
-			b.none->finalizer.fptr = [](Wg_Obj* obj, void*) { delete (Wg_Obj::Class*)obj->data; };
-			b.none->Get<Wg_Obj::Class>().instanceAttributes.Set("__class__", b.none);
-			b.none->attributes.AddParent(b.object->Get<Wg_Obj::Class>().instanceAttributes);
-			b.none->Get<Wg_Obj::Class>().userdata = context;
-			b.none->Get<Wg_Obj::Class>().ctor = ctors::none;
+			b.noneType = Alloc(context);
+			b.noneType->type = "__class";
+			klass = new Wg_Obj::Class{ std::string("NoneType") };
+			Wg_SetUserdata(b.noneType, klass);
+			Wg_RegisterFinalizer(b.noneType, [](void* ud) { delete (Wg_Obj::Class*)ud; }, klass);
+			b.noneType->attributes.AddParent(b.object->Get<Wg_Obj::Class>().instanceAttributes);
+			b.noneType->Get<Wg_Obj::Class>().userdata = context;
+			b.noneType->Get<Wg_Obj::Class>().ctor = ctors::none;
 
 			// Create None singleton
 			b.none = Alloc(context);
@@ -3882,22 +3884,23 @@ namespace wings {
 			RegisterMethod(b._bool, "__hash__", methods::bool_hash);
 			RegisterMethod(b._bool, "__abs__", methods::bool_abs);
 
-			Wg_Obj* _false = Alloc(context);
-			if (_false == nullptr)
+			b._false = Alloc(context);
+			if (b._false == nullptr)
 				throw LibraryInitException();
-			_false->attributes = b._bool->Get<Wg_Obj::Class>().instanceAttributes.Copy();
-			_false->type = "__bool";
-			_false->data = new bool(false);
-			_false->finalizer.fptr = [](Wg_Obj* obj, void*) { delete (bool*)obj->data; };
-			b._false = _false;
-			Wg_Obj* _true = Alloc(context);
-			if (_true == nullptr)
+			b._false->attributes = b._bool->Get<Wg_Obj::Class>().instanceAttributes.Copy();
+			b._false->type = "__bool";
+			auto falseData = new bool(false);
+			Wg_SetUserdata(b._false, falseData);
+			Wg_RegisterFinalizer(b._false, [](void* ud) { delete (bool*)ud; }, falseData);
+
+			b._true = Alloc(context);
+			if (b._true == nullptr)
 				throw LibraryInitException();
-			_true->attributes = b._bool->Get<Wg_Obj::Class>().instanceAttributes.Copy();
-			_true->type = "__bool";
-			_true->data = new bool(true);
-			_true->finalizer.fptr = [](Wg_Obj* obj, void*) { delete (bool*)obj->data; };
-			b._true = _true;
+			b._true->attributes = b._bool->Get<Wg_Obj::Class>().instanceAttributes.Copy();
+			b._true->type = "__bool";
+			auto trueData = new bool(true);
+			Wg_SetUserdata(b._true, trueData);
+			Wg_RegisterFinalizer(b._true, [](void* ud) { delete (bool*)ud; }, trueData);
 
 			b._int = createClass("int");
 			RegisterMethod(b._int, "__init__", ctors::_int);

@@ -11,7 +11,7 @@ typedef uint64_t Wg_uint;
 typedef double Wg_float;
 
 typedef Wg_Obj* (*Wg_Function)(Wg_Context* context, Wg_Obj** args, int argc);
-typedef void (*Wg_Finalizer)(Wg_Obj* obj, void* userdata);
+typedef void (*Wg_Finalizer)(void* userdata);
 typedef void (*Wg_PrintFunction)(const char* message, int len, void* userdata);
 typedef void (*Wg_ErrorCallback)(const char* message, void* userdata);
 typedef bool (*Wg_IterationCallback)(Wg_Obj* obj, void* userdata);
@@ -23,11 +23,6 @@ typedef struct Wg_FuncDesc {
 	bool isMethod;
 	const char* prettyName;
 } Wg_FuncDesc;
-
-typedef struct Wg_FinalizerDesc {
-	Wg_Finalizer fptr;
-	void* userdata;
-} Wg_FinalizerDesc;
 
 typedef struct Wg_Config {
 	int maxAlloc;
@@ -708,23 +703,16 @@ WG_DLL_EXPORT void Wg_SetUserdata(Wg_Obj* obj, void* userdata);
 WG_DLL_EXPORT bool Wg_TryGetUserdata(const Wg_Obj* obj, const char* type, void** out);
 
 /**
-* Get the finalizer of an object.
-*
-* @param obj The object to get the finalizer from.
-* @param finalizer A finalizer description.
-*/
-WG_DLL_EXPORT void Wg_GetFinalizer(const Wg_Obj* obj, Wg_FinalizerDesc* finalizer);
-
-/**
-* Set the finalizer of an object.
+* Register the finalizer of an object.
 *
 * The finalizer is run when the object is garbage collected.
 * Do not instantiate any objects in the finalizer.
 * 
 * @param obj The object to set the finalizer for.
-* @param finalizer The received finalizer description.
+* @param finalizer The finalizer callback function.
+* @param userdata The userdata to pass to the finalizer callback.
 */
-WG_DLL_EXPORT void Wg_SetFinalizer(Wg_Obj* obj, const Wg_FinalizerDesc* finalizer);
+WG_DLL_EXPORT void Wg_RegisterFinalizer(Wg_Obj* obj, Wg_Finalizer finalizer, void* userdata WG_DEFAULT_ARG(nullptr));
 
 /**
 * Check if an object contains an attribute.

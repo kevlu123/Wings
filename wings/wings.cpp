@@ -84,7 +84,8 @@ extern "C" {
 
 	void Wg_DestroyContext(Wg_Context* context) {
 		WG_ASSERT_VOID(context);
-		wings::DestroyAllObjects(context);
+		context->closing = true;
+		Wg_CollectGarbage(context);
 		delete context;
 	}
 
@@ -434,23 +435,29 @@ extern "C" {
 
 	Wg_Obj* Wg_NewFunction(Wg_Context* context, Wg_Function fptr, void* userdata, const char* prettyName) {
 		WG_ASSERT(context && fptr);
-		if (Wg_Obj* v = Wg_Call(context->builtins.func, nullptr, 0)) {
-			v->Get<Wg_Obj::Func>() = {
-				nullptr,
-				fptr,
-				userdata,
-				false,
-				std::string(context->currentModule.top()),
-				std::string(prettyName ? prettyName : wings::DEFAULT_FUNC_NAME)
-			};
-			return v;
-		} else {
+
+		Wg_Obj* obj = wings::Alloc(context);
+		if (obj == nullptr)
 			return nullptr;
-		}
+
+		//obj->attributes = ((Wg_Context*)ud)->builtins.func->Get<Wg_Obj::Class>().instanceAttributes.Copy();
+		obj->type = "__func";
+		auto data = new Wg_Obj::Func;
+		Wg_SetUserdata(obj, data);
+		Wg_RegisterFinalizer(obj, [](void* ud) { delete (Wg_Obj::Func*)ud; }, data);
+
+		data->fptr = fptr;
+		data->userdata = userdata;
+		data->isMethod = false;
+		data->module = context->currentModule.top();
+		data->prettyName = prettyName ? prettyName : wings::DEFAULT_FUNC_NAME;
+		data->self = nullptr;
+
+		return obj;
 	}
 
 	Wg_Obj* Wg_BindMethod(Wg_Obj* klass, const char* name, Wg_Function fptr, void* userdata) {
-		WG_ASSERT(klass && fptr);
+		WG_ASSERT(klass && fptr && Wg_IsClass(klass));
 		Wg_Context* context = klass->context;
 		wings::Wg_ObjRef ref(klass);
 		Wg_Obj* fn = Wg_NewFunction(context, fptr, userdata, name);
@@ -480,7 +487,7 @@ extern "C" {
 		refs.emplace_back(klass);
 		klass->type = "__class";
 		klass->data = new Wg_Obj::Class{ std::string(name) };
-		klass->finalizer.fptr = [](Wg_Obj* obj, void*) { delete (Wg_Obj::Class*)obj->data; };
+		Wg_RegisterFinalizer(klass, [](void* ud) { delete (Wg_Obj::Class*)ud; }, klass->data);
 		klass->Get<Wg_Obj::Class>().module = context->currentModule.top();
 		klass->Get<Wg_Obj::Class>().instanceAttributes.Set("__class__", klass);
 		klass->attributes.AddParent(context->builtins.object->Get<Wg_Obj::Class>().instanceAttributes);
@@ -685,14 +692,9 @@ extern "C" {
 		}
 	}
 
-	void Wg_GetFinalizer(const Wg_Obj* obj, Wg_FinalizerDesc* out) {
-		WG_ASSERT_VOID(obj && out);
-		*out = obj->finalizer;
-	}
-
-	void Wg_SetFinalizer(Wg_Obj* obj, const Wg_FinalizerDesc* finalizer) {
+	void Wg_RegisterFinalizer(Wg_Obj* obj, Wg_Finalizer finalizer, void* userdata) {
 		WG_ASSERT_VOID(obj && finalizer);
-		obj->finalizer = *finalizer;
+		obj->finalizers.push_back({ finalizer, userdata });
 	}
 
 	Wg_Obj* Wg_HasAttribute(Wg_Obj* obj, const char* member) {
@@ -1332,21 +1334,23 @@ extern "C" {
 		WG_ASSERT_VOID(context);
 
 		std::deque<const Wg_Obj*> inUse;
-		if (context->currentException)
-			inUse.push_back(context->currentException);
-		for (const auto& [obj, _] : context->protectedObjects)
-			inUse.push_back(obj);
-		for (auto& [_, globals] : context->globals)
-			for (auto& var : globals)
-				inUse.push_back(*var.second);
-		for (Wg_Obj* obj : context->kwargs)
-			if (obj)
+		if (!context->closing) {
+			if (context->currentException)
+				inUse.push_back(context->currentException);
+			for (const auto& [obj, _] : context->protectedObjects)
 				inUse.push_back(obj);
-		for (auto& obj : context->builtins.GetAll())
-			if (obj)
-				inUse.push_back(obj);
-		if (context->argv)
-			inUse.push_back(context->argv);
+			for (auto& [_, globals] : context->globals)
+				for (auto& var : globals)
+					inUse.push_back(*var.second);
+			for (Wg_Obj* obj : context->kwargs)
+				if (obj)
+					inUse.push_back(obj);
+			for (auto& obj : context->builtins.GetAll())
+				if (obj)
+					inUse.push_back(obj);
+			if (context->argv)
+				inUse.push_back(context->argv);
+		}
 
 		// Recursively find objects in use
 		std::unordered_set<const Wg_Obj*> traversed;
@@ -1398,8 +1402,9 @@ extern "C" {
 
 		// Call finalizers
 		for (auto& obj : context->mem)
-			if (obj->finalizer.fptr && !traversed.contains(obj.get()))
-				obj->finalizer.fptr(obj.get(), obj->finalizer.userdata);
+			if (!traversed.contains(obj.get()))
+				for (const auto& finalizer : obj->finalizers)
+					finalizer.first(finalizer.second);
 
 		// Remove unused objects
 		context->mem.erase(

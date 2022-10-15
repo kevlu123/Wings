@@ -39,16 +39,6 @@ namespace wings {
 		return p;
 	}
 
-	void DestroyAllObjects(Wg_Context* context) {
-		// Call finalizers
-		for (auto& obj : context->mem)
-			if (obj->finalizer.fptr)
-				obj->finalizer.fptr(obj.get(), obj->finalizer.userdata);
-
-		// Deallocate
-		context->mem.clear();
-	}
-
 	void CallErrorCallback(const char* message) {
 		errorCallbackMutex.lock();
 		auto cb = errorCallback;
@@ -255,11 +245,8 @@ namespace wings {
 			delete def;
 			return nullptr;
 		}
-
-		Wg_FinalizerDesc finalizer{};
-		finalizer.fptr = [](Wg_Obj* obj, void* userdata) { delete (wings::DefObject*)userdata; };
-		finalizer.userdata = def;
-		Wg_SetFinalizer(obj, &finalizer);
+		
+		Wg_RegisterFinalizer(obj, [](void* ud) { delete (wings::DefObject*)ud; }, def);
 
 		return obj;
 	}

@@ -28,7 +28,6 @@ namespace wings {
 	std::string WObjTypeToString(const Wg_Obj* obj);
 	void CallErrorCallback(const char* message);
 	Wg_Obj* Alloc(Wg_Context* context);
-	void DestroyAllObjects(Wg_Context* context);
 	bool IsKeyword(std::string_view s);
 	bool IsValidIdentifier(std::string_view s);
 	Wg_Obj* Compile(Wg_Context* context, const char* code, const char* module, const char* prettyName, bool expr);
@@ -247,7 +246,7 @@ struct Wg_Obj {
 	template <class T> T& Get() { return *(T*)data; }
 
 	wings::AttributeTable attributes;
-	Wg_FinalizerDesc finalizer{};
+	std::vector<std::pair<Wg_Finalizer, void*>> finalizers;
 	std::vector<Wg_Obj*> references;
 	Wg_Context* context;
 };
@@ -255,6 +254,7 @@ struct Wg_Obj {
 struct Wg_Context {
 	using Globals = std::unordered_map<std::string, wings::RcPtr<Wg_Obj*>>;
 	Wg_Config config{};
+	bool closing = false;
 	size_t lastObjectCountAfterGC = 0;
 	std::deque<std::unique_ptr<Wg_Obj>> mem;
 	std::unordered_map<const Wg_Obj*, size_t> protectedObjects;

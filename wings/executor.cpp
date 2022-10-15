@@ -349,10 +349,7 @@ namespace wings {
 			}
 			obj->Get<Wg_Obj::Func>().isMethod = instr.def->isMethod;
 
-			Wg_FinalizerDesc finalizer{};
-			finalizer.fptr = [](Wg_Obj* obj, void* userdata) { delete (DefObject*)userdata; };
-			finalizer.userdata = def;
-			Wg_SetFinalizer(obj, &finalizer);
+			Wg_RegisterFinalizer(obj, [](void* userdata) { delete (DefObject*)userdata; }, def);
 
 			PushStack(obj);
 			break;
