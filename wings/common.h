@@ -253,26 +253,36 @@ struct Wg_Obj {
 };
 
 struct Wg_Context {
-	using Globals = std::unordered_map<std::string, wings::RcPtr<Wg_Obj*>>;
 	Wg_Config config{};
+	wings::Rng rng;
 	bool closing = false;
+	
+	// Garbage collection
 	size_t lastObjectCountAfterGC = 0;
 	std::deque<std::unique_ptr<Wg_Obj>> mem;
 	std::unordered_map<const Wg_Obj*, size_t> protectedObjects;
+
+	// Object instances
+	using Globals = std::unordered_map<std::string, wings::RcPtr<Wg_Obj*>>;
 	std::unordered_map<std::string, Globals> globals;
-	Wg_Obj* currentException = nullptr;
-	std::vector<Wg_Obj*> reprStack;
+	wings::Builtins builtins{};
+	Wg_Obj* argv = nullptr;
+	
+	// Exception info
 	std::vector<wings::TraceFrame> currentTrace;
 	std::vector<wings::OwnedTraceFrame> exceptionTrace;
 	std::string traceMessage;
-	wings::Builtins builtins{};
+	Wg_Obj* currentException = nullptr;
+	
+	// Function call data
 	std::vector<Wg_Obj*> kwargs;
 	std::vector<void*> userdata;
+	std::vector<Wg_Obj*> reprStack;
+
+	// Imports
 	std::unordered_map<std::string, Wg_ModuleLoader> moduleLoaders;
 	std::stack<std::string_view> currentModule;
 	std::string importPath;
-	wings::Rng rng;
-	Wg_Obj* argv;
 };
 
 #define WG_UNREACHABLE() std::abort()

@@ -24,14 +24,13 @@ extern "C" {
 		out->maxAlloc = 100'000;
 		out->maxRecursion = 50;
 		out->gcRunFactor = 2.0f;
-		out->print = [](const char* message, int len, void*) {
-			std::cout << std::string_view(message, (size_t)len);
-		};
 		out->printUserdata = nullptr;
 		out->argv = nullptr;
 		out->argc = 0;
 		out->enableOSAccess = false;
-		out->isatty = false;
+		out->print = [](const char* message, int len, void*) {
+			std::cout << std::string_view(message, (size_t)len);
+		};
 	}
 
 	Wg_Context* Wg_CreateContext(const Wg_Config* config) {

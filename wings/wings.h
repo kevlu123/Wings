@@ -19,7 +19,6 @@ typedef bool (*Wg_ModuleLoader)(Wg_Context* context);
 
 typedef struct Wg_Config {
 	bool enableOSAccess;
-	bool isatty;
 	int maxAlloc;
 	int maxRecursion;
 	float gcRunFactor;

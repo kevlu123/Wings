@@ -4149,10 +4149,8 @@ namespace wings {
 			RegisterFunction(context, "print", lib::print);
 			RegisterFunction(context, "round", lib::round);
 			RegisterFunction(context, "setattr", lib::setattr);
-			if (context->config.isatty) {
-				RegisterFunction(context, "exit", lib::exit);
-				RegisterFunction(context, "quit", lib::exit);
-			}
+			RegisterFunction(context, "exit", lib::exit);
+			RegisterFunction(context, "quit", lib::exit);
 			
 			// Initialize the rest with a script
 			if (Execute(context, CODE, "__builtins__") == nullptr)
