@@ -19,7 +19,7 @@ namespace wings {
 			Wg_CollectGarbage(context);
 			if (context->mem.size() >= context->config.maxAlloc) {
 				// If there are still too many objects then set a MemoryException
-				Wg_RaiseExceptionObject(context->builtins.memoryErrorInstance);
+				Wg_RaiseException(context, WG_EXC_MEMORYERROR);
 				return nullptr;
 			}
 		}

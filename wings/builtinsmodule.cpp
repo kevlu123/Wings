@@ -2313,6 +2313,32 @@ namespace wings {
 		}
 
 		template <Collection collection>
+		static Wg_Obj* collection_mul(Wg_Context* context, Wg_Obj** argv, int argc) {
+			WG_EXPECT_ARG_COUNT(2);
+			WG_EXPECT_ARG_TYPE_INT(1);
+
+			Wg_Obj* col = nullptr;
+			if constexpr (collection == Collection::List) {
+				WG_EXPECT_ARG_TYPE_LIST(0);
+				col = Wg_NewList(context, nullptr, 0);
+			} else {
+				WG_EXPECT_ARG_TYPE_TUPLE(0);
+				col = Wg_NewTuple(context, nullptr, 0);
+			}
+			if (col == nullptr)
+				return nullptr;
+
+			Wg_int mul = Wg_GetInt(argv[1]);
+			const auto& thisBuf = argv[0]->Get<std::vector<Wg_Obj*>>();
+			auto& buf = col->Get<std::vector<Wg_Obj*>>();
+			buf.reserve(mul * thisBuf.size());
+			for (Wg_int i = 0; i < mul; i++) {
+				buf.insert(buf.end(), thisBuf.begin(), thisBuf.end());
+			}
+			return col;
+		}
+
+		template <Collection collection>
 		static Wg_Obj* collection_nonzero(Wg_Context* context, Wg_Obj** argv, int argc) {
 			WG_EXPECT_ARG_COUNT(1);
 			if constexpr (collection == Collection::List) {
@@ -3810,6 +3836,7 @@ namespace wings {
 			b.tuple->Get<Wg_Obj::Class>().userdata = context;
 			b.tuple->Get<Wg_Obj::Class>().ctor = ctors::tuple;
 			Wg_SetGlobal(context, "tuple", b.tuple);
+			RegisterMethod(b.tuple, "__mul__", methods::collection_mul<Collection::Tuple>);
 			RegisterMethod(b.tuple, "__iter__", methods::object_iter);
 			RegisterMethod(b.tuple, "__str__", methods::collection_str<Collection::Tuple>);
 			RegisterMethod(b.tuple, "__getitem__", methods::collection_getitem<Collection::Tuple>);
@@ -4002,6 +4029,7 @@ namespace wings {
 
 			b.list = createClass("list");
 			RegisterMethod(b.list, "__init__", ctors::list);
+			RegisterMethod(b.list, "__mul__", methods::collection_mul<Collection::List>);
 			RegisterMethod(b.list, "__nonzero__", methods::collection_nonzero<Collection::List>);
 			RegisterMethod(b.list, "__str__", methods::collection_str<Collection::List>);
 			RegisterMethod(b.list, "__len__", methods::collection_len<Collection::List>);

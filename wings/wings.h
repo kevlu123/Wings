@@ -17,24 +17,16 @@ typedef void (*Wg_ErrorCallback)(const char* message, void* userdata);
 typedef bool (*Wg_IterationCallback)(Wg_Obj* obj, void* userdata);
 typedef bool (*Wg_ModuleLoader)(Wg_Context* context);
 
-typedef struct Wg_FuncDesc {
-	Wg_Function fptr;
-	void* userdata;
-	bool isMethod;
-	const char* prettyName;
-} Wg_FuncDesc;
-
 typedef struct Wg_Config {
+	bool enableOSAccess;
+	bool isatty;
 	int maxAlloc;
 	int maxRecursion;
-	int maxCollectionSize;
 	float gcRunFactor;
 	Wg_PrintFunction print;
 	void* printUserdata;
 	const char* const* argv;
 	int argc;
-	bool enableOSAccess;
-	bool isatty;
 } Wg_Config;
 
 typedef enum Wg_UnOp {

@@ -23,7 +23,6 @@ extern "C" {
 		WG_ASSERT_VOID(out);
 		out->maxAlloc = 100'000;
 		out->maxRecursion = 100;
-		out->maxCollectionSize = 1'000'000'000;
 		out->gcRunFactor = 2.0f;
 		out->print = [](const char* message, int len, void*) {
 			std::cout << std::string_view(message, (size_t)len);
@@ -65,7 +64,6 @@ extern "C" {
 			WG_ASSERT(context);
 			WG_ASSERT(config->maxAlloc >= 0);
 			WG_ASSERT(config->maxRecursion >= 0);
-			WG_ASSERT(config->maxCollectionSize >= 0);
 			WG_ASSERT(config->gcRunFactor >= 1.0f);
 			WG_ASSERT(config->argc >= 0);
 			if (config->argc) {
@@ -794,6 +792,9 @@ extern "C" {
 			wings::Wg_ObjRef yieldedRef(yielded);
 			if (!callback(yielded, userdata))
 				return Wg_GetCurrentException(context) == nullptr;
+
+			if (Wg_GetCurrentException(context))
+				return false;
 		}
 	}
 
@@ -908,7 +909,12 @@ extern "C" {
 			context->currentModule.push(module);
 			context->userdata.push_back(userdata);
 			context->kwargs.push_back(kwargsDict);
-			Wg_Obj* ret = fptr(context, argsWithSelf.data(), (int)argsWithSelf.size());
+			Wg_Obj* ret = nullptr;
+			try {
+				ret = fptr(context, argsWithSelf.data(), (int)argsWithSelf.size());
+			} catch (std::bad_alloc&) {
+				Wg_RaiseException(context, WG_EXC_MEMORYERROR);
+			}
 			context->kwargs.pop_back();
 			context->userdata.pop_back();
 			context->currentModule.pop();
@@ -1215,7 +1221,7 @@ extern "C" {
 		case WG_EXC_KEYERROR:
 			return Wg_RaiseExceptionClass(context->builtins.keyError, message);
 		case WG_EXC_MEMORYERROR:
-			return Wg_RaiseExceptionClass(context->builtins.memoryError, message);
+			return Wg_RaiseExceptionObject(context->builtins.memoryErrorInstance);
 		case WG_EXC_NAMEERROR:
 			return Wg_RaiseExceptionClass(context->builtins.nameError, message);
 		case WG_EXC_OSERROR:
