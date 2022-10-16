@@ -184,6 +184,7 @@ namespace wings {
 		Wg_Obj* _true;
 		Wg_Obj* _false;
 		Wg_Obj* memoryErrorInstance;
+		Wg_Obj* recursionErrorInstance;
 
 		auto GetAll() const {
 			return std::array{
@@ -198,9 +199,9 @@ namespace wings {
 				osError, isADirectoryError, nameError, runtimeError, notImplementedError, recursionError,
 				typeError, valueError,
 
-				isinstance, repr,
+				isinstance, repr, hash, len,
 
-				none, _true, _false, memoryErrorInstance,
+				none, _true, _false, memoryErrorInstance, recursionError,
 			};
 		}
 	};

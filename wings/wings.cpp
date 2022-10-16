@@ -22,7 +22,7 @@ extern "C" {
 	void Wg_DefaultConfig(Wg_Config* out) {
 		WG_ASSERT_VOID(out);
 		out->maxAlloc = 100'000;
-		out->maxRecursion = 100;
+		out->maxRecursion = 50;
 		out->gcRunFactor = 2.0f;
 		out->print = [](const char* message, int len, void*) {
 			std::cout << std::string_view(message, (size_t)len);
@@ -49,17 +49,7 @@ extern "C" {
 		Wg_RegisterModule(context, "sys", wings::ImportSys);
 		Wg_RegisterModule(context, "time", wings::ImportTime);
 		Wg_ImportAllFromModule(context, "__builtins__");
-
-		Wg_Config defCfg = context->config;
-		if (config == nullptr) {
-			config = &defCfg;
-		}
 		
-		if (config->enableOSAccess) {
-			Wg_RegisterModule(context, "os", wings::ImportOS);
-		}
-
-		// Apply possibly restrictive config now
 		if (config) {
 			WG_ASSERT(context);
 			WG_ASSERT(config->maxAlloc >= 0);
@@ -72,6 +62,10 @@ extern "C" {
 					WG_ASSERT(config->argv[i]);
 			}
 			context->config = *config;
+		}
+		
+		if (context->config.enableOSAccess) {
+			Wg_RegisterModule(context, "os", wings::ImportOS);
 		}
 		
 		if (!wings::InitArgv(context, context->config.argv, context->config.argc))
@@ -849,13 +843,19 @@ extern "C" {
 
 	Wg_Obj* Wg_Call(Wg_Obj* callable, Wg_Obj** argv, int argc, Wg_Obj* kwargsDict) {
 		WG_ASSERT(callable && argc >= 0 && (argc == 0 || argv));
+
+		Wg_Context* context = callable->context;
+		if (context->kwargs.size() >= context->config.maxRecursion) {
+			Wg_RaiseException(context, WG_EXC_RECURSIONERROR);
+			return nullptr;
+		}
+
 		if (Wg_IsFunction(callable) || Wg_IsClass(callable)) {
 			if (argc)
 				WG_ASSERT(argv);
 			for (int i = 0; i < argc; i++)
 				WG_ASSERT(argv[i]);
 
-			Wg_Context* context = callable->context;
 
 			if (kwargsDict) {
 				if (!Wg_IsDictionary(kwargsDict)) {
@@ -1233,7 +1233,7 @@ extern "C" {
 		case WG_EXC_NOTIMPLEMENTEDERROR:
 			return Wg_RaiseExceptionClass(context->builtins.notImplementedError, message);
 		case WG_EXC_RECURSIONERROR:
-			return Wg_RaiseExceptionClass(context->builtins.recursionError, message);
+			return Wg_RaiseExceptionObject(context->builtins.recursionErrorInstance);
 		case WG_EXC_SYNTAXERROR:
 			return Wg_RaiseExceptionClass(context->builtins.syntaxError, message);
 		case WG_EXC_TYPEERROR:

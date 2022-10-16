@@ -4194,6 +4194,10 @@ namespace wings {
 			b.memoryErrorInstance = Wg_Call(b.memoryError, nullptr, 0);
 			if (b.memoryErrorInstance == nullptr)
 				throw LibraryInitException();
+
+			b.recursionErrorInstance = Wg_Call(b.recursionError, nullptr, 0);
+			if (b.recursionErrorInstance == nullptr)
+				throw LibraryInitException();
 			
 		} catch (LibraryInitException&) {
 			std::abort(); // Internal error
