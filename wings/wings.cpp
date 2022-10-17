@@ -19,16 +19,16 @@
 #include <unordered_set>
 
 extern "C" {
-	void Wg_DefaultConfig(Wg_Config* out) {
-		WG_ASSERT_VOID(out);
-		out->maxAlloc = 100'000;
-		out->maxRecursion = 50;
-		out->gcRunFactor = 2.0f;
-		out->printUserdata = nullptr;
-		out->argv = nullptr;
-		out->argc = 0;
-		out->enableOSAccess = false;
-		out->print = [](const char* message, int len, void*) {
+	void Wg_DefaultConfig(Wg_Config* config) {
+		WG_ASSERT_VOID(config);
+		config->maxAlloc = 1'000'000;
+		config->maxRecursion = 50;
+		config->gcRunFactor = 2.0f;
+		config->printUserdata = nullptr;
+		config->argv = nullptr;
+		config->argc = 0;
+		config->enableOSAccess = false;
+		config->print = [](const char* message, int len, void*) {
 			std::cout << std::string_view(message, (size_t)len);
 		};
 	}
@@ -60,6 +60,13 @@ extern "C" {
 				for (int i = 0; i < config->argc; i++)
 					WG_ASSERT(config->argv[i]);
 			}
+
+			if (config->importPath) {
+				context->importPath = config->importPath;
+				if (config->importPath[0] != '/' && config->importPath[0] != '\\')
+					context->importPath += "/";
+			}
+
 			context->config = *config;
 		}
 		
@@ -92,29 +99,27 @@ extern "C" {
 		Wg_Print(context, message, (int)std::strlen(message));
 	}
 
-	void Wg_SetErrorCallback(Wg_ErrorCallback callback, void* userdata) {
-		std::scoped_lock lock(wings::errorCallbackMutex);
+	void Wg_SetErrorCallback(Wg_ErrorCallback callback) {
 		wings::errorCallback = callback;
-		wings::errorCallbackUserdata = userdata;
 	}
 
-	Wg_Obj* Wg_Compile(Wg_Context* context, const char* code, const char* prettyName) {
-		return wings::Compile(context, code, "__main__", prettyName, false);
+	Wg_Obj* Wg_Compile(Wg_Context* context, const char* script, const char* prettyName) {
+		return wings::Compile(context, script, "__main__", prettyName, false);
 	}
 
-	Wg_Obj* Wg_CompileExpression(Wg_Context* context, const char* code, const char* prettyName) {
-		return wings::Compile(context, code, "__main__", prettyName, true);
+	Wg_Obj* Wg_CompileExpression(Wg_Context* context, const char* script, const char* prettyName) {
+		return wings::Compile(context, script, "__main__", prettyName, true);
 	}
 
-	Wg_Obj* Wg_Execute(Wg_Context* context, const char* code, const char* prettyName) {
-		if (Wg_Obj* fn = Wg_Compile(context, code, prettyName)) {
-			return Wg_Call(fn, nullptr, 0);
+	bool Wg_Execute(Wg_Context* context, const char* script, const char* prettyName) {
+		if (Wg_Obj* fn = Wg_Compile(context, script, prettyName)) {
+			return Wg_Call(fn, nullptr, 0) != nullptr;
 		}
-		return nullptr;
+		return false;
 	}
 	
-	Wg_Obj* Wg_ExecuteExpression(Wg_Context* context, const char* code, const char* prettyName) {
-		if (Wg_Obj* fn = Wg_CompileExpression(context, code, prettyName)) {
+	Wg_Obj* Wg_ExecuteExpression(Wg_Context* context, const char* script, const char* prettyName) {
+		if (Wg_Obj* fn = Wg_CompileExpression(context, script, prettyName)) {
 			return Wg_Call(fn, nullptr, 0);
 		}
 		return nullptr;
@@ -262,12 +267,6 @@ extern "C" {
 			Wg_SetGlobal(context, var.c_str(), *val);
 		}
 		return true;
-	}
-
-	void Wg_SetImportPath(Wg_Context* context, const char* path) {
-		context->importPath = path;
-		if (path[0] != '/' && path[0] != '\\')
-			context->importPath += "/";
 	}
 
 	Wg_Obj* Wg_None(Wg_Context* context) {
@@ -459,12 +458,12 @@ extern "C" {
 		return fn;
 	}
 
-	Wg_Obj* Wg_NewClass(Wg_Context* context, const char* name, Wg_Obj** bases, int baseCount) {
+	Wg_Obj* Wg_NewClass(Wg_Context* context, const char* name, Wg_Obj** bases, int basesLen) {
 		std::vector<wings::Wg_ObjRef> refs;
-		WG_ASSERT(context && name && baseCount >= 0);
-		if (baseCount > 0) {
+		WG_ASSERT(context && name && basesLen >= 0);
+		if (basesLen > 0) {
 			WG_ASSERT(bases);
-			for (int i = 0; i < baseCount; i++) {
+			for (int i = 0; i < basesLen; i++) {
 				WG_ASSERT(bases[i] && Wg_IsClass(bases[i]));
 				refs.emplace_back(bases[i]);
 			}
@@ -484,8 +483,8 @@ extern "C" {
 		klass->attributes.AddParent(context->builtins.object->Get<Wg_Obj::Class>().instanceAttributes);
 
 		// Set bases
-		int actualBaseCount = baseCount ? baseCount : 1;
-		Wg_Obj** actualBases = baseCount ? bases : &context->builtins.object;
+		int actualBaseCount = basesLen ? basesLen : 1;
+		Wg_Obj** actualBases = basesLen ? bases : &context->builtins.object;
 		for (int i = 0; i < actualBaseCount; i++) {
 			klass->Get<Wg_Obj::Class>().instanceAttributes.AddParent(actualBases[i]->Get<Wg_Obj::Class>().instanceAttributes);
 			klass->Get<Wg_Obj::Class>().bases.push_back(actualBases[i]);
@@ -577,14 +576,8 @@ extern "C" {
 		if (initFn == nullptr)
 			return nullptr;
 		Wg_LinkReference(initFn, klass);
-		Wg_AddAttributeToClass(klass, "__init__", initFn);
 
 		return klass;
-	}
-
-	void Wg_AddAttributeToClass(Wg_Obj* class_, const char* attribute, Wg_Obj* value) {
-		WG_ASSERT_VOID(class_ && attribute && value && Wg_IsClass(class_) && wings::IsValidIdentifier(attribute));
-		class_->Get<Wg_Obj::Class>().instanceAttributes.Set(attribute, value);
 	}
 
 	bool Wg_IsNone(const Wg_Obj* obj) {
@@ -659,11 +652,11 @@ extern "C" {
 		else return obj->Get<Wg_float>();
 	}
 
-	const char* Wg_GetString(const Wg_Obj* obj, int* length) {
+	const char* Wg_GetString(const Wg_Obj* obj, int* len) {
 		WG_ASSERT(obj && Wg_IsString(obj));
 		const auto& s = obj->Get<std::string>();
-		if (length)
-			*length = (int)s.size();
+		if (len)
+			*len = (int)s.size();
 		return s.c_str();
 	}
 
@@ -688,39 +681,39 @@ extern "C" {
 		obj->finalizers.push_back({ finalizer, userdata });
 	}
 
-	Wg_Obj* Wg_HasAttribute(Wg_Obj* obj, const char* member) {
-		WG_ASSERT(obj && member && wings::IsValidIdentifier(member));
-		Wg_Obj* mem = obj->attributes.Get(member);
+	Wg_Obj* Wg_HasAttribute(Wg_Obj* obj, const char* attribute) {
+		WG_ASSERT(obj && attribute && wings::IsValidIdentifier(attribute));
+		Wg_Obj* mem = obj->attributes.Get(attribute);
 		if (mem && Wg_IsFunction(mem) && mem->Get<Wg_Obj::Func>().isMethod) {
 			mem->Get<Wg_Obj::Func>().self = obj;
 		}
 		return mem;
 	}
 
-	Wg_Obj* Wg_GetAttribute(Wg_Obj* obj, const char* member) {
-		WG_ASSERT(obj && member && wings::IsValidIdentifier(member));
-		Wg_Obj* mem = obj->attributes.Get(member);
+	Wg_Obj* Wg_GetAttribute(Wg_Obj* obj, const char* attribute) {
+		WG_ASSERT(obj && attribute && wings::IsValidIdentifier(attribute));
+		Wg_Obj* mem = obj->attributes.Get(attribute);
 		if (mem == nullptr) {
-			Wg_RaiseAttributeError(obj, member);
+			Wg_RaiseAttributeError(obj, attribute);
 		} else if (Wg_IsFunction(mem) && mem->Get<Wg_Obj::Func>().isMethod) {
 			mem->Get<Wg_Obj::Func>().self = obj;
 		}
 		return mem;
 	}
 
-	void Wg_SetAttribute(Wg_Obj* obj, const char* member, Wg_Obj* value) {
-		WG_ASSERT_VOID(obj && member && value && wings::IsValidIdentifier(member));
-		obj->attributes.Set(member, value);
+	void Wg_SetAttribute(Wg_Obj* obj, const char* attribute, Wg_Obj* value) {
+		WG_ASSERT_VOID(obj && attribute && value && wings::IsValidIdentifier(attribute));
+		obj->attributes.Set(attribute, value);
 	}
 
-	Wg_Obj* Wg_GetAttributeFromBase(Wg_Obj* obj, const char* member, Wg_Obj* baseClass) {
-		WG_ASSERT(obj && member && wings::IsValidIdentifier(member));
+	Wg_Obj* Wg_GetAttributeFromBase(Wg_Obj* obj, const char* attribute, Wg_Obj* baseClass) {
+		WG_ASSERT(obj && attribute && wings::IsValidIdentifier(attribute));
 
 		Wg_Obj* mem{};
 		if (baseClass == nullptr) {
-			mem = obj->attributes.GetFromBase(member);
+			mem = obj->attributes.GetFromBase(attribute);
 		} else {
-			mem = baseClass->Get<Wg_Obj::Class>().instanceAttributes.Get(member);
+			mem = baseClass->Get<Wg_Obj::Class>().instanceAttributes.Get(attribute);
 		}
 
 		if (mem && Wg_IsFunction(mem) && mem->Get<Wg_Obj::Func>().isMethod) {
@@ -763,6 +756,8 @@ extern "C" {
 		WG_ASSERT(obj && callback);
 		Wg_Context* context = obj->context;
 
+		wings::Wg_ObjRef objRef(obj);
+
 		Wg_Obj* iter = Wg_CallMethod(obj, "__iter__", nullptr, 0);
 		if (iter == nullptr)
 			return false;
@@ -771,10 +766,10 @@ extern "C" {
 		while (true) {
 			Wg_Obj* yielded = Wg_CallMethod(iter, "__next__", nullptr, 0);
 
-			Wg_Obj* exc = Wg_GetCurrentException(context);
+			Wg_Obj* exc = Wg_GetException(context);
 			if (exc) {
 				if (Wg_IsInstance(exc, &context->builtins.stopIteration, 1)) {
-					Wg_ClearCurrentException(context);
+					Wg_ClearException(context);
 					return true;
 				} else {
 					return false;
@@ -784,14 +779,14 @@ extern "C" {
 			WG_ASSERT(yielded); // If no exception was thrown then a value must be yielded
 			wings::Wg_ObjRef yieldedRef(yielded);
 			if (!callback(yielded, userdata))
-				return Wg_GetCurrentException(context) == nullptr;
+				return Wg_GetException(context) == nullptr;
 
-			if (Wg_GetCurrentException(context))
+			if (Wg_GetException(context))
 				return false;
 		}
 	}
 
-	bool Wg_Unpack(Wg_Obj* obj, Wg_Obj** out, int count) {
+	bool Wg_Unpack(Wg_Obj* obj, int count, Wg_Obj** out) {
 		WG_ASSERT(obj && (count == 0 || out));
 
 		Wg_Context* context = obj->context;
@@ -807,7 +802,7 @@ extern "C" {
 			if (s->index >= s->count) {
 				Wg_RaiseException(s->context, WG_EXC_VALUEERROR, "Too many values to unpack");
 			} else {
-				Wg_ProtectObject(yielded);
+				Wg_IncRef(yielded);
 				s->array[s->index] = yielded;
 				s->index++;
 			}
@@ -815,7 +810,7 @@ extern "C" {
 			});
 
 		for (int i = s.index; i; i--)
-			Wg_UnprotectObject(out[i - 1]);
+			Wg_DecRef(out[i - 1]);
 
 		if (!success) {
 			return false;
@@ -1180,12 +1175,12 @@ extern "C" {
 		return context->traceMessage.c_str();
 	}
 
-	Wg_Obj* Wg_GetCurrentException(Wg_Context* context) {
+	Wg_Obj* Wg_GetException(Wg_Context* context) {
 		WG_ASSERT(context);
 		return context->currentException;
 	}
 
-	void Wg_ClearCurrentException(Wg_Context* context) {
+	void Wg_ClearException(Wg_Context* context) {
 		WG_ASSERT_VOID(context);
 		context->currentException = nullptr;
 		context->exceptionTrace.clear();
@@ -1244,27 +1239,27 @@ extern "C" {
 		}
 	}
 
-	void Wg_RaiseExceptionClass(Wg_Obj* type, const char* message) {
-		WG_ASSERT_VOID(type);
-		wings::Wg_ObjRef ref(type);
+	void Wg_RaiseExceptionClass(Wg_Obj* klass, const char* message) {
+		WG_ASSERT_VOID(klass);
+		wings::Wg_ObjRef ref(klass);
 
-		Wg_Obj* msg = Wg_NewString(type->context, message);
+		Wg_Obj* msg = Wg_NewString(klass->context, message);
 		if (msg == nullptr) {
 			return;
 		}
 
 		// If exception creation was successful then set the exception.
 		// Otherwise the exception will already be set by some other code.
-		if (Wg_Obj* exceptionObject = Wg_Call(type, &msg, msg ? 1 : 0)) {
+		if (Wg_Obj* exceptionObject = Wg_Call(klass, &msg, msg ? 1 : 0)) {
 			Wg_RaiseExceptionObject(exceptionObject);
 		}
 	}
 
-	void Wg_RaiseExceptionObject(Wg_Obj* exception) {
-		WG_ASSERT_VOID(exception);
-		Wg_Context* context = exception->context;
-		if (Wg_IsInstance(exception, &context->builtins.baseException, 1)) {
-			context->currentException = exception;
+	void Wg_RaiseExceptionObject(Wg_Obj* obj) {
+		WG_ASSERT_VOID(obj);
+		Wg_Context* context = obj->context;
+		if (Wg_IsInstance(obj, &context->builtins.baseException, 1)) {
+			context->currentException = obj;
 			context->exceptionTrace.clear();
 			for (const auto& frame : context->currentTrace)
 				context->exceptionTrace.push_back(frame.ToOwned());
@@ -1290,9 +1285,9 @@ extern "C" {
 		Wg_RaiseException(context, WG_EXC_TYPEERROR, msg.c_str());
 	}
 
-	void Wg_RaiseArgumentTypeError(Wg_Context* context, int argIndex, const char* expected) {
-		WG_ASSERT_VOID(context && argIndex >= 0 && expected);
-		std::string msg = "Argument " + std::to_string(argIndex + 1)
+	void Wg_RaiseArgumentTypeError(Wg_Context* context, int index, const char* expected) {
+		WG_ASSERT_VOID(context && index >= 0 && expected);
+		std::string msg = "Argument " + std::to_string(index + 1)
 			+ " Expected type " + expected;
 		Wg_RaiseException(context, WG_EXC_TYPEERROR, msg.c_str());
 	}
@@ -1424,13 +1419,13 @@ extern "C" {
 		context->lastObjectCountAfterGC = context->mem.size();
 	}
 
-	void Wg_ProtectObject(const Wg_Obj* obj) {
+	void Wg_IncRef(const Wg_Obj* obj) {
 		WG_ASSERT_VOID(obj);
 		size_t& refCount = obj->context->protectedObjects[obj];
 		refCount++;
 	}
 
-	void Wg_UnprotectObject(const Wg_Obj* obj) {
+	void Wg_DecRef(const Wg_Obj* obj) {
 		WG_ASSERT_VOID(obj);
 		auto it = obj->context->protectedObjects.find(obj);
 		WG_ASSERT_VOID(it != obj->context->protectedObjects.end());

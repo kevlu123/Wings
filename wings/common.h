@@ -14,15 +14,13 @@
 #include <memory>
 #include <type_traits>
 #include <cstdlib>
-#include <mutex>
+#include <atomic>
 #include <random>
 
 static_assert(sizeof(Wg_int) == sizeof(Wg_uint));
 
 namespace wings {
-	extern Wg_ErrorCallback errorCallback;
-	extern void* errorCallbackUserdata;
-	extern std::mutex errorCallbackMutex;
+	extern std::atomic<Wg_ErrorCallback> errorCallback;
 	
 	size_t Guid();
 	std::string WObjTypeToString(const Wg_Obj* obj);
@@ -35,6 +33,7 @@ namespace wings {
 	bool InitArgv(Wg_Context* context, const char* const* argv, int argc);
 	void RegisterMethod(Wg_Obj* klass, const char* name, Wg_Function fptr);
 	Wg_Obj* RegisterFunction(Wg_Context* context, const char* name, Wg_Function fptr);
+	void AddAttributeToClass(Wg_Obj* klass, const char* attribute, Wg_Obj* value);
 
 	struct LibraryInitException : std::exception {};
 
@@ -113,12 +112,12 @@ namespace wings {
 
 	struct Wg_ObjRef {
 		Wg_ObjRef() : obj(nullptr) {}
-		explicit Wg_ObjRef(Wg_Obj* obj) : obj(obj) { if (obj) Wg_ProtectObject(obj); }
+		explicit Wg_ObjRef(Wg_Obj* obj) : obj(obj) { if (obj) Wg_IncRef(obj); }
 		explicit Wg_ObjRef(Wg_ObjRef&& other) noexcept : obj(other.obj) { other.obj = nullptr; }
 		Wg_ObjRef& operator=(Wg_ObjRef&& other) noexcept { obj = other.obj; other.obj = nullptr; return *this; }
 		Wg_ObjRef(const Wg_ObjRef&) = delete;
 		Wg_ObjRef& operator=(const Wg_ObjRef&) = delete;
-		~Wg_ObjRef() { if (obj) Wg_UnprotectObject(obj); }
+		~Wg_ObjRef() { if (obj) Wg_DecRef(obj); }
 		Wg_Obj* Get() const { return obj; }
 	private:
 		Wg_Obj* obj;
@@ -256,6 +255,7 @@ struct Wg_Context {
 	Wg_Config config{};
 	wings::Rng rng;
 	bool closing = false;
+	bool gcRunning = false;
 	
 	// Garbage collection
 	size_t lastObjectCountAfterGC = 0;

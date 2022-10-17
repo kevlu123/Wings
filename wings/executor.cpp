@@ -137,18 +137,18 @@ namespace wings {
 
 	DefObject::~DefObject() {
 		for (Wg_Obj* val : defaultParameterValues)
-			Wg_UnprotectObject(val);
+			Wg_DecRef(val);
 	}
 
 	void  Executor::PushStack(Wg_Obj* obj) {
-		Wg_ProtectObject(obj);
+		Wg_IncRef(obj);
 		stack.push_back(obj);
 	}
 
 	Wg_Obj* Executor::PopStack() {
 		auto obj = stack.back();
 		stack.pop_back();
-		Wg_UnprotectObject(obj);
+		Wg_DecRef(obj);
 		return obj;
 	}
 
@@ -188,8 +188,8 @@ namespace wings {
 		auto it = variables.find(name);
 		if (it != variables.end()) {
 			if (*it->second != value) {
-				Wg_UnprotectObject(*it->second);
-				Wg_ProtectObject(value);
+				Wg_DecRef(*it->second);
+				Wg_IncRef(value);
 				*it->second = value;
 			}
 		} else {
@@ -233,7 +233,7 @@ namespace wings {
 
 	Wg_Obj* Executor::Run() {
 		for (const auto& var : variables)
-			Wg_ProtectObject(*var.second);
+			Wg_IncRef(*var.second);
 
 		auto& frame = context->currentTrace.back();
 		frame.module = def->module;
@@ -276,7 +276,7 @@ namespace wings {
 
 		ClearStack();
 		for (const auto& var : variables)
-			Wg_UnprotectObject(*var.second);
+			Wg_DecRef(*var.second);
 
 		if (exitValue.has_value()) {
 			return exitValue.value();
@@ -317,7 +317,7 @@ namespace wings {
 				def->parameterNames.push_back(param.name);
 			for (size_t i = 0; i < instr.def->defaultParameterCount; i++) {
 				Wg_Obj* value = PopStack();
-				Wg_ProtectObject(value);
+				Wg_IncRef(value);
 				def->defaultParameterValues.push_back(value);
 			}
 			def->listArgs = instr.def->listArgs;
@@ -373,7 +373,7 @@ namespace wings {
 			}
 
 			for (size_t i = 0; i < methodCount; i++)
-				Wg_AddAttributeToClass(klass, instr.klass->methodNames[i].c_str(), methods[i]);
+				AddAttributeToClass(klass, instr.klass->methodNames[i].c_str(), methods[i]);
 
 			for (size_t i = 0; i < methodCount + baseCount; i++)
 				PopStack();
@@ -681,14 +681,14 @@ namespace wings {
 			break;
 		case Instruction::Type::PopTry:
 			tryFrames.pop();
-			if (Wg_GetCurrentException(context))
+			if (Wg_GetException(context))
 				exitValue = nullptr;
 			break;
 		case Instruction::Type::Except:
-			Wg_ClearCurrentException(context);
+			Wg_ClearException(context);
 			break;
 		case Instruction::Type::CurrentException:
-			PushStack(Wg_GetCurrentException(context));
+			PushStack(Wg_GetException(context));
 			break;
 		case Instruction::Type::IsInstance:
 			PushStack(context->builtins.isinstance);

@@ -8,11 +8,12 @@
 
 namespace wings {
 
-	Wg_ErrorCallback errorCallback;
-	void* errorCallbackUserdata;
-	std::mutex errorCallbackMutex;
+	std::atomic<Wg_ErrorCallback> errorCallback;
 	
 	Wg_Obj* Alloc(Wg_Context* context) {
+		// Objects should never be allocated while the garbage collector is running.
+		WG_ASSERT(!context->gcRunning);
+		
 		// Check allocation limits
 		if (context->mem.size() >= context->config.maxAlloc) {
 			// Too many objects. Try to free up objects
@@ -40,13 +41,10 @@ namespace wings {
 	}
 
 	void CallErrorCallback(const char* message) {
-		errorCallbackMutex.lock();
-		auto cb = errorCallback;
-		auto ud = errorCallbackUserdata;
-		errorCallbackMutex.unlock();
+		Wg_ErrorCallback cb = errorCallback;
 
 		if (cb) {
-			cb(message, ud);
+			cb(message);
 		} else {
 			std::abort();
 		}
@@ -160,14 +158,14 @@ namespace wings {
 	}
 	
 	void RegisterMethod(Wg_Obj* klass, const char* name, Wg_Function fptr) {
-		Wg_Obj* method = Wg_NewFunction(klass->context, fptr, nullptr, name);
-		if (method == nullptr)
-			throw LibraryInitException();
-
-		method->Get<Wg_Obj::Func>().isMethod = true;
 		if (Wg_IsClass(klass)) {
-			Wg_AddAttributeToClass(klass, name, method);
+			if (Wg_BindMethod(klass, name, fptr, nullptr) == nullptr)
+				throw LibraryInitException();
 		} else {
+			Wg_Obj* method = Wg_NewFunction(klass->context, fptr, nullptr, name);
+			if (method == nullptr)
+				throw LibraryInitException();
+			method->Get<Wg_Obj::Func>().isMethod = true;
 			Wg_SetAttribute(klass, name, method);
 		}
 	}
@@ -178,6 +176,11 @@ namespace wings {
 			throw LibraryInitException();
 		Wg_SetGlobal(context, name, obj);
 		return obj;
+	}
+
+	void AddAttributeToClass(Wg_Obj* klass, const char* attribute, Wg_Obj* value) {
+		WG_ASSERT_VOID(klass && attribute && value && Wg_IsClass(klass) && wings::IsValidIdentifier(attribute));
+		klass->Get<Wg_Obj::Class>().instanceAttributes.Set(attribute, value);
 	}
 
 	Wg_Obj* Compile(Wg_Context* context, const char* code, const char* module, const char* prettyName, bool expr) {

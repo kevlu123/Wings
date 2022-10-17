@@ -785,7 +785,7 @@ namespace wings {
 
 				auto f = [](Wg_Obj* obj, void* ud) {
 					Wg_Obj* kv[2]{};
-					if (!Wg_Unpack(obj, kv, 2))
+					if (!Wg_Unpack(obj, 2, kv))
 						return false;
 
 					wings::Wg_ObjRef ref(kv[1]);
@@ -2917,7 +2917,7 @@ namespace wings {
 
 			auto f = [](Wg_Obj* obj, void* ud) {
 				Wg_Obj* kv[2]{};
-				if (!Wg_Unpack(obj, kv, 2))
+				if (!Wg_Unpack(obj, 2, kv))
 					return false;
 				
 				Wg_ObjRef ref(kv[1]);
@@ -2986,7 +2986,7 @@ namespace wings {
 			try {
 				return Wg_NewBool(context, argv[0]->Get<WSet>().contains(argv[1]));
 			} catch (HashException&) {
-				Wg_ClearCurrentException(context);
+				Wg_ClearException(context);
 				return Wg_NewBool(context, false);
 			}
 		}
@@ -3650,7 +3650,11 @@ namespace wings {
 			} else {
 				WG_EXPECT_ARG_TYPE_STRING(0);
 				const char* source = Wg_GetString(argv[0]);
-				return Wg_Execute(context, source, "<string>");
+				if (Wg_Execute(context, source, "<string>")) {
+					return Wg_None(context);
+				} else {
+					return nullptr;
+				}
 			}
 			return Wg_None(context);
 		}
