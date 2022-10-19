@@ -229,6 +229,8 @@ class range:
 			self.step = step
 	def __iter__(self):
 		return __RangeIter(self.start, self.stop, self.step)
+	def __reversed__(self):
+		return range(self.stop - self.step, self.start - self.step, -self.step)
 
 def repr(x):
 	v = x.__repr__()

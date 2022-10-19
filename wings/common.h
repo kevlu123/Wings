@@ -37,6 +37,8 @@ namespace wings {
 
 	struct LibraryInitException : std::exception {};
 
+	struct Executor;
+
 	template <class F, class T>
 	void RegisterConstant(Wg_Context* context, const char* name, F f, T v) {
 		Wg_Obj* obj = f(context, v);
@@ -261,6 +263,7 @@ struct Wg_Context {
 	size_t lastObjectCountAfterGC = 0;
 	std::deque<std::unique_ptr<Wg_Obj>> mem;
 	std::unordered_map<const Wg_Obj*, size_t> protectedObjects;
+	std::vector<wings::Executor*> executors;
 
 	// Object instances
 	using Globals = std::unordered_map<std::string, wings::RcPtr<Wg_Obj*>>;

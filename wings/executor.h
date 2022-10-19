@@ -12,7 +12,6 @@
 namespace wings {
 
 	struct DefObject {
-		~DefObject();
 		static Wg_Obj* Run(Wg_Context* context, Wg_Obj** args, int argc);
 		Wg_Context* context{};
 		RcPtr<std::vector<Instruction>> instructions;
@@ -37,6 +36,8 @@ namespace wings {
 	struct Executor {
 		Wg_Obj* Run();
 
+		void GetReferences(std::deque<const Wg_Obj*>& refs);
+
 		void PushStack(Wg_Obj* obj);
 		Wg_Obj* PopStack();
 		void PopStackUntil(size_t size);
@@ -56,7 +57,7 @@ namespace wings {
 		size_t pc{};
 		std::vector<Wg_Obj*> stack;
 		std::stack<size_t> argFrames;
-		std::stack<std::vector<Wg_Obj*>> kwargsStack;
+		std::vector<std::vector<Wg_Obj*>> kwargsStack;
 		std::unordered_map<std::string, RcPtr<Wg_Obj*>> variables;
 		std::optional<Wg_Obj*> exitValue;
 

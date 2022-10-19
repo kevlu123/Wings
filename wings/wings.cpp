@@ -1,5 +1,6 @@
 #include "wings.h"
 #include "common.h"
+#include "executor.h"
 
 #include "builtinsmodule.h"
 #include "dismodule.h"
@@ -839,90 +840,103 @@ extern "C" {
 
 	Wg_Obj* Wg_Call(Wg_Obj* callable, Wg_Obj** argv, int argc, Wg_Obj* kwargsDict) {
 		WG_ASSERT(callable && argc >= 0 && (argc == 0 || argv));
+		if (argc)
+			WG_ASSERT(argv);
+		for (int i = 0; i < argc; i++)
+			WG_ASSERT(argv[i]);
 
 		Wg_Context* context = callable->context;
+		
+		// Check recursion limit
 		if (context->kwargs.size() >= context->config.maxRecursion) {
 			Wg_RaiseException(context, WG_EXC_RECURSIONERROR);
 			return nullptr;
 		}
 
-		if (Wg_IsFunction(callable) || Wg_IsClass(callable)) {
-			if (argc)
-				WG_ASSERT(argv);
-			for (int i = 0; i < argc; i++)
-				WG_ASSERT(argv[i]);
-
-
-			if (kwargsDict) {
-				if (!Wg_IsDictionary(kwargsDict)) {
-					Wg_RaiseException(context, WG_EXC_TYPEERROR, "Keyword arguments must be a dictionary");
-					return nullptr;
-				}
-				for (const auto& [key, value] : kwargsDict->Get<wings::WDict>()) {
-					if (!Wg_IsString(key)) {
-						Wg_RaiseException(context, WG_EXC_TYPEERROR, "Keyword arguments dictionary must only contain string keys");
-						return nullptr;
-					}
-				}
-			}
-
-			std::vector<wings::Wg_ObjRef> refs;
-			refs.emplace_back(callable);
-			for (int i = 0; i < argc; i++)
-				refs.emplace_back(argv[i]);
-
-			Wg_Obj* (*fptr)(Wg_Context*, Wg_Obj**, int);
-			void* userdata = nullptr;
-			Wg_Obj* self = nullptr;
-			std::string_view module;
-			if (Wg_IsFunction(callable)) {
-				const auto& func = callable->Get<Wg_Obj::Func>();
-				if (func.self)
-					self = func.self;
-				fptr = func.fptr;
-				userdata = func.userdata;
-				module = func.module;
-
-				context->currentTrace.push_back(wings::TraceFrame{
-					{},
-					"",
-					func.module,
-					func.prettyName
-					});
-			} else {
-				fptr = callable->Get<Wg_Obj::Class>().ctor;
-				userdata = callable->Get<Wg_Obj::Class>().userdata;
-				module = callable->Get<Wg_Obj::Class>().module;
-			}
-
-			std::vector<Wg_Obj*> argsWithSelf;
-			if (self) {
-				argsWithSelf.push_back(self);
-				refs.emplace_back(self);
-			}
-			argsWithSelf.insert(argsWithSelf.end(), argv, argv + argc);
-
-			context->currentModule.push(module);
-			context->userdata.push_back(userdata);
-			context->kwargs.push_back(kwargsDict);
-			Wg_Obj* ret = nullptr;
-			try {
-				ret = fptr(context, argsWithSelf.data(), (int)argsWithSelf.size());
-			} catch (std::bad_alloc&) {
-				Wg_RaiseException(context, WG_EXC_MEMORYERROR);
-			}
-			context->kwargs.pop_back();
-			context->userdata.pop_back();
-			context->currentModule.pop();
-
-			if (Wg_IsFunction(callable)) {
-				context->currentTrace.pop_back();
-			}
-
-			return ret;
-		} else {
+		// Call the __call__ method if object is neither a function nor a class
+		if (!Wg_IsFunction(callable) && !Wg_IsClass(callable)) {
 			return Wg_CallMethod(callable, "__call__", argv, argc);
 		}
+
+		// Validate keyword arguments
+		if (kwargsDict) {
+			if (!Wg_IsDictionary(kwargsDict)) {
+				Wg_RaiseException(context, WG_EXC_TYPEERROR, "Keyword arguments must be a dictionary");
+				return nullptr;
+			}
+			for (const auto& [key, value] : kwargsDict->Get<wings::WDict>()) {
+				if (!Wg_IsString(key)) {
+					Wg_RaiseException(context, WG_EXC_TYPEERROR, "Keyword arguments dictionary must only contain string keys");
+					return nullptr;
+				}
+			}
+		}
+
+		// Prevent arguments from being garbage collected
+		std::vector<wings::Wg_ObjRef> refs;
+		refs.emplace_back(callable);
+		for (int i = 0; i < argc; i++)
+			refs.emplace_back(argv[i]);
+
+		// Get the raw function pointer, userdata, module, and self
+		// depending on whether the callable is a function or class.
+		Wg_Obj* (*fptr)(Wg_Context*, Wg_Obj**, int);
+		void* userdata = nullptr;
+		std::string_view module;
+		Wg_Obj* self = nullptr;
+		if (Wg_IsFunction(callable)) {
+			const auto& func = callable->Get<Wg_Obj::Func>();
+			if (func.self)
+				self = func.self;
+			fptr = func.fptr;
+			userdata = func.userdata;
+			module = func.module;
+		} else {
+			const auto& klass = callable->Get<Wg_Obj::Class>();
+			fptr = klass.ctor;
+			userdata = klass.userdata;
+			module = klass.module;
+		}
+
+		// Prepare arguments into a contiguous buffer
+		std::vector<Wg_Obj*> argsWithSelf;
+		if (self) {
+			argsWithSelf.push_back(self);
+			refs.emplace_back(self);
+		}
+		argsWithSelf.insert(argsWithSelf.end(), argv, argv + argc);
+
+		// Push various data onto stacks
+		context->currentModule.push(module);
+		context->userdata.push_back(userdata);
+		context->kwargs.push_back(kwargsDict);
+		if (Wg_IsFunction(callable)) {
+			const auto& func = callable->Get<Wg_Obj::Func>();
+			context->currentTrace.push_back(wings::TraceFrame{
+				{},
+				"",
+				func.module,
+				func.prettyName
+				});
+		}
+		
+		// Perform the call
+		Wg_Obj* ret = nullptr;
+		try {
+			ret = fptr(context, argsWithSelf.data(), (int)argsWithSelf.size());
+		} catch (std::bad_alloc&) {
+			Wg_RaiseException(context, WG_EXC_MEMORYERROR);
+		}
+		
+		// Pop the data off the stacks
+		context->currentModule.pop();
+		context->userdata.pop_back();
+		context->kwargs.pop_back();
+		if (Wg_IsFunction(callable)) {
+			context->currentTrace.pop_back();
+		}
+
+		return ret;
 	}
 
 	Wg_Obj* Wg_CallMethod(Wg_Obj* obj, const char* member, Wg_Obj** argv, int argc, Wg_Obj* kwargsDict) {
@@ -1360,6 +1374,8 @@ extern "C" {
 					inUse.push_back(obj);
 			if (context->argv)
 				inUse.push_back(context->argv);
+			for (const auto& executor : context->executors)
+				executor->GetReferences(inUse);
 		}
 
 		// Recursively find objects in use
@@ -1386,8 +1402,16 @@ extern "C" {
 						inUse.push_back(value);
 					}
 				} else if (Wg_IsFunction(obj)) {
-					if (obj->Get<Wg_Obj::Func>().self) {
-						inUse.push_back(obj->Get<Wg_Obj::Func>().self);
+					const auto& fn = obj->Get<Wg_Obj::Func>();
+					if (fn.self) {
+						inUse.push_back(fn.self);
+					}
+					if (fn.fptr == &wings::DefObject::Run) {
+						auto* def = (wings::DefObject*)fn.userdata;
+						for (const auto& capture : def->captures)
+							inUse.push_back(*capture.second);
+						for (const auto& arg : def->defaultParameterValues)
+							inUse.push_back(arg);
 					}
 				} else if (Wg_IsClass(obj)) {
 					inUse.insert(

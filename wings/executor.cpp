@@ -132,23 +132,19 @@ namespace wings {
 			return nullptr;
 		}
 
-		return executor.Run();
-	}
-
-	DefObject::~DefObject() {
-		for (Wg_Obj* val : defaultParameterValues)
-			Wg_DecRef(val);
+		context->executors.push_back(&executor);
+		auto result = executor.Run();
+		context->executors.pop_back();
+		return result;
 	}
 
 	void  Executor::PushStack(Wg_Obj* obj) {
-		Wg_IncRef(obj);
 		stack.push_back(obj);
 	}
 
 	Wg_Obj* Executor::PopStack() {
 		auto obj = stack.back();
 		stack.pop_back();
-		Wg_DecRef(obj);
 		return obj;
 	}
 
@@ -169,7 +165,7 @@ namespace wings {
 	}
 
 	size_t Executor::PopArgFrame() {
-		kwargsStack.pop();
+		kwargsStack.pop_back();
 		size_t ret = stack.size() - argFrames.top();
 		argFrames.pop();
 		return ret;
@@ -187,11 +183,7 @@ namespace wings {
 	void Executor::SetVariable(const std::string& name, Wg_Obj* value) {
 		auto it = variables.find(name);
 		if (it != variables.end()) {
-			if (*it->second != value) {
-				Wg_DecRef(*it->second);
-				Wg_IncRef(value);
-				*it->second = value;
-			}
+			*it->second = value;
 		} else {
 			Wg_SetGlobal(context, name.c_str(), value);
 		}
@@ -232,9 +224,6 @@ namespace wings {
 	}
 
 	Wg_Obj* Executor::Run() {
-		for (const auto& var : variables)
-			Wg_IncRef(*var.second);
-
 		auto& frame = context->currentTrace.back();
 		frame.module = def->module;
 		frame.func = def->prettyName;
@@ -275,8 +264,6 @@ namespace wings {
 		}
 
 		ClearStack();
-		for (const auto& var : variables)
-			Wg_DecRef(*var.second);
 
 		if (exitValue.has_value()) {
 			return exitValue.value();
@@ -325,11 +312,8 @@ namespace wings {
 
 			for (const auto& param : instr.def->parameters)
 				def->parameterNames.push_back(param.name);
-			for (size_t i = 0; i < instr.def->defaultParameterCount; i++) {
-				Wg_Obj* value = PopStack();
-				Wg_IncRef(value);
-				def->defaultParameterValues.push_back(value);
-			}
+			for (size_t i = 0; i < instr.def->defaultParameterCount; i++)
+				def->defaultParameterValues.push_back(PopStack());
 			def->listArgs = instr.def->listArgs;
 			def->kwArgs = instr.def->kwArgs;
 
@@ -486,17 +470,17 @@ namespace wings {
 		}
 		case Instruction::Type::PushArgFrame:
 			argFrames.push(stack.size());
-			kwargsStack.push({});
+			kwargsStack.push_back({});
 			break;
 		case Instruction::Type::Call: {
-			size_t kwargc = kwargsStack.top().size();
+			size_t kwargc = kwargsStack.back().size();
 			size_t argc = stack.size() - argFrames.top() - kwargc - 1;
 
 			Wg_Obj* fn = stack[stack.size() - argc - kwargc - 1];
 			Wg_Obj** args = stack.data() + stack.size() - argc - kwargc;
 			Wg_Obj** kwargsv = stack.data() + stack.size() - kwargc;
 
-			Wg_Obj* kwargs = Wg_NewDictionary(context, kwargsStack.top().data(), kwargsv, (int)kwargc);
+			Wg_Obj* kwargs = Wg_NewDictionary(context, kwargsStack.back().data(), kwargsv, (int)kwargc);
 			if (kwargs == nullptr) {
 				exitValue = nullptr;
 				return;
@@ -563,13 +547,13 @@ namespace wings {
 					exitValue = nullptr;
 					return;
 				}
-				kwargsStack.top().push_back(key);
+				kwargsStack.back().push_back(key);
 				PushStack(value);
 			}
 			break;
 		}
 		case Instruction::Type::PushKwarg:
-			kwargsStack.top().push_back(PopStack());
+			kwargsStack.back().push_back(PopStack());
 			break;
 		case Instruction::Type::Not: {
 			Wg_Obj* arg = Wg_UnaryOp(WG_UOP_BOOL, PopStack());
@@ -663,5 +647,15 @@ namespace wings {
 		default:
 			WG_UNREACHABLE();
 		}
+	}
+
+	void Executor::GetReferences(std::deque<const Wg_Obj*>& refs) {
+		for (const auto& var : variables)
+			refs.push_back(*var.second);
+		for (const auto& frame : kwargsStack)
+			for (const auto& kwarg : frame)
+				refs.push_back(kwarg);
+		for (const auto& val : this->stack)
+			refs.push_back(val);
 	}
 }
