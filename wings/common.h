@@ -249,7 +249,6 @@ struct Wg_Obj {
 
 	wings::AttributeTable attributes;
 	std::vector<std::pair<Wg_Finalizer, void*>> finalizers;
-	std::vector<Wg_Obj*> references;
 	Wg_Context* context;
 };
 

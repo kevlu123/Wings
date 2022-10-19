@@ -855,7 +855,7 @@ void Wg_CollectGarbage(Wg_Context* context);
 * 
 * @param obj The object whose reference count is to be incremented.
 * 
-* @see Wg_DecRef, Wg_LinkReference, Wg_UnlinkReference
+* @see Wg_DecRef
 */
 WG_DLL_EXPORT
 void Wg_IncRef(const Wg_Obj* obj);
@@ -868,35 +868,10 @@ void Wg_IncRef(const Wg_Obj* obj);
 * 
 * @param obj The object whose reference count is to be decremented.
 *
-* @see Wg_IncRef, Wg_LinkReference, Wg_UnlinkReference
+* @see Wg_IncRef
 */
 WG_DLL_EXPORT
 void Wg_DecRef(const Wg_Obj* obj);
-
-/**
-* @brief Create a reference link between two objects.
-* 
-* When a child object is linked to a parent object, the child will
-* not be garbage collected as long as the parent is alive.
-* 
-* @param parent The parent object.
-* @param child The child object.
-* 
-* @see Wg_IncRef, Wg_DecRef, Wg_UnlinkReference
-*/
-WG_DLL_EXPORT
-void Wg_LinkReference(Wg_Obj* parent, Wg_Obj* child);
-
-/**
-* @brief Remove a reference link between two objects created by Wg_LinkReference.
-* 
-* @param parent The parent object.
-* @param child The child object.
-* 
-* @see Wg_IncRef, Wg_DecRef
-*/
-WG_DLL_EXPORT
-void Wg_UnlinkReference(Wg_Obj* parent, Wg_Obj* child);
 
 /**
 * @brief Get the None singleton value.
@@ -1051,7 +1026,7 @@ Wg_Obj* Wg_NewFunction(Wg_Context* context, Wg_Function fptr, void* userdata, co
 * To get the userdata in the function, call Wg_GetFunctionUserdata().
 * To get the keyword arguments passed to the function, call Wg_GetKwargs().
 * 
-* @attention Existing instances of the class will not gain the new method.
+* @note Existing instances of the class will gain the new method.
 *
 * @param klass The class to bind the method to.
 * @param name The name of the method.

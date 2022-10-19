@@ -433,7 +433,7 @@ extern "C" {
 		if (obj == nullptr)
 			return nullptr;
 
-		//obj->attributes = ((Wg_Context*)ud)->builtins.func->Get<Wg_Obj::Class>().instanceAttributes.Copy();
+		obj->attributes = context->builtins.func->Get<Wg_Obj::Class>().instanceAttributes.Copy();
 		obj->type = "__func";
 		auto data = new Wg_Obj::Func;
 		Wg_SetUserdata(obj, data);
@@ -494,22 +494,6 @@ extern "C" {
 		}
 		if (Wg_Obj* basesTuple = Wg_NewTuple(context, actualBases, actualBaseCount)) {
 			klass->attributes.Set("__bases__", basesTuple);
-		} else {
-			return nullptr;
-		}
-
-		// Set __str__()
-		auto tostr = [](Wg_Context* context, Wg_Obj** argv, int argc) -> Wg_Obj* {
-			if (argc != 1) {
-				Wg_RaiseArgumentCountError(context, argc, 1);
-				return nullptr;
-			}
-			std::string s = "<class '" + argv[0]->Get<Wg_Obj::Class>().name + "'>";
-			return Wg_NewString(argv[0]->context, s.c_str());
-		};
-		if (Wg_Obj* tostrFn = Wg_NewFunction(context, tostr, nullptr, "__str__")) {
-			tostrFn->Get<Wg_Obj::Func>().isMethod = true;
-			Wg_SetAttribute(klass, "__str__", tostrFn);
 		} else {
 			return nullptr;
 		}
@@ -575,10 +559,14 @@ extern "C" {
 			return Wg_None(context);
 		};
 		std::string initName = std::string(name) + ".__init__";
+
+		wings::Wg_ObjRef ref(klass);
 		Wg_Obj* initFn = Wg_BindMethod(klass, initName.c_str(), init, klass);
 		if (initFn == nullptr)
 			return nullptr;
-		Wg_LinkReference(initFn, klass);
+
+		Wg_IncRef(klass);
+		Wg_RegisterFinalizer(initFn, [](void* ud) { Wg_DecRef((Wg_Obj*)ud); }, klass);
 
 		return klass;
 	}
@@ -1427,10 +1415,6 @@ extern "C" {
 				obj->attributes.ForEach([&](auto& entry) {
 					inUse.push_back(entry);
 					});
-
-				for (Wg_Obj* child : obj->references) {
-					inUse.push_back(child);
-				}
 			}
 		}
 
@@ -1468,22 +1452,6 @@ extern "C" {
 		} else {
 			it->second--;
 		}
-	}
-
-	void Wg_LinkReference(Wg_Obj* parent, Wg_Obj* child) {
-		WG_ASSERT_VOID(parent && child);
-		parent->references.push_back(child);
-	}
-
-	void Wg_UnlinkReference(Wg_Obj* parent, Wg_Obj* child) {
-		WG_ASSERT_VOID(parent && child);
-		auto it = std::find(
-			parent->references.begin(),
-			parent->references.end(),
-			child
-		);
-		WG_ASSERT_VOID(it != parent->references.end());
-		parent->references.erase(it);
 	}
 
 } // extern "C"

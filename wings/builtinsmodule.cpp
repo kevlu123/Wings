@@ -857,7 +857,9 @@ namespace wings {
 			auto* it = new WDict::iterator(argv[1]->Get<WDict>().begin());
 			Wg_SetUserdata(argv[0], it);
 			Wg_RegisterFinalizer(argv[0], [](void* ud) { delete (WDict::iterator*)ud; }, it);
-			Wg_LinkReference(argv[0], argv[1]);
+
+			Wg_IncRef(argv[1]);
+			Wg_RegisterFinalizer(argv[0], [](void* ud) { Wg_DecRef((Wg_Obj*)ud); }, argv[1]);
 			return Wg_None(context);
 		}
 
@@ -867,7 +869,9 @@ namespace wings {
 			auto* it = new WSet::iterator(argv[1]->Get<WSet>().begin());
 			Wg_SetUserdata(argv[0], it);
 			Wg_RegisterFinalizer(argv[0], [](void* ud) { delete (WSet::iterator*)ud; }, it);
-			Wg_LinkReference(argv[0], argv[1]);
+
+			Wg_IncRef(argv[1]);
+			Wg_RegisterFinalizer(argv[0], [](void* ud) { Wg_DecRef((Wg_Obj*)ud); }, argv[1]);
 			return Wg_None(context);
 		}
 
@@ -932,8 +936,13 @@ namespace wings {
 		
 		static Wg_Obj* object_str(Wg_Context* context, Wg_Obj** argv, int argc) {
 			WG_EXPECT_ARG_COUNT(1);
-			std::string s = "<" + WObjTypeToString(argv[0]) + " object at 0x" + PtrToString(argv[0]) + ">";
-			return Wg_NewString(context, s.c_str());
+			if (Wg_IsClass(argv[0])) {
+				std::string s = "<class '" + argv[0]->Get<Wg_Obj::Class>().name + "'>";
+				return Wg_NewString(context, s.c_str());
+			} else {
+				std::string s = "<" + WObjTypeToString(argv[0]) + " object at 0x" + PtrToString(argv[0]) + ">";
+				return Wg_NewString(context, s.c_str());
+			}
 		}
 
 		static Wg_Obj* object_nonzero(Wg_Context* context, Wg_Obj** argv, int argc) {
@@ -3272,13 +3281,6 @@ namespace wings {
 			return Wg_NewBool(context, s.result);
 		}
 
-		static Wg_Obj* func_str(Wg_Context* context, Wg_Obj** argv, int argc) {
-			WG_EXPECT_ARG_COUNT(1);
-			WG_EXPECT_ARG_TYPE_FUNC(0);
-			std::string s = "<function at " + PtrToString(argv[0]) + ">";
-			return Wg_NewString(context, s.c_str());
-		}
-
 		static Wg_Obj* BaseException_str(Wg_Context* context, Wg_Obj** argv, int argc) {
 			WG_EXPECT_ARG_COUNT(1);
 			return Wg_GetAttribute(argv[0], "_message");
@@ -3850,13 +3852,13 @@ namespace wings {
 			Wg_SetUserdata(b.func, klass);
 			Wg_RegisterFinalizer(b.func, [](void* ud) { delete (Wg_Obj::Class*)ud; }, klass);
 			b.func->Get<Wg_Obj::Class>().instanceAttributes.Set("__class__", b.func);
+			b.func->Get<Wg_Obj::Class>().instanceAttributes.AddParent(b.object->Get<Wg_Obj::Class>().instanceAttributes);
 			b.func->attributes.AddParent(b.object->Get<Wg_Obj::Class>().instanceAttributes);
 			b.func->Get<Wg_Obj::Class>().userdata = context;
 			b.func->Get<Wg_Obj::Class>().ctor = [](Wg_Context* context, Wg_Obj**, int) -> Wg_Obj* {
 				Wg_RaiseException(context, WG_EXC_TYPEERROR, "A function cannot be created directly");
 				return nullptr;
 			};
-			RegisterMethod(b.func, "__str__", methods::func_str);
 
 			// Create tuple class
 			b.tuple = Alloc(context);
@@ -3865,6 +3867,7 @@ namespace wings {
 			Wg_SetUserdata(b.tuple, klass);
 			Wg_RegisterFinalizer(b.tuple, [](void* ud) { delete (Wg_Obj::Class*)ud; }, klass);
 			b.tuple->Get<Wg_Obj::Class>().instanceAttributes.Set("__class__", b.tuple);
+			b.tuple->Get<Wg_Obj::Class>().instanceAttributes.AddParent(b.object->Get<Wg_Obj::Class>().instanceAttributes);
 			b.tuple->attributes.AddParent(b.object->Get<Wg_Obj::Class>().instanceAttributes);
 			b.tuple->Get<Wg_Obj::Class>().userdata = context;
 			b.tuple->Get<Wg_Obj::Class>().ctor = ctors::tuple;
@@ -3903,10 +3906,13 @@ namespace wings {
 			Wg_Obj* emptyTuple = Wg_NewTuple(context, nullptr, 0);
 			if (emptyTuple == nullptr)
 				throw LibraryInitException();
+			Wg_Obj* objectTuple = Wg_NewTuple(context, &b.object, 1);
+			if (objectTuple == nullptr)
+				throw LibraryInitException();
 			Wg_SetAttribute(b.object, "__bases__", emptyTuple);
-			Wg_SetAttribute(b.none, "__bases__", emptyTuple);
-			Wg_SetAttribute(b.func, "__bases__", emptyTuple);
-			Wg_SetAttribute(b.tuple, "__bases__", emptyTuple);
+			Wg_SetAttribute(b.none, "__bases__", objectTuple);
+			Wg_SetAttribute(b.func, "__bases__", objectTuple);
+			Wg_SetAttribute(b.tuple, "__bases__", objectTuple);
 
 			// Add methods
 			RegisterMethod(b.object, "__pos__", methods::self);
