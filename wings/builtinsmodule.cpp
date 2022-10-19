@@ -3728,6 +3728,33 @@ namespace wings {
 		}
 
 		static Wg_Obj* print(Wg_Context* context, Wg_Obj** argv, int argc) {
+			Wg_Obj* kwargs = Wg_GetKwargs(context);
+			if (kwargs == nullptr)
+				return nullptr;
+			
+			Wg_Obj* kw[3]{};
+			const char* keys[3] = { "sep", "end", "flush" };
+			if (!Wg_ParseKwargs(kwargs, keys, 3, kw))
+				return nullptr;
+
+			std::string sep = " ";
+			std::string end = "\n";
+			bool flush = false;
+
+			if (kw[0]) {
+				if (Wg_IsNone(kw[0]))
+					sep = "";
+				else
+					sep = Wg_GetString(kw[0]);
+			}
+
+			if (kw[1]) {
+				if (Wg_IsNone(kw[1]))
+					end = "";
+				else
+					end = Wg_GetString(kw[1]);
+			}
+
 			std::string text;
 			for (int i = 0; i < argc; i++) {
 				if (Wg_Obj* s = Wg_UnaryOp(WG_UOP_STR, argv[i])) {
@@ -3737,10 +3764,10 @@ namespace wings {
 				}
 
 				if (i < argc - 1) {
-					text += ' ';
+					text += sep;
 				}
 			}
-			text += '\n';
+			text += end;
 			Wg_Print(context, text.c_str(), (int)text.size());
 			return Wg_None(context);
 		}
