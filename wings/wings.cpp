@@ -2,6 +2,7 @@
 #include "common.h"
 
 #include "builtinsmodule.h"
+#include "dismodule.h"
 #include "mathmodule.h"
 #include "osmodule.h"
 #include "randommodule.h"
@@ -43,6 +44,7 @@ extern "C" {
 		Wg_DefaultConfig(&context->config);
 		
 		Wg_RegisterModule(context, "__builtins__", wings::ImportBuiltins);
+		Wg_RegisterModule(context, "dis", wings::ImportDis);
 		Wg_RegisterModule(context, "math", wings::ImportMath);
 		Wg_RegisterModule(context, "random", wings::ImportRandom);
 		Wg_RegisterModule(context, "sys", wings::ImportSys);

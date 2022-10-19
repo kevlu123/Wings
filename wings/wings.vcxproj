@@ -146,6 +146,7 @@
     <ClCompile Include="attributetable.cpp" />
     <ClCompile Include="common.cpp" />
     <ClCompile Include="compile.cpp" />
+    <ClCompile Include="dismodule.cpp" />
     <ClCompile Include="executor.cpp" />
     <ClCompile Include="exprparse.cpp" />
     <ClCompile Include="lex.cpp" />
@@ -164,6 +165,7 @@
     <ClInclude Include="attributetable.h" />
     <ClInclude Include="common.h" />
     <ClInclude Include="compile.h" />
+    <ClInclude Include="dismodule.h" />
     <ClInclude Include="executor.h" />
     <ClInclude Include="exprparse.h" />
     <ClInclude Include="lex.h" />

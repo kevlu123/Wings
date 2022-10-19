@@ -95,8 +95,7 @@ namespace wings {
 			Operation,
 			Pop,
 			And, Or, Not,
-			In, NotIn,
-			Is, IsNot,
+			Is,
 		} type{};
 
 		std::unique_ptr<DirectAssignInstruction> directAssign;

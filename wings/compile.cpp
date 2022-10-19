@@ -244,25 +244,48 @@ namespace wings {
 			instr.type = Instruction::Type::Not;
 			break;
 		case Operation::In:
-			CompileExpression(expression.children[0], instructions);
+		case Operation::NotIn: {
+			Instruction argFrame{};
+			argFrame.srcPos = expression.srcPos;
+			argFrame.type = Instruction::Type::PushArgFrame;
+			instructions.push_back(std::move(argFrame));
+
 			CompileExpression(expression.children[1], instructions);
-			instr.type = Instruction::Type::In;
-			break;
-		case Operation::NotIn:
+
+			Instruction dot{};
+			dot.srcPos = expression.srcPos;
+			dot.type = Instruction::Type::Dot;
+			dot.string = std::make_unique<StringArgInstruction>();
+			dot.string->string = "__contains__";
+			instructions.push_back(std::move(dot));
+
 			CompileExpression(expression.children[0], instructions);
-			CompileExpression(expression.children[1], instructions);
-			instr.type = Instruction::Type::NotIn;
+
+			instr.type = Instruction::Type::Call;
+
+			if (expression.operation == Operation::NotIn) {
+				Instruction notInstr{};
+				notInstr.srcPos = expression.srcPos;
+				notInstr.type = Instruction::Type::Not;
+				instructions.push_back(std::move(notInstr));
+			}
 			break;
+		}
 		case Operation::Is:
-			CompileExpression(expression.children[0], instructions);
-			CompileExpression(expression.children[1], instructions);
-			instr.type = Instruction::Type::Is;
-			break;
 		case Operation::IsNot:
 			CompileExpression(expression.children[0], instructions);
 			CompileExpression(expression.children[1], instructions);
-			instr.type = Instruction::Type::IsNot;
-			break;
+			
+			instr.type = Instruction::Type::Is;
+			instructions.push_back(std::move(instr));
+			
+			if (expression.operation == Operation::IsNot) {
+				Instruction notInstr{};
+				notInstr.srcPos = expression.srcPos;
+				notInstr.type = Instruction::Type::Not;
+				instructions.push_back(std::move(notInstr));
+			}
+			return;
 		case Operation::IfElse:
 			CompileInlineIfElse(expression, instructions);
 			return;

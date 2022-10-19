@@ -59,6 +59,9 @@
     <ClCompile Include="osmodule.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="dismodule.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="wings.h">
@@ -110,6 +113,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="osmodule.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="dismodule.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

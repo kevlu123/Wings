@@ -117,7 +117,7 @@ namespace wings {
 	}
 
 	static bool IsPossibleSymbol(const std::string& s) {
-		return std::any_of(SYMBOLS.begin(), SYMBOLS.end(), [&](const auto& x) {return x.starts_with(s); });
+		return std::any_of(SYMBOLS.begin(), SYMBOLS.end(), [&](const auto& x) { return x.starts_with(s); });
 	}
 
 	static bool IsPossibleSymbol(char c) {

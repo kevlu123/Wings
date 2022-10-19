@@ -396,7 +396,7 @@ namespace wings {
 			} else if (auto* f = std::get_if<Wg_float>(instr.literal.get())) {
 				value = Wg_NewFloat(context, *f);
 			} else if (auto* s = std::get_if<std::string>(instr.literal.get())) {
-				value = Wg_NewString(context, s->c_str());
+				value = Wg_NewStringBuffer(context, s->c_str(), (int)s->size());
 			} else {
 				WG_UNREACHABLE();
 			}
@@ -635,31 +635,8 @@ namespace wings {
 			}
 			break;
 		}
-		case Instruction::Type::In: {
-			Wg_Obj* container = PopStack();
-			Wg_Obj* obj = PopStack();
-			if (Wg_Obj* value = Wg_BinaryOp(WG_BOP_IN, obj, container)) {
-				PushStack(value);
-			} else {
-				exitValue = nullptr;
-			}
-			break;
-		}
-		case Instruction::Type::NotIn: {
-			Wg_Obj* container = PopStack();
-			Wg_Obj* obj = PopStack();
-			if (Wg_Obj* value = Wg_BinaryOp(WG_BOP_NOTIN, obj, container)) {
-				PushStack(value);
-			} else {
-				exitValue = nullptr;
-			}
-			break;
-		}
 		case Instruction::Type::Is:
 			PushStack(Wg_NewBool(context, PopStack() == PopStack()));
-			break;
-		case Instruction::Type::IsNot:
-			PushStack(Wg_NewBool(context, PopStack() != PopStack()));
 			break;
 		case Instruction::Type::Raise: {
 			Wg_Obj* expr = PopStack();
