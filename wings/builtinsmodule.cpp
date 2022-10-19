@@ -568,10 +568,10 @@ static bool MergeSort(Wg_Obj** data, size_t len, Wg_Obj* key) {
 			buf[i] = left[a];
 			a++;
 		} else {
-			Wg_Obj* leftMapped = key ? Wg_Call(key, &left[a], 1) : left[a];
+			Wg_Obj* leftMapped = (key && !Wg_IsNone(key)) ? Wg_Call(key, &left[a], 1) : left[a];
 			if (leftMapped == nullptr)
 				return false;
-			Wg_Obj* rightMapped = key ? Wg_Call(key, &right[b], 1) : right[b];
+			Wg_Obj* rightMapped = (key && !Wg_IsNone(key)) ? Wg_Call(key, &right[b], 1) : right[b];
 			if (rightMapped == nullptr)
 				return false;
 
@@ -3301,7 +3301,7 @@ namespace wings {
 			}
 			
 			Wg_Obj* key = (*it)->first;
-			++it;
+			++(*it);
 			return key;
 		}
 
@@ -3320,7 +3320,7 @@ namespace wings {
 			}
 
 			Wg_Obj* value = (*it)->second;
-			++it;
+			++(*it);
 			return value;
 		}
 
@@ -3339,7 +3339,7 @@ namespace wings {
 			}
 
 			Wg_Obj* tup[2] = { (*it)->first, (*it)->second };
-			++it;
+			++(*it);
 			return Wg_NewTuple(context, tup, 2);
 		}
 
@@ -3358,7 +3358,7 @@ namespace wings {
 			}
 			
 			Wg_Obj* obj = **it;
-			++it;
+			++(*it);
 			return obj;
 		}
 

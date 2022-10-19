@@ -480,10 +480,13 @@ namespace wings {
 			Wg_Obj** args = stack.data() + stack.size() - argc - kwargc;
 			Wg_Obj** kwargsv = stack.data() + stack.size() - kwargc;
 
-			Wg_Obj* kwargs = Wg_NewDictionary(context, kwargsStack.back().data(), kwargsv, (int)kwargc);
-			if (kwargs == nullptr) {
-				exitValue = nullptr;
-				return;
+			Wg_Obj* kwargs = nullptr;
+			if (kwargc) {
+				kwargs = Wg_NewDictionary(context, kwargsStack.back().data(), kwargsv, (int)kwargc);
+				if (kwargs == nullptr) {
+					exitValue = nullptr;
+					return;
+				}
 			}
 
 			if (Wg_Obj* ret = Wg_Call(fn, args, (int)argc, kwargs)) {
