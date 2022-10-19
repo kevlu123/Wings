@@ -1006,12 +1006,20 @@ extern "C" {
 		case WG_UOP_LEN:
 			return Wg_Call(context->builtins.len, &arg, 1);
 		case WG_UOP_BOOL:
+			if (Wg_IsBool(arg))
+				return arg;
 			return Wg_Call(context->builtins._bool, &arg, 1);
 		case WG_UOP_INT:
+			if (Wg_IsInt(arg))
+				return arg;
 			return Wg_Call(context->builtins._int, &arg, 1);
 		case WG_UOP_FLOAT:
+			if (Wg_IsIntOrFloat(arg))
+				return arg;
 			return Wg_Call(context->builtins._float, &arg, 1);
 		case WG_UOP_STR:
+			if (Wg_IsString(arg))
+				return arg;
 			return Wg_Call(context->builtins.str, &arg, 1);
 		case WG_UOP_REPR:
 			return Wg_Call(context->builtins.repr, &arg, 1);

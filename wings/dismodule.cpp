@@ -119,8 +119,14 @@ namespace wings {
 				case Instruction::Type::Jump:
 					s += "JUMP\t\tto " + std::to_string(instr.jump->location);
 					break;
+				case Instruction::Type::JumpIfFalsePop:
+					s += "JUMP_IF_FALSE_POP\tto " + std::to_string(instr.jump->location);
+					break;
 				case Instruction::Type::JumpIfFalse:
 					s += "JUMP_IF_FALSE\tto " + std::to_string(instr.jump->location);
+					break;
+				case Instruction::Type::JumpIfTrue:
+					s += "JUMP_IF_TRUE\tto " + std::to_string(instr.jump->location);
 					break;
 				case Instruction::Type::List:
 					s += "MAKE_LIST";

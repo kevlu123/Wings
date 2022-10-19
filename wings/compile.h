@@ -70,12 +70,18 @@ namespace wings {
 			Dot,
 			Import,
 			ImportFrom,
+			Operation,
+			Pop,
+			Not,
+			Is,
 
 			DirectAssign,
 			MemberAssign,
 
 			Jump,
+			JumpIfFalsePop,
 			JumpIfFalse,
+			JumpIfTrue,
 			Return,
 
 			Raise,
@@ -91,11 +97,6 @@ namespace wings {
 			UnpackMapForMapCreation,
 			UnpackMapForCall,
 			PushKwarg,
-
-			Operation,
-			Pop,
-			And, Or, Not,
-			Is,
 		} type{};
 
 		std::unique_ptr<DirectAssignInstruction> directAssign;

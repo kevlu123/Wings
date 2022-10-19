@@ -75,7 +75,7 @@ namespace wings {
 
 		Instruction falseJump{};
 		falseJump.srcPos = condition.srcPos;
-		falseJump.type = Instruction::Type::JumpIfFalse;
+		falseJump.type = Instruction::Type::JumpIfFalsePop;
 		falseJump.jump = std::make_unique<JumpInstruction>();
 		size_t falseJumpIndex = instructions.size();
 		instructions.push_back(std::move(falseJump));
@@ -94,6 +94,60 @@ namespace wings {
 		CompileExpression(falseCase, instructions);
 
 		instructions[trueJumpIndex].jump->location = instructions.size();
+	}
+
+	static void CompileShortcircuitLogical(const Expression& expr, std::vector<Instruction>& instructions
+		)
+	{
+		const auto& lhs = expr.children[0];
+		const auto& rhs = expr.children[1];
+
+		CompileExpression(lhs, instructions);
+		
+		size_t jmpInstrIndex = instructions.size();
+		Instruction jmp{};
+		if (expr.operation == Operation::And) {
+			jmp.type = Instruction::Type::JumpIfFalse;
+		} else {
+			jmp.type = Instruction::Type::JumpIfTrue;
+		}
+		jmp.srcPos = expr.srcPos;
+		jmp.jump = std::make_unique<JumpInstruction>();
+		instructions.push_back(std::move(jmp));
+
+		CompileExpression(rhs, instructions);
+		
+		instructions[jmpInstrIndex].jump->location = instructions.size();
+	}
+
+	static void CompileIn(const Expression& expression, std::vector<Instruction>& instructions) {
+		Instruction argFrame{};
+		argFrame.srcPos = expression.srcPos;
+		argFrame.type = Instruction::Type::PushArgFrame;
+		instructions.push_back(std::move(argFrame));
+
+		CompileExpression(expression.children[1], instructions);
+
+		Instruction dot{};
+		dot.srcPos = expression.srcPos;
+		dot.type = Instruction::Type::Dot;
+		dot.string = std::make_unique<StringArgInstruction>();
+		dot.string->string = "__contains__";
+		instructions.push_back(std::move(dot));
+
+		CompileExpression(expression.children[0], instructions);
+
+		Instruction call{};
+		call.srcPos = expression.srcPos;
+		call.type = Instruction::Type::Call;
+		instructions.push_back(std::move(call));
+
+		if (expression.operation == Operation::NotIn) {
+			Instruction notInstr{};
+			notInstr.srcPos = expression.srcPos;
+			notInstr.type = Instruction::Type::Not;
+			instructions.push_back(std::move(notInstr));
+		}
 	}
 
 	static void CompileAssignment(
@@ -229,52 +283,21 @@ namespace wings {
 			instr.type = Instruction::Type::Call;
 			break;
 		}
-		case Operation::And:
-			CompileExpression(expression.children[0], instructions);
-			CompileExpression(expression.children[1], instructions);
-			instr.type = Instruction::Type::And;
-			break;
 		case Operation::Or:
-			CompileExpression(expression.children[0], instructions);
-			CompileExpression(expression.children[1], instructions);
-			instr.type = Instruction::Type::Or;
-			break;
+		case Operation::And:
+			CompileShortcircuitLogical(expression, instructions);
+			return;
 		case Operation::Not:
 			CompileExpression(expression.children[0], instructions);
 			instr.type = Instruction::Type::Not;
 			break;
 		case Operation::In:
-		case Operation::NotIn: {
-			Instruction argFrame{};
-			argFrame.srcPos = expression.srcPos;
-			argFrame.type = Instruction::Type::PushArgFrame;
-			instructions.push_back(std::move(argFrame));
-
-			CompileExpression(expression.children[1], instructions);
-
-			Instruction dot{};
-			dot.srcPos = expression.srcPos;
-			dot.type = Instruction::Type::Dot;
-			dot.string = std::make_unique<StringArgInstruction>();
-			dot.string->string = "__contains__";
-			instructions.push_back(std::move(dot));
-
-			CompileExpression(expression.children[0], instructions);
-
-			instr.type = Instruction::Type::Call;
-
-			if (expression.operation == Operation::NotIn) {
-				Instruction notInstr{};
-				notInstr.srcPos = expression.srcPos;
-				notInstr.type = Instruction::Type::Not;
-				instructions.push_back(std::move(notInstr));
-			}
-			break;
-		}
+		case Operation::NotIn:
+			CompileIn(expression, instructions);
+			return;
 		case Operation::Is:
 		case Operation::IsNot:
-			CompileExpression(expression.children[0], instructions);
-			CompileExpression(expression.children[1], instructions);
+			compileChildExpressions();
 			
 			instr.type = Instruction::Type::Is;
 			instructions.push_back(std::move(instr));
@@ -412,7 +435,7 @@ namespace wings {
 		size_t falseJumpInstrIndex = instructions.size();
 		Instruction falseJump{};
 		falseJump.srcPos = node.srcPos;
-		falseJump.type = Instruction::Type::JumpIfFalse;
+		falseJump.type = Instruction::Type::JumpIfFalsePop;
 		falseJump.jump = std::make_unique<JumpInstruction>();
 		instructions.push_back(std::move(falseJump));
 
@@ -443,7 +466,7 @@ namespace wings {
 		size_t terminateJumpInstrIndex = instructions.size();
 		Instruction terminateJump{};
 		terminateJump.srcPos = node.srcPos;
-		terminateJump.type = Instruction::Type::JumpIfFalse;
+		terminateJump.type = Instruction::Type::JumpIfFalsePop;
 		terminateJump.jump = std::make_unique<JumpInstruction>();
 		instructions.push_back(std::move(terminateJump));
 
@@ -696,7 +719,7 @@ namespace wings {
 				jumpToNextExceptIndex = instructions.size();
 				Instruction jumpToNextExcept{};
 				jumpToNextExcept.srcPos = exceptClause.srcPos;
-				jumpToNextExcept.type = Instruction::Type::JumpIfFalse;
+				jumpToNextExcept.type = Instruction::Type::JumpIfFalsePop;
 				jumpToNextExcept.jump = std::make_unique<JumpInstruction>();
 				instructions.push_back(std::move(jumpToNextExcept));
 

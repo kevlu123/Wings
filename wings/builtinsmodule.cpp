@@ -1068,7 +1068,7 @@ namespace wings {
 		static Wg_Obj* null_nonzero(Wg_Context* context, Wg_Obj** argv, int argc) {
 			WG_EXPECT_ARG_COUNT(1);
 			WG_EXPECT_ARG_TYPE_NULL(0);
-			return Wg_None(context);
+			return Wg_NewBool(context, false);
 		}
 
 		static Wg_Obj* null_str(Wg_Context* context, Wg_Obj** argv, int argc) {

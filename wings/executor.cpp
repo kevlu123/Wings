@@ -290,9 +290,19 @@ namespace wings {
 		case Instruction::Type::Jump:
 			pc = instr.jump->location - 1;
 			break;
-		case Instruction::Type::JumpIfFalse:
+		case Instruction::Type::JumpIfFalsePop:
 			if (Wg_Obj* truthy = Wg_UnaryOp(WG_UOP_BOOL, PopStack())) {
 				if (!Wg_GetBool(truthy)) {
+					pc = instr.jump->location - 1;
+				}
+			} else {
+				exitValue = nullptr;
+			}
+			break;
+		case Instruction::Type::JumpIfFalse:
+		case Instruction::Type::JumpIfTrue:
+			if (Wg_Obj* truthy = Wg_UnaryOp(WG_UOP_BOOL, PeekStack())) {
+				if (Wg_GetBool(truthy) == (instr.type == Instruction::Type::JumpIfTrue)) {
 					pc = instr.jump->location - 1;
 				}
 			} else {
@@ -561,66 +571,6 @@ namespace wings {
 		case Instruction::Type::PushKwarg:
 			kwargsStack.top().push_back(PopStack());
 			break;
-		case Instruction::Type::And: {
-			Wg_Obj* arg1 = Wg_UnaryOp(WG_UOP_BOOL, PopStack());
-			if (arg1 == nullptr) {
-				exitValue = nullptr;
-				break;
-			}
-
-			if (!Wg_GetBool(arg1)) {
-				// Short circuit
-				if (Wg_Obj* value = Wg_NewBool(context, false)) {
-					PushStack(value);
-				} else {
-					exitValue = nullptr;
-					break;
-				}
-			}
-
-			Wg_Obj* arg2 = Wg_UnaryOp(WG_UOP_BOOL, PopStack());
-			if (arg2 == nullptr) {
-				exitValue = nullptr;
-				break;
-			}
-			
-			if (Wg_Obj* value = Wg_NewBool(context, Wg_GetBool(arg2))) {
-				PushStack(value);
-			} else {
-				exitValue = nullptr;
-			}
-			break;
-		}
-		case Instruction::Type::Or: {
-			Wg_Obj* arg1 = Wg_UnaryOp(WG_UOP_BOOL, PopStack());
-			if (arg1 == nullptr) {
-				exitValue = nullptr;
-				break;
-			}
-
-			if (Wg_GetBool(arg1)) {
-				// Short circuit
-				if (Wg_Obj* value = Wg_NewBool(context, true)) {
-					PushStack(value);
-				} else {
-					exitValue = nullptr;
-					break;
-				}
-			}
-
-			Wg_Obj* arg2 = Wg_UnaryOp(WG_UOP_BOOL, PopStack());
-			if (arg2 == nullptr) {
-				exitValue = nullptr;
-				break;
-			}
-
-			if (Wg_Obj* value = Wg_NewBool(context, Wg_GetBool(arg2))) {
-				PushStack(value);
-			} else {
-				exitValue = nullptr;
-			}
-			break;
-		}
 		case Instruction::Type::Not: {
 			Wg_Obj* arg = Wg_UnaryOp(WG_UOP_BOOL, PopStack());
 			if (arg == nullptr) {
