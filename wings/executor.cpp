@@ -39,7 +39,7 @@ namespace wings {
 
 		std::vector<bool> assignedParams(def->parameterNames.size());
 		if (kwargs) {
-			for (const auto& [k, value] : kwargs->Get<wings::WDict>()) {
+			for (const auto& [k, value] : kwargs->Get<WDict>()) {
 				const char* key = Wg_GetString(k);
 				bool found = false;
 				for (size_t i = 0; i < def->parameterNames.size(); i++) {
@@ -62,7 +62,7 @@ namespace wings {
 					}
 
 					try {
-						newKwargs->Get<wings::WDict>()[k] = value;
+						newKwargs->Get<WDict>()[k] = value;
 					} catch (HashException&) {
 						return nullptr;
 					}
@@ -431,7 +431,7 @@ namespace wings {
 					Wg_Obj* val = start[2 * i + 1];
 					Wg_ObjRef ref(dict);
 					try {
-						dict->Get<wings::WDict>()[key] = val;
+						dict->Get<WDict>()[key] = val;
 					} catch (HashException&) {
 						exitValue = nullptr;
 						return;
@@ -530,7 +530,7 @@ namespace wings {
 				return;
 			}
 
-			for (const auto& [key, value] : map->Get<wings::WDict>()) {
+			for (const auto& [key, value] : map->Get<WDict>()) {
 				PushStack(key);
 				PushStack(value);
 			}
@@ -544,7 +544,7 @@ namespace wings {
 				return;
 			}
 
-			for (const auto& [key, value] : map->Get<wings::WDict>()) {
+			for (const auto& [key, value] : map->Get<WDict>()) {
 				if (!Wg_IsString(key)) {
 					Wg_RaiseException(context, WG_EXC_TYPEERROR, "Keywords must be strings");
 					exitValue = nullptr;

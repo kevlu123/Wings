@@ -7,7 +7,7 @@
 
 namespace wings {
 
-	static constexpr const char* CODE = R"(
+	static constexpr const char* MATH_CODE = R"(
 def comb(n, k):
 	if not isinstance(n, int) or not isinstance(k, int):
 		raise TypeError("comb() only accepts integers")
@@ -282,7 +282,7 @@ def radians(x):
 			RegisterConstant(context, "pi", Wg_NewFloat, std::numbers::pi_v<Wg_float>);
 			RegisterConstant(context, "tau", Wg_NewFloat, 2 * std::numbers::pi_v<Wg_float>);
 
-			if (Execute(context, CODE, "math") == nullptr)
+			if (Execute(context, MATH_CODE, "math") == nullptr)
 				throw LibraryInitException();
 
 			return true;

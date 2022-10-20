@@ -7,7 +7,7 @@
 
 namespace wings {
 
-	thread_local std::vector<Statement::Type> statementHierarchy;
+	static thread_local std::vector<Statement::Type> statementHierarchy;
 
 	static CodeError ParseBody(const LexTree& node, Statement::Type statType, std::vector<Statement>& out);
 

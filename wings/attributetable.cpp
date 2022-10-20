@@ -4,7 +4,8 @@ namespace wings {
 
 	AttributeTable::AttributeTable() :
 		attributes(MakeRcPtr<Table>()),
-		owned(true) {
+		owned(true)
+	{
 	}
 
 	Wg_Obj* AttributeTable::Get(const std::string& name) const {

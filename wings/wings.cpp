@@ -20,6 +20,64 @@
 #include <queue>
 #include <unordered_set>
 
+namespace wings {
+	static bool ReadFromFile(const std::string& path, std::string& data) {
+		std::ifstream f(path);
+		if (!f.is_open())
+			return false;
+
+		std::stringstream buffer;
+		buffer << f.rdbuf();
+
+		if (!f)
+			return false;
+
+		data = buffer.str();
+		return true;
+	}
+
+	static bool LoadFileModule(Wg_Context* context, const std::string& module) {
+		std::string path = context->importPath + module + ".py";
+		std::string source;
+		if (!ReadFromFile(path, source)) {
+			std::string msg = std::string("No module named '") + module + "'";
+			Wg_RaiseException(context, WG_EXC_IMPORTERROR, msg.c_str());
+			return false;
+		}
+
+		Wg_Obj* fn = Compile(context, source.c_str(), module.c_str(), module.c_str(), false);
+		if (fn == nullptr)
+			return false;
+
+		return Wg_Call(fn, nullptr, 0) != nullptr;
+	}
+
+	static bool LoadModule(Wg_Context* context, const std::string& name) {
+		if (!context->globals.contains(name)) {
+			bool success{};
+			context->globals.insert({ std::string(name), {} });
+			context->currentModule.push(name);
+
+			if (name != "__builtins__")
+				Wg_ImportAllFromModule(context, "__builtins__");
+
+			auto it = context->moduleLoaders.find(name);
+			if (it != context->moduleLoaders.end()) {
+				success = it->second(context);
+			} else {
+				success = LoadFileModule(context, name);
+			}
+
+			context->currentModule.pop();
+			if (!success) {
+				context->globals.erase(name);
+				return false;
+			}
+		}
+		return true;
+	}
+}
+
 extern "C" {
 	void Wg_DefaultConfig(Wg_Config* config) {
 		WG_ASSERT_VOID(config);
@@ -157,62 +215,6 @@ extern "C" {
 		context->moduleLoaders.insert({ std::string(name), loader });
 	}
 
-	static bool ReadFromFile(const std::string& path, std::string& data) {
-		std::ifstream f(path);
-		if (!f.is_open())
-			return false;
-
-		std::stringstream buffer;
-		buffer << f.rdbuf();
-
-		if (!f)
-			return false;
-
-		data = buffer.str();
-		return true;
-	}
-
-	static bool LoadFileModule(Wg_Context* context, const std::string& module) {
-		std::string path = context->importPath + module + ".py";
-		std::string source;
-		if (!ReadFromFile(path, source)) {
-			std::string msg = std::string("No module named '") + module + "'";
-			Wg_RaiseException(context, WG_EXC_IMPORTERROR, msg.c_str());
-			return false;
-		}
-
-		Wg_Obj* fn = wings::Compile(context, source.c_str(), module.c_str(), module.c_str(), false);
-		if (fn == nullptr)
-			return false;
-
-		return Wg_Call(fn, nullptr, 0) != nullptr;
-	}
-
-	static bool LoadModule(Wg_Context* context, const std::string& name) {
-		if (!context->globals.contains(name)) {
-			bool success{};
-			context->globals.insert({ std::string(name), {} });
-			context->currentModule.push(name);
-
-			if (name != "__builtins__")
-				Wg_ImportAllFromModule(context, "__builtins__");
-
-			auto it = context->moduleLoaders.find(name);
-			if (it != context->moduleLoaders.end()) {
-				success = it->second(context);
-			} else {
-				success = LoadFileModule(context, name);
-			}
-
-			context->currentModule.pop();
-			if (!success) {
-				context->globals.erase(name);
-				return false;
-			}
-		}
-		return true;
-	}
-
 	Wg_Obj* Wg_ImportModule(Wg_Context* context, const char* module, const char* alias) {
 		WG_ASSERT(context && module && wings::IsValidIdentifier(module));
 		if (alias) {
@@ -221,7 +223,7 @@ extern "C" {
 			alias = module;
 		}
 
-		if (!LoadModule(context, module))
+		if (!wings::LoadModule(context, module))
 			return nullptr;
 
 		Wg_Obj* moduleObject = Wg_Call(context->builtins.moduleObject, nullptr, 0);
@@ -243,7 +245,7 @@ extern "C" {
 			alias = name;
 		}
 
-		if (!LoadModule(context, module))
+		if (!wings::LoadModule(context, module))
 			return nullptr;
 
 		auto& mod = context->globals.at(module);
@@ -262,7 +264,7 @@ extern "C" {
 	bool Wg_ImportAllFromModule(Wg_Context* context, const char* module) {
 		WG_ASSERT(context && module && wings::IsValidIdentifier(module));
 
-		if (!LoadModule(context, module))
+		if (!wings::LoadModule(context, module))
 			return false;
 
 		auto& mod = context->globals.at(module);

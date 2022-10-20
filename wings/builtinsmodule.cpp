@@ -13,7 +13,8 @@
 #include <algorithm>
 #include <bit>
 
-static const char* const CODE = R"(
+namespace wings {
+	static const char* const BUILTINS_CODE = R"(
 class __DefaultIter:
 	def __init__(self, iterable):
 		self.iterable = iterable
@@ -348,256 +349,254 @@ class TypeError(Exception):
 
 class ValueError(Exception):
 	pass
-)";
+	)";
 
 
-enum class Collection {
-	List,
-	Tuple,
-};
-
-static std::string PtrToString(const void* p) {
-	std::stringstream ss;
-	ss << p;
-	return ss.str();
-}
-
-static bool AbsIndex(Wg_Obj* container, Wg_Obj* index, Wg_int& out, std::optional<Wg_int>& size) {
-	Wg_Obj* len = Wg_UnaryOp(WG_UOP_LEN, container);
-	if (len == nullptr)
-		return false;
-
-	if (!Wg_IsInt(index)) {
-		Wg_RaiseException(container->context, WG_EXC_TYPEERROR, "index must be an integer");
-		return false;
-	}
-
-	Wg_int length = size.has_value() ? size.value() : Wg_GetInt(len);
-	Wg_int i = Wg_GetInt(index);
-
-	if (i < 0) {
-		out = length + i;
-	} else {
-		out = i;
-	}
-	return true;
-}
-
-static bool AbsIndex(Wg_Obj* container, Wg_Obj* index, Wg_int& out) {
-	std::optional<Wg_int> size;
-	return AbsIndex(container, index, out, size);
-}
-
-template <class F>
-static bool IterateRange(Wg_int start, Wg_int stop, Wg_int step, F f) {
-	WG_ASSERT(step);
-	if (step > 0) {
-		for (Wg_int i = (Wg_int)start; i < (Wg_int)stop; i += step)
-			if (!f(i))
-				return false;
-	} else {
-		for (Wg_int i = (Wg_int)start; i > (Wg_int)stop; i += step)
-			if (!f(i))
-				return false;
-	}
-	return true;
-}
-
-static bool AbsSlice(Wg_Obj* container, Wg_Obj* slice, Wg_int& start, Wg_int& stop, Wg_int& step) {
-	std::optional<Wg_int> size;
-	std::vector<wings::Wg_ObjRef> refs;
-	refs.emplace_back(container);
-	refs.emplace_back(slice);
-
-	Wg_Obj* stepAttr = Wg_GetAttribute(slice, "step");
-	refs.emplace_back(stepAttr);
-	if (stepAttr == nullptr) {
-		return false;
-	} else if (Wg_IsNone(stepAttr)) {
-		step = 1;
-	} else if (!Wg_IsInt(stepAttr)) {
-		Wg_RaiseException(slice->context, WG_EXC_TYPEERROR, "slice step attribute must be an integer");
-		return false;
-	} else if ((step = Wg_GetInt(stepAttr)) == 0) {
-		Wg_RaiseException(slice->context, WG_EXC_VALUEERROR, "slice step cannot be 0");
-		return false;
-	}
-
-	Wg_Obj* startAttr = Wg_GetAttribute(slice, "start");
-	refs.emplace_back(startAttr);
-	bool hasStart = true;
-	if (startAttr == nullptr) {
-		return false;
-	} else if (Wg_IsNone(startAttr)) {
-		hasStart = false;
-	} else if (!AbsIndex(container, startAttr, start, size)) {
-		return false;
-	}
-
-	Wg_Obj* stopAttr = Wg_GetAttribute(slice, "stop");
-	refs.emplace_back(stopAttr);
-	bool hasStop = true;
-	if (stopAttr == nullptr) {
-		return false;
-	} else if (Wg_IsNone(stopAttr)) {
-		hasStop = false;
-	} else if (!AbsIndex(container, stopAttr, stop, size)) {
-		return false;
-	}
-
-	auto getSize = [&](Wg_int& out) {
-		if (size.has_value()) {
-			out = size.value();
-		} else {
-			Wg_Obj* len = Wg_UnaryOp(WG_UOP_LEN, container);
-			if (len == nullptr)
-				return false;
-			out = Wg_GetInt(len);
-			size = out;
-		}
-		return true;
+	enum class Collection {
+		List,
+		Tuple,
 	};
 
-	if (!hasStart) {
-		if (step < 0) {
-			if (!getSize(start))
-				return false;
-			start--;
-		} else {
-			start = 0;
+	static std::string PtrToString(const void* p) {
+		std::stringstream ss;
+		ss << p;
+		return ss.str();
+	}
+
+	static bool AbsIndex(Wg_Obj* container, Wg_Obj* index, Wg_int& out, std::optional<Wg_int>& size) {
+		Wg_Obj* len = Wg_UnaryOp(WG_UOP_LEN, container);
+		if (len == nullptr)
+			return false;
+
+		if (!Wg_IsInt(index)) {
+			Wg_RaiseException(container->context, WG_EXC_TYPEERROR, "index must be an integer");
+			return false;
 		}
-	}
 
-	if (!hasStop) {
-		if (step < 0) {
-			stop = -1;
+		Wg_int length = size.has_value() ? size.value() : Wg_GetInt(len);
+		Wg_int i = Wg_GetInt(index);
+
+		if (i < 0) {
+			out = length + i;
 		} else {
-			if (!getSize(stop))
-				return false;
+			out = i;
 		}
-	}
-
-	return true;
-}
-
-static void StringReplace(std::string& str, std::string_view from, std::string_view to, Wg_int count) {
-	if (from.empty())
-		return;
-	size_t start_pos = 0;
-	while ((start_pos = str.find(from, start_pos)) != std::string::npos && count > 0) {
-		str.replace(start_pos, from.length(), to);
-		start_pos += to.length();
-		count--;
-	}
-}
-
-static std::vector<std::string> StringSplit(std::string s, std::string_view sep, Wg_int maxSplit) {
-	std::vector<std::string> buf;
-	size_t pos = 0;
-	std::string token;
-	while ((pos = s.find(sep)) != std::string::npos && maxSplit > 0) {
-		token = s.substr(0, pos);
-		if (!token.empty())
-			buf.push_back(std::move(token));
-		s.erase(0, pos + sep.size());
-		maxSplit--;
-	}
-	if (!s.empty())
-		buf.push_back(std::move(s));
-	return buf;
-}
-
-static std::vector<std::string> StringSplitChar(std::string s, std::string_view chars, Wg_int maxSplit) {
-	size_t last = 0;
-	size_t next = 0;
-	std::vector<std::string> buf;
-	while ((next = s.find_first_of(chars, last)) != std::string::npos && maxSplit > 0) {
-		if (next > last)
-			buf.push_back(s.substr(last, next - last));
-		last = next + 1;
-		maxSplit--;
-	}
-	if (last < s.size())
-		buf.push_back(s.substr(last));
-	return buf;
-}
-
-static std::vector<std::string> StringSplitLines(std::string s, bool keepLineBreaks) {
-	size_t last = 0;
-	size_t next = 0;
-	std::vector<std::string> buf;
-	while ((next = s.find_first_of("\r\n", last)) != std::string::npos) {
-		buf.push_back(s.substr(last, next - last));
-		last = next + 1;
-		if (s[next] == '\r' && next + 1 < s.size() && s[next + 1] == '\n')
-			last++;
-	}
-	if (last < s.size())
-		buf.push_back(s.substr(last));
-	return buf;
-}
-
-static bool IsSpace(char c) {
-	return c == ' ' || c == '\t' || c == '\n' || c == '\r'
-		|| c == '\v' || c == '\f';
-};
-
-static bool MergeSort(Wg_Obj** data, size_t len, Wg_Obj* key) {
-	if (len == 1)
 		return true;
+	}
 
-	Wg_Obj** left = data;
-	size_t leftSize = len / 2;
-	Wg_Obj** right = data + leftSize;
-	size_t rightSize = len - leftSize;
-	if (!MergeSort(left, leftSize, key))
-		return false;
-	if (!MergeSort(right, rightSize, key))
-		return false;
+	static bool AbsIndex(Wg_Obj* container, Wg_Obj* index, Wg_int& out) {
+		std::optional<Wg_int> size;
+		return AbsIndex(container, index, out, size);
+	}
 
-	std::vector<Wg_Obj*> buf(len);
-	size_t a = 0;
-	size_t b = 0;
-	for (size_t i = 0; i < len; i++) {
-		if (a == leftSize) {
-			// No more elements on the left
-			buf[i] = right[b];
-			b++;
-		} else if (b == rightSize) {
-			// No more elements on the right
-			buf[i] = left[a];
-			a++;
+	template <class F>
+	static bool IterateRange(Wg_int start, Wg_int stop, Wg_int step, F f) {
+		WG_ASSERT(step);
+		if (step > 0) {
+			for (Wg_int i = (Wg_int)start; i < (Wg_int)stop; i += step)
+				if (!f(i))
+					return false;
 		} else {
-			Wg_Obj* leftMapped = (key && !Wg_IsNone(key)) ? Wg_Call(key, &left[a], 1) : left[a];
-			if (leftMapped == nullptr)
-				return false;
-			Wg_Obj* rightMapped = (key && !Wg_IsNone(key)) ? Wg_Call(key, &right[b], 1) : right[b];
-			if (rightMapped == nullptr)
-				return false;
+			for (Wg_int i = (Wg_int)start; i > (Wg_int)stop; i += step)
+				if (!f(i))
+					return false;
+		}
+		return true;
+	}
 
-			Wg_Obj* gt = Wg_BinaryOp(WG_BOP_LE, rightMapped, leftMapped);
-			if (gt == nullptr)
-				return false;
+	static bool AbsSlice(Wg_Obj* container, Wg_Obj* slice, Wg_int& start, Wg_int& stop, Wg_int& step) {
+		std::optional<Wg_int> size;
+		std::vector<Wg_ObjRef> refs;
+		refs.emplace_back(container);
+		refs.emplace_back(slice);
 
-			if (Wg_GetBool(gt)) {
-				// right < left
-				buf[i] = right[b];
-				b++;
+		Wg_Obj* stepAttr = Wg_GetAttribute(slice, "step");
+		refs.emplace_back(stepAttr);
+		if (stepAttr == nullptr) {
+			return false;
+		} else if (Wg_IsNone(stepAttr)) {
+			step = 1;
+		} else if (!Wg_IsInt(stepAttr)) {
+			Wg_RaiseException(slice->context, WG_EXC_TYPEERROR, "slice step attribute must be an integer");
+			return false;
+		} else if ((step = Wg_GetInt(stepAttr)) == 0) {
+			Wg_RaiseException(slice->context, WG_EXC_VALUEERROR, "slice step cannot be 0");
+			return false;
+		}
+
+		Wg_Obj* startAttr = Wg_GetAttribute(slice, "start");
+		refs.emplace_back(startAttr);
+		bool hasStart = true;
+		if (startAttr == nullptr) {
+			return false;
+		} else if (Wg_IsNone(startAttr)) {
+			hasStart = false;
+		} else if (!AbsIndex(container, startAttr, start, size)) {
+			return false;
+		}
+
+		Wg_Obj* stopAttr = Wg_GetAttribute(slice, "stop");
+		refs.emplace_back(stopAttr);
+		bool hasStop = true;
+		if (stopAttr == nullptr) {
+			return false;
+		} else if (Wg_IsNone(stopAttr)) {
+			hasStop = false;
+		} else if (!AbsIndex(container, stopAttr, stop, size)) {
+			return false;
+		}
+
+		auto getSize = [&](Wg_int& out) {
+			if (size.has_value()) {
+				out = size.value();
 			} else {
-				// right >= left
-				buf[i] = left[a];
-				a++;
+				Wg_Obj* len = Wg_UnaryOp(WG_UOP_LEN, container);
+				if (len == nullptr)
+					return false;
+				out = Wg_GetInt(len);
+				size = out;
+			}
+			return true;
+		};
+
+		if (!hasStart) {
+			if (step < 0) {
+				if (!getSize(start))
+					return false;
+				start--;
+			} else {
+				start = 0;
 			}
 		}
+
+		if (!hasStop) {
+			if (step < 0) {
+				stop = -1;
+			} else {
+				if (!getSize(stop))
+					return false;
+			}
+		}
+
+		return true;
+	}
+
+	static void StringReplace(std::string& str, std::string_view from, std::string_view to, Wg_int count) {
+		if (from.empty())
+			return;
+		size_t start_pos = 0;
+		while ((start_pos = str.find(from, start_pos)) != std::string::npos && count > 0) {
+			str.replace(start_pos, from.length(), to);
+			start_pos += to.length();
+			count--;
+		}
+	}
+
+	static std::vector<std::string> StringSplit(std::string s, std::string_view sep, Wg_int maxSplit) {
+		std::vector<std::string> buf;
+		size_t pos = 0;
+		std::string token;
+		while ((pos = s.find(sep)) != std::string::npos && maxSplit > 0) {
+			token = s.substr(0, pos);
+			if (!token.empty())
+				buf.push_back(std::move(token));
+			s.erase(0, pos + sep.size());
+			maxSplit--;
+		}
+		if (!s.empty())
+			buf.push_back(std::move(s));
+		return buf;
+	}
+
+	static std::vector<std::string> StringSplitChar(std::string s, std::string_view chars, Wg_int maxSplit) {
+		size_t last = 0;
+		size_t next = 0;
+		std::vector<std::string> buf;
+		while ((next = s.find_first_of(chars, last)) != std::string::npos && maxSplit > 0) {
+			if (next > last)
+				buf.push_back(s.substr(last, next - last));
+			last = next + 1;
+			maxSplit--;
+		}
+		if (last < s.size())
+			buf.push_back(s.substr(last));
+		return buf;
+	}
+
+	static std::vector<std::string> StringSplitLines(std::string s, bool keepLineBreaks) {
+		size_t last = 0;
+		size_t next = 0;
+		std::vector<std::string> buf;
+		while ((next = s.find_first_of("\r\n", last)) != std::string::npos) {
+			buf.push_back(s.substr(last, next - last));
+			last = next + 1;
+			if (s[next] == '\r' && next + 1 < s.size() && s[next + 1] == '\n')
+				last++;
+		}
+		if (last < s.size())
+			buf.push_back(s.substr(last));
+		return buf;
+	}
+
+	static bool IsSpace(char c) {
+		return c == ' ' || c == '\t' || c == '\n' || c == '\r'
+			|| c == '\v' || c == '\f';
+	};
+
+	static bool MergeSort(Wg_Obj** data, size_t len, Wg_Obj* key) {
+		if (len == 1)
+			return true;
+
+		Wg_Obj** left = data;
+		size_t leftSize = len / 2;
+		Wg_Obj** right = data + leftSize;
+		size_t rightSize = len - leftSize;
+		if (!MergeSort(left, leftSize, key))
+			return false;
+		if (!MergeSort(right, rightSize, key))
+			return false;
+
+		std::vector<Wg_Obj*> buf(len);
+		size_t a = 0;
+		size_t b = 0;
+		for (size_t i = 0; i < len; i++) {
+			if (a == leftSize) {
+				// No more elements on the left
+				buf[i] = right[b];
+				b++;
+			} else if (b == rightSize) {
+				// No more elements on the right
+				buf[i] = left[a];
+				a++;
+			} else {
+				Wg_Obj* leftMapped = (key && !Wg_IsNone(key)) ? Wg_Call(key, &left[a], 1) : left[a];
+				if (leftMapped == nullptr)
+					return false;
+				Wg_Obj* rightMapped = (key && !Wg_IsNone(key)) ? Wg_Call(key, &right[b], 1) : right[b];
+				if (rightMapped == nullptr)
+					return false;
+
+				Wg_Obj* gt = Wg_BinaryOp(WG_BOP_LE, rightMapped, leftMapped);
+				if (gt == nullptr)
+					return false;
+
+				if (Wg_GetBool(gt)) {
+					// right < left
+					buf[i] = right[b];
+					b++;
+				} else {
+					// right >= left
+					buf[i] = left[a];
+					a++;
+				}
+			}
+		}
+	
+		for (size_t i = 0; i < len; i++)
+			data[i] = buf[i];
+		return true;
 	}
 	
-	for (size_t i = 0; i < len; i++)
-		data[i] = buf[i];
-	return true;
-}
-
-namespace wings {
-
 	namespace ctors {
 
 		static Wg_Obj* object(Wg_Context* context, Wg_Obj** argv, int argc) { // Excludes self
@@ -775,9 +774,9 @@ namespace wings {
 			argv[0]->attributes = context->builtins.dict->Get<Wg_Obj::Class>().instanceAttributes.Copy();
 			argv[0]->type = "__map";
 
-			auto data = new wings::WDict();
+			auto data = new WDict();
 			Wg_SetUserdata(argv[0], data);
-			Wg_RegisterFinalizer(argv[0], [](void* ud) { delete (wings::WDict*)ud; }, data);
+			Wg_RegisterFinalizer(argv[0], [](void* ud) { delete (WDict*)ud; }, data);
 
 			if (argc == 2) {
 				Wg_Obj* iterable = argv[1];
@@ -790,7 +789,7 @@ namespace wings {
 					if (!Wg_Unpack(obj, 2, kv))
 						return false;
 
-					wings::Wg_ObjRef ref(kv[1]);
+					Wg_ObjRef ref(kv[1]);
 					try {
 						((WDict*)ud)->operator[](kv[0]) = kv[1];
 					} catch (HashException&) {}
@@ -818,9 +817,9 @@ namespace wings {
 			argv[0]->attributes = context->builtins.set->Get<Wg_Obj::Class>().instanceAttributes.Copy();
 			argv[0]->type = "__set";
 
-			auto data = new wings::WSet();
+			auto data = new WSet();
 			Wg_SetUserdata(argv[0], data);
-			Wg_RegisterFinalizer(argv[0], [](void* ud) { delete (wings::WSet*)ud; }, data);
+			Wg_RegisterFinalizer(argv[0], [](void* ud) { delete (WSet*)ud; }, data);
 
 			if (argc == 2) {
 				Wg_Obj* iterable = argv[1];
@@ -2737,7 +2736,7 @@ namespace wings {
 				return Wg_NewString(context, "{...}");
 			} else {
 				context->reprStack.push_back(argv[0]);
-				const auto& buf = argv[0]->Get<wings::WDict>();
+				const auto& buf = argv[0]->Get<WDict>();
 				std::string s = "{";
 				for (const auto& [key, val] : buf) {
 					Wg_Obj* k = Wg_UnaryOp(WG_UOP_REPR, key);
@@ -2960,7 +2959,7 @@ namespace wings {
 				return Wg_NewString(context, "{...}");
 			} else {
 				context->reprStack.push_back(argv[0]);
-				const auto& buf = argv[0]->Get<wings::WSet>();
+				const auto& buf = argv[0]->Get<WSet>();
 
 				if (buf.empty()) {
 					context->reprStack.pop_back();
@@ -4192,7 +4191,7 @@ namespace wings {
 			RegisterFunction(context, "quit", lib::exit);
 			
 			// Initialize the rest with a script
-			if (Execute(context, CODE, "__builtins__") == nullptr)
+			if (Execute(context, BUILTINS_CODE, "__builtins__") == nullptr)
 				throw LibraryInitException();
 
 			b.len = getGlobal("len");

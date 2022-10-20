@@ -96,9 +96,7 @@ namespace wings {
 		instructions[trueJumpIndex].jump->location = instructions.size();
 	}
 
-	static void CompileShortcircuitLogical(const Expression& expr, std::vector<Instruction>& instructions
-		)
-	{
+	static void CompileShortcircuitLogical(const Expression& expr, std::vector<Instruction>& instructions) {
 		const auto& lhs = expr.children[0];
 		const auto& rhs = expr.children[1];
 

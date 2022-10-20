@@ -13,29 +13,29 @@ namespace wings {
 		props.push_back({ "srcPos", '(' + std::to_string(srcPos.line + 1)
 								  + ',' + std::to_string(srcPos.column + 1) + ')' });
 		switch (type) {
-		case wings::Token::Type::Null:
+		case Token::Type::Null:
 			props.push_back({ "type", "null" });
 			break;
-		case wings::Token::Type::Bool:
+		case Token::Type::Bool:
 			props.push_back({ "type", "bool" });
 			props.push_back({ "value", literal.b ? "True" : "False" });
 			break;
-		case wings::Token::Type::Int:
+		case Token::Type::Int:
 			props.push_back({ "type", "int" });
 			props.push_back({ "value", std::to_string(literal.i) });
 			break;
-		case wings::Token::Type::Float:
+		case Token::Type::Float:
 			props.push_back({ "type", "float" });
 			props.push_back({ "value", std::to_string(literal.f) });
 			break;
-		case wings::Token::Type::String:
+		case Token::Type::String:
 			props.push_back({ "type", "string" });
 			props.push_back({ "value", literal.s });
 			break;
-		case wings::Token::Type::Symbol:
+		case Token::Type::Symbol:
 			props.push_back({ "type", "symbol" });
 			break;
-		case wings::Token::Type::Word:
+		case Token::Type::Word:
 			props.push_back({ "type", "word" });
 			break;
 		default:
@@ -192,7 +192,7 @@ namespace wings {
 		} else if (t.text == "True" || t.text == "False") {
 			t.type = Token::Type::Bool;
 			t.literal.b = t.text[0] == 'T';
-		} else if (wings::IsKeyword(t.text)) {
+		} else if (IsKeyword(t.text)) {
 			t.type = Token::Type::Keyword;
 		}
 		return t;
@@ -480,6 +480,10 @@ namespace wings {
 			} else if (currentIndent == parentIndent + 1) {
 				// Indented
 				// Make the last child the new parent
+				if (parents.top()->children.empty()) {
+					error = CodeError::Bad("Indentation not expected", { i, 0 });
+					break;
+				}
 				parents.push(&parents.top()->children.back());
 			} else if (currentIndent < parentIndent) {
 				// De-indented

@@ -5,7 +5,7 @@
 
 namespace wings {
 
-	static constexpr const char* CODE = R"(
+	static constexpr const char* RAND_CODE = R"(
 def choice(seq):
 	t = tuple(seq)
 	return t[randint(0, len(t) - 1)]
@@ -76,7 +76,7 @@ def randrange(*args):
 			RegisterFunction(context, "random", random);
 			RegisterFunction(context, "uniform", uniform);
 
-			if (!Execute(context, CODE, "random"))
+			if (!Execute(context, RAND_CODE, "random"))
 				throw LibraryInitException();
 			
 			return true;

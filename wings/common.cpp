@@ -179,7 +179,7 @@ namespace wings {
 	}
 
 	void AddAttributeToClass(Wg_Obj* klass, const char* attribute, Wg_Obj* value) {
-		WG_ASSERT_VOID(klass && attribute && value && Wg_IsClass(klass) && wings::IsValidIdentifier(attribute));
+		WG_ASSERT_VOID(klass && attribute && value && Wg_IsClass(klass) && IsValidIdentifier(attribute));
 		klass->Get<Wg_Obj::Class>().instanceAttributes.Set(attribute, value);
 	}
 
@@ -187,17 +187,17 @@ namespace wings {
 		WG_ASSERT(context && code);
 
 		if (prettyName == nullptr)
-			prettyName = wings::DEFAULT_FUNC_NAME;
+			prettyName = DEFAULT_FUNC_NAME;
 
-		auto lexResult = wings::Lex(code);
-		auto originalSource = wings::MakeRcPtr<std::vector<std::string>>(lexResult.originalSource);
+		auto lexResult = Lex(code);
+		auto originalSource = MakeRcPtr<std::vector<std::string>>(lexResult.originalSource);
 
-		auto raiseException = [&](const wings::CodeError& error) {
+		auto raiseException = [&](const CodeError& error) {
 			std::string_view lineText;
 			if (error.srcPos.line < originalSource->size()) {
 				lineText = (*originalSource)[error.srcPos.line];
 			}
-			context->currentTrace.push_back(wings::TraceFrame{
+			context->currentTrace.push_back(TraceFrame{
 				error.srcPos,
 				lineText,
 				module,
@@ -220,36 +220,36 @@ namespace wings {
 		}
 
 		if (expr) {
-			std::vector<wings::Statement> body = std::move(parseResult.parseTree.expr.def.body);
-			if (body.size() != 1 || body[0].type != wings::Statement::Type::Expr) {
-				raiseException(wings::CodeError::Bad("Invalid syntax"));
+			std::vector<Statement> body = std::move(parseResult.parseTree.expr.def.body);
+			if (body.size() != 1 || body[0].type != Statement::Type::Expr) {
+				raiseException(CodeError::Bad("Invalid syntax"));
 				return nullptr;
 			}
 
-			wings::Statement ret{};
+			Statement ret{};
 			ret.srcPos = body[0].srcPos;
-			ret.type = wings::Statement::Type::Return;
+			ret.type = Statement::Type::Return;
 			ret.expr = std::move(body[0].expr);
 
 			parseResult.parseTree.expr.def.body.clear();
 			parseResult.parseTree.expr.def.body.push_back(std::move(ret));
 		}
 
-		auto* def = new wings::DefObject();
+		auto* def = new DefObject();
 		def->context = context;
 		def->module = module;
 		def->prettyName = prettyName;
 		def->originalSource = std::move(originalSource);
 		auto instructions = Compile(parseResult.parseTree);
-		def->instructions = MakeRcPtr<std::vector<wings::Instruction>>(std::move(instructions));
+		def->instructions = MakeRcPtr<std::vector<Instruction>>(std::move(instructions));
 
-		Wg_Obj* obj = Wg_NewFunction(context, &wings::DefObject::Run, def);
+		Wg_Obj* obj = Wg_NewFunction(context, &DefObject::Run, def);
 		if (obj == nullptr) {
 			delete def;
 			return nullptr;
 		}
 		
-		Wg_RegisterFinalizer(obj, [](void* ud) { delete (wings::DefObject*)ud; }, def);
+		Wg_RegisterFinalizer(obj, [](void* ud) { delete (DefObject*)ud; }, def);
 
 		return obj;
 	}
@@ -262,8 +262,8 @@ namespace wings {
 		}
 	}
 
-	Rng::Rng()
-		: engine(std::random_device()())
+	Rng::Rng() :
+		engine(std::random_device()())
 	{
 	}
 
