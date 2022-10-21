@@ -106,7 +106,7 @@ namespace wings {
 		std::string_view func;
 		bool syntaxError = false;
 		OwnedTraceFrame ToOwned() const {
-			return { srcPos, lineText.data(), module.data(), func.data(), syntaxError };
+			return { srcPos, std::string(lineText), std::string(module), std::string(func), syntaxError };
 		}
 	};
 

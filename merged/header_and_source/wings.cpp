@@ -2222,7 +2222,7 @@ namespace wings {
 		std::string_view func;
 		bool syntaxError = false;
 		OwnedTraceFrame ToOwned() const {
-			return { srcPos, lineText.data(), module.data(), func.data(), syntaxError };
+			return { srcPos, std::string(lineText), std::string(module), std::string(func), syntaxError };
 		}
 	};
 
@@ -6178,21 +6178,10 @@ class ValueError(Exception):
 
 			std::string sep = " ";
 			std::string end = "\n";
-			bool flush = false;
-
-			if (kw[0]) {
-				if (Wg_IsNone(kw[0]))
-					sep = "";
-				else
-					sep = Wg_GetString(kw[0]);
-			}
-
-			if (kw[1]) {
-				if (Wg_IsNone(kw[1]))
-					end = "";
-				else
-					end = Wg_GetString(kw[1]);
-			}
+			if (kw[0] && !Wg_IsNone(kw[0]))
+				sep = Wg_GetString(kw[0]);
+			if (kw[1] && !Wg_IsNone(kw[1]))
+				end = Wg_GetString(kw[1]);
 
 			std::string text;
 			for (int i = 0; i < argc; i++) {
@@ -11568,6 +11557,10 @@ namespace wings {
 			++p;
 		}
 
+		if (node.children.empty()) {
+			return CodeError::Bad("Expected class body", (--p)->srcPos);
+		}
+
 		if (auto error = ExpectColonEnding(p)) {
 			return error;
 		}
@@ -13528,6 +13521,7 @@ extern "C" {
 		WG_ASSERT_VOID(context);
 		context->currentException = nullptr;
 		context->exceptionTrace.clear();
+		context->currentTrace.clear();
 		context->traceMessage.clear();
 	}
 

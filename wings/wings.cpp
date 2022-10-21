@@ -1198,6 +1198,7 @@ extern "C" {
 		WG_ASSERT_VOID(context);
 		context->currentException = nullptr;
 		context->exceptionTrace.clear();
+		context->currentTrace.clear();
 		context->traceMessage.clear();
 	}
 

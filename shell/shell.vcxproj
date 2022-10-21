@@ -21,8 +21,8 @@
   <PropertyGroup Label="Globals">
     <VCProjectVersion>16.0</VCProjectVersion>
     <Keyword>Win32Proj</Keyword>
-    <ProjectGuid>{5bb4012b-8d2e-4d1a-b2af-d50a255d7e1e}</ProjectGuid>
-    <RootNamespace>wings</RootNamespace>
+    <ProjectGuid>{d340ea67-65a1-449b-a71e-d884d67e07f2}</ProjectGuid>
+    <RootNamespace>shell</RootNamespace>
     <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
@@ -71,20 +71,20 @@
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
-    <LinkIncremental>true</LinkIncremental>
-    <TargetName>_wings</TargetName>
+    <IncludePath>$(SolutionDir)merged\single_header;$(IncludePath)</IncludePath>
+    <TargetName>wings</TargetName>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
-    <LinkIncremental>false</LinkIncremental>
-    <TargetName>_wings</TargetName>
+    <IncludePath>$(SolutionDir)merged\single_header;$(IncludePath)</IncludePath>
+    <TargetName>wings</TargetName>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
-    <LinkIncremental>true</LinkIncremental>
-    <TargetName>_wings</TargetName>
+    <IncludePath>$(SolutionDir)merged\single_header;$(IncludePath)</IncludePath>
+    <TargetName>wings</TargetName>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
-    <LinkIncremental>false</LinkIncremental>
-    <TargetName>_wings</TargetName>
+    <IncludePath>$(SolutionDir)merged\single_header;$(IncludePath)</IncludePath>
+    <TargetName>wings</TargetName>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
@@ -147,46 +147,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="attributetable.cpp" />
-    <ClCompile Include="common.cpp" />
-    <ClCompile Include="compile.cpp" />
-    <ClCompile Include="dismodule.cpp" />
-    <ClCompile Include="executor.cpp" />
-    <ClCompile Include="exprparse.cpp" />
-    <ClCompile Include="lex.cpp" />
-    <ClCompile Include="builtinsmodule.cpp" />
     <ClCompile Include="main.cpp" />
-    <ClCompile Include="mathmodule.cpp" />
-    <ClCompile Include="osmodule.cpp" />
-    <ClCompile Include="parse.cpp" />
-    <ClCompile Include="randommodule.cpp" />
-    <ClCompile Include="sysmodule.cpp" />
-    <ClCompile Include="tests.cpp" />
-    <ClCompile Include="timemodule.cpp" />
-    <ClCompile Include="wings.cpp" />
-  </ItemGroup>
-  <ItemGroup>
-    <ClInclude Include="attributetable.h" />
-    <ClInclude Include="common.h" />
-    <ClInclude Include="compile.h" />
-    <ClInclude Include="dismodule.h" />
-    <ClInclude Include="executor.h" />
-    <ClInclude Include="exprparse.h" />
-    <ClInclude Include="lex.h" />
-    <ClInclude Include="builtinsmodule.h" />
-    <ClInclude Include="mathmodule.h" />
-    <ClInclude Include="osmodule.h" />
-    <ClInclude Include="parse.h" />
-    <ClInclude Include="randommodule.h" />
-    <ClInclude Include="rcptr.h" />
-    <ClInclude Include="hash.h" />
-    <ClInclude Include="sysmodule.h" />
-    <ClInclude Include="tests.h" />
-    <ClInclude Include="timemodule.h" />
-    <ClInclude Include="wings.h" />
-  </ItemGroup>
-  <ItemGroup>
-    <None Include="cpp.hint" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

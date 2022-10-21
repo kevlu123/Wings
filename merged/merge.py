@@ -6,7 +6,7 @@ IGNORE = ["main.cpp", "tests.h", "tests.cpp", "cpp.hint"]
 
 cur_path = pathlib.Path(__file__).parent
 input_folder = f"{str(cur_path.parent)}{sep}wings{sep}"
-h_output_folder = f"{str(cur_path)}{sep}header_only{sep}"
+h_output_folder = f"{str(cur_path)}{sep}single_header{sep}"
 hs_output_folder = f"{str(cur_path)}{sep}header_and_source{sep}"
 filenames = [
     str(f.absolute()) for f in pathlib.Path(input_folder).glob("*.[ch]*")

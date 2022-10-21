@@ -3742,21 +3742,10 @@ class ValueError(Exception):
 
 			std::string sep = " ";
 			std::string end = "\n";
-			bool flush = false;
-
-			if (kw[0]) {
-				if (Wg_IsNone(kw[0]))
-					sep = "";
-				else
-					sep = Wg_GetString(kw[0]);
-			}
-
-			if (kw[1]) {
-				if (Wg_IsNone(kw[1]))
-					end = "";
-				else
-					end = Wg_GetString(kw[1]);
-			}
+			if (kw[0] && !Wg_IsNone(kw[0]))
+				sep = Wg_GetString(kw[0]);
+			if (kw[1] && !Wg_IsNone(kw[1]))
+				end = Wg_GetString(kw[1]);
 
 			std::string text;
 			for (int i = 0; i < argc; i++) {

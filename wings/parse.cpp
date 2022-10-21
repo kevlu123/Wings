@@ -530,6 +530,10 @@ namespace wings {
 			++p;
 		}
 
+		if (node.children.empty()) {
+			return CodeError::Bad("Expected class body", (--p)->srcPos);
+		}
+
 		if (auto error = ExpectColonEnding(p)) {
 			return error;
 		}
