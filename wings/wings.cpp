@@ -838,7 +838,7 @@ extern "C" {
 		Wg_Context* context = callable->context;
 		
 		// Check recursion limit
-		if (context->kwargs.size() >= context->config.maxRecursion) {
+		if (context->kwargs.size() >= (size_t)context->config.maxRecursion) {
 			Wg_RaiseException(context, WG_EXC_RECURSIONERROR);
 			return nullptr;
 		}
@@ -1198,7 +1198,7 @@ extern "C" {
 		WG_ASSERT_VOID(context);
 		context->currentException = nullptr;
 		context->exceptionTrace.clear();
-		context->currentTrace.clear();
+		//context->currentTrace.clear();
 		context->traceMessage.clear();
 	}
 

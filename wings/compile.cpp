@@ -762,8 +762,7 @@ namespace wings {
 		}
 
 		CompileBody(node.tryBlock.finallyClause, instructions);
-
-		size_t tryInstrIndex = instructions.size();
+		
 		Instruction popTry{};
 		popTry.srcPos = node.srcPos;
 		popTry.type = Instruction::Type::PopTry;

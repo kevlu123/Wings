@@ -491,7 +491,7 @@ namespace wings {
 					parents.pop();
 			}
 
-			parents.top()->children.push_back(LexTree{ std::move(tokens) });
+			parents.top()->children.push_back(LexTree{ std::move(tokens), {} });
 		}
 
 		LexResult result{};

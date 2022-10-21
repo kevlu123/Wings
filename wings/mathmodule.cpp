@@ -6,8 +6,8 @@
 #include <limits>
 
 namespace wings {
-
-	static constexpr const char* MATH_CODE = R"(
+	namespace mathmodule {
+		static constexpr const char* MATH_CODE = R"(
 def comb(n, k):
 	if not isinstance(n, int) or not isinstance(k, int):
 		raise TypeError("comb() only accepts integers")
@@ -121,136 +121,138 @@ def degrees(x):
 def radians(x):
 	return x * pi / 180.0
 )";
-	
-	static Wg_Obj* ceil(Wg_Context* context, Wg_Obj** argv, int argc) {
-		WG_EXPECT_ARG_COUNT(1);
-		if (Wg_IsIntOrFloat(argv[0])) {
-			return Wg_NewInt(context, (Wg_int)std::ceil(Wg_GetFloat(argv[0])));
+
+		static Wg_Obj* ceil(Wg_Context* context, Wg_Obj** argv, int argc) {
+			WG_EXPECT_ARG_COUNT(1);
+			if (Wg_IsIntOrFloat(argv[0])) {
+				return Wg_NewInt(context, (Wg_int)std::ceil(Wg_GetFloat(argv[0])));
+			}
+			return Wg_CallMethod(argv[0], "__ceil__", nullptr, 0);
 		}
-		return Wg_CallMethod(argv[0], "__ceil__", nullptr, 0);
-	}
 
-	static Wg_Obj* floor(Wg_Context* context, Wg_Obj** argv, int argc) {
-		WG_EXPECT_ARG_COUNT(1);
-		if (Wg_IsIntOrFloat(argv[0])) {
-			return Wg_NewInt(context, (Wg_int)std::floor(Wg_GetFloat(argv[0])));
+		static Wg_Obj* floor(Wg_Context* context, Wg_Obj** argv, int argc) {
+			WG_EXPECT_ARG_COUNT(1);
+			if (Wg_IsIntOrFloat(argv[0])) {
+				return Wg_NewInt(context, (Wg_int)std::floor(Wg_GetFloat(argv[0])));
+			}
+			return Wg_CallMethod(argv[0], "__floor__", nullptr, 0);
 		}
-		return Wg_CallMethod(argv[0], "__floor__", nullptr, 0);
-	}
 
-	using FpCheck = bool(*)(Wg_float);
+		using FpCheck = bool(*)(Wg_float);
 
-	template <FpCheck f>
-	static Wg_Obj* isx(Wg_Context* context, Wg_Obj** argv, int argc) {
-		WG_EXPECT_ARG_COUNT(1);
-		WG_EXPECT_ARG_TYPE_INT_OR_FLOAT(0);
-		return Wg_NewBool(context, f(Wg_GetFloat(argv[0])));
-	}
+		template <FpCheck f>
+		static Wg_Obj* isx(Wg_Context* context, Wg_Obj** argv, int argc) {
+			WG_EXPECT_ARG_COUNT(1);
+			WG_EXPECT_ARG_TYPE_INT_OR_FLOAT(0);
+			return Wg_NewBool(context, f(Wg_GetFloat(argv[0])));
+		}
 
-	static Wg_Obj* isfinite(Wg_Context* context, Wg_Obj** argv, int argc) {
-		return isx<std::isfinite>(context, argv, argc);
-	}
+		static Wg_Obj* isfinite(Wg_Context* context, Wg_Obj** argv, int argc) {
+			return isx<std::isfinite>(context, argv, argc);
+		}
 
-	static Wg_Obj* isinf(Wg_Context* context, Wg_Obj** argv, int argc) {
-		return isx<std::isinf>(context, argv, argc);
-	}
+		static Wg_Obj* isinf(Wg_Context* context, Wg_Obj** argv, int argc) {
+			return isx<std::isinf>(context, argv, argc);
+		}
 
-	static Wg_Obj* isnan(Wg_Context* context, Wg_Obj** argv, int argc) {
-		return isx<std::isnan>(context, argv, argc);
-	}
+		static Wg_Obj* isnan(Wg_Context* context, Wg_Obj** argv, int argc) {
+			return isx<std::isnan>(context, argv, argc);
+		}
 
-	static Wg_Obj* log(Wg_Context* context, Wg_Obj** argv, int argc) {
-		WG_EXPECT_ARG_COUNT_BETWEEN(1, 2);
-		WG_EXPECT_ARG_TYPE_INT_OR_FLOAT(0);
-		Wg_float base = std::numbers::e_v<Wg_float>;
-		if (argc == 2) {
+		static Wg_Obj* log(Wg_Context* context, Wg_Obj** argv, int argc) {
+			WG_EXPECT_ARG_COUNT_BETWEEN(1, 2);
+			WG_EXPECT_ARG_TYPE_INT_OR_FLOAT(0);
+			Wg_float base = std::numbers::e_v<Wg_float>;
+			if (argc == 2) {
+				WG_EXPECT_ARG_TYPE_INT_OR_FLOAT(1);
+				base = Wg_GetFloat(argv[1]);
+			}
+			return Wg_NewFloat(context, std::log(Wg_GetFloat(argv[0])) / std::log(base));
+		}
+
+		using Op = Wg_float(*)(Wg_float);
+
+		template <Op op>
+		static Wg_Obj* opx(Wg_Context* context, Wg_Obj** argv, int argc) {
+			WG_EXPECT_ARG_COUNT(1);
+			WG_EXPECT_ARG_TYPE_INT_OR_FLOAT(0);
+			return Wg_NewFloat(context, op(Wg_GetFloat(argv[0])));
+		}
+
+		static Wg_Obj* cos(Wg_Context* context, Wg_Obj** argv, int argc) {
+			return opx<std::cos>(context, argv, argc);
+		}
+
+		static Wg_Obj* sin(Wg_Context* context, Wg_Obj** argv, int argc) {
+			return opx<std::sin>(context, argv, argc);
+		}
+
+		static Wg_Obj* tan(Wg_Context* context, Wg_Obj** argv, int argc) {
+			return opx<std::tan>(context, argv, argc);
+		}
+
+		static Wg_Obj* acos(Wg_Context* context, Wg_Obj** argv, int argc) {
+			return opx<std::acos>(context, argv, argc);
+		}
+
+		static Wg_Obj* asin(Wg_Context* context, Wg_Obj** argv, int argc) {
+			return opx<std::asin>(context, argv, argc);
+		}
+
+		static Wg_Obj* atan(Wg_Context* context, Wg_Obj** argv, int argc) {
+			return opx<std::atan>(context, argv, argc);
+		}
+
+		static Wg_Obj* cosh(Wg_Context* context, Wg_Obj** argv, int argc) {
+			return opx<std::cosh>(context, argv, argc);
+		}
+
+		static Wg_Obj* sinh(Wg_Context* context, Wg_Obj** argv, int argc) {
+			return opx<std::sinh>(context, argv, argc);
+		}
+
+		static Wg_Obj* tanh(Wg_Context* context, Wg_Obj** argv, int argc) {
+			return opx<std::tanh>(context, argv, argc);
+		}
+
+		static Wg_Obj* acosh(Wg_Context* context, Wg_Obj** argv, int argc) {
+			return opx<std::acosh>(context, argv, argc);
+		}
+
+		static Wg_Obj* asinh(Wg_Context* context, Wg_Obj** argv, int argc) {
+			return opx<std::asinh>(context, argv, argc);
+		}
+
+		static Wg_Obj* atanh(Wg_Context* context, Wg_Obj** argv, int argc) {
+			return opx<std::atanh>(context, argv, argc);
+		}
+
+		static Wg_Obj* erf(Wg_Context* context, Wg_Obj** argv, int argc) {
+			return opx<std::erf>(context, argv, argc);
+		}
+
+		static Wg_Obj* erfc(Wg_Context* context, Wg_Obj** argv, int argc) {
+			return opx<std::erfc>(context, argv, argc);
+		}
+
+		static Wg_Obj* gamma(Wg_Context* context, Wg_Obj** argv, int argc) {
+			return opx<std::tgamma>(context, argv, argc);
+		}
+
+		static Wg_Obj* lgamma(Wg_Context* context, Wg_Obj** argv, int argc) {
+			return opx<std::lgamma>(context, argv, argc);
+		}
+
+		static Wg_Obj* atan2(Wg_Context* context, Wg_Obj** argv, int argc) {
+			WG_EXPECT_ARG_COUNT(2);
+			WG_EXPECT_ARG_TYPE_INT_OR_FLOAT(0);
 			WG_EXPECT_ARG_TYPE_INT_OR_FLOAT(1);
-			base = Wg_GetFloat(argv[1]);
+			return Wg_NewFloat(context, std::atan2(Wg_GetFloat(argv[0]), Wg_GetFloat(argv[1])));
 		}
-		return Wg_NewFloat(context, std::log(Wg_GetFloat(argv[0])) / std::log(base));
-	}
-
-	using Op = Wg_float(*)(Wg_float);
-
-	template <Op op>
-	static Wg_Obj* opx(Wg_Context* context, Wg_Obj** argv, int argc) {
-		WG_EXPECT_ARG_COUNT(1);
-		WG_EXPECT_ARG_TYPE_INT_OR_FLOAT(0);
-		return Wg_NewFloat(context, op(Wg_GetFloat(argv[0])));
-	}
-
-	static Wg_Obj* cos(Wg_Context* context, Wg_Obj** argv, int argc) {
-		return opx<std::cos>(context, argv, argc);
-	}
-
-	static Wg_Obj* sin(Wg_Context* context, Wg_Obj** argv, int argc) {
-		return opx<std::sin>(context, argv, argc);
-	}
-
-	static Wg_Obj* tan(Wg_Context* context, Wg_Obj** argv, int argc) {
-		return opx<std::tan>(context, argv, argc);
-	}
-
-	static Wg_Obj* acos(Wg_Context* context, Wg_Obj** argv, int argc) {
-		return opx<std::acos>(context, argv, argc);
-	}
-
-	static Wg_Obj* asin(Wg_Context* context, Wg_Obj** argv, int argc) {
-		return opx<std::asin>(context, argv, argc);
-	}
-
-	static Wg_Obj* atan(Wg_Context* context, Wg_Obj** argv, int argc) {
-		return opx<std::atan>(context, argv, argc);
-	}
-
-	static Wg_Obj* cosh(Wg_Context* context, Wg_Obj** argv, int argc) {
-		return opx<std::cosh>(context, argv, argc);
-	}
-
-	static Wg_Obj* sinh(Wg_Context* context, Wg_Obj** argv, int argc) {
-		return opx<std::sinh>(context, argv, argc);
-	}
-
-	static Wg_Obj* tanh(Wg_Context* context, Wg_Obj** argv, int argc) {
-		return opx<std::tanh>(context, argv, argc);
-	}
-
-	static Wg_Obj* acosh(Wg_Context* context, Wg_Obj** argv, int argc) {
-		return opx<std::acosh>(context, argv, argc);
-	}
-
-	static Wg_Obj* asinh(Wg_Context* context, Wg_Obj** argv, int argc) {
-		return opx<std::asinh>(context, argv, argc);
-	}
-
-	static Wg_Obj* atanh(Wg_Context* context, Wg_Obj** argv, int argc) {
-		return opx<std::atanh>(context, argv, argc);
-	}
-
-	static Wg_Obj* erf(Wg_Context* context, Wg_Obj** argv, int argc) {
-		return opx<std::erf>(context, argv, argc);
-	}
-
-	static Wg_Obj* erfc(Wg_Context* context, Wg_Obj** argv, int argc) {
-		return opx<std::erfc>(context, argv, argc);
-	}
-
-	static Wg_Obj* gamma(Wg_Context* context, Wg_Obj** argv, int argc) {
-		return opx<std::tgamma>(context, argv, argc);
-	}
-
-	static Wg_Obj* lgamma(Wg_Context* context, Wg_Obj** argv, int argc) {
-		return opx<std::lgamma>(context, argv, argc);
-	}
-
-	static Wg_Obj* atan2(Wg_Context* context, Wg_Obj** argv, int argc) {
-		WG_EXPECT_ARG_COUNT(2);
-		WG_EXPECT_ARG_TYPE_INT_OR_FLOAT(0);
-		WG_EXPECT_ARG_TYPE_INT_OR_FLOAT(1);
-		return Wg_NewFloat(context, std::atan2(Wg_GetFloat(argv[0]), Wg_GetFloat(argv[1])));
 	}
 	
 	bool ImportMath(Wg_Context* context) {
+		using namespace mathmodule;
 		try {
 			RegisterFunction(context, "ceil", ceil);
 			RegisterFunction(context, "floor", floor);

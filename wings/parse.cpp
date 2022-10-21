@@ -382,7 +382,7 @@ namespace wings {
 			std::unordered_set<std::string> variables;
 			for (const auto& child : expr.children)
 				variables.merge(GetWriteVariables(child));
-				return variables;
+			return variables;
 		}
 	}
 
@@ -1058,7 +1058,6 @@ namespace wings {
 		// Rearrange elif and else nodes
 		for (size_t i = 0; i < out.size(); i++) {
 			auto& stat = out[i];
-			Statement::Type lastType = i ? out[i - 1].type : Statement::Type::Pass;
 
 			std::optional<Statement> elseClause;
 			if (stat.type == Statement::Type::Elif) {

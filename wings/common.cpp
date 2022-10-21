@@ -15,10 +15,10 @@ namespace wings {
 		WG_ASSERT(!context->gcRunning);
 		
 		// Check allocation limits
-		if (context->mem.size() >= context->config.maxAlloc) {
+		if (context->mem.size() >= (size_t)context->config.maxAlloc) {
 			// Too many objects. Try to free up objects
 			Wg_CollectGarbage(context);
-			if (context->mem.size() >= context->config.maxAlloc) {
+			if (context->mem.size() >= (size_t)context->config.maxAlloc) {
 				// If there are still too many objects then set a MemoryException
 				Wg_RaiseException(context, WG_EXC_MEMORYERROR);
 				return nullptr;
@@ -100,7 +100,7 @@ namespace wings {
 	}
 
 	CodeError CodeError::Good() {
-		return CodeError{ true };
+		return CodeError{ true, {}, {} };
 	}
 
 	CodeError CodeError::Bad(std::string message, SourcePosition srcPos) {
@@ -206,6 +206,8 @@ namespace wings {
 				});
 
 			Wg_RaiseException(context, WG_EXC_SYNTAXERROR, error.message.c_str());
+
+			context->currentTrace.pop_back();
 		};
 
 		if (lexResult.error) {

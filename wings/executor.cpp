@@ -79,7 +79,7 @@ namespace wings {
 			executor.variables.insert({ def->listArgs.value(), MakeRcPtr<Wg_Obj*>(listArgs) });
 		}
 
-		for (int i = 0; i < argc; i++) {
+		for (size_t i = 0; i < (size_t)argc; i++) {
 			if (i < def->parameterNames.size()) {
 				if (assignedParams[i]) {
 					std::string msg;
@@ -381,7 +381,7 @@ namespace wings {
 		}
 		case Instruction::Type::Literal: {
 			Wg_Obj* value{};
-			if (auto* n = std::get_if<std::nullptr_t>(instr.literal.get())) {
+			if (std::holds_alternative<std::nullptr_t>(*instr.literal)) {
 				value = Wg_None(context);
 			} else if (auto* b = std::get_if<bool>(instr.literal.get())) {
 				value = Wg_NewBool(context, *b);

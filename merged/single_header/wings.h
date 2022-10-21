@@ -1803,9 +1803,9 @@ namespace wings {
 			mySize = 0;
 		}
 		
-		std::vector<Bucket> buckets;
 		Hash hasher;
 		Equal equal;
+		std::vector<Bucket> buckets;
 		float maxLoadFactor = 1.0f;
 		size_t mySize = 0;
 	};
@@ -2450,6 +2450,7 @@ struct Wg_Context {
 #include <cmath>
 #include <algorithm>
 #include <bit>
+#include <cstring>
 
 namespace wings {
 	static const char* const BUILTINS_CODE = R"(
@@ -2961,7 +2962,7 @@ class ValueError(Exception):
 		return buf;
 	}
 
-	inline std::vector<std::string> StringSplitLines(std::string s, bool keepLineBreaks) {
+	inline std::vector<std::string> StringSplitLines(std::string s) {
 		size_t last = 0;
 		size_t next = 0;
 		std::vector<std::string> buf;
@@ -2979,7 +2980,7 @@ class ValueError(Exception):
 	inline bool IsSpace(char c) {
 		return c == ' ' || c == '\t' || c == '\n' || c == '\r'
 			|| c == '\v' || c == '\f';
-	};
+	}
 
 	inline bool MergeSort(Wg_Obj** data, size_t len, Wg_Obj* key) {
 		if (len == 1)
@@ -3037,7 +3038,7 @@ class ValueError(Exception):
 	
 	namespace ctors {
 
-		inline Wg_Obj* object(Wg_Context* context, Wg_Obj** argv, int argc) { // Excludes self
+		inline Wg_Obj* object(Wg_Context* context, Wg_Obj**, int argc) { // Excludes self
 			WG_EXPECT_ARG_COUNT(0);
 
 			Wg_Obj* obj = Alloc(context);
@@ -3049,7 +3050,7 @@ class ValueError(Exception):
 			return obj;
 		}
 
-		inline Wg_Obj* none(Wg_Context* context, Wg_Obj** argv, int argc) { // Excludes self
+		inline Wg_Obj* none(Wg_Context* context, Wg_Obj**, int) { // Excludes self
 			return context->builtins.none;
 		}
 
@@ -3382,7 +3383,7 @@ class ValueError(Exception):
 			}
 		}
 
-		inline Wg_Obj* object_nonzero(Wg_Context* context, Wg_Obj** argv, int argc) {
+		inline Wg_Obj* object_nonzero(Wg_Context* context, Wg_Obj**, int argc) {
 			WG_EXPECT_ARG_COUNT(1);
 			return Wg_NewBool(context, true);
 		}
@@ -3920,7 +3921,7 @@ class ValueError(Exception):
 				return sub.find(std::tolower(c)) != std::string_view::npos;
 			};
 
-			auto digitValueOf = [](char c, int base) {
+			auto digitValueOf = [&](char c, int base) {
 				return DIGITS.substr(0, base).find(std::tolower(c));
 			};
 
@@ -4213,7 +4214,8 @@ class ValueError(Exception):
 			WG_EXPECT_ARG_TYPE_STRING(0);
 
 			std::string s = Wg_GetString(argv[0]);
-			std::transform(s.begin(), s.end(), s.begin(), std::tolower);
+			std::transform(s.begin(), s.end(), s.begin(),
+				[](unsigned char c) { return std::tolower(c); });
 			return Wg_NewString(context, s.c_str());
 		}
 
@@ -4222,7 +4224,8 @@ class ValueError(Exception):
 			WG_EXPECT_ARG_TYPE_STRING(0);
 
 			std::string s = Wg_GetString(argv[0]);
-			std::transform(s.begin(), s.end(), s.begin(), std::toupper);
+			std::transform(s.begin(), s.end(), s.begin(),
+				[](unsigned char c) { return std::toupper(c); });
 			return Wg_NewString(context, s.c_str());
 		}
 
@@ -4458,7 +4461,7 @@ class ValueError(Exception):
 		}
 
 		inline Wg_Obj* str_isascii(Wg_Context* context, Wg_Obj** argv, int argc) {
-			constexpr auto f = [](char c) { return c < 128; };
+			constexpr auto f = [](char c) { return c >= 0 && c < 128; };
 			return str_isx<f>(context, argv, argc);
 		}
 
@@ -4511,7 +4514,7 @@ class ValueError(Exception):
 			struct State {
 				std::string_view sep;
 				std::string s;
-			} state = { Wg_GetString(argv[0]) };
+			} state = { Wg_GetString(argv[0]), "" };
 
 			bool success = Wg_Iterate(argv[1], &state, [](Wg_Obj* obj, void* ud) {
 				State& state = *(State*)ud;
@@ -4698,16 +4701,10 @@ class ValueError(Exception):
 		}
 
 		inline Wg_Obj* str_splitlines(Wg_Context* context, Wg_Obj** argv, int argc) {
-			WG_EXPECT_ARG_COUNT_BETWEEN(1, 2);
+			WG_EXPECT_ARG_COUNT(1);
 			WG_EXPECT_ARG_TYPE_STRING(0);
 
-			bool keepLineBreaks = false;
-			if (argc == 2) {
-				WG_EXPECT_ARG_TYPE_BOOL(1);
-				keepLineBreaks = Wg_GetBool(argv[1]);
-			}
-
-			std::vector<std::string> strings = StringSplitLines(Wg_GetString(argv[0]), keepLineBreaks);
+			std::vector<std::string> strings = StringSplitLines(Wg_GetString(argv[0]));
 
 			Wg_Obj* li = Wg_NewList(context);
 			if (li == nullptr)
@@ -5864,7 +5861,7 @@ class ValueError(Exception):
 			return Wg_Call(context->builtins.list, argv, 1);
 		}
 
-		inline Wg_Obj* File_closex(Wg_Context* context, Wg_Obj** argv, int argc) {
+		inline Wg_Obj* File_closex(Wg_Context* context, Wg_Obj** argv, int) {
 			std::fstream* f{};
 			if (!TryGetUserdata(argv[0], "__File", &f)) {
 				Wg_RaiseArgumentTypeError(context, 0, "__File");
@@ -6100,7 +6097,7 @@ class ValueError(Exception):
 			return Wg_None(context);
 		}
 
-		inline Wg_Obj* exit(Wg_Context* context, Wg_Obj** argv, int argc) {
+		inline Wg_Obj* exit(Wg_Context* context, Wg_Obj**, int) {
 			Wg_RaiseException(context, WG_EXC_SYSTEMEXIT);
 			return nullptr;
 		}
@@ -6774,14 +6771,12 @@ namespace wings {
 			String,
 		} type;
 
-		struct {
-			union {
-				bool b;
-				Wg_int i;
-				Wg_float f;
-			};
-			std::string s;
+		union {
+			bool b;
+			Wg_int i;
+			Wg_float f;
 		};
+		std::string s;
 	};
 
 	struct Statement;
@@ -7104,10 +7099,10 @@ namespace wings {
 		WG_ASSERT(!context->gcRunning);
 		
 		// Check allocation limits
-		if (context->mem.size() >= context->config.maxAlloc) {
+		if (context->mem.size() >= (size_t)context->config.maxAlloc) {
 			// Too many objects. Try to free up objects
 			Wg_CollectGarbage(context);
-			if (context->mem.size() >= context->config.maxAlloc) {
+			if (context->mem.size() >= (size_t)context->config.maxAlloc) {
 				// If there are still too many objects then set a MemoryException
 				Wg_RaiseException(context, WG_EXC_MEMORYERROR);
 				return nullptr;
@@ -7189,7 +7184,7 @@ namespace wings {
 	}
 
 	inline CodeError CodeError::Good() {
-		return CodeError{ true };
+		return CodeError{ true, {}, {} };
 	}
 
 	inline CodeError CodeError::Bad(std::string message, SourcePosition srcPos) {
@@ -7295,6 +7290,8 @@ namespace wings {
 				});
 
 			Wg_RaiseException(context, WG_EXC_SYNTAXERROR, error.message.c_str());
+
+			context->currentTrace.pop_back();
 		};
 
 		if (lexResult.error) {
@@ -8168,8 +8165,7 @@ namespace wings {
 		}
 
 		CompileBody(node.tryBlock.finallyClause, instructions);
-
-		size_t tryInstrIndex = instructions.size();
+		
 		Instruction popTry{};
 		popTry.srcPos = node.srcPos;
 		popTry.type = Instruction::Type::PopTry;
@@ -8227,230 +8223,233 @@ namespace wings {
 
 #include <queue>
 
-namespace wings {	
-	inline std::string AssignTargetToString(const AssignTarget& target) {
-		if (target.type == AssignType::Direct) {
-			return target.direct;
-		} else {
-			std::string s = "(";
-			for (const auto& child : target.pack) {
-				s += AssignTargetToString(child);
-				s += ", ";
-			}
-			s.pop_back();
-			s.pop_back();
-			return s;
-		}
-	}
-
-	inline std::string LiteralToString(const LiteralInstruction& literal) {
-		if (std::holds_alternative<std::nullptr_t>(literal)) {
-			return "None";
-		} else if (std::holds_alternative<bool>(literal)) {
-			return std::get<bool>(literal) ? "True" : "False";
-		} else if (std::holds_alternative<Wg_int>(literal)) {
-			return std::to_string(std::get<Wg_int>(literal));
-		} else if (std::holds_alternative<Wg_float>(literal)) {
-			return std::to_string(std::get<Wg_float>(literal));
-		} else if (std::holds_alternative<std::string>(literal)) {
-			return "\"" + std::get<std::string>(literal) + "\"";
-		} else {
-			WG_UNREACHABLE();
-		}
-	}
-
-	inline std::string PadLeft(size_t i, size_t size) {
-		auto n = std::to_string(i);
-		while (n.size() < size)
-			n.insert(0, 1, ' ');
-		return n;
-	}
-
-	inline Wg_Obj* dis(Wg_Context* context, Wg_Obj** argv, int argc) {
-		WG_EXPECT_ARG_COUNT(1);
-		WG_EXPECT_ARG_TYPE_FUNC(0);
-
-		const auto& fn = argv[0]->Get<Wg_Obj::Func>();
-		if (fn.fptr != &DefObject::Run) {
-			Wg_RaiseException(context, WG_EXC_TYPEERROR, "Cannot disassemble native function");
-			return nullptr;
-		}
-
-		struct Func {
-			const std::vector<Instruction>* instructions;
-			std::string_view name;
-		};
-
-		std::queue<Func> functions;
-		DefObject* def = (DefObject*)fn.userdata;
-		functions.push(Func{ &*def->instructions, def->prettyName });
-
-		std::string s;
-		while (!functions.empty()) {
-			s += "Function ";
-			s += functions.front().name;
-			s += "()\n";
-			const auto* instructions = functions.front().instructions;
-			functions.pop();
-			
-			for (size_t i = 0; i < instructions->size(); i++) {
-				const Instruction& instr = (*instructions)[i];
-
-				if (i == 0 || instr.srcPos.line != (*instructions)[i - 1].srcPos.line) {
-					if (i)
-						s += "\n";
-					s += PadLeft(instr.srcPos.line + 1, 6) + " ";
-				} else {
-					s += "       ";
+namespace wings {
+	namespace dismodule {
+		inline std::string AssignTargetToString(const AssignTarget& target) {
+			if (target.type == AssignType::Direct) {
+				return target.direct;
+			} else {
+				std::string s = "(";
+				for (const auto& child : target.pack) {
+					s += AssignTargetToString(child);
+					s += ", ";
 				}
-				s += PadLeft(i, 4) + " ";
+				s.pop_back();
+				s.pop_back();
+				return s;
+			}
+		}
 
-				switch (instr.type) {
-				case Instruction::Type::DirectAssign:
-					if (instr.directAssign->assignTarget.type == AssignType::Direct) {
-						s += "ASSIGN\t\t";
+		inline std::string LiteralToString(const LiteralInstruction& literal) {
+			if (std::holds_alternative<std::nullptr_t>(literal)) {
+				return "None";
+			} else if (std::holds_alternative<bool>(literal)) {
+				return std::get<bool>(literal) ? "True" : "False";
+			} else if (std::holds_alternative<Wg_int>(literal)) {
+				return std::to_string(std::get<Wg_int>(literal));
+			} else if (std::holds_alternative<Wg_float>(literal)) {
+				return std::to_string(std::get<Wg_float>(literal));
+			} else if (std::holds_alternative<std::string>(literal)) {
+				return "\"" + std::get<std::string>(literal) + "\"";
+			} else {
+				WG_UNREACHABLE();
+			}
+		}
+
+		inline std::string PadLeft(size_t i, size_t size) {
+			auto n = std::to_string(i);
+			while (n.size() < size)
+				n.insert(0, 1, ' ');
+			return n;
+		}
+
+		inline Wg_Obj* dis(Wg_Context* context, Wg_Obj** argv, int argc) {
+			WG_EXPECT_ARG_COUNT(1);
+			WG_EXPECT_ARG_TYPE_FUNC(0);
+
+			const auto& fn = argv[0]->Get<Wg_Obj::Func>();
+			if (fn.fptr != &DefObject::Run) {
+				Wg_RaiseException(context, WG_EXC_TYPEERROR, "Cannot disassemble native function");
+				return nullptr;
+			}
+
+			struct Func {
+				const std::vector<Instruction>* instructions;
+				std::string_view name;
+			};
+
+			std::queue<Func> functions;
+			DefObject* def = (DefObject*)fn.userdata;
+			functions.push(Func{ &*def->instructions, def->prettyName });
+
+			std::string s;
+			while (!functions.empty()) {
+				s += "Function ";
+				s += functions.front().name;
+				s += "()\n";
+				const auto* instructions = functions.front().instructions;
+				functions.pop();
+
+				for (size_t i = 0; i < instructions->size(); i++) {
+					const Instruction& instr = (*instructions)[i];
+
+					if (i == 0 || instr.srcPos.line != (*instructions)[i - 1].srcPos.line) {
+						if (i)
+							s += "\n";
+						s += PadLeft(instr.srcPos.line + 1, 6) + " ";
 					} else {
-						s += "ASSIGN_PACK\t\t";
+						s += "       ";
 					}
-					s += AssignTargetToString(instr.directAssign->assignTarget);
-					break;
-				case Instruction::Type::MemberAssign:
-					s += "ASSIGN_ATTR\t\t" + instr.string->string;
-					break;
-				case Instruction::Type::Literal:
-					s += "LOAD_CONST\t\t" + LiteralToString(*instr.literal);
-					break;
-				case Instruction::Type::Call:
-					s += "CALL";
-					break;
-				case Instruction::Type::Return:
-					s += "RETURN";
-					break;
-				case Instruction::Type::Pop:
-					s += "POP";
-					break;
-				case Instruction::Type::PushArgFrame:
-					s += "BEGIN_ARGS";
-					break;
-				case Instruction::Type::Dot:
-					s += "GET_ATTR\t\t" + instr.string->string;
-					break;
-				case Instruction::Type::Variable:
-					s += "LOAD_VAR\t\t" + instr.string->string;
-					break;
-				case Instruction::Type::Jump:
-					s += "JUMP\t\tto " + std::to_string(instr.jump->location);
-					break;
-				case Instruction::Type::JumpIfFalsePop:
-					s += "JUMP_IF_FALSE_POP\tto " + std::to_string(instr.jump->location);
-					break;
-				case Instruction::Type::JumpIfFalse:
-					s += "JUMP_IF_FALSE\tto " + std::to_string(instr.jump->location);
-					break;
-				case Instruction::Type::JumpIfTrue:
-					s += "JUMP_IF_TRUE\tto " + std::to_string(instr.jump->location);
-					break;
-				case Instruction::Type::List:
-					s += "MAKE_LIST";
-					break;
-				case Instruction::Type::Tuple:
-					s += "MAKE_TUPLE";
-					break;
-				case Instruction::Type::Map:
-					s += "MAKE_DICT";
-					break;
-				case Instruction::Type::Set:
-					s += "MAKE_SET";
-					break;
-				case Instruction::Type::Slice:
-					s += "MAKE_SLICE";
-					break;
-				case Instruction::Type::Raise:
-					s += "RAISE";
-					break;
-				case Instruction::Type::PushTry:
-					s += "BEGIN_TRY\t\t" + std::to_string(instr.pushTry->exceptJump)
-						+ ", " + std::to_string(instr.pushTry->finallyJump);
-					break;
-				case Instruction::Type::PopTry:
-					s += "END_TRY";
-					break;
-				case Instruction::Type::CurrentException:
-					s += "LOAD_CUR_EXCEPT";
-					break;
-				case Instruction::Type::IsInstance:
-					s += "LOAD_IS_INSTANCE";
-					break;
-				case Instruction::Type::Except:
-					s += "HANDLE_EXCEPT";
-					break;
-				case Instruction::Type::Import:
-					s += "IMPORT\t\t" + instr.import->module;
-					if (!instr.import->alias.empty())
-						s += " as " + instr.import->alias;
-					break;
-				case Instruction::Type::ImportFrom:
-					if (instr.importFrom->names.empty()) {
-						s += "IMPORT_ALL\t\t" + instr.importFrom->module;
-					} else if (!instr.importFrom->alias.empty()) {
-						s += "IMPORT_FROM\t\tfrom " + instr.importFrom->module
-							+ " import " + instr.importFrom->names[0]
-							+ " as " + instr.importFrom->alias;
-					} else {
-						s += "IMPORT_FROM\t\tfrom " + instr.importFrom->module + " import ";
-						for (const auto& name : instr.importFrom->names) {
+					s += PadLeft(i, 4) + " ";
+
+					switch (instr.type) {
+					case Instruction::Type::DirectAssign:
+						if (instr.directAssign->assignTarget.type == AssignType::Direct) {
+							s += "ASSIGN\t\t";
+						} else {
+							s += "ASSIGN_PACK\t\t";
+						}
+						s += AssignTargetToString(instr.directAssign->assignTarget);
+						break;
+					case Instruction::Type::MemberAssign:
+						s += "ASSIGN_ATTR\t\t" + instr.string->string;
+						break;
+					case Instruction::Type::Literal:
+						s += "LOAD_CONST\t\t" + LiteralToString(*instr.literal);
+						break;
+					case Instruction::Type::Call:
+						s += "CALL";
+						break;
+					case Instruction::Type::Return:
+						s += "RETURN";
+						break;
+					case Instruction::Type::Pop:
+						s += "POP";
+						break;
+					case Instruction::Type::PushArgFrame:
+						s += "BEGIN_ARGS";
+						break;
+					case Instruction::Type::Dot:
+						s += "GET_ATTR\t\t" + instr.string->string;
+						break;
+					case Instruction::Type::Variable:
+						s += "LOAD_VAR\t\t" + instr.string->string;
+						break;
+					case Instruction::Type::Jump:
+						s += "JUMP\t\tto " + std::to_string(instr.jump->location);
+						break;
+					case Instruction::Type::JumpIfFalsePop:
+						s += "JUMP_IF_FALSE_POP\tto " + std::to_string(instr.jump->location);
+						break;
+					case Instruction::Type::JumpIfFalse:
+						s += "JUMP_IF_FALSE\tto " + std::to_string(instr.jump->location);
+						break;
+					case Instruction::Type::JumpIfTrue:
+						s += "JUMP_IF_TRUE\tto " + std::to_string(instr.jump->location);
+						break;
+					case Instruction::Type::List:
+						s += "MAKE_LIST";
+						break;
+					case Instruction::Type::Tuple:
+						s += "MAKE_TUPLE";
+						break;
+					case Instruction::Type::Map:
+						s += "MAKE_DICT";
+						break;
+					case Instruction::Type::Set:
+						s += "MAKE_SET";
+						break;
+					case Instruction::Type::Slice:
+						s += "MAKE_SLICE";
+						break;
+					case Instruction::Type::Raise:
+						s += "RAISE";
+						break;
+					case Instruction::Type::PushTry:
+						s += "BEGIN_TRY\t\t" + std::to_string(instr.pushTry->exceptJump)
+							+ ", " + std::to_string(instr.pushTry->finallyJump);
+						break;
+					case Instruction::Type::PopTry:
+						s += "END_TRY";
+						break;
+					case Instruction::Type::CurrentException:
+						s += "LOAD_CUR_EXCEPT";
+						break;
+					case Instruction::Type::IsInstance:
+						s += "LOAD_IS_INSTANCE";
+						break;
+					case Instruction::Type::Except:
+						s += "HANDLE_EXCEPT";
+						break;
+					case Instruction::Type::Import:
+						s += "IMPORT\t\t" + instr.import->module;
+						if (!instr.import->alias.empty())
+							s += " as " + instr.import->alias;
+						break;
+					case Instruction::Type::ImportFrom:
+						if (instr.importFrom->names.empty()) {
+							s += "IMPORT_ALL\t\t" + instr.importFrom->module;
+						} else if (!instr.importFrom->alias.empty()) {
+							s += "IMPORT_FROM\t\tfrom " + instr.importFrom->module
+								+ " import " + instr.importFrom->names[0]
+								+ " as " + instr.importFrom->alias;
+						} else {
+							s += "IMPORT_FROM\t\tfrom " + instr.importFrom->module + " import ";
+							for (const auto& name : instr.importFrom->names) {
+								s += name + ", ";
+							}
+							s.pop_back();
+							s.pop_back();
+						}
+						break;
+					case Instruction::Type::Is:
+						s += "IS";
+						break;
+					case Instruction::Type::PushKwarg:
+						s += "PUSH_KWARG";
+						break;
+					case Instruction::Type::UnpackMapForCall:
+						s += "UNPACK_KWARGS";
+						break;
+					case Instruction::Type::UnpackMapForMapCreation:
+						s += "UNPACK_DICT";
+						break;
+					case Instruction::Type::Unpack:
+						s += "UNPACK_ITERABLE";
+						break;
+					case Instruction::Type::Class:
+						s += "MAKE_CLASS\t\t" + instr.klass->prettyName + " [";
+						for (const auto& name : instr.klass->methodNames) {
 							s += name + ", ";
 						}
 						s.pop_back();
 						s.pop_back();
-					}
-					break;
-				case Instruction::Type::Is:
-					s += "IS";
-					break;
-				case Instruction::Type::PushKwarg:
-					s += "PUSH_KWARG";
-					break;
-				case Instruction::Type::UnpackMapForCall:
-					s += "UNPACK_KWARGS";
-					break;
-				case Instruction::Type::UnpackMapForMapCreation:
-					s += "UNPACK_DICT";
-					break;
-				case Instruction::Type::Unpack:
-					s += "UNPACK_ITERABLE";
-					break;
-				case Instruction::Type::Class:
-					s += "MAKE_CLASS\t\t" + instr.klass->prettyName + " [";
-					for (const auto& name : instr.klass->methodNames) {
-						s += name + ", ";
-					}
-					s.pop_back();
-					s.pop_back();
-					s += "]";
-					break;
-				case Instruction::Type::Def:
-					s += "MAKE_FUNCTION\t" + instr.def->prettyName;
+						s += "]";
+						break;
+					case Instruction::Type::Def:
+						s += "MAKE_FUNCTION\t" + instr.def->prettyName;
 
-					functions.push(Func{ &*instr.def->instructions, instr.def->prettyName });
-					break;
-				default:
-					s += "???";
-					break;
+						functions.push(Func{ &*instr.def->instructions, instr.def->prettyName });
+						break;
+					default:
+						s += "???";
+						break;
+					}
+
+					s += "\n";
 				}
 
 				s += "\n";
 			}
 
-			s += "\n";
+			Wg_Print(context, s.c_str(), (int)s.size());
+
+			return Wg_None(context);
 		}
-
-		Wg_Print(context, s.c_str(), (int)s.size());
-
-		return Wg_None(context);
 	}
 
 	inline bool ImportDis(Wg_Context* context) {
+		using namespace dismodule;
 		try {
 			RegisterFunction(context, "dis", dis);
 			return true;
@@ -8539,7 +8538,7 @@ namespace wings {
 			executor.variables.insert({ def->listArgs.value(), MakeRcPtr<Wg_Obj*>(listArgs) });
 		}
 
-		for (int i = 0; i < argc; i++) {
+		for (size_t i = 0; i < (size_t)argc; i++) {
 			if (i < def->parameterNames.size()) {
 				if (assignedParams[i]) {
 					std::string msg;
@@ -8841,7 +8840,7 @@ namespace wings {
 		}
 		case Instruction::Type::Literal: {
 			Wg_Obj* value{};
-			if (auto* n = std::get_if<std::nullptr_t>(instr.literal.get())) {
+			if (std::holds_alternative<std::nullptr_t>(*instr.literal)) {
 				value = Wg_None(context);
 			} else if (auto* b = std::get_if<bool>(instr.literal.get())) {
 				value = Wg_NewBool(context, *b);
@@ -9133,8 +9132,8 @@ namespace wings {
 	inline CodeError ParseExpression(TokenIter& p, Expression& out, size_t minPrecedence, std::optional<Expression> preParsedArg = std::nullopt);
 
 	inline TokenIter::TokenIter(const std::vector<Token>& tokens) :
-		tokens(&tokens),
-		index(0)
+		index(0),
+		tokens(&tokens)
 	{
 	}
 
@@ -10532,7 +10531,7 @@ namespace wings {
 					parents.pop();
 			}
 
-			parents.top()->children.push_back(LexTree{ std::move(tokens) });
+			parents.top()->children.push_back(LexTree{ std::move(tokens), {} });
 		}
 
 		LexResult result{};
@@ -10554,8 +10553,8 @@ namespace wings {
 #include <limits>
 
 namespace wings {
-
-	static constexpr const char* MATH_CODE = R"(
+	namespace mathmodule {
+		static constexpr const char* MATH_CODE = R"(
 def comb(n, k):
 	if not isinstance(n, int) or not isinstance(k, int):
 		raise TypeError("comb() only accepts integers")
@@ -10669,136 +10668,138 @@ def degrees(x):
 def radians(x):
 	return x * pi / 180.0
 )";
-	
-	inline Wg_Obj* ceil(Wg_Context* context, Wg_Obj** argv, int argc) {
-		WG_EXPECT_ARG_COUNT(1);
-		if (Wg_IsIntOrFloat(argv[0])) {
-			return Wg_NewInt(context, (Wg_int)std::ceil(Wg_GetFloat(argv[0])));
+
+		inline Wg_Obj* ceil(Wg_Context* context, Wg_Obj** argv, int argc) {
+			WG_EXPECT_ARG_COUNT(1);
+			if (Wg_IsIntOrFloat(argv[0])) {
+				return Wg_NewInt(context, (Wg_int)std::ceil(Wg_GetFloat(argv[0])));
+			}
+			return Wg_CallMethod(argv[0], "__ceil__", nullptr, 0);
 		}
-		return Wg_CallMethod(argv[0], "__ceil__", nullptr, 0);
-	}
 
-	inline Wg_Obj* floor(Wg_Context* context, Wg_Obj** argv, int argc) {
-		WG_EXPECT_ARG_COUNT(1);
-		if (Wg_IsIntOrFloat(argv[0])) {
-			return Wg_NewInt(context, (Wg_int)std::floor(Wg_GetFloat(argv[0])));
+		inline Wg_Obj* floor(Wg_Context* context, Wg_Obj** argv, int argc) {
+			WG_EXPECT_ARG_COUNT(1);
+			if (Wg_IsIntOrFloat(argv[0])) {
+				return Wg_NewInt(context, (Wg_int)std::floor(Wg_GetFloat(argv[0])));
+			}
+			return Wg_CallMethod(argv[0], "__floor__", nullptr, 0);
 		}
-		return Wg_CallMethod(argv[0], "__floor__", nullptr, 0);
-	}
 
-	using FpCheck = bool(*)(Wg_float);
+		using FpCheck = bool(*)(Wg_float);
 
-	template <FpCheck f>
-	inline Wg_Obj* isx(Wg_Context* context, Wg_Obj** argv, int argc) {
-		WG_EXPECT_ARG_COUNT(1);
-		WG_EXPECT_ARG_TYPE_INT_OR_FLOAT(0);
-		return Wg_NewBool(context, f(Wg_GetFloat(argv[0])));
-	}
+		template <FpCheck f>
+		inline Wg_Obj* isx(Wg_Context* context, Wg_Obj** argv, int argc) {
+			WG_EXPECT_ARG_COUNT(1);
+			WG_EXPECT_ARG_TYPE_INT_OR_FLOAT(0);
+			return Wg_NewBool(context, f(Wg_GetFloat(argv[0])));
+		}
 
-	inline Wg_Obj* isfinite(Wg_Context* context, Wg_Obj** argv, int argc) {
-		return isx<std::isfinite>(context, argv, argc);
-	}
+		inline Wg_Obj* isfinite(Wg_Context* context, Wg_Obj** argv, int argc) {
+			return isx<std::isfinite>(context, argv, argc);
+		}
 
-	inline Wg_Obj* isinf(Wg_Context* context, Wg_Obj** argv, int argc) {
-		return isx<std::isinf>(context, argv, argc);
-	}
+		inline Wg_Obj* isinf(Wg_Context* context, Wg_Obj** argv, int argc) {
+			return isx<std::isinf>(context, argv, argc);
+		}
 
-	inline Wg_Obj* isnan(Wg_Context* context, Wg_Obj** argv, int argc) {
-		return isx<std::isnan>(context, argv, argc);
-	}
+		inline Wg_Obj* isnan(Wg_Context* context, Wg_Obj** argv, int argc) {
+			return isx<std::isnan>(context, argv, argc);
+		}
 
-	inline Wg_Obj* log(Wg_Context* context, Wg_Obj** argv, int argc) {
-		WG_EXPECT_ARG_COUNT_BETWEEN(1, 2);
-		WG_EXPECT_ARG_TYPE_INT_OR_FLOAT(0);
-		Wg_float base = std::numbers::e_v<Wg_float>;
-		if (argc == 2) {
+		inline Wg_Obj* log(Wg_Context* context, Wg_Obj** argv, int argc) {
+			WG_EXPECT_ARG_COUNT_BETWEEN(1, 2);
+			WG_EXPECT_ARG_TYPE_INT_OR_FLOAT(0);
+			Wg_float base = std::numbers::e_v<Wg_float>;
+			if (argc == 2) {
+				WG_EXPECT_ARG_TYPE_INT_OR_FLOAT(1);
+				base = Wg_GetFloat(argv[1]);
+			}
+			return Wg_NewFloat(context, std::log(Wg_GetFloat(argv[0])) / std::log(base));
+		}
+
+		using Op = Wg_float(*)(Wg_float);
+
+		template <Op op>
+		inline Wg_Obj* opx(Wg_Context* context, Wg_Obj** argv, int argc) {
+			WG_EXPECT_ARG_COUNT(1);
+			WG_EXPECT_ARG_TYPE_INT_OR_FLOAT(0);
+			return Wg_NewFloat(context, op(Wg_GetFloat(argv[0])));
+		}
+
+		inline Wg_Obj* cos(Wg_Context* context, Wg_Obj** argv, int argc) {
+			return opx<std::cos>(context, argv, argc);
+		}
+
+		inline Wg_Obj* sin(Wg_Context* context, Wg_Obj** argv, int argc) {
+			return opx<std::sin>(context, argv, argc);
+		}
+
+		inline Wg_Obj* tan(Wg_Context* context, Wg_Obj** argv, int argc) {
+			return opx<std::tan>(context, argv, argc);
+		}
+
+		inline Wg_Obj* acos(Wg_Context* context, Wg_Obj** argv, int argc) {
+			return opx<std::acos>(context, argv, argc);
+		}
+
+		inline Wg_Obj* asin(Wg_Context* context, Wg_Obj** argv, int argc) {
+			return opx<std::asin>(context, argv, argc);
+		}
+
+		inline Wg_Obj* atan(Wg_Context* context, Wg_Obj** argv, int argc) {
+			return opx<std::atan>(context, argv, argc);
+		}
+
+		inline Wg_Obj* cosh(Wg_Context* context, Wg_Obj** argv, int argc) {
+			return opx<std::cosh>(context, argv, argc);
+		}
+
+		inline Wg_Obj* sinh(Wg_Context* context, Wg_Obj** argv, int argc) {
+			return opx<std::sinh>(context, argv, argc);
+		}
+
+		inline Wg_Obj* tanh(Wg_Context* context, Wg_Obj** argv, int argc) {
+			return opx<std::tanh>(context, argv, argc);
+		}
+
+		inline Wg_Obj* acosh(Wg_Context* context, Wg_Obj** argv, int argc) {
+			return opx<std::acosh>(context, argv, argc);
+		}
+
+		inline Wg_Obj* asinh(Wg_Context* context, Wg_Obj** argv, int argc) {
+			return opx<std::asinh>(context, argv, argc);
+		}
+
+		inline Wg_Obj* atanh(Wg_Context* context, Wg_Obj** argv, int argc) {
+			return opx<std::atanh>(context, argv, argc);
+		}
+
+		inline Wg_Obj* erf(Wg_Context* context, Wg_Obj** argv, int argc) {
+			return opx<std::erf>(context, argv, argc);
+		}
+
+		inline Wg_Obj* erfc(Wg_Context* context, Wg_Obj** argv, int argc) {
+			return opx<std::erfc>(context, argv, argc);
+		}
+
+		inline Wg_Obj* gamma(Wg_Context* context, Wg_Obj** argv, int argc) {
+			return opx<std::tgamma>(context, argv, argc);
+		}
+
+		inline Wg_Obj* lgamma(Wg_Context* context, Wg_Obj** argv, int argc) {
+			return opx<std::lgamma>(context, argv, argc);
+		}
+
+		inline Wg_Obj* atan2(Wg_Context* context, Wg_Obj** argv, int argc) {
+			WG_EXPECT_ARG_COUNT(2);
+			WG_EXPECT_ARG_TYPE_INT_OR_FLOAT(0);
 			WG_EXPECT_ARG_TYPE_INT_OR_FLOAT(1);
-			base = Wg_GetFloat(argv[1]);
+			return Wg_NewFloat(context, std::atan2(Wg_GetFloat(argv[0]), Wg_GetFloat(argv[1])));
 		}
-		return Wg_NewFloat(context, std::log(Wg_GetFloat(argv[0])) / std::log(base));
-	}
-
-	using Op = Wg_float(*)(Wg_float);
-
-	template <Op op>
-	inline Wg_Obj* opx(Wg_Context* context, Wg_Obj** argv, int argc) {
-		WG_EXPECT_ARG_COUNT(1);
-		WG_EXPECT_ARG_TYPE_INT_OR_FLOAT(0);
-		return Wg_NewFloat(context, op(Wg_GetFloat(argv[0])));
-	}
-
-	inline Wg_Obj* cos(Wg_Context* context, Wg_Obj** argv, int argc) {
-		return opx<std::cos>(context, argv, argc);
-	}
-
-	inline Wg_Obj* sin(Wg_Context* context, Wg_Obj** argv, int argc) {
-		return opx<std::sin>(context, argv, argc);
-	}
-
-	inline Wg_Obj* tan(Wg_Context* context, Wg_Obj** argv, int argc) {
-		return opx<std::tan>(context, argv, argc);
-	}
-
-	inline Wg_Obj* acos(Wg_Context* context, Wg_Obj** argv, int argc) {
-		return opx<std::acos>(context, argv, argc);
-	}
-
-	inline Wg_Obj* asin(Wg_Context* context, Wg_Obj** argv, int argc) {
-		return opx<std::asin>(context, argv, argc);
-	}
-
-	inline Wg_Obj* atan(Wg_Context* context, Wg_Obj** argv, int argc) {
-		return opx<std::atan>(context, argv, argc);
-	}
-
-	inline Wg_Obj* cosh(Wg_Context* context, Wg_Obj** argv, int argc) {
-		return opx<std::cosh>(context, argv, argc);
-	}
-
-	inline Wg_Obj* sinh(Wg_Context* context, Wg_Obj** argv, int argc) {
-		return opx<std::sinh>(context, argv, argc);
-	}
-
-	inline Wg_Obj* tanh(Wg_Context* context, Wg_Obj** argv, int argc) {
-		return opx<std::tanh>(context, argv, argc);
-	}
-
-	inline Wg_Obj* acosh(Wg_Context* context, Wg_Obj** argv, int argc) {
-		return opx<std::acosh>(context, argv, argc);
-	}
-
-	inline Wg_Obj* asinh(Wg_Context* context, Wg_Obj** argv, int argc) {
-		return opx<std::asinh>(context, argv, argc);
-	}
-
-	inline Wg_Obj* atanh(Wg_Context* context, Wg_Obj** argv, int argc) {
-		return opx<std::atanh>(context, argv, argc);
-	}
-
-	inline Wg_Obj* erf(Wg_Context* context, Wg_Obj** argv, int argc) {
-		return opx<std::erf>(context, argv, argc);
-	}
-
-	inline Wg_Obj* erfc(Wg_Context* context, Wg_Obj** argv, int argc) {
-		return opx<std::erfc>(context, argv, argc);
-	}
-
-	inline Wg_Obj* gamma(Wg_Context* context, Wg_Obj** argv, int argc) {
-		return opx<std::tgamma>(context, argv, argc);
-	}
-
-	inline Wg_Obj* lgamma(Wg_Context* context, Wg_Obj** argv, int argc) {
-		return opx<std::lgamma>(context, argv, argc);
-	}
-
-	inline Wg_Obj* atan2(Wg_Context* context, Wg_Obj** argv, int argc) {
-		WG_EXPECT_ARG_COUNT(2);
-		WG_EXPECT_ARG_TYPE_INT_OR_FLOAT(0);
-		WG_EXPECT_ARG_TYPE_INT_OR_FLOAT(1);
-		return Wg_NewFloat(context, std::atan2(Wg_GetFloat(argv[0]), Wg_GetFloat(argv[1])));
 	}
 	
 	inline bool ImportMath(Wg_Context* context) {
+		using namespace mathmodule;
 		try {
 			RegisterFunction(context, "ceil", ceil);
 			RegisterFunction(context, "floor", floor);
@@ -10850,156 +10851,159 @@ namespace wings {
 #include <filesystem>
 
 namespace wings {
-	namespace fs = std::filesystem;
+	namespace osmodule {
+		namespace fs = std::filesystem;
 
-	inline Wg_Obj* system(Wg_Context* context, Wg_Obj** argv, int argc) {
-		WG_EXPECT_ARG_COUNT(1);
-		WG_EXPECT_ARG_TYPE_STRING(0);
-		int ec = std::system(Wg_GetString(argv[0]));
-		return Wg_NewInt(context, (Wg_int)ec);
-	}
-
-	inline Wg_Obj* mkdir(Wg_Context* context, Wg_Obj** argv, int argc) {
-		WG_EXPECT_ARG_COUNT(1);
-		WG_EXPECT_ARG_TYPE_STRING(0);
-		const char* path = Wg_GetString(argv[0]);
-		std::error_code ec{};
-		if (!fs::create_directory(path, ec)) {
-			Wg_RaiseException(context, WG_EXC_OSERROR);
-			return nullptr;
-		}
-		return Wg_None(context);
-	}
-
-	inline Wg_Obj* makedirs(Wg_Context* context, Wg_Obj** argv, int argc) {
-		WG_EXPECT_ARG_COUNT(1);
-		WG_EXPECT_ARG_TYPE_STRING(0);
-		const char* path = Wg_GetString(argv[0]);
-		std::error_code ec{};
-		if (!fs::create_directories(path, ec)) {
-			Wg_RaiseException(context, WG_EXC_OSERROR);
-			return nullptr;
-		}
-		return Wg_None(context);
-	}
-
-	inline Wg_Obj* remove(Wg_Context* context, Wg_Obj** argv, int argc) {
-		WG_EXPECT_ARG_COUNT(1);
-		WG_EXPECT_ARG_TYPE_STRING(0);
-		const char* path = Wg_GetString(argv[0]);
-		
-		std::error_code ec{};
-		if (!fs::is_regular_file(path, ec)) {
-			Wg_RaiseException(context, WG_EXC_ISADIRECTORYERROR);
-			return nullptr;
-		}
-		
-		if (!fs::remove(path, ec)) {
-			Wg_RaiseException(context, WG_EXC_OSERROR);
-			return nullptr;
-		}
-		
-		return Wg_None(context);
-	}
-
-	inline Wg_Obj* rmdir(Wg_Context* context, Wg_Obj** argv, int argc) {
-		WG_EXPECT_ARG_COUNT(1);
-		WG_EXPECT_ARG_TYPE_STRING(0);
-		const char* path = Wg_GetString(argv[0]);
-
-		std::error_code ec{};
-		if (!fs::is_directory(path, ec)) {
-			Wg_RaiseException(context, WG_EXC_OSERROR);
-			return nullptr;
-		}
-
-		if (!fs::remove(path, ec)) {
-			Wg_RaiseException(context, WG_EXC_OSERROR);
-			return nullptr;
-		}
-
-		return Wg_None(context);
-	}
-
-	inline Wg_Obj* rename(Wg_Context* context, Wg_Obj** argv, int argc) {
-		WG_EXPECT_ARG_COUNT(2);
-		WG_EXPECT_ARG_TYPE_STRING(0);
-		WG_EXPECT_ARG_TYPE_STRING(1);
-		const char* src = Wg_GetString(argv[0]);
-		const char* dst = Wg_GetString(argv[1]);
-
-		std::error_code ec{};
-		fs::rename(src, dst, ec);
-		if (ec) {
-			Wg_RaiseException(context, WG_EXC_OSERROR);
-			return nullptr;
-		}
-
-		return Wg_None(context);
-	}
-
-	inline Wg_Obj* listdir(Wg_Context* context, Wg_Obj** argv, int argc) {
-		WG_EXPECT_ARG_COUNT_BETWEEN(0, 1);
-		const char* path = ".";
-		if (argc == 1) {
+		inline Wg_Obj* system(Wg_Context* context, Wg_Obj** argv, int argc) {
+			WG_EXPECT_ARG_COUNT(1);
 			WG_EXPECT_ARG_TYPE_STRING(0);
-			path = Wg_GetString(argv[0]);
+			int ec = std::system(Wg_GetString(argv[0]));
+			return Wg_NewInt(context, (Wg_int)ec);
 		}
 
-		std::error_code ec{};
-		std::vector<fs::path> paths;
-		for (const auto& entry : std::filesystem::directory_iterator(path, ec)) {
-			paths.push_back(entry.path());
-		}
-
-		if (ec) {		
-			Wg_RaiseException(context, WG_EXC_OSERROR);
-			return nullptr;
-		}
-		
-		Wg_Obj* list = Wg_NewList(context);
-		if (list == nullptr)
-			return nullptr;
-		Wg_ObjRef ref(list);
-		
-		for (const auto& path : paths) {
-			Wg_Obj* entry = Wg_NewString(context, path.string().c_str());
-			if (entry == nullptr)
+		inline Wg_Obj* mkdir(Wg_Context* context, Wg_Obj** argv, int argc) {
+			WG_EXPECT_ARG_COUNT(1);
+			WG_EXPECT_ARG_TYPE_STRING(0);
+			const char* path = Wg_GetString(argv[0]);
+			std::error_code ec{};
+			if (!fs::create_directory(path, ec)) {
+				Wg_RaiseException(context, WG_EXC_OSERROR);
 				return nullptr;
-			if (Wg_CallMethod(list, "append", &entry, 1) == nullptr)
+			}
+			return Wg_None(context);
+		}
+
+		inline Wg_Obj* makedirs(Wg_Context* context, Wg_Obj** argv, int argc) {
+			WG_EXPECT_ARG_COUNT(1);
+			WG_EXPECT_ARG_TYPE_STRING(0);
+			const char* path = Wg_GetString(argv[0]);
+			std::error_code ec{};
+			if (!fs::create_directories(path, ec)) {
+				Wg_RaiseException(context, WG_EXC_OSERROR);
 				return nullptr;
+			}
+			return Wg_None(context);
 		}
 
-		return list;
-	}
+		inline Wg_Obj* remove(Wg_Context* context, Wg_Obj** argv, int argc) {
+			WG_EXPECT_ARG_COUNT(1);
+			WG_EXPECT_ARG_TYPE_STRING(0);
+			const char* path = Wg_GetString(argv[0]);
 
-	inline Wg_Obj* abort(Wg_Context* context, Wg_Obj** argv, int argc) {
-		WG_EXPECT_ARG_COUNT(0);
-		std::abort();
-	}
+			std::error_code ec{};
+			if (!fs::is_regular_file(path, ec)) {
+				Wg_RaiseException(context, WG_EXC_ISADIRECTORYERROR);
+				return nullptr;
+			}
 
-	inline Wg_Obj* chdir(Wg_Context* context, Wg_Obj** argv, int argc) {
-		WG_EXPECT_ARG_COUNT(1);
-		WG_EXPECT_ARG_TYPE_STRING(0);
-		const char* path = Wg_GetString(argv[0]);
+			if (!fs::remove(path, ec)) {
+				Wg_RaiseException(context, WG_EXC_OSERROR);
+				return nullptr;
+			}
 
-		std::error_code ec{};
-		fs::current_path(path, ec);
-		if (ec) {
-			Wg_RaiseException(context, WG_EXC_OSERROR);
-			return nullptr;
+			return Wg_None(context);
 		}
 
-		return Wg_None(context);
-	}
+		inline Wg_Obj* rmdir(Wg_Context* context, Wg_Obj** argv, int argc) {
+			WG_EXPECT_ARG_COUNT(1);
+			WG_EXPECT_ARG_TYPE_STRING(0);
+			const char* path = Wg_GetString(argv[0]);
 
-	inline Wg_Obj* getcwd(Wg_Context* context, Wg_Obj** argv, int argc) {
-		WG_EXPECT_ARG_COUNT(0);
-		auto path = fs::current_path().string();
-		return Wg_NewString(context, path.c_str());
+			std::error_code ec{};
+			if (!fs::is_directory(path, ec)) {
+				Wg_RaiseException(context, WG_EXC_OSERROR);
+				return nullptr;
+			}
+
+			if (!fs::remove(path, ec)) {
+				Wg_RaiseException(context, WG_EXC_OSERROR);
+				return nullptr;
+			}
+
+			return Wg_None(context);
+		}
+
+		inline Wg_Obj* rename(Wg_Context* context, Wg_Obj** argv, int argc) {
+			WG_EXPECT_ARG_COUNT(2);
+			WG_EXPECT_ARG_TYPE_STRING(0);
+			WG_EXPECT_ARG_TYPE_STRING(1);
+			const char* src = Wg_GetString(argv[0]);
+			const char* dst = Wg_GetString(argv[1]);
+
+			std::error_code ec{};
+			fs::rename(src, dst, ec);
+			if (ec) {
+				Wg_RaiseException(context, WG_EXC_OSERROR);
+				return nullptr;
+			}
+
+			return Wg_None(context);
+		}
+
+		inline Wg_Obj* listdir(Wg_Context* context, Wg_Obj** argv, int argc) {
+			WG_EXPECT_ARG_COUNT_BETWEEN(0, 1);
+			const char* path = ".";
+			if (argc == 1) {
+				WG_EXPECT_ARG_TYPE_STRING(0);
+				path = Wg_GetString(argv[0]);
+			}
+
+			std::error_code ec{};
+			std::vector<fs::path> paths;
+			for (const auto& entry : std::filesystem::directory_iterator(path, ec)) {
+				paths.push_back(entry.path());
+			}
+
+			if (ec) {
+				Wg_RaiseException(context, WG_EXC_OSERROR);
+				return nullptr;
+			}
+
+			Wg_Obj* list = Wg_NewList(context);
+			if (list == nullptr)
+				return nullptr;
+			Wg_ObjRef ref(list);
+
+			for (const auto& path : paths) {
+				Wg_Obj* entry = Wg_NewString(context, path.string().c_str());
+				if (entry == nullptr)
+					return nullptr;
+				if (Wg_CallMethod(list, "append", &entry, 1) == nullptr)
+					return nullptr;
+			}
+
+			return list;
+		}
+
+		inline Wg_Obj* abort(Wg_Context* context, Wg_Obj**, int argc) {
+			WG_EXPECT_ARG_COUNT(0);
+			std::abort();
+		}
+
+		inline Wg_Obj* chdir(Wg_Context* context, Wg_Obj** argv, int argc) {
+			WG_EXPECT_ARG_COUNT(1);
+			WG_EXPECT_ARG_TYPE_STRING(0);
+			const char* path = Wg_GetString(argv[0]);
+
+			std::error_code ec{};
+			fs::current_path(path, ec);
+			if (ec) {
+				Wg_RaiseException(context, WG_EXC_OSERROR);
+				return nullptr;
+			}
+
+			return Wg_None(context);
+		}
+
+		inline Wg_Obj* getcwd(Wg_Context* context, Wg_Obj**, int argc) {
+			WG_EXPECT_ARG_COUNT(0);
+			auto path = fs::current_path().string();
+			return Wg_NewString(context, path.c_str());
+		}
 	}
 
 	inline bool ImportOS(Wg_Context* context) {
+		using namespace osmodule;
 		try {
 			RegisterFunction(context, "system", system);
 			RegisterFunction(context, "chdir", chdir);
@@ -11411,7 +11415,7 @@ namespace wings {
 			std::unordered_set<std::string> variables;
 			for (const auto& child : expr.children)
 				variables.merge(GetWriteVariables(child));
-				return variables;
+			return variables;
 		}
 	}
 
@@ -12087,7 +12091,6 @@ namespace wings {
 		// Rearrange elif and else nodes
 		for (size_t i = 0; i < out.size(); i++) {
 			auto& stat = out[i];
-			Statement::Type lastType = i ? out[i - 1].type : Statement::Type::Pass;
 
 			std::optional<Statement> elseClause;
 			if (stat.type == Statement::Type::Elif) {
@@ -12189,8 +12192,8 @@ namespace wings {
 #include <random>
 
 namespace wings {
-
-	static constexpr const char* RAND_CODE = R"(
+	namespace randommodule {
+		static constexpr const char* RAND_CODE = R"(
 def choice(seq):
 	t = tuple(seq)
 	return t[randint(0, len(t) - 1)]
@@ -12206,54 +12209,52 @@ def getrandbits(n):
 def randrange(*args):
 	return choice(range(*args))
 		)";
-	
-	inline Wg_Obj* randint(Wg_Context* context, Wg_Obj** argv, int argc) {
-		WG_EXPECT_ARG_COUNT(2);
-		WG_EXPECT_ARG_TYPE_INT(0);
-		WG_EXPECT_ARG_TYPE_INT(1);
-		Wg_int lower = Wg_GetInt(argv[0]);
-		Wg_int upper = Wg_GetInt(argv[1]);
-		return Wg_NewInt(context, context->rng.Int(lower, upper));
-	}
 
-	inline Wg_Obj* random(Wg_Context* context, Wg_Obj** argv, int argc) {
-		WG_EXPECT_ARG_COUNT(0);
-		return Wg_NewFloat(context, context->rng.Rand());
-	}
-
-	inline Wg_Obj* seed(Wg_Context* context, Wg_Obj** argv, int argc) {
-		WG_EXPECT_ARG_COUNT(1);
-		WG_EXPECT_ARG_TYPE_INT(0);
-		context->rng.Seed(Wg_GetInt(argv[0]));
-		return Wg_None(context);
-	}
-
-	inline Wg_Obj* shuffle(Wg_Context* context, Wg_Obj** argv, int argc) {
-		WG_EXPECT_ARG_COUNT(1);
-		WG_EXPECT_ARG_TYPE_LIST(0);
-		auto& li = argv[0]->Get<std::vector<Wg_Obj*>>();
-		std::shuffle(li.begin(), li.end(), context->rng.Engine());
-		return Wg_None(context);
-	}
-
-	inline Wg_Obj* uniform(Wg_Context* context, Wg_Obj** argv, int argc) {
-		WG_EXPECT_ARG_COUNT(2);
-		WG_EXPECT_ARG_TYPE_INT_OR_FLOAT(0);
-		WG_EXPECT_ARG_TYPE_INT_OR_FLOAT(1);
-		Wg_float lower = Wg_GetFloat(argv[0]);
-		Wg_float upper = Wg_GetFloat(argv[1]);
-		if (lower > upper) {
-			Wg_RaiseException(context, WG_EXC_VALUEERROR, "Lower bound must be less than or equal to upper bound");
-			return nullptr;
+		inline Wg_Obj* randint(Wg_Context* context, Wg_Obj** argv, int argc) {
+			WG_EXPECT_ARG_COUNT(2);
+			WG_EXPECT_ARG_TYPE_INT(0);
+			WG_EXPECT_ARG_TYPE_INT(1);
+			Wg_int lower = Wg_GetInt(argv[0]);
+			Wg_int upper = Wg_GetInt(argv[1]);
+			return Wg_NewInt(context, context->rng.Int(lower, upper));
 		}
-		return Wg_NewFloat(context, context->rng.Float(lower, upper));
+
+		inline Wg_Obj* random(Wg_Context* context, Wg_Obj**, int argc) {
+			WG_EXPECT_ARG_COUNT(0);
+			return Wg_NewFloat(context, context->rng.Rand());
+		}
+
+		inline Wg_Obj* seed(Wg_Context* context, Wg_Obj** argv, int argc) {
+			WG_EXPECT_ARG_COUNT(1);
+			WG_EXPECT_ARG_TYPE_INT(0);
+			context->rng.Seed(Wg_GetInt(argv[0]));
+			return Wg_None(context);
+		}
+
+		inline Wg_Obj* shuffle(Wg_Context* context, Wg_Obj** argv, int argc) {
+			WG_EXPECT_ARG_COUNT(1);
+			WG_EXPECT_ARG_TYPE_LIST(0);
+			auto& li = argv[0]->Get<std::vector<Wg_Obj*>>();
+			std::shuffle(li.begin(), li.end(), context->rng.Engine());
+			return Wg_None(context);
+		}
+
+		inline Wg_Obj* uniform(Wg_Context* context, Wg_Obj** argv, int argc) {
+			WG_EXPECT_ARG_COUNT(2);
+			WG_EXPECT_ARG_TYPE_INT_OR_FLOAT(0);
+			WG_EXPECT_ARG_TYPE_INT_OR_FLOAT(1);
+			Wg_float lower = Wg_GetFloat(argv[0]);
+			Wg_float upper = Wg_GetFloat(argv[1]);
+			if (lower > upper) {
+				Wg_RaiseException(context, WG_EXC_VALUEERROR, "Lower bound must be less than or equal to upper bound");
+				return nullptr;
+			}
+			return Wg_NewFloat(context, context->rng.Float(lower, upper));
+		}
 	}
 
 	inline bool ImportRandom(Wg_Context* context) {
-		Wg_Obj* rngClass = Wg_NewClass(context, "__Rng", nullptr, 0);
-		if (rngClass == nullptr)
-			return false;
-
+		using namespace randommodule;
 		try {
 			RegisterFunction(context, "seed", seed);
 			RegisterFunction(context, "shuffle", shuffle);
@@ -12278,12 +12279,15 @@ namespace wings {
 
 
 namespace wings {
-	inline Wg_Obj* exit(Wg_Context* context, Wg_Obj** argv, int argc) {
-		Wg_RaiseException(context, WG_EXC_SYSTEMEXIT);
-		return nullptr;
+	namespace sysmodule {
+		inline Wg_Obj* exit(Wg_Context* context, Wg_Obj**, int) {
+			Wg_RaiseException(context, WG_EXC_SYSTEMEXIT);
+			return nullptr;
+		}
 	}
 	
 	inline bool ImportSys(Wg_Context* context) {
+		using namespace sysmodule;
 		try {
 			RegisterFunction(context, "exit", exit);
 			Wg_SetGlobal(context, "argv", context->argv);
@@ -12304,24 +12308,27 @@ namespace wings {
 #include <thread>
 
 namespace wings {
-	inline Wg_Obj* sleep(Wg_Context* context, Wg_Obj** argv, int argc) {
-		WG_EXPECT_ARG_COUNT(1);
-		WG_EXPECT_ARG_TYPE_INT_OR_FLOAT(0);
-		Wg_float secs = Wg_GetFloat(argv[0]);
-		int ms = (int)(secs * 1000);
-		std::this_thread::sleep_for(std::chrono::milliseconds(ms));
-		return Wg_None(context);
-	}
-	
-	inline Wg_Obj* time(Wg_Context* context, Wg_Obj** argv, int argc) {
-		WG_EXPECT_ARG_COUNT(0);
-		auto now = std::chrono::system_clock::now();
-		auto now_ms = std::chrono::time_point_cast<std::chrono::milliseconds>(now);
-		auto value = now_ms.time_since_epoch();
-		return Wg_NewFloat(context, (Wg_float)value.count() / 1000);
+	namespace timemodule {
+		inline Wg_Obj* sleep(Wg_Context* context, Wg_Obj** argv, int argc) {
+			WG_EXPECT_ARG_COUNT(1);
+			WG_EXPECT_ARG_TYPE_INT_OR_FLOAT(0);
+			Wg_float secs = Wg_GetFloat(argv[0]);
+			int ms = (int)(secs * 1000);
+			std::this_thread::sleep_for(std::chrono::milliseconds(ms));
+			return Wg_None(context);
+		}
+
+		inline Wg_Obj* time(Wg_Context* context, Wg_Obj**, int argc) {
+			WG_EXPECT_ARG_COUNT(0);
+			auto now = std::chrono::system_clock::now();
+			auto now_ms = std::chrono::time_point_cast<std::chrono::milliseconds>(now);
+			auto value = now_ms.time_since_epoch();
+			return Wg_NewFloat(context, (Wg_float)value.count() / 1000);
+		}
 	}
 	
 	inline bool ImportTime(Wg_Context* context) {
+		using namespace timemodule;
 		try {
 			RegisterFunction(context, "time", time);
 			RegisterFunction(context, "sleep", sleep);
@@ -13163,7 +13170,7 @@ extern "C" {
 		Wg_Context* context = callable->context;
 		
 		// Check recursion limit
-		if (context->kwargs.size() >= context->config.maxRecursion) {
+		if (context->kwargs.size() >= (size_t)context->config.maxRecursion) {
 			Wg_RaiseException(context, WG_EXC_RECURSIONERROR);
 			return nullptr;
 		}
@@ -13523,7 +13530,7 @@ extern "C" {
 		WG_ASSERT_VOID(context);
 		context->currentException = nullptr;
 		context->exceptionTrace.clear();
-		context->currentTrace.clear();
+		//context->currentTrace.clear();
 		context->traceMessage.clear();
 	}
 

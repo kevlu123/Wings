@@ -93,9 +93,9 @@ namespace wings {
 			mySize = 0;
 		}
 		
-		std::vector<Bucket> buckets;
 		Hash hasher;
 		Equal equal;
+		std::vector<Bucket> buckets;
 		float maxLoadFactor = 1.0f;
 		size_t mySize = 0;
 	};

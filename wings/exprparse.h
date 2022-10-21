@@ -60,14 +60,12 @@ namespace wings {
 			String,
 		} type;
 
-		struct {
-			union {
-				bool b;
-				Wg_int i;
-				Wg_float f;
-			};
-			std::string s;
+		union {
+			bool b;
+			Wg_int i;
+			Wg_float f;
 		};
+		std::string s;
 	};
 
 	struct Statement;

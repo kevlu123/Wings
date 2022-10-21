@@ -12,6 +12,7 @@
 #include <cmath>
 #include <algorithm>
 #include <bit>
+#include <cstring>
 
 namespace wings {
 	static const char* const BUILTINS_CODE = R"(
@@ -523,7 +524,7 @@ class ValueError(Exception):
 		return buf;
 	}
 
-	static std::vector<std::string> StringSplitLines(std::string s, bool keepLineBreaks) {
+	static std::vector<std::string> StringSplitLines(std::string s) {
 		size_t last = 0;
 		size_t next = 0;
 		std::vector<std::string> buf;
@@ -541,7 +542,7 @@ class ValueError(Exception):
 	static bool IsSpace(char c) {
 		return c == ' ' || c == '\t' || c == '\n' || c == '\r'
 			|| c == '\v' || c == '\f';
-	};
+	}
 
 	static bool MergeSort(Wg_Obj** data, size_t len, Wg_Obj* key) {
 		if (len == 1)
@@ -599,7 +600,7 @@ class ValueError(Exception):
 	
 	namespace ctors {
 
-		static Wg_Obj* object(Wg_Context* context, Wg_Obj** argv, int argc) { // Excludes self
+		static Wg_Obj* object(Wg_Context* context, Wg_Obj**, int argc) { // Excludes self
 			WG_EXPECT_ARG_COUNT(0);
 
 			Wg_Obj* obj = Alloc(context);
@@ -611,7 +612,7 @@ class ValueError(Exception):
 			return obj;
 		}
 
-		static Wg_Obj* none(Wg_Context* context, Wg_Obj** argv, int argc) { // Excludes self
+		static Wg_Obj* none(Wg_Context* context, Wg_Obj**, int) { // Excludes self
 			return context->builtins.none;
 		}
 
@@ -944,7 +945,7 @@ class ValueError(Exception):
 			}
 		}
 
-		static Wg_Obj* object_nonzero(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* object_nonzero(Wg_Context* context, Wg_Obj**, int argc) {
 			WG_EXPECT_ARG_COUNT(1);
 			return Wg_NewBool(context, true);
 		}
@@ -1482,7 +1483,7 @@ class ValueError(Exception):
 				return sub.find(std::tolower(c)) != std::string_view::npos;
 			};
 
-			auto digitValueOf = [](char c, int base) {
+			auto digitValueOf = [&](char c, int base) {
 				return DIGITS.substr(0, base).find(std::tolower(c));
 			};
 
@@ -1775,7 +1776,8 @@ class ValueError(Exception):
 			WG_EXPECT_ARG_TYPE_STRING(0);
 
 			std::string s = Wg_GetString(argv[0]);
-			std::transform(s.begin(), s.end(), s.begin(), std::tolower);
+			std::transform(s.begin(), s.end(), s.begin(),
+				[](unsigned char c) { return std::tolower(c); });
 			return Wg_NewString(context, s.c_str());
 		}
 
@@ -1784,7 +1786,8 @@ class ValueError(Exception):
 			WG_EXPECT_ARG_TYPE_STRING(0);
 
 			std::string s = Wg_GetString(argv[0]);
-			std::transform(s.begin(), s.end(), s.begin(), std::toupper);
+			std::transform(s.begin(), s.end(), s.begin(),
+				[](unsigned char c) { return std::toupper(c); });
 			return Wg_NewString(context, s.c_str());
 		}
 
@@ -2020,7 +2023,7 @@ class ValueError(Exception):
 		}
 
 		static Wg_Obj* str_isascii(Wg_Context* context, Wg_Obj** argv, int argc) {
-			constexpr auto f = [](char c) { return c < 128; };
+			constexpr auto f = [](char c) { return c >= 0 && c < 128; };
 			return str_isx<f>(context, argv, argc);
 		}
 
@@ -2073,7 +2076,7 @@ class ValueError(Exception):
 			struct State {
 				std::string_view sep;
 				std::string s;
-			} state = { Wg_GetString(argv[0]) };
+			} state = { Wg_GetString(argv[0]), "" };
 
 			bool success = Wg_Iterate(argv[1], &state, [](Wg_Obj* obj, void* ud) {
 				State& state = *(State*)ud;
@@ -2260,16 +2263,10 @@ class ValueError(Exception):
 		}
 
 		static Wg_Obj* str_splitlines(Wg_Context* context, Wg_Obj** argv, int argc) {
-			WG_EXPECT_ARG_COUNT_BETWEEN(1, 2);
+			WG_EXPECT_ARG_COUNT(1);
 			WG_EXPECT_ARG_TYPE_STRING(0);
 
-			bool keepLineBreaks = false;
-			if (argc == 2) {
-				WG_EXPECT_ARG_TYPE_BOOL(1);
-				keepLineBreaks = Wg_GetBool(argv[1]);
-			}
-
-			std::vector<std::string> strings = StringSplitLines(Wg_GetString(argv[0]), keepLineBreaks);
+			std::vector<std::string> strings = StringSplitLines(Wg_GetString(argv[0]));
 
 			Wg_Obj* li = Wg_NewList(context);
 			if (li == nullptr)
@@ -3426,7 +3423,7 @@ class ValueError(Exception):
 			return Wg_Call(context->builtins.list, argv, 1);
 		}
 
-		static Wg_Obj* File_closex(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* File_closex(Wg_Context* context, Wg_Obj** argv, int) {
 			std::fstream* f{};
 			if (!TryGetUserdata(argv[0], "__File", &f)) {
 				Wg_RaiseArgumentTypeError(context, 0, "__File");
@@ -3662,7 +3659,7 @@ class ValueError(Exception):
 			return Wg_None(context);
 		}
 
-		static Wg_Obj* exit(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* exit(Wg_Context* context, Wg_Obj**, int) {
 			Wg_RaiseException(context, WG_EXC_SYSTEMEXIT);
 			return nullptr;
 		}

@@ -10,8 +10,8 @@ namespace wings {
 	static CodeError ParseExpression(TokenIter& p, Expression& out, size_t minPrecedence, std::optional<Expression> preParsedArg = std::nullopt);
 
 	TokenIter::TokenIter(const std::vector<Token>& tokens) :
-		tokens(&tokens),
-		index(0)
+		index(0),
+		tokens(&tokens)
 	{
 	}
 
