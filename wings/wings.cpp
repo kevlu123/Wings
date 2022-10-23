@@ -19,6 +19,7 @@
 #include <sstream>
 #include <queue>
 #include <unordered_set>
+#include <cstring>
 
 namespace wings {
 	static bool ReadFromFile(const std::string& path, std::string& data) {

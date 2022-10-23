@@ -1,6 +1,3 @@
-#ifndef WINGS_H
-#define WINGS_H
-
 /**
 * @file wings.h
 * 
@@ -1592,7 +1589,7 @@ namespace wings {
 	using RcPtr = std::shared_ptr<T>;
 
 	template <typename T, typename... Args>
-	inline RcPtr<T> MakeRcPtr(Args&&... args) {
+	RcPtr<T> MakeRcPtr(Args&&... args) {
 		return std::make_shared<T>(std::forward<Args>(args)...);
 	}
 }
@@ -1634,12 +1631,12 @@ namespace wings {
 	};
 
 	template <class Fn>
-	inline void AttributeTable::ForEach(Fn fn) const {
+	void AttributeTable::ForEach(Fn fn) const {
 		attributes->ForEach(fn);
 	}
 
 	template <class Fn>
-	inline void AttributeTable::Table::ForEach(Fn fn) const {
+	void AttributeTable::Table::ForEach(Fn fn) const {
 		for (const auto& [_, val] : entries)
 			fn(val);
 
@@ -1649,19 +1646,20 @@ namespace wings {
 }
 
 
+
 namespace wings {
 
-	inline AttributeTable::AttributeTable() :
+	AttributeTable::AttributeTable() :
 		attributes(MakeRcPtr<Table>()),
 		owned(true)
 	{
 	}
 
-	inline Wg_Obj* AttributeTable::Get(const std::string& name) const {
+	Wg_Obj* AttributeTable::Get(const std::string& name) const {
 		return attributes->Get(name);
 	}
 
-	inline Wg_Obj* AttributeTable::Table::Get(const std::string& name) const {
+	Wg_Obj* AttributeTable::Table::Get(const std::string& name) const {
 		auto it = entries.find(name);
 		if (it != entries.end())
 			return it->second;
@@ -1673,30 +1671,30 @@ namespace wings {
 		return nullptr;
 	}
 
-	inline Wg_Obj* AttributeTable::GetFromBase(const std::string& name) const {
+	Wg_Obj* AttributeTable::GetFromBase(const std::string& name) const {
 		for (const auto& parent : attributes->parents)
 			if (Wg_Obj* val = parent->Get(name))
 				return val;
 		return nullptr;
 	}
 
-	inline void AttributeTable::Set(const std::string& name, Wg_Obj* value) {
+	void AttributeTable::Set(const std::string& name, Wg_Obj* value) {
 		Mutate();
 		attributes->entries[name] = value;
 	}
 
-	inline void AttributeTable::AddParent(AttributeTable& parent) {
+	void AttributeTable::AddParent(AttributeTable& parent) {
 		attributes->parents.push_back(parent.attributes);
 	}
 
-	inline AttributeTable AttributeTable::Copy() {
+	AttributeTable AttributeTable::Copy() {
 		AttributeTable copy;
 		copy.attributes = attributes;
 		copy.owned = false;
 		return copy;
 	}
 
-	inline void AttributeTable::Mutate() {
+	void AttributeTable::Mutate() {
 		if (!owned) {
 			attributes = MakeRcPtr<Table>(*attributes);
 			owned = true;
@@ -1746,40 +1744,40 @@ namespace wings {
 		RelaxedHash() : hasher(), equal(), buckets(1) {
 		}
 
-		inline bool contains(const Key& key) const {
+		bool contains(const Key& key) const {
 			const Bucket* buck = nullptr;
 			return get_item(key, &buck);
 		}
 
-		inline bool empty() const noexcept {
+		bool empty() const noexcept {
 			return size() == 0;
 		}
 
-		inline size_t size() const noexcept {
+		size_t size() const noexcept {
 			return mySize;
 		}
 
-		inline size_t bucket_count() const noexcept {
+		size_t bucket_count() const noexcept {
 			return buckets.size();
 		}
 
-		inline size_t bucket(const Key& key) const {
+		size_t bucket(const Key& key) const {
 			return hasher(key) % bucket_count();
 		}
 
-		inline size_t bucket_size(size_t n) noexcept {
+		size_t bucket_size(size_t n) noexcept {
 			return buckets[n].size();
 		}
 
-		inline float load_factor() const noexcept {
+		float load_factor() const noexcept {
 			return (float)size() / bucket_count();
 		}
 
-		inline float max_load_factor() const noexcept {
+		float max_load_factor() const noexcept {
 			return maxLoadFactor;
 		}
 
-		inline void max_load_factor(float ml) noexcept {
+		void max_load_factor(float ml) noexcept {
 			maxLoadFactor = ml;
 		}
 
@@ -1787,17 +1785,17 @@ namespace wings {
 		virtual BucketItem* get_item(const Key& key, Bucket** buck) = 0;
 		virtual const BucketItem* get_item(const Key& key, const Bucket** buck) const = 0;
 		
-		inline void incr_size() {
+		void incr_size() {
 			mySize++;
 			if (load_factor() > max_load_factor())
 				rehash(bucket_count() * 2 + 1);
 		}
 
-		inline void decr_size() {
+		void decr_size() {
 			mySize--;
 		}
 
-		inline void clear_buckets() noexcept {
+		void clear_buckets() noexcept {
 			for (auto& buck : buckets)
 				buck.clear();
 			mySize = 0;
@@ -1815,7 +1813,7 @@ namespace wings {
 	private:
 		template <class Container>
 		struct Iterator {
-			inline Iterator(Container* container = nullptr, size_t bucketIndex = (size_t)-1, size_t itemIndex = (size_t)-1) :
+			Iterator(Container* container = nullptr, size_t bucketIndex = (size_t)-1, size_t itemIndex = (size_t)-1) :
 				container(container), bucketIndex(bucketIndex), itemIndex(itemIndex) {
 				Revalidate();
 			}
@@ -1844,14 +1842,14 @@ namespace wings {
 				return !(*this == rhs);
 			}
 
-			inline void Revalidate() {
+			void Revalidate() {
 				while (!CheckEnd() && itemIndex >= container->buckets[bucketIndex].size()) {
 					bucketIndex++;
 					itemIndex = 0;
 				}
 			}
 		private:
-			inline bool CheckEnd() {
+			bool CheckEnd() {
 				if (container && bucketIndex >= container->buckets.size())
 					container = nullptr;
 				return container == nullptr;
@@ -1869,11 +1867,11 @@ namespace wings {
 		using iterator = Iterator<RelaxedSet>;
 		using const_iterator = Iterator<const RelaxedSet>;
 
-		inline void clear() noexcept {
+		void clear() noexcept {
 			this->clear_buckets();
 		}
 		
-		inline void insert(Key key) {
+		void insert(Key key) {
 			Bucket* buck = nullptr;
 			if (!this->get_item(key, &buck)) {
 				buck->push_back(std::move(key));
@@ -1881,7 +1879,7 @@ namespace wings {
 			}
 		}
 
-		inline const_iterator find(const Key& key) const {
+		const_iterator find(const Key& key) const {
 			const Bucket* buck = nullptr;
 			if (auto* item = this->get_item(key, &buck)) {
 				return const_iterator{
@@ -1893,17 +1891,17 @@ namespace wings {
 			return end();
 		}
 
-		inline void erase(iterator it) {
+		void erase(iterator it) {
 			auto& buck = this->buckets[it.bucketIndex];
 			buck.erase(buck.begin() + it.itemIndex);
 			this->decr_size();
 		}
 
-		inline void erase(const_iterator it) {
+		void erase(const_iterator it) {
 			erase(iterator{ this, it.bucketIndex, it.itemIndex });
 		}
 
-		inline void rehash(size_t count) override {
+		void rehash(size_t count) override {
 			auto oldBuckets = std::move(this->buckets);
 			clear();
 			this->buckets.resize(count);
@@ -1925,7 +1923,7 @@ namespace wings {
 		iterator end() noexcept { return iterator(); }
 		
 	protected:
-		inline Key* get_item(const Key& key, Bucket** buck) override {
+		Key* get_item(const Key& key, Bucket** buck) override {
 			auto& b = this->buckets[this->bucket(key)];
 			*buck = &b;
 			for (auto& item : b)
@@ -1934,7 +1932,7 @@ namespace wings {
 			return nullptr;
 		}
 
-		inline const Key* get_item(const Key& key, const Bucket** buck) const override {
+		const Key* get_item(const Key& key, const Bucket** buck) const override {
 			auto& b = this->buckets[this->bucket(key)];
 			*buck = &b;
 			for (auto& item : b)
@@ -1949,7 +1947,7 @@ namespace wings {
 	private:
 		template <class Container>
 		struct Iterator {
-			inline Iterator(Container* container = nullptr, size_t index = (size_t)-1) :
+			Iterator(Container* container = nullptr, size_t index = (size_t)-1) :
 				container(container), index(index) {
 				Revalidate();
 			}
@@ -1976,13 +1974,13 @@ namespace wings {
 				return !(*this == rhs);
 			}
 
-			inline void Revalidate() {
+			void Revalidate() {
 				while (!CheckEnd() && container->storage[index] == std::nullopt) {
 					index++;
 				}
 			}
 		private:
-			inline bool CheckEnd() {
+			bool CheckEnd() {
 				if (container && index >= container->storage.size())
 					container = nullptr;
 				return container == nullptr;
@@ -2004,12 +2002,12 @@ namespace wings {
 		RelaxedMap(RelaxedMap&&) = delete;
 		RelaxedMap& operator=(RelaxedMap&&) = delete;
 
-		inline void clear() noexcept {
+		void clear() noexcept {
 			this->clear_buckets();
 			storage.clear();
 		}
 		
-		inline void insert(std::pair<const Key, Value> pair) {
+		void insert(std::pair<const Key, Value> pair) {
 			Bucket* buck = nullptr;
 			if (!this->get_item(pair.first, &buck)) {
 				buck->push_back(storage.size());
@@ -2018,7 +2016,7 @@ namespace wings {
 			}
 		}
 
-		inline std::optional<Value> erase(const Key& key) {
+		std::optional<Value> erase(const Key& key) {
 			Bucket* buck = nullptr;
 			if (auto* index = this->get_item(key, &buck)) {
 				buck->erase(std::find(buck->begin(), buck->end(), *index));
@@ -2030,7 +2028,7 @@ namespace wings {
 			return std::nullopt;
 		}
 
-		inline std::pair<const Key, Value> pop() {
+		std::pair<const Key, Value> pop() {
 			size_t i = storage.size() - 1;
 			while (storage[i] == std::nullopt)
 				i--;
@@ -2045,27 +2043,27 @@ namespace wings {
 			return pair.value();
 		}
 		
-		inline iterator find(const Key& key) {
+		iterator find(const Key& key) {
 			Bucket* buck = nullptr;
 			if (auto* index = this->get_item(key, &buck))
 				return iterator{ this, *index };
 			return end();
 		}
 
-		inline const_iterator find(const Key& key) const {
+		const_iterator find(const Key& key) const {
 			const Bucket* buck = nullptr;
 			if (auto* index = this->get_item(key, &buck))
 				return iterator{ this, *index };
 			return end();
 		}
 
-		inline Value& at(const Key& key) {
+		Value& at(const Key& key) {
 			if (auto* value = try_at(key))
 				return *value;
 			throw std::out_of_range();
 		}
 		
-		inline const Value& at(const Key& key) const {
+		const Value& at(const Key& key) const {
 			if (auto* value = try_at(key))
 				return *value;
 			throw std::out_of_range();
@@ -2081,7 +2079,7 @@ namespace wings {
 			return storage.back().value().second;
 		}
 
-		inline void rehash(size_t count) override {
+		void rehash(size_t count) override {
 			this->buckets.clear();
 			this->buckets.resize(count);
 			for (size_t i = 0; i < storage.size(); i++) {
@@ -2101,7 +2099,7 @@ namespace wings {
 		iterator end() noexcept { return iterator(); }
 
 	protected:
-		inline size_t* get_item(const Key& key, Bucket** buck) override {
+		size_t* get_item(const Key& key, Bucket** buck) override {
 			auto& b = this->buckets[this->bucket(key)];
 			*buck = &b;
 			for (auto& index : b)
@@ -2110,7 +2108,7 @@ namespace wings {
 			return nullptr;
 		}
 
-		inline const size_t* get_item(const Key& key, const Bucket** buck) const override {
+		const size_t* get_item(const Key& key, const Bucket** buck) const override {
 			auto& b = this->buckets[this->bucket(key)];
 			*buck = &b;
 			for (auto& index : b)
@@ -2138,7 +2136,7 @@ namespace wings {
 static_assert(sizeof(Wg_int) == sizeof(Wg_uint));
 
 namespace wings {
-	inline extern std::atomic<Wg_ErrorCallback> errorCallback;
+	extern std::atomic<Wg_ErrorCallback> errorCallback;
 	
 	size_t Guid();
 	std::string WObjTypeToString(const Wg_Obj* obj);
@@ -2158,7 +2156,7 @@ namespace wings {
 	struct Executor;
 
 	template <class F, class T>
-	inline void RegisterConstant(Wg_Context* context, const char* name, F f, T v) {
+	void RegisterConstant(Wg_Context* context, const char* name, F f, T v) {
 		Wg_Obj* obj = f(context, v);
 		if (obj == nullptr)
 			throw LibraryInitException();
@@ -2166,7 +2164,7 @@ namespace wings {
 	}
 
 	template <class T>
-	inline bool TryGetUserdata(Wg_Obj* obj, const char* type, T** out) {
+	bool TryGetUserdata(Wg_Obj* obj, const char* type, T** out) {
 		return Wg_TryGetUserdata(obj, type, (void**)out);
 	}
 
@@ -2223,7 +2221,7 @@ namespace wings {
 		std::string_view module;
 		std::string_view func;
 		bool syntaxError = false;
-		inline OwnedTraceFrame ToOwned() const {
+		OwnedTraceFrame ToOwned() const {
 			return { srcPos, std::string(lineText), std::string(module), std::string(func), syntaxError };
 		}
 	};
@@ -2238,7 +2236,7 @@ namespace wings {
 		Wg_ObjRef(const Wg_ObjRef&) = delete;
 		Wg_ObjRef& operator=(const Wg_ObjRef&) = delete;
 		~Wg_ObjRef() { if (obj) Wg_DecRef(obj); }
-		inline Wg_Obj* Get() const { return obj; }
+		Wg_Obj* Get() const { return obj; }
 	private:
 		Wg_Obj* obj;
 	};
@@ -2305,7 +2303,7 @@ namespace wings {
 		Wg_Obj* memoryErrorInstance;
 		Wg_Obj* recursionErrorInstance;
 
-		inline auto GetAll() const {
+		auto GetAll() const {
 			return std::array{
 				object, noneType, _bool, _int, _float, str, tuple, list,
 				dict, set, func, slice, defaultIter, defaultReverseIter,
@@ -2796,13 +2794,13 @@ class ValueError(Exception):
 		Tuple,
 	};
 
-	inline std::string PtrToString(const void* p) {
+	static std::string PtrToString(const void* p) {
 		std::stringstream ss;
 		ss << p;
 		return ss.str();
 	}
 
-	inline bool AbsIndex(Wg_Obj* container, Wg_Obj* index, Wg_int& out, std::optional<Wg_int>& size) {
+	static bool AbsIndex(Wg_Obj* container, Wg_Obj* index, Wg_int& out, std::optional<Wg_int>& size) {
 		Wg_Obj* len = Wg_UnaryOp(WG_UOP_LEN, container);
 		if (len == nullptr)
 			return false;
@@ -2823,13 +2821,13 @@ class ValueError(Exception):
 		return true;
 	}
 
-	inline bool AbsIndex(Wg_Obj* container, Wg_Obj* index, Wg_int& out) {
+	static bool AbsIndex(Wg_Obj* container, Wg_Obj* index, Wg_int& out) {
 		std::optional<Wg_int> size;
 		return AbsIndex(container, index, out, size);
 	}
 
 	template <class F>
-	inline bool IterateRange(Wg_int start, Wg_int stop, Wg_int step, F f) {
+	static bool IterateRange(Wg_int start, Wg_int stop, Wg_int step, F f) {
 		WG_ASSERT(step);
 		if (step > 0) {
 			for (Wg_int i = (Wg_int)start; i < (Wg_int)stop; i += step)
@@ -2843,7 +2841,7 @@ class ValueError(Exception):
 		return true;
 	}
 
-	inline bool AbsSlice(Wg_Obj* container, Wg_Obj* slice, Wg_int& start, Wg_int& stop, Wg_int& step) {
+	static bool AbsSlice(Wg_Obj* container, Wg_Obj* slice, Wg_int& start, Wg_int& stop, Wg_int& step) {
 		std::optional<Wg_int> size;
 		std::vector<Wg_ObjRef> refs;
 		refs.emplace_back(container);
@@ -2920,7 +2918,7 @@ class ValueError(Exception):
 		return true;
 	}
 
-	inline void StringReplace(std::string& str, std::string_view from, std::string_view to, Wg_int count) {
+	static void StringReplace(std::string& str, std::string_view from, std::string_view to, Wg_int count) {
 		if (from.empty())
 			return;
 		size_t start_pos = 0;
@@ -2931,7 +2929,7 @@ class ValueError(Exception):
 		}
 	}
 
-	inline std::vector<std::string> StringSplit(std::string s, std::string_view sep, Wg_int maxSplit) {
+	static std::vector<std::string> StringSplit(std::string s, std::string_view sep, Wg_int maxSplit) {
 		std::vector<std::string> buf;
 		size_t pos = 0;
 		std::string token;
@@ -2947,7 +2945,7 @@ class ValueError(Exception):
 		return buf;
 	}
 
-	inline std::vector<std::string> StringSplitChar(std::string s, std::string_view chars, Wg_int maxSplit) {
+	static std::vector<std::string> StringSplitChar(std::string s, std::string_view chars, Wg_int maxSplit) {
 		size_t last = 0;
 		size_t next = 0;
 		std::vector<std::string> buf;
@@ -2962,7 +2960,7 @@ class ValueError(Exception):
 		return buf;
 	}
 
-	inline std::vector<std::string> StringSplitLines(std::string s) {
+	static std::vector<std::string> StringSplitLines(std::string s) {
 		size_t last = 0;
 		size_t next = 0;
 		std::vector<std::string> buf;
@@ -2977,12 +2975,12 @@ class ValueError(Exception):
 		return buf;
 	}
 
-	inline bool IsSpace(char c) {
+	static bool IsSpace(char c) {
 		return c == ' ' || c == '\t' || c == '\n' || c == '\r'
 			|| c == '\v' || c == '\f';
 	}
 
-	inline bool MergeSort(Wg_Obj** data, size_t len, Wg_Obj* key) {
+	static bool MergeSort(Wg_Obj** data, size_t len, Wg_Obj* key) {
 		if (len == 1)
 			return true;
 
@@ -3038,7 +3036,7 @@ class ValueError(Exception):
 	
 	namespace ctors {
 
-		inline Wg_Obj* object(Wg_Context* context, Wg_Obj**, int argc) { // Excludes self
+		static Wg_Obj* object(Wg_Context* context, Wg_Obj**, int argc) { // Excludes self
 			WG_EXPECT_ARG_COUNT(0);
 
 			Wg_Obj* obj = Alloc(context);
@@ -3050,11 +3048,11 @@ class ValueError(Exception):
 			return obj;
 		}
 
-		inline Wg_Obj* none(Wg_Context* context, Wg_Obj**, int) { // Excludes self
+		static Wg_Obj* none(Wg_Context* context, Wg_Obj**, int) { // Excludes self
 			return context->builtins.none;
 		}
 
-		inline Wg_Obj* _bool(Wg_Context* context, Wg_Obj** argv, int argc) { // Excludes self
+		static Wg_Obj* _bool(Wg_Context* context, Wg_Obj** argv, int argc) { // Excludes self
 			WG_EXPECT_ARG_COUNT_BETWEEN(0, 1);
 
 			if (argc == 1) {
@@ -3071,7 +3069,7 @@ class ValueError(Exception):
 			return context->builtins._false;
 		}
 		
-		inline Wg_Obj* _int(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* _int(Wg_Context* context, Wg_Obj** argv, int argc) {
 			WG_EXPECT_ARG_COUNT_BETWEEN(1, 3);
 
 			Wg_int v = 0;
@@ -3096,7 +3094,7 @@ class ValueError(Exception):
 			return Wg_None(context);
 		}
 
-		inline Wg_Obj* _float(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* _float(Wg_Context* context, Wg_Obj** argv, int argc) {
 			WG_EXPECT_ARG_COUNT_BETWEEN(1, 2);
 
 			Wg_float v = 0;
@@ -3121,7 +3119,7 @@ class ValueError(Exception):
 			return Wg_None(context);
 		}
 
-		inline Wg_Obj* str(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* str(Wg_Context* context, Wg_Obj** argv, int argc) {
 			WG_EXPECT_ARG_COUNT_BETWEEN(1, 2);
 
 			const char* v = "";
@@ -3145,7 +3143,7 @@ class ValueError(Exception):
 			return Wg_None(context);
 		}
 
-		inline Wg_Obj* tuple(Wg_Context* context, Wg_Obj** argv, int argc) { // Excludes self
+		static Wg_Obj* tuple(Wg_Context* context, Wg_Obj** argv, int argc) { // Excludes self
 			WG_EXPECT_ARG_COUNT_BETWEEN(0, 1);
 
 			struct State {
@@ -3178,7 +3176,7 @@ class ValueError(Exception):
 			return obj;
 		}
 
-		inline Wg_Obj* list(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* list(Wg_Context* context, Wg_Obj** argv, int argc) {
 			WG_EXPECT_ARG_COUNT_BETWEEN(1, 2);
 
 			struct State {
@@ -3207,7 +3205,7 @@ class ValueError(Exception):
 			return Wg_None(context);
 		}
 
-		inline Wg_Obj* map(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* map(Wg_Context* context, Wg_Obj** argv, int argc) {
 			WG_EXPECT_ARG_COUNT_BETWEEN(1, 2);
 			
 			argv[0]->attributes = context->builtins.dict->Get<Wg_Obj::Class>().instanceAttributes.Copy();
@@ -3250,7 +3248,7 @@ class ValueError(Exception):
 			return Wg_None(context);
 		}
 
-		inline Wg_Obj* set(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* set(Wg_Context* context, Wg_Obj** argv, int argc) {
 			WG_EXPECT_ARG_COUNT_BETWEEN(1, 2);
 			
 			argv[0]->attributes = context->builtins.set->Get<Wg_Obj::Class>().instanceAttributes.Copy();
@@ -3276,7 +3274,7 @@ class ValueError(Exception):
 			return Wg_None(context);
 		}
 
-		inline Wg_Obj* BaseException(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* BaseException(Wg_Context* context, Wg_Obj** argv, int argc) {
 			WG_EXPECT_ARG_COUNT_BETWEEN(1, 2);
 			if (argc == 2) {
 				Wg_SetAttribute(argv[0], "_message", argv[1]);
@@ -3289,7 +3287,7 @@ class ValueError(Exception):
 			}
 		}
 
-		inline Wg_Obj* DictIter(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* DictIter(Wg_Context* context, Wg_Obj** argv, int argc) {
 			WG_EXPECT_ARG_COUNT(2);
 			WG_EXPECT_ARG_TYPE_MAP(1);
 			auto* it = new WDict::iterator(argv[1]->Get<WDict>().begin());
@@ -3301,7 +3299,7 @@ class ValueError(Exception):
 			return Wg_None(context);
 		}
 
-		inline Wg_Obj* SetIter(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* SetIter(Wg_Context* context, Wg_Obj** argv, int argc) {
 			WG_EXPECT_ARG_COUNT(2);
 			WG_EXPECT_ARG_TYPE_SET(1);
 			auto* it = new WSet::iterator(argv[1]->Get<WSet>().begin());
@@ -3313,7 +3311,7 @@ class ValueError(Exception):
 			return Wg_None(context);
 		}
 
-		inline Wg_Obj* File(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* File(Wg_Context* context, Wg_Obj** argv, int argc) {
 			WG_EXPECT_ARG_COUNT_BETWEEN(2, 3);
 			WG_EXPECT_ARG_TYPE_STRING(1);
 
@@ -3372,7 +3370,7 @@ class ValueError(Exception):
 
 	namespace methods {
 		
-		inline Wg_Obj* object_str(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* object_str(Wg_Context* context, Wg_Obj** argv, int argc) {
 			WG_EXPECT_ARG_COUNT(1);
 			if (Wg_IsClass(argv[0])) {
 				std::string s = "<class '" + argv[0]->Get<Wg_Obj::Class>().name + "'>";
@@ -3383,22 +3381,22 @@ class ValueError(Exception):
 			}
 		}
 
-		inline Wg_Obj* object_nonzero(Wg_Context* context, Wg_Obj**, int argc) {
+		static Wg_Obj* object_nonzero(Wg_Context* context, Wg_Obj**, int argc) {
 			WG_EXPECT_ARG_COUNT(1);
 			return Wg_NewBool(context, true);
 		}
 
-		inline Wg_Obj* object_repr(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* object_repr(Wg_Context* context, Wg_Obj** argv, int argc) {
 			WG_EXPECT_ARG_COUNT(1);
 			return Wg_UnaryOp(WG_UOP_STR, argv[0]);
 		}
 
-		inline Wg_Obj* object_eq(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* object_eq(Wg_Context* context, Wg_Obj** argv, int argc) {
 			WG_EXPECT_ARG_COUNT(2);
 			return Wg_NewBool(context, argv[0] == argv[1]);
 		}
 
-		inline Wg_Obj* object_ne(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* object_ne(Wg_Context* context, Wg_Obj** argv, int argc) {
 			WG_EXPECT_ARG_COUNT(2);
 			Wg_Obj* eq = Wg_BinaryOp(WG_BOP_EQ, argv[0], argv[1]);
 			if (eq == nullptr)
@@ -3406,7 +3404,7 @@ class ValueError(Exception):
 			return Wg_NewBool(context, !Wg_GetBool(eq));
 		}
 
-		inline Wg_Obj* object_le(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* object_le(Wg_Context* context, Wg_Obj** argv, int argc) {
 			WG_EXPECT_ARG_COUNT(2);
 			Wg_Obj* lt = Wg_BinaryOp(WG_BOP_LT, argv[0], argv[1]);
 			if (lt == nullptr)
@@ -3416,7 +3414,7 @@ class ValueError(Exception):
 			return Wg_BinaryOp(WG_BOP_EQ, argv[0], argv[1]);
 		}
 
-		inline Wg_Obj* object_ge(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* object_ge(Wg_Context* context, Wg_Obj** argv, int argc) {
 			WG_EXPECT_ARG_COUNT(2);
 			Wg_Obj* lt = Wg_BinaryOp(WG_BOP_LT, argv[0], argv[1]);
 			if (lt == nullptr)
@@ -3424,7 +3422,7 @@ class ValueError(Exception):
 			return Wg_NewBool(context, !Wg_GetBool(lt));
 		}
 
-		inline Wg_Obj* object_gt(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* object_gt(Wg_Context* context, Wg_Obj** argv, int argc) {
 			WG_EXPECT_ARG_COUNT(2);
 			Wg_Obj* lt = Wg_BinaryOp(WG_BOP_LT, argv[0], argv[1]);
 			if (lt == nullptr)
@@ -3438,163 +3436,163 @@ class ValueError(Exception):
 			return Wg_NewBool(context, !Wg_GetBool(eq));
 		}
 
-		inline Wg_Obj* object_hash(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* object_hash(Wg_Context* context, Wg_Obj** argv, int argc) {
 			WG_EXPECT_ARG_COUNT(1);
 			Wg_int hash = (Wg_int)std::hash<Wg_Obj*>()(argv[0]);
 			return Wg_NewInt(context, hash);
 		}
 
-		inline Wg_Obj* object_iadd(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* object_iadd(Wg_Context* context, Wg_Obj** argv, int argc) {
 			WG_EXPECT_ARG_COUNT(2);
 			return Wg_CallMethod(argv[0], "__add__", &argv[1], 1);
 		}
 
-		inline Wg_Obj* object_isub(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* object_isub(Wg_Context* context, Wg_Obj** argv, int argc) {
 			WG_EXPECT_ARG_COUNT(2);
 			return Wg_CallMethod(argv[0], "__sub__", &argv[1], 1);
 		}
 
-		inline Wg_Obj* object_imul(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* object_imul(Wg_Context* context, Wg_Obj** argv, int argc) {
 			WG_EXPECT_ARG_COUNT(2);
 			return Wg_CallMethod(argv[0], "__mul__", &argv[1], 1);
 		}
 
-		inline Wg_Obj* object_itruediv(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* object_itruediv(Wg_Context* context, Wg_Obj** argv, int argc) {
 			WG_EXPECT_ARG_COUNT(2);
 			return Wg_CallMethod(argv[0], "__truediv__", &argv[1], 1);
 		}
 
-		inline Wg_Obj* object_ifloordiv(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* object_ifloordiv(Wg_Context* context, Wg_Obj** argv, int argc) {
 			WG_EXPECT_ARG_COUNT(2);
 			return Wg_CallMethod(argv[0], "__floordiv__", &argv[1], 1);
 		}
 
-		inline Wg_Obj* object_imod(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* object_imod(Wg_Context* context, Wg_Obj** argv, int argc) {
 			WG_EXPECT_ARG_COUNT(2);
 			return Wg_CallMethod(argv[0], "__mod__", &argv[1], 1);
 		}
 
-		inline Wg_Obj* object_ipow(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* object_ipow(Wg_Context* context, Wg_Obj** argv, int argc) {
 			WG_EXPECT_ARG_COUNT(2);
 			return Wg_CallMethod(argv[0], "__pow__", &argv[1], 1);
 		}
 
-		inline Wg_Obj* object_iand(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* object_iand(Wg_Context* context, Wg_Obj** argv, int argc) {
 			WG_EXPECT_ARG_COUNT(2);
 			return Wg_CallMethod(argv[0], "__and__", &argv[1], 1);
 		}
 
-		inline Wg_Obj* object_ior(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* object_ior(Wg_Context* context, Wg_Obj** argv, int argc) {
 			WG_EXPECT_ARG_COUNT(2);
 			return Wg_CallMethod(argv[0], "__or__", &argv[1], 1);
 		}
 
-		inline Wg_Obj* object_ixor(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* object_ixor(Wg_Context* context, Wg_Obj** argv, int argc) {
 			WG_EXPECT_ARG_COUNT(2);
 			return Wg_CallMethod(argv[0], "__xor__", &argv[1], 1);
 		}
 
-		inline Wg_Obj* object_ilshift(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* object_ilshift(Wg_Context* context, Wg_Obj** argv, int argc) {
 			WG_EXPECT_ARG_COUNT(2);
 			return Wg_CallMethod(argv[0], "__lshift__", &argv[1], 1);
 		}
 
-		inline Wg_Obj* object_irshift(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* object_irshift(Wg_Context* context, Wg_Obj** argv, int argc) {
 			WG_EXPECT_ARG_COUNT(2);
 			return Wg_CallMethod(argv[0], "__rshift__", &argv[1], 1);
 		}
 
-		inline Wg_Obj* object_iter(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* object_iter(Wg_Context* context, Wg_Obj** argv, int argc) {
 			WG_EXPECT_ARG_COUNT(1);
 			return Wg_Call(context->builtins.defaultIter, argv, 1);
 		}
 
-		inline Wg_Obj* object_reversed(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* object_reversed(Wg_Context* context, Wg_Obj** argv, int argc) {
 			WG_EXPECT_ARG_COUNT(1);
 			return Wg_Call(context->builtins.defaultReverseIter, argv, 1);
 		}
 
-		inline Wg_Obj* null_nonzero(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* null_nonzero(Wg_Context* context, Wg_Obj** argv, int argc) {
 			WG_EXPECT_ARG_COUNT(1);
 			WG_EXPECT_ARG_TYPE_NULL(0);
 			return Wg_NewBool(context, false);
 		}
 
-		inline Wg_Obj* null_str(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* null_str(Wg_Context* context, Wg_Obj** argv, int argc) {
 			WG_EXPECT_ARG_COUNT(1);
 			WG_EXPECT_ARG_TYPE_NULL(0);
 			return Wg_NewString(context, "None");
 		}
 
-		inline Wg_Obj* bool_int(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* bool_int(Wg_Context* context, Wg_Obj** argv, int argc) {
 			WG_EXPECT_ARG_COUNT(1);
 			WG_EXPECT_ARG_TYPE_BOOL(0);
 			return Wg_NewInt(context, Wg_GetBool(argv[0]) ? 1 : 0);
 		}
 
-		inline Wg_Obj* bool_float(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* bool_float(Wg_Context* context, Wg_Obj** argv, int argc) {
 			WG_EXPECT_ARG_COUNT(1);
 			WG_EXPECT_ARG_TYPE_BOOL(0);
 			return Wg_NewFloat(context, Wg_GetBool(argv[0]) ? (Wg_float)1 : (Wg_float)0);
 		}
 
-		inline Wg_Obj* bool_str(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* bool_str(Wg_Context* context, Wg_Obj** argv, int argc) {
 			WG_EXPECT_ARG_COUNT(1);
 			WG_EXPECT_ARG_TYPE_BOOL(0);
 			return Wg_NewString(context, Wg_GetBool(argv[0]) ? "True" : "False");
 		}
 
-		inline Wg_Obj* bool_eq(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* bool_eq(Wg_Context* context, Wg_Obj** argv, int argc) {
 			WG_EXPECT_ARG_COUNT(2);
 			WG_EXPECT_ARG_TYPE_BOOL(0);
 			return Wg_NewBool(context, Wg_IsBool(argv[1]) && Wg_GetBool(argv[0]) == Wg_GetBool(argv[1]));
 		}
 
-		inline Wg_Obj* bool_hash(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* bool_hash(Wg_Context* context, Wg_Obj** argv, int argc) {
 			WG_EXPECT_ARG_COUNT(1);
 			WG_EXPECT_ARG_TYPE_BOOL(0);
 			Wg_int hash = (Wg_int)std::hash<bool>()(Wg_GetBool(argv[0]));
 			return Wg_NewInt(context, hash);
 		}
 
-		inline Wg_Obj* bool_abs(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* bool_abs(Wg_Context* context, Wg_Obj** argv, int argc) {
 			WG_EXPECT_ARG_COUNT(1);
 			WG_EXPECT_ARG_TYPE_BOOL(0);
 			return Wg_NewInt(context, Wg_GetBool(argv[0]) ? 1 : 0);
 		}
 
-		inline Wg_Obj* int_nonzero(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* int_nonzero(Wg_Context* context, Wg_Obj** argv, int argc) {
 			WG_EXPECT_ARG_COUNT(1);
 			WG_EXPECT_ARG_TYPE_INT(0);
 			return Wg_NewBool(context, Wg_GetInt(argv[0]) != 0);
 		}
 
-		inline Wg_Obj* int_float(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* int_float(Wg_Context* context, Wg_Obj** argv, int argc) {
 			WG_EXPECT_ARG_COUNT(1);
 			WG_EXPECT_ARG_TYPE_INT(0);
 			return Wg_NewFloat(context, Wg_GetFloat(argv[0]));
 		}
 
-		inline Wg_Obj* int_str(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* int_str(Wg_Context* context, Wg_Obj** argv, int argc) {
 			WG_EXPECT_ARG_COUNT(1);
 			WG_EXPECT_ARG_TYPE_INT(0);
 			return Wg_NewString(context, std::to_string(argv[0]->Get<Wg_int>()).c_str());
 		}
 
-		inline Wg_Obj* int_eq(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* int_eq(Wg_Context* context, Wg_Obj** argv, int argc) {
 			WG_EXPECT_ARG_COUNT(2);
 			WG_EXPECT_ARG_TYPE_INT(0);
 			return Wg_NewBool(context, Wg_IsInt(argv[1]) && Wg_GetInt(argv[0]) == Wg_GetInt(argv[1]));
 		}
 
-		inline Wg_Obj* int_lt(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* int_lt(Wg_Context* context, Wg_Obj** argv, int argc) {
 			WG_EXPECT_ARG_COUNT(2);
 			WG_EXPECT_ARG_TYPE_INT(0);
 			WG_EXPECT_ARG_TYPE_INT_OR_FLOAT(1);
 			return Wg_NewBool(context, Wg_GetFloat(argv[0]) < Wg_GetFloat(argv[1]));
 		}
 
-		inline Wg_Obj* int_hash(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* int_hash(Wg_Context* context, Wg_Obj** argv, int argc) {
 			WG_EXPECT_ARG_COUNT(1);
 			WG_EXPECT_ARG_TYPE_INT(0);
 			//Wg_int hash = (Wg_int)std::hash<Wg_int>()(Wg_GetInt(argv[0]));
@@ -3602,19 +3600,19 @@ class ValueError(Exception):
 			return Wg_NewInt(context, hash);
 		}
 
-		inline Wg_Obj* int_abs(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* int_abs(Wg_Context* context, Wg_Obj** argv, int argc) {
 			WG_EXPECT_ARG_COUNT(1);
 			WG_EXPECT_ARG_TYPE_INT(0);
 			return Wg_NewInt(context, std::abs(Wg_GetInt(argv[0])));
 		}
 
-		inline Wg_Obj* int_neg(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* int_neg(Wg_Context* context, Wg_Obj** argv, int argc) {
 			WG_EXPECT_ARG_COUNT(1);
 			WG_EXPECT_ARG_TYPE_INT(0);
 			return Wg_NewInt(context, -Wg_GetInt(argv[0]));
 		}
 
-		inline Wg_Obj* int_add(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* int_add(Wg_Context* context, Wg_Obj** argv, int argc) {
 			WG_EXPECT_ARG_COUNT(2);
 			WG_EXPECT_ARG_TYPE_INT(0);
 			WG_EXPECT_ARG_TYPE_INT_OR_FLOAT(1);
@@ -3625,7 +3623,7 @@ class ValueError(Exception):
 			}
 		}
 
-		inline Wg_Obj* int_sub(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* int_sub(Wg_Context* context, Wg_Obj** argv, int argc) {
 			WG_EXPECT_ARG_COUNT(2);
 			WG_EXPECT_ARG_TYPE_INT(0);
 			WG_EXPECT_ARG_TYPE_INT_OR_FLOAT(1);
@@ -3636,7 +3634,7 @@ class ValueError(Exception):
 			}
 		}
 
-		inline Wg_Obj* int_mul(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* int_mul(Wg_Context* context, Wg_Obj** argv, int argc) {
 			WG_EXPECT_ARG_COUNT(2);
 			WG_EXPECT_ARG_TYPE_INT(0);
 
@@ -3656,7 +3654,7 @@ class ValueError(Exception):
 			}
 		}
 
-		inline Wg_Obj* int_truediv(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* int_truediv(Wg_Context* context, Wg_Obj** argv, int argc) {
 			WG_EXPECT_ARG_COUNT(2);
 			WG_EXPECT_ARG_TYPE_INT(0);
 			WG_EXPECT_ARG_TYPE_INT_OR_FLOAT(0);
@@ -3668,7 +3666,7 @@ class ValueError(Exception):
 			return Wg_NewFloat(context, Wg_GetFloat(argv[0]) / Wg_GetFloat(argv[1]));
 		}
 
-		inline Wg_Obj* int_floordiv(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* int_floordiv(Wg_Context* context, Wg_Obj** argv, int argc) {
 			WG_EXPECT_ARG_COUNT(2);
 			WG_EXPECT_ARG_TYPE_INT(0);
 			WG_EXPECT_ARG_TYPE_INT_OR_FLOAT(1);
@@ -3685,7 +3683,7 @@ class ValueError(Exception):
 			}
 		}
 
-		inline Wg_Obj* int_mod(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* int_mod(Wg_Context* context, Wg_Obj** argv, int argc) {
 			WG_EXPECT_ARG_COUNT(2);
 			WG_EXPECT_ARG_TYPE_INT(0);
 			WG_EXPECT_ARG_TYPE_INT_OR_FLOAT(1);
@@ -3706,7 +3704,7 @@ class ValueError(Exception):
 			}
 		}
 
-		inline Wg_Obj* int_pow(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* int_pow(Wg_Context* context, Wg_Obj** argv, int argc) {
 			WG_EXPECT_ARG_COUNT(2);
 			WG_EXPECT_ARG_TYPE_INT(0);
 			
@@ -3718,34 +3716,34 @@ class ValueError(Exception):
 			}
 		}
 
-		inline Wg_Obj* int_and(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* int_and(Wg_Context* context, Wg_Obj** argv, int argc) {
 			WG_EXPECT_ARG_COUNT(2);
 			WG_EXPECT_ARG_TYPE_INT(0);
 			WG_EXPECT_ARG_TYPE_INT(1);
 			return Wg_NewInt(context, Wg_GetInt(argv[0]) & Wg_GetInt(argv[1]));
 		}
 
-		inline Wg_Obj* int_or(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* int_or(Wg_Context* context, Wg_Obj** argv, int argc) {
 			WG_EXPECT_ARG_COUNT(2);
 			WG_EXPECT_ARG_TYPE_INT(0);
 			WG_EXPECT_ARG_TYPE_INT(1);
 			return Wg_NewInt(context, Wg_GetInt(argv[0]) | Wg_GetInt(argv[1]));
 		}
 
-		inline Wg_Obj* int_xor(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* int_xor(Wg_Context* context, Wg_Obj** argv, int argc) {
 			WG_EXPECT_ARG_COUNT(2);
 			WG_EXPECT_ARG_TYPE_INT(0);
 			WG_EXPECT_ARG_TYPE_INT(1);
 			return Wg_NewInt(context, Wg_GetInt(argv[0]) ^ Wg_GetInt(argv[1]));
 		}
 
-		inline Wg_Obj* int_invert(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* int_invert(Wg_Context* context, Wg_Obj** argv, int argc) {
 			WG_EXPECT_ARG_COUNT(1);
 			WG_EXPECT_ARG_TYPE_INT(0);
 			return Wg_NewInt(context, ~Wg_GetInt(argv[0]));
 		}
 
-		inline Wg_Obj* int_lshift(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* int_lshift(Wg_Context* context, Wg_Obj** argv, int argc) {
 			WG_EXPECT_ARG_COUNT(2);
 			WG_EXPECT_ARG_TYPE_INT(0);
 			WG_EXPECT_ARG_TYPE_INT(1);
@@ -3759,7 +3757,7 @@ class ValueError(Exception):
 			return Wg_NewInt(context, Wg_GetInt(argv[0]) << shift);
 		}
 
-		inline Wg_Obj* int_rshift(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* int_rshift(Wg_Context* context, Wg_Obj** argv, int argc) {
 			WG_EXPECT_ARG_COUNT(2);
 			WG_EXPECT_ARG_TYPE_INT(0);
 			WG_EXPECT_ARG_TYPE_INT(1);
@@ -3776,7 +3774,7 @@ class ValueError(Exception):
 			return Wg_NewInt(context, i);
 		}
 
-		inline Wg_Obj* int_bit_length(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* int_bit_length(Wg_Context* context, Wg_Obj** argv, int argc) {
 			WG_EXPECT_ARG_COUNT(1);
 			WG_EXPECT_ARG_TYPE_INT(0);
 
@@ -3784,7 +3782,7 @@ class ValueError(Exception):
 			return Wg_NewInt(context, (Wg_int)std::bit_width(n));
 		}
 
-		inline Wg_Obj* int_bit_count(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* int_bit_count(Wg_Context* context, Wg_Obj** argv, int argc) {
 			WG_EXPECT_ARG_COUNT(1);
 			WG_EXPECT_ARG_TYPE_INT(0);
 
@@ -3792,19 +3790,19 @@ class ValueError(Exception):
 			return Wg_NewInt(context, (Wg_int)std::popcount(n));
 		}
 
-		inline Wg_Obj* float_nonzero(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* float_nonzero(Wg_Context* context, Wg_Obj** argv, int argc) {
 			WG_EXPECT_ARG_COUNT(1);
 			WG_EXPECT_ARG_TYPE_INT_OR_FLOAT(0);
 			return Wg_NewBool(context, Wg_GetFloat(argv[0]) != 0);
 		}
 
-		inline Wg_Obj* float_int(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* float_int(Wg_Context* context, Wg_Obj** argv, int argc) {
 			WG_EXPECT_ARG_COUNT(1);
 			WG_EXPECT_ARG_TYPE_INT_OR_FLOAT(0);
 			return Wg_NewInt(context, (Wg_int)Wg_GetFloat(argv[0]));
 		}
 
-		inline Wg_Obj* float_str(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* float_str(Wg_Context* context, Wg_Obj** argv, int argc) {
 			WG_EXPECT_ARG_COUNT(1);
 			WG_EXPECT_ARG_TYPE_FLOAT(0);
 			std::string s = std::to_string(argv[0]->Get<Wg_float>());
@@ -3814,88 +3812,88 @@ class ValueError(Exception):
 			return Wg_NewString(context, s.c_str());
 		}
 
-		inline Wg_Obj* float_eq(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* float_eq(Wg_Context* context, Wg_Obj** argv, int argc) {
 			WG_EXPECT_ARG_COUNT(2);
 			WG_EXPECT_ARG_TYPE_INT_OR_FLOAT(0);
 			return Wg_NewBool(context, Wg_IsIntOrFloat(argv[1]) && Wg_GetFloat(argv[0]) == Wg_GetFloat(argv[1]));
 		}
 
-		inline Wg_Obj* float_lt(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* float_lt(Wg_Context* context, Wg_Obj** argv, int argc) {
 			WG_EXPECT_ARG_COUNT(2);
 			WG_EXPECT_ARG_TYPE_INT_OR_FLOAT(0);
 			WG_EXPECT_ARG_TYPE_INT_OR_FLOAT(1);
 			return Wg_NewBool(context, Wg_GetFloat(argv[0]) < Wg_GetFloat(argv[1]));
 		}
 
-		inline Wg_Obj* float_hash(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* float_hash(Wg_Context* context, Wg_Obj** argv, int argc) {
 			WG_EXPECT_ARG_COUNT(1);
 			WG_EXPECT_ARG_TYPE_FLOAT(0);
 			Wg_int hash = (Wg_int)std::hash<Wg_float>()(Wg_GetFloat(argv[0]));
 			return Wg_NewInt(context, hash);
 		}
 
-		inline Wg_Obj* float_abs(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* float_abs(Wg_Context* context, Wg_Obj** argv, int argc) {
 			WG_EXPECT_ARG_COUNT(1);
 			WG_EXPECT_ARG_TYPE_FLOAT(0);
 			return Wg_NewFloat(context, std::abs(Wg_GetFloat(argv[0])));
 		}
 
-		inline Wg_Obj* float_neg(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* float_neg(Wg_Context* context, Wg_Obj** argv, int argc) {
 			WG_EXPECT_ARG_COUNT(1);
 			WG_EXPECT_ARG_TYPE_INT_OR_FLOAT(0);
 			return Wg_NewFloat(context, -Wg_GetFloat(argv[0]));
 		}
 
-		inline Wg_Obj* float_add(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* float_add(Wg_Context* context, Wg_Obj** argv, int argc) {
 			WG_EXPECT_ARG_COUNT(2);
 			WG_EXPECT_ARG_TYPE_INT_OR_FLOAT(0);
 			WG_EXPECT_ARG_TYPE_INT_OR_FLOAT(1);
 			return Wg_NewFloat(context, Wg_GetFloat(argv[0]) + Wg_GetFloat(argv[1]));
 		}
 
-		inline Wg_Obj* float_sub(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* float_sub(Wg_Context* context, Wg_Obj** argv, int argc) {
 			WG_EXPECT_ARG_COUNT(2);
 			WG_EXPECT_ARG_TYPE_INT_OR_FLOAT(0);
 			WG_EXPECT_ARG_TYPE_INT_OR_FLOAT(1);
 			return Wg_NewFloat(context, Wg_GetFloat(argv[0]) - Wg_GetFloat(argv[1]));
 		}
 
-		inline Wg_Obj* float_mul(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* float_mul(Wg_Context* context, Wg_Obj** argv, int argc) {
 			WG_EXPECT_ARG_COUNT(2);
 			WG_EXPECT_ARG_TYPE_INT_OR_FLOAT(0);
 			WG_EXPECT_ARG_TYPE_INT_OR_FLOAT(1);
 			return Wg_NewFloat(context, Wg_GetFloat(argv[0]) * Wg_GetFloat(argv[1]));
 		}
 
-		inline Wg_Obj* float_truediv(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* float_truediv(Wg_Context* context, Wg_Obj** argv, int argc) {
 			WG_EXPECT_ARG_COUNT(2);
 			WG_EXPECT_ARG_TYPE_INT_OR_FLOAT(0);
 			WG_EXPECT_ARG_TYPE_INT_OR_FLOAT(1);
 			return Wg_NewFloat(context, Wg_GetFloat(argv[0]) / Wg_GetFloat(argv[1]));
 		}
 
-		inline Wg_Obj* float_floordiv(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* float_floordiv(Wg_Context* context, Wg_Obj** argv, int argc) {
 			WG_EXPECT_ARG_COUNT(2);
 			WG_EXPECT_ARG_TYPE_INT_OR_FLOAT(0);
 			WG_EXPECT_ARG_TYPE_INT_OR_FLOAT(1);
 			return Wg_NewFloat(context, std::floor(Wg_GetFloat(argv[0]) / Wg_GetFloat(argv[1])));
 		}
 
-		inline Wg_Obj* float_mod(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* float_mod(Wg_Context* context, Wg_Obj** argv, int argc) {
 			WG_EXPECT_ARG_COUNT(2);
 			WG_EXPECT_ARG_TYPE_INT_OR_FLOAT(0);
 			WG_EXPECT_ARG_TYPE_INT_OR_FLOAT(1);
 			return Wg_NewFloat(context, std::fmod(Wg_GetFloat(argv[0]), Wg_GetFloat(argv[1])));
 		}
 
-		inline Wg_Obj* float_pow(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* float_pow(Wg_Context* context, Wg_Obj** argv, int argc) {
 			WG_EXPECT_ARG_COUNT(2);
 			WG_EXPECT_ARG_TYPE_INT_OR_FLOAT(0);
 			WG_EXPECT_ARG_TYPE_INT_OR_FLOAT(1);
 			return Wg_NewFloat(context, std::pow(Wg_GetFloat(argv[0]), Wg_GetFloat(argv[1])));
 		}
 
-		inline Wg_Obj* float_is_integer(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* float_is_integer(Wg_Context* context, Wg_Obj** argv, int argc) {
 			WG_EXPECT_ARG_COUNT(1);
 			WG_EXPECT_ARG_TYPE_FLOAT(0);
 
@@ -3903,14 +3901,14 @@ class ValueError(Exception):
 			return Wg_NewBool(context, std::floor(f) == f);
 		}
 
-		inline Wg_Obj* str_nonzero(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* str_nonzero(Wg_Context* context, Wg_Obj** argv, int argc) {
 			WG_EXPECT_ARG_COUNT(1);
 			WG_EXPECT_ARG_TYPE_STRING(0);
 			std::string s = Wg_GetString(argv[0]);
 			return Wg_NewBool(context, !s.empty());
 		}
 
-		inline Wg_Obj* str_int(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* str_int(Wg_Context* context, Wg_Obj** argv, int argc) {
 			WG_EXPECT_ARG_COUNT_BETWEEN(1, 2);
 			WG_EXPECT_ARG_TYPE_STRING(0);
 
@@ -3977,7 +3975,7 @@ class ValueError(Exception):
 			return Wg_NewInt(context, (Wg_int)value);
 		}
 
-		inline Wg_Obj* str_float(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* str_float(Wg_Context* context, Wg_Obj** argv, int argc) {
 			WG_EXPECT_ARG_COUNT(1);
 			WG_EXPECT_ARG_TYPE_STRING(0);
 
@@ -4066,7 +4064,7 @@ class ValueError(Exception):
 			return Wg_NewFloat(context, fvalue);
 		}
 
-		inline Wg_Obj* str_repr(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* str_repr(Wg_Context* context, Wg_Obj** argv, int argc) {
 			WG_EXPECT_ARG_COUNT(1);
 			WG_EXPECT_ARG_TYPE_STRING(0);
 			
@@ -4099,33 +4097,33 @@ class ValueError(Exception):
 			return Wg_NewString(context, s.c_str());
 		}
 
-		inline Wg_Obj* str_len(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* str_len(Wg_Context* context, Wg_Obj** argv, int argc) {
 			WG_EXPECT_ARG_COUNT(1);
 			WG_EXPECT_ARG_TYPE_STRING(0);
 			return Wg_NewInt(context, (Wg_int)argv[0]->Get<std::string>().size());
 		}
 
-		inline Wg_Obj* str_eq(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* str_eq(Wg_Context* context, Wg_Obj** argv, int argc) {
 			WG_EXPECT_ARG_COUNT(2);
 			WG_EXPECT_ARG_TYPE_STRING(0);
 			return Wg_NewBool(context, Wg_IsString(argv[1]) && std::strcmp(Wg_GetString(argv[0]), Wg_GetString(argv[1])) == 0);
 		}
 
-		inline Wg_Obj* str_lt(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* str_lt(Wg_Context* context, Wg_Obj** argv, int argc) {
 			WG_EXPECT_ARG_COUNT(2);
 			WG_EXPECT_ARG_TYPE_STRING(0);
 			WG_EXPECT_ARG_TYPE_STRING(1);
 			return Wg_NewBool(context, std::strcmp(Wg_GetString(argv[0]), Wg_GetString(argv[1])) < 0);
 		}
 
-		inline Wg_Obj* str_hash(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* str_hash(Wg_Context* context, Wg_Obj** argv, int argc) {
 			WG_EXPECT_ARG_COUNT(1);
 			WG_EXPECT_ARG_TYPE_STRING(0);
 			Wg_int hash = (Wg_int)std::hash<std::string_view>()(Wg_GetString(argv[0]));
 			return Wg_NewInt(context, hash);
 		}
 
-		inline Wg_Obj* str_add(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* str_add(Wg_Context* context, Wg_Obj** argv, int argc) {
 			WG_EXPECT_ARG_COUNT(2);
 			WG_EXPECT_ARG_TYPE_STRING(0);
 			WG_EXPECT_ARG_TYPE_STRING(1);
@@ -4134,7 +4132,7 @@ class ValueError(Exception):
 			return Wg_NewString(context, s.c_str());
 		}
 
-		inline Wg_Obj* str_mul(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* str_mul(Wg_Context* context, Wg_Obj** argv, int argc) {
 			WG_EXPECT_ARG_COUNT(2);
 			WG_EXPECT_ARG_TYPE_STRING(0);
 			WG_EXPECT_ARG_TYPE_INT(1);
@@ -4147,14 +4145,14 @@ class ValueError(Exception):
 			return Wg_NewString(context, s.c_str());
 		}
 
-		inline Wg_Obj* str_contains(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* str_contains(Wg_Context* context, Wg_Obj** argv, int argc) {
 			WG_EXPECT_ARG_COUNT(2);
 			WG_EXPECT_ARG_TYPE_STRING(0);
 			WG_EXPECT_ARG_TYPE_STRING(1);
 			return Wg_NewBool(context, std::strstr(Wg_GetString(argv[0]), Wg_GetString(argv[1])));
 		}
 
-		inline Wg_Obj* str_getitem(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* str_getitem(Wg_Context* context, Wg_Obj** argv, int argc) {
 			WG_EXPECT_ARG_COUNT(2);
 			WG_EXPECT_ARG_TYPE_STRING(0);
 
@@ -4200,7 +4198,7 @@ class ValueError(Exception):
 			return nullptr;
 		}
 
-		inline Wg_Obj* str_capitalize(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* str_capitalize(Wg_Context* context, Wg_Obj** argv, int argc) {
 			WG_EXPECT_ARG_COUNT(1);
 			WG_EXPECT_ARG_TYPE_STRING(0);
 			std::string s = Wg_GetString(argv[0]);
@@ -4209,7 +4207,7 @@ class ValueError(Exception):
 			return Wg_NewString(context, s.c_str());
 		}
 
-		inline Wg_Obj* str_lower(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* str_lower(Wg_Context* context, Wg_Obj** argv, int argc) {
 			WG_EXPECT_ARG_COUNT(1);
 			WG_EXPECT_ARG_TYPE_STRING(0);
 
@@ -4219,7 +4217,7 @@ class ValueError(Exception):
 			return Wg_NewString(context, s.c_str());
 		}
 
-		inline Wg_Obj* str_upper(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* str_upper(Wg_Context* context, Wg_Obj** argv, int argc) {
 			WG_EXPECT_ARG_COUNT(1);
 			WG_EXPECT_ARG_TYPE_STRING(0);
 
@@ -4229,11 +4227,11 @@ class ValueError(Exception):
 			return Wg_NewString(context, s.c_str());
 		}
 
-		inline Wg_Obj* str_casefold(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* str_casefold(Wg_Context* context, Wg_Obj** argv, int argc) {
 			return str_lower(context, argv, argc);
 		}
 
-		inline Wg_Obj* str_center(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* str_center(Wg_Context* context, Wg_Obj** argv, int argc) {
 			WG_EXPECT_ARG_COUNT_BETWEEN(2, 3);
 			WG_EXPECT_ARG_TYPE_STRING(0);
 			WG_EXPECT_ARG_TYPE_INT(1);
@@ -4259,7 +4257,7 @@ class ValueError(Exception):
 			return Wg_NewString(context, s.c_str());
 		}
 
-		inline Wg_Obj* str_count(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* str_count(Wg_Context* context, Wg_Obj** argv, int argc) {
 			WG_EXPECT_ARG_COUNT(2);
 			WG_EXPECT_ARG_TYPE_STRING(0);
 			WG_EXPECT_ARG_TYPE_STRING(1);
@@ -4276,7 +4274,7 @@ class ValueError(Exception):
 			return Wg_NewInt(context, count);
 		}
 
-		inline Wg_Obj* str_format(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* str_format(Wg_Context* context, Wg_Obj** argv, int argc) {
 			WG_EXPECT_ARG_COUNT_AT_LEAST(1);
 			WG_EXPECT_ARG_TYPE_STRING(0);
 			
@@ -4342,7 +4340,7 @@ class ValueError(Exception):
 			return Wg_NewString(context, s.c_str());
 		}
 
-		inline Wg_Obj* str_startswith(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* str_startswith(Wg_Context* context, Wg_Obj** argv, int argc) {
 			WG_EXPECT_ARG_COUNT(2);
 			WG_EXPECT_ARG_TYPE_STRING(0);
 			WG_EXPECT_ARG_TYPE_STRING(1);
@@ -4352,7 +4350,7 @@ class ValueError(Exception):
 			return Wg_NewBool(context, s.starts_with(end));
 		}
 
-		inline Wg_Obj* str_endswith(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* str_endswith(Wg_Context* context, Wg_Obj** argv, int argc) {
 			WG_EXPECT_ARG_COUNT(2);
 			WG_EXPECT_ARG_TYPE_STRING(0);
 			WG_EXPECT_ARG_TYPE_STRING(1);
@@ -4363,7 +4361,7 @@ class ValueError(Exception):
 		}
 
 		template <bool reverse>
-		inline Wg_Obj* str_findx(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* str_findx(Wg_Context* context, Wg_Obj** argv, int argc) {
 			WG_EXPECT_ARG_COUNT_BETWEEN(2, 4);
 			WG_EXPECT_ARG_TYPE_STRING(0);
 			WG_EXPECT_ARG_TYPE_STRING(1);
@@ -4412,7 +4410,7 @@ class ValueError(Exception):
 		}
 
 		template <bool reverse>
-		inline Wg_Obj* str_indexx(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* str_indexx(Wg_Context* context, Wg_Obj** argv, int argc) {
 			Wg_Obj* location = str_findx<reverse>(context, argv, argc);
 			if (location == nullptr)
 				return nullptr;
@@ -4425,24 +4423,24 @@ class ValueError(Exception):
 			}
 		}
 
-		inline Wg_Obj* str_find(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* str_find(Wg_Context* context, Wg_Obj** argv, int argc) {
 			return str_findx<false>(context, argv, argc);
 		}
 
-		inline Wg_Obj* str_index(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* str_index(Wg_Context* context, Wg_Obj** argv, int argc) {
 			return str_indexx<false>(context, argv, argc);
 		}
 
-		inline Wg_Obj* str_rfind(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* str_rfind(Wg_Context* context, Wg_Obj** argv, int argc) {
 			return str_findx<true>(context, argv, argc);
 		}
 
-		inline Wg_Obj* str_rindex(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* str_rindex(Wg_Context* context, Wg_Obj** argv, int argc) {
 			return str_indexx<true>(context, argv, argc);
 		}
 
 		template <auto F>
-		inline Wg_Obj* str_isx(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* str_isx(Wg_Context* context, Wg_Obj** argv, int argc) {
 			WG_EXPECT_ARG_COUNT(1);
 			WG_EXPECT_ARG_TYPE_STRING(0);
 
@@ -4450,54 +4448,54 @@ class ValueError(Exception):
 			return Wg_NewBool(context, std::all_of(s.begin(), s.end(), F));
 		}
 
-		inline Wg_Obj* str_isalnum(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* str_isalnum(Wg_Context* context, Wg_Obj** argv, int argc) {
 			constexpr auto f = [](char c) { return ('a' <= c && c <= 'z') || ('A' <= c && c <= 'Z') || ('0' <= c && c <= '9'); };
 			return str_isx<f>(context, argv, argc);
 		}
 
-		inline Wg_Obj* str_isalpha(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* str_isalpha(Wg_Context* context, Wg_Obj** argv, int argc) {
 			constexpr auto f = [](char c) { return ('a' <= c && c <= 'z') || ('A' <= c && c <= 'Z'); };
 			return str_isx<f>(context, argv, argc);
 		}
 
-		inline Wg_Obj* str_isascii(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* str_isascii(Wg_Context* context, Wg_Obj** argv, int argc) {
 			constexpr auto f = [](char c) { return c >= 0 && c < 128; };
 			return str_isx<f>(context, argv, argc);
 		}
 
-		inline Wg_Obj* str_isdigit(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* str_isdigit(Wg_Context* context, Wg_Obj** argv, int argc) {
 			constexpr auto f = [](char c) { return '0' <= c && c <= '9'; };
 			return str_isx<f>(context, argv, argc);
 		}
 
-		inline Wg_Obj* str_isdecimal(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* str_isdecimal(Wg_Context* context, Wg_Obj** argv, int argc) {
 			return str_isdigit(context, argv, argc);
 		}
 
-		inline Wg_Obj* str_isnumeric(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* str_isnumeric(Wg_Context* context, Wg_Obj** argv, int argc) {
 			return str_isdigit(context, argv, argc);
 		}
 
-		inline Wg_Obj* str_isprintable(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* str_isprintable(Wg_Context* context, Wg_Obj** argv, int argc) {
 			constexpr auto f = [](char c) { return c >= 32 && c <= 127; };
 			return str_isx<f>(context, argv, argc);
 		}
 
-		inline Wg_Obj* str_isspace(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* str_isspace(Wg_Context* context, Wg_Obj** argv, int argc) {
 			return str_isx<IsSpace>(context, argv, argc);
 		}
 
-		inline Wg_Obj* str_isupper(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* str_isupper(Wg_Context* context, Wg_Obj** argv, int argc) {
 			constexpr auto f = [](char c) { return !('a' <= c && c <= 'z'); };
 			return str_isx<f>(context, argv, argc);
 		}
 
-		inline Wg_Obj* str_islower(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* str_islower(Wg_Context* context, Wg_Obj** argv, int argc) {
 			constexpr auto f = [](char c) { return !('A' <= c && c <= 'Z'); };
 			return str_isx<f>(context, argv, argc);
 		}
 
-		inline Wg_Obj* str_isidentifier(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* str_isidentifier(Wg_Context* context, Wg_Obj** argv, int argc) {
 			WG_EXPECT_ARG_COUNT(1);
 			WG_EXPECT_ARG_TYPE_STRING(0);
 
@@ -4507,7 +4505,7 @@ class ValueError(Exception):
 			return Wg_NewBool(context, allAlphaNum && (s.empty() || s[0] < '0' || s[0] > '9'));
 		}
 
-		inline Wg_Obj* str_join(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* str_join(Wg_Context* context, Wg_Obj** argv, int argc) {
 			WG_EXPECT_ARG_COUNT(2);
 			WG_EXPECT_ARG_TYPE_STRING(0);
 
@@ -4539,7 +4537,7 @@ class ValueError(Exception):
 			return Wg_NewString(context, state.s.c_str());
 		}
 
-		inline Wg_Obj* str_replace(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* str_replace(Wg_Context* context, Wg_Obj** argv, int argc) {
 			WG_EXPECT_ARG_COUNT_BETWEEN(3, 4);
 			WG_EXPECT_ARG_TYPE_STRING(0);
 			WG_EXPECT_ARG_TYPE_STRING(1);
@@ -4559,7 +4557,7 @@ class ValueError(Exception):
 		}
 
 		template <bool left, bool zfill = false>
-		inline Wg_Obj* str_just(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* str_just(Wg_Context* context, Wg_Obj** argv, int argc) {
 			if constexpr (zfill) {
 				WG_EXPECT_ARG_COUNT(2);
 			} else {
@@ -4597,19 +4595,19 @@ class ValueError(Exception):
 			return Wg_NewString(context, s.c_str());
 		}
 
-		inline Wg_Obj* str_ljust(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* str_ljust(Wg_Context* context, Wg_Obj** argv, int argc) {
 			return str_just<true>(context, argv, argc);
 		}
 
-		inline Wg_Obj* str_rjust(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* str_rjust(Wg_Context* context, Wg_Obj** argv, int argc) {
 			return str_just<false>(context, argv, argc);
 		}
 
-		inline Wg_Obj* str_zfill(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* str_zfill(Wg_Context* context, Wg_Obj** argv, int argc) {
 			return str_just<true, true>(context, argv, argc);
 		}
 
-		inline Wg_Obj* str_lstrip(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* str_lstrip(Wg_Context* context, Wg_Obj** argv, int argc) {
 			WG_EXPECT_ARG_COUNT_BETWEEN(1, 2);
 			WG_EXPECT_ARG_TYPE_STRING(0);
 
@@ -4626,7 +4624,7 @@ class ValueError(Exception):
 			return Wg_NewString(context, s.data() + pos);
 		}
 
-		inline Wg_Obj* str_rstrip(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* str_rstrip(Wg_Context* context, Wg_Obj** argv, int argc) {
 			WG_EXPECT_ARG_COUNT_BETWEEN(1, 2);
 			WG_EXPECT_ARG_TYPE_STRING(0);
 
@@ -4644,7 +4642,7 @@ class ValueError(Exception):
 			return Wg_NewString(context, s.c_str());
 		}
 
-		inline Wg_Obj* str_strip(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* str_strip(Wg_Context* context, Wg_Obj** argv, int argc) {
 			WG_EXPECT_ARG_COUNT_BETWEEN(1, 2);
 			WG_EXPECT_ARG_TYPE_STRING(0);
 
@@ -4666,7 +4664,7 @@ class ValueError(Exception):
 			return Wg_NewString(context, s.data() + pos);
 		}
 
-		inline Wg_Obj* str_split(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* str_split(Wg_Context* context, Wg_Obj** argv, int argc) {
 			WG_EXPECT_ARG_COUNT_BETWEEN(1, 3);
 			WG_EXPECT_ARG_TYPE_STRING(0);
 
@@ -4700,7 +4698,7 @@ class ValueError(Exception):
 			return li;
 		}
 
-		inline Wg_Obj* str_splitlines(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* str_splitlines(Wg_Context* context, Wg_Obj** argv, int argc) {
 			WG_EXPECT_ARG_COUNT(1);
 			WG_EXPECT_ARG_TYPE_STRING(0);
 
@@ -4721,7 +4719,7 @@ class ValueError(Exception):
 		}
 
 		template <Collection collection>
-		inline Wg_Obj* collection_str(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* collection_str(Wg_Context* context, Wg_Obj** argv, int argc) {
 			constexpr bool isTuple = collection == Collection::Tuple;
 			WG_EXPECT_ARG_COUNT(1);
 			if constexpr (isTuple) {
@@ -4758,7 +4756,7 @@ class ValueError(Exception):
 		}
 
 		template <Collection collection>
-		inline Wg_Obj* collection_mul(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* collection_mul(Wg_Context* context, Wg_Obj** argv, int argc) {
 			WG_EXPECT_ARG_COUNT(2);
 			WG_EXPECT_ARG_TYPE_INT(1);
 
@@ -4784,7 +4782,7 @@ class ValueError(Exception):
 		}
 
 		template <Collection collection>
-		inline Wg_Obj* collection_nonzero(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* collection_nonzero(Wg_Context* context, Wg_Obj** argv, int argc) {
 			WG_EXPECT_ARG_COUNT(1);
 			if constexpr (collection == Collection::List) {
 				WG_EXPECT_ARG_TYPE_LIST(0);
@@ -4796,7 +4794,7 @@ class ValueError(Exception):
 		}
 
 		template <Collection collection>
-		inline Wg_Obj* collection_lt(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* collection_lt(Wg_Context* context, Wg_Obj** argv, int argc) {
 			WG_EXPECT_ARG_COUNT(2);
 			if constexpr (collection == Collection::List) {
 				WG_EXPECT_ARG_TYPE_LIST(0);
@@ -4831,7 +4829,7 @@ class ValueError(Exception):
 		}
 
 		template <Collection collection>
-		inline Wg_Obj* collection_eq(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* collection_eq(Wg_Context* context, Wg_Obj** argv, int argc) {
 			WG_EXPECT_ARG_COUNT(2);
 			if constexpr (collection == Collection::List) {
 				WG_EXPECT_ARG_TYPE_LIST(0);
@@ -4862,7 +4860,7 @@ class ValueError(Exception):
 		}
 
 		template <Collection collection>
-		inline Wg_Obj* collection_contains(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* collection_contains(Wg_Context* context, Wg_Obj** argv, int argc) {
 			WG_EXPECT_ARG_COUNT(2);
 			if constexpr (collection == Collection::List) {
 				WG_EXPECT_ARG_TYPE_LIST(0);
@@ -4884,7 +4882,7 @@ class ValueError(Exception):
 		}
 
 		template <Collection collection>
-		inline Wg_Obj* collection_len(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* collection_len(Wg_Context* context, Wg_Obj** argv, int argc) {
 			WG_EXPECT_ARG_COUNT(1);
 			if constexpr (collection == Collection::List) {
 				WG_EXPECT_ARG_TYPE_LIST(0);
@@ -4896,7 +4894,7 @@ class ValueError(Exception):
 		}
 
 		template <Collection collection>
-		inline Wg_Obj* collection_count(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* collection_count(Wg_Context* context, Wg_Obj** argv, int argc) {
 			WG_EXPECT_ARG_COUNT(2);
 			if constexpr (collection == Collection::List) {
 				WG_EXPECT_ARG_TYPE_LIST(0);
@@ -4918,7 +4916,7 @@ class ValueError(Exception):
 		}
 
 		template <Collection collection>
-		inline Wg_Obj* collection_index(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* collection_index(Wg_Context* context, Wg_Obj** argv, int argc) {
 			WG_EXPECT_ARG_COUNT(2);
 			if constexpr (collection == Collection::List) {
 				WG_EXPECT_ARG_TYPE_LIST(0);
@@ -4940,7 +4938,7 @@ class ValueError(Exception):
 		}
 
 		template <Collection collection>
-		inline Wg_Obj* collection_getitem(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* collection_getitem(Wg_Context* context, Wg_Obj** argv, int argc) {
 			WG_EXPECT_ARG_COUNT(2);
 			if constexpr (collection == Collection::List) {
 				WG_EXPECT_ARG_TYPE_LIST(0);
@@ -4993,7 +4991,7 @@ class ValueError(Exception):
 			return nullptr;
 		}
 
-		inline Wg_Obj* list_setitem(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* list_setitem(Wg_Context* context, Wg_Obj** argv, int argc) {
 			WG_EXPECT_ARG_COUNT(3);
 			WG_EXPECT_ARG_TYPE_LIST(0);
 			WG_EXPECT_ARG_TYPE_INT(1);
@@ -5012,7 +5010,7 @@ class ValueError(Exception):
 			return Wg_None(context);
 		}
 		
-		inline Wg_Obj* list_append(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* list_append(Wg_Context* context, Wg_Obj** argv, int argc) {
 			WG_EXPECT_ARG_COUNT(2);
 			WG_EXPECT_ARG_TYPE_LIST(0);
 
@@ -5020,7 +5018,7 @@ class ValueError(Exception):
 			return Wg_None(context);
 		}
 
-		inline Wg_Obj* list_insert(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* list_insert(Wg_Context* context, Wg_Obj** argv, int argc) {
 			WG_EXPECT_ARG_COUNT(3);
 			WG_EXPECT_ARG_TYPE_LIST(0);
 			WG_EXPECT_ARG_TYPE_INT(1);
@@ -5035,7 +5033,7 @@ class ValueError(Exception):
 			return Wg_None(context);
 		}
 
-		inline Wg_Obj* list_pop(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* list_pop(Wg_Context* context, Wg_Obj** argv, int argc) {
 			WG_EXPECT_ARG_COUNT_BETWEEN(1, 2);
 			WG_EXPECT_ARG_TYPE_LIST(0);
 
@@ -5057,7 +5055,7 @@ class ValueError(Exception):
 			return popped;
 		}
 
-		inline Wg_Obj* list_remove(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* list_remove(Wg_Context* context, Wg_Obj** argv, int argc) {
 			WG_EXPECT_ARG_COUNT(2);
 			WG_EXPECT_ARG_TYPE_LIST(0);
 
@@ -5078,7 +5076,7 @@ class ValueError(Exception):
 			return nullptr;
 		}
 
-		inline Wg_Obj* list_clear(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* list_clear(Wg_Context* context, Wg_Obj** argv, int argc) {
 			WG_EXPECT_ARG_COUNT(1);
 			WG_EXPECT_ARG_TYPE_LIST(0);
 
@@ -5086,7 +5084,7 @@ class ValueError(Exception):
 			return Wg_None(context);
 		}
 
-		inline Wg_Obj* list_copy(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* list_copy(Wg_Context* context, Wg_Obj** argv, int argc) {
 			WG_EXPECT_ARG_COUNT(1);
 			WG_EXPECT_ARG_TYPE_LIST(0);
 
@@ -5094,7 +5092,7 @@ class ValueError(Exception):
 			return Wg_NewList(context, buf.data(), !buf.size());
 		}
 
-		inline Wg_Obj* list_extend(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* list_extend(Wg_Context* context, Wg_Obj** argv, int argc) {
 			WG_EXPECT_ARG_COUNT(2);
 			WG_EXPECT_ARG_TYPE_LIST(0);
 
@@ -5116,7 +5114,7 @@ class ValueError(Exception):
 			return Wg_None(context);
 		}
 
-		inline Wg_Obj* list_sort(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* list_sort(Wg_Context* context, Wg_Obj** argv, int argc) {
 			WG_EXPECT_ARG_COUNT(1);
 			WG_EXPECT_ARG_TYPE_LIST(0);
 
@@ -5153,7 +5151,7 @@ class ValueError(Exception):
 			return Wg_None(context);
 		}
 
-		inline Wg_Obj* list_reverse(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* list_reverse(Wg_Context* context, Wg_Obj** argv, int argc) {
 			WG_EXPECT_ARG_COUNT(1);
 			WG_EXPECT_ARG_TYPE_LIST(0);
 
@@ -5162,7 +5160,7 @@ class ValueError(Exception):
 			return Wg_None(context);
 		}
 
-		inline Wg_Obj* map_str(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* map_str(Wg_Context* context, Wg_Obj** argv, int argc) {
 			WG_EXPECT_ARG_COUNT(1);
 			WG_EXPECT_ARG_TYPE_MAP(0);
 
@@ -5197,19 +5195,19 @@ class ValueError(Exception):
 			}
 		}
 
-		inline Wg_Obj* map_nonzero(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* map_nonzero(Wg_Context* context, Wg_Obj** argv, int argc) {
 			WG_EXPECT_ARG_COUNT(1);
 			WG_EXPECT_ARG_TYPE_MAP(0);
 			return Wg_NewBool(context, !argv[0]->Get<WDict>().empty());
 		}
 
-		inline Wg_Obj* map_len(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* map_len(Wg_Context* context, Wg_Obj** argv, int argc) {
 			WG_EXPECT_ARG_COUNT(1);
 			WG_EXPECT_ARG_TYPE_MAP(0);
 			return Wg_NewInt(context, (Wg_int)argv[0]->Get<WDict>().size());
 		}
 
-		inline Wg_Obj* map_contains(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* map_contains(Wg_Context* context, Wg_Obj** argv, int argc) {
 			WG_EXPECT_ARG_COUNT(2);
 			WG_EXPECT_ARG_TYPE_MAP(0);
 			try {
@@ -5219,25 +5217,25 @@ class ValueError(Exception):
 			}
 		}
 
-		inline Wg_Obj* map_iter(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* map_iter(Wg_Context* context, Wg_Obj** argv, int argc) {
 			WG_EXPECT_ARG_COUNT(1);
 			WG_EXPECT_ARG_TYPE_MAP(0);
 			return Wg_Call(context->builtins.dictKeysIter, argv, 1, nullptr);
 		}
 
-		inline Wg_Obj* map_values(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* map_values(Wg_Context* context, Wg_Obj** argv, int argc) {
 			WG_EXPECT_ARG_COUNT(1);
 			WG_EXPECT_ARG_TYPE_MAP(0);
 			return Wg_Call(context->builtins.dictValuesIter, argv, 1, nullptr);
 		}
 
-		inline Wg_Obj* map_items(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* map_items(Wg_Context* context, Wg_Obj** argv, int argc) {
 			WG_EXPECT_ARG_COUNT(1);
 			WG_EXPECT_ARG_TYPE_MAP(0);
 			return Wg_Call(context->builtins.dictItemsIter, argv, 1, nullptr);
 		}
 
-		inline Wg_Obj* map_get(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* map_get(Wg_Context* context, Wg_Obj** argv, int argc) {
 			WG_EXPECT_ARG_COUNT_BETWEEN(2, 3);
 			WG_EXPECT_ARG_TYPE_MAP(0);
 
@@ -5256,7 +5254,7 @@ class ValueError(Exception):
 			return it->second;
 		}
 
-		inline Wg_Obj* map_getitem(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* map_getitem(Wg_Context* context, Wg_Obj** argv, int argc) {
 			WG_EXPECT_ARG_COUNT(2);
 			WG_EXPECT_ARG_TYPE_MAP(0);
 
@@ -5276,7 +5274,7 @@ class ValueError(Exception):
 			return it->second;
 		}
 
-		inline Wg_Obj* map_setitem(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* map_setitem(Wg_Context* context, Wg_Obj** argv, int argc) {
 			WG_EXPECT_ARG_COUNT(3);
 			WG_EXPECT_ARG_TYPE_MAP(0);
 
@@ -5288,14 +5286,14 @@ class ValueError(Exception):
 			return Wg_None(context);
 		}
 
-		inline Wg_Obj* map_clear(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* map_clear(Wg_Context* context, Wg_Obj** argv, int argc) {
 			WG_EXPECT_ARG_COUNT(1);
 			WG_EXPECT_ARG_TYPE_MAP(0);
 			argv[0]->Get<WDict>().clear();
 			return Wg_None(context);
 		}
 
-		inline Wg_Obj* map_copy(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* map_copy(Wg_Context* context, Wg_Obj** argv, int argc) {
 			WG_EXPECT_ARG_COUNT(1);
 			WG_EXPECT_ARG_TYPE_MAP(0);
 
@@ -5308,7 +5306,7 @@ class ValueError(Exception):
 			return Wg_NewDictionary(context, keys.data(), values.data(), (int)keys.size());
 		}
 
-		inline Wg_Obj* map_pop(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* map_pop(Wg_Context* context, Wg_Obj** argv, int argc) {
 			WG_EXPECT_ARG_COUNT_BETWEEN(2, 3);
 			WG_EXPECT_ARG_TYPE_MAP(0);
 
@@ -5322,7 +5320,7 @@ class ValueError(Exception):
 			return nullptr;
 		}
 
-		inline Wg_Obj* map_popitem(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* map_popitem(Wg_Context* context, Wg_Obj** argv, int argc) {
 			WG_EXPECT_ARG_COUNT(1);
 			WG_EXPECT_ARG_TYPE_MAP(0);
 
@@ -5337,7 +5335,7 @@ class ValueError(Exception):
 			return Wg_NewTuple(context, tupElems, 2);
 		}
 
-		inline Wg_Obj* map_setdefault(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* map_setdefault(Wg_Context* context, Wg_Obj** argv, int argc) {
 			WG_EXPECT_ARG_COUNT_BETWEEN(2, 3);
 			WG_EXPECT_ARG_TYPE_MAP(0);
 
@@ -5351,7 +5349,7 @@ class ValueError(Exception):
 			}
 		}
 
-		inline Wg_Obj* map_update(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* map_update(Wg_Context* context, Wg_Obj** argv, int argc) {
 			WG_EXPECT_ARG_COUNT(2);
 			WG_EXPECT_ARG_TYPE_MAP(0);
 
@@ -5379,13 +5377,13 @@ class ValueError(Exception):
 			}
 		}
 
-		inline Wg_Obj* set_nonzero(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* set_nonzero(Wg_Context* context, Wg_Obj** argv, int argc) {
 			WG_EXPECT_ARG_COUNT(1);
 			WG_EXPECT_ARG_TYPE_SET(0);
 			return Wg_NewBool(context, !argv[0]->Get<WSet>().empty());
 		}
 
-		inline Wg_Obj* set_str(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* set_str(Wg_Context* context, Wg_Obj** argv, int argc) {
 			WG_EXPECT_ARG_COUNT(1);
 			WG_EXPECT_ARG_TYPE_SET(0);
 
@@ -5419,13 +5417,13 @@ class ValueError(Exception):
 			}
 		}
 
-		inline Wg_Obj* set_iter(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* set_iter(Wg_Context* context, Wg_Obj** argv, int argc) {
 			WG_EXPECT_ARG_COUNT(1);
 			WG_EXPECT_ARG_TYPE_SET(0);
 			return Wg_Call(context->builtins.setIter, argv, 1, nullptr);
 		}
 
-		inline Wg_Obj* set_contains(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* set_contains(Wg_Context* context, Wg_Obj** argv, int argc) {
 			WG_EXPECT_ARG_COUNT(2);
 			WG_EXPECT_ARG_TYPE_SET(0);
 			try {
@@ -5436,33 +5434,33 @@ class ValueError(Exception):
 			}
 		}
 
-		inline Wg_Obj* set_len(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* set_len(Wg_Context* context, Wg_Obj** argv, int argc) {
 			WG_EXPECT_ARG_COUNT(1);
 			WG_EXPECT_ARG_TYPE_SET(0);
 			return Wg_NewInt(context, (int)argv[0]->Get<WSet>().size());
 		}
 
-		inline Wg_Obj* set_clear(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* set_clear(Wg_Context* context, Wg_Obj** argv, int argc) {
 			WG_EXPECT_ARG_COUNT(1);
 			WG_EXPECT_ARG_TYPE_SET(0);
 			argv[0]->Get<WSet>().clear();
 			return Wg_None(context);
 		}
 
-		inline Wg_Obj* set_copy(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* set_copy(Wg_Context* context, Wg_Obj** argv, int argc) {
 			WG_EXPECT_ARG_COUNT(1);
 			WG_EXPECT_ARG_TYPE_SET(0);
 			return Wg_Call(context->builtins.set, argv, 1);
 		}
 		
-		inline Wg_Obj* set_add(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* set_add(Wg_Context* context, Wg_Obj** argv, int argc) {
 			WG_EXPECT_ARG_COUNT(2);
 			WG_EXPECT_ARG_TYPE_SET(0);
 			argv[0]->Get<WSet>().insert(argv[1]);
 			return Wg_None(context);
 		}
 
-		inline Wg_Obj* set_remove(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* set_remove(Wg_Context* context, Wg_Obj** argv, int argc) {
 			WG_EXPECT_ARG_COUNT(2);
 			WG_EXPECT_ARG_TYPE_SET(0);
 			
@@ -5483,7 +5481,7 @@ class ValueError(Exception):
 			}
 		}
 
-		inline Wg_Obj* set_discard(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* set_discard(Wg_Context* context, Wg_Obj** argv, int argc) {
 			WG_EXPECT_ARG_COUNT(2);
 			WG_EXPECT_ARG_TYPE_SET(0);
 
@@ -5500,7 +5498,7 @@ class ValueError(Exception):
 			return Wg_None(context);
 		}
 
-		inline Wg_Obj* set_pop(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* set_pop(Wg_Context* context, Wg_Obj** argv, int argc) {
 			WG_EXPECT_ARG_COUNT(1);
 			WG_EXPECT_ARG_TYPE_SET(0);
 			auto& set = argv[0]->Get<WSet>();
@@ -5514,7 +5512,7 @@ class ValueError(Exception):
 			return obj;
 		}
 
-		inline Wg_Obj* set_update(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* set_update(Wg_Context* context, Wg_Obj** argv, int argc) {
 			WG_EXPECT_ARG_COUNT(2);
 			WG_EXPECT_ARG_TYPE_SET(0);
 
@@ -5532,7 +5530,7 @@ class ValueError(Exception):
 			return Wg_None(context);
 		}
 
-		inline Wg_Obj* set_union(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* set_union(Wg_Context* context, Wg_Obj** argv, int argc) {
 			WG_EXPECT_ARG_COUNT_AT_LEAST(1);
 			WG_EXPECT_ARG_TYPE_SET(0);
 
@@ -5553,7 +5551,7 @@ class ValueError(Exception):
 			return res;
 		}
 
-		inline Wg_Obj* set_difference(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* set_difference(Wg_Context* context, Wg_Obj** argv, int argc) {
 			WG_EXPECT_ARG_COUNT_AT_LEAST(1);
 			WG_EXPECT_ARG_TYPE_SET(0);
 
@@ -5589,7 +5587,7 @@ class ValueError(Exception):
 			return res;
 		}
 
-		inline Wg_Obj* set_intersection(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* set_intersection(Wg_Context* context, Wg_Obj** argv, int argc) {
 			WG_EXPECT_ARG_COUNT_AT_LEAST(1);
 			WG_EXPECT_ARG_TYPE_SET(0);
 
@@ -5625,7 +5623,7 @@ class ValueError(Exception):
 			return res;
 		}
 
-		inline Wg_Obj* set_symmetric_difference(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* set_symmetric_difference(Wg_Context* context, Wg_Obj** argv, int argc) {
 			WG_EXPECT_ARG_COUNT(2);
 			WG_EXPECT_ARG_TYPE_SET(0);
 
@@ -5662,7 +5660,7 @@ class ValueError(Exception):
 			return res;
 		}
 
-		inline Wg_Obj* set_isdisjoint(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* set_isdisjoint(Wg_Context* context, Wg_Obj** argv, int argc) {
 			WG_EXPECT_ARG_COUNT(2);
 			WG_EXPECT_ARG_TYPE_SET(0);
 
@@ -5673,7 +5671,7 @@ class ValueError(Exception):
 			return Wg_UnaryOp(WG_UOP_NOT, inters);
 		}
 
-		inline Wg_Obj* set_issubset(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* set_issubset(Wg_Context* context, Wg_Obj** argv, int argc) {
 			WG_EXPECT_ARG_COUNT(2);
 			WG_EXPECT_ARG_TYPE_SET(0);
 
@@ -5690,7 +5688,7 @@ class ValueError(Exception):
 			return Wg_NewBool(context, inters->Get<WSet>().size() == size);
 		}
 
-		inline Wg_Obj* set_issuperset(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* set_issuperset(Wg_Context* context, Wg_Obj** argv, int argc) {
 			WG_EXPECT_ARG_COUNT(2);
 			WG_EXPECT_ARG_TYPE_SET(0);
 
@@ -5715,12 +5713,12 @@ class ValueError(Exception):
 			return Wg_NewBool(context, s.result);
 		}
 
-		inline Wg_Obj* BaseException_str(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* BaseException_str(Wg_Context* context, Wg_Obj** argv, int argc) {
 			WG_EXPECT_ARG_COUNT(1);
 			return Wg_GetAttribute(argv[0], "_message");
 		}
 
-		inline Wg_Obj* DictKeysIter_next(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* DictKeysIter_next(Wg_Context* context, Wg_Obj** argv, int argc) {
 			WG_EXPECT_ARG_COUNT(1);
 			WDict::iterator* it{};
 			if (!TryGetUserdata(argv[0], "__DictKeysIter", &it)) {
@@ -5739,7 +5737,7 @@ class ValueError(Exception):
 			return key;
 		}
 
-		inline Wg_Obj* DictValuesIter_next(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* DictValuesIter_next(Wg_Context* context, Wg_Obj** argv, int argc) {
 			WG_EXPECT_ARG_COUNT(1);
 			WDict::iterator* it{};
 			if (!TryGetUserdata(argv[0], "__DictValuesIter", &it)) {
@@ -5758,7 +5756,7 @@ class ValueError(Exception):
 			return value;
 		}
 
-		inline Wg_Obj* DictItemsIter_next(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* DictItemsIter_next(Wg_Context* context, Wg_Obj** argv, int argc) {
 			WG_EXPECT_ARG_COUNT(1);
 			WDict::iterator* it{};
 			if (!TryGetUserdata(argv[0], "__DictItemsIter", &it)) {
@@ -5777,7 +5775,7 @@ class ValueError(Exception):
 			return Wg_NewTuple(context, tup, 2);
 		}
 
-		inline Wg_Obj* SetIter_next(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* SetIter_next(Wg_Context* context, Wg_Obj** argv, int argc) {
 			WG_EXPECT_ARG_COUNT(1);
 			WSet::iterator* it{};
 			if (!TryGetUserdata(argv[0], "__SetIter", &it)) {
@@ -5796,7 +5794,7 @@ class ValueError(Exception):
 			return obj;
 		}
 
-		inline Wg_Obj* File_iter(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* File_iter(Wg_Context* context, Wg_Obj** argv, int argc) {
 			WG_EXPECT_ARG_COUNT(1);
 			if (!Wg_TryGetUserdata(argv[0], "__File", nullptr)) {
 				Wg_RaiseArgumentTypeError(context, 0, "__File");
@@ -5806,7 +5804,7 @@ class ValueError(Exception):
 			return Wg_Call(context->builtins.readlineIter, argv, 1);
 		}
 
-		inline Wg_Obj* File_read(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* File_read(Wg_Context* context, Wg_Obj** argv, int argc) {
 			WG_EXPECT_ARG_COUNT_BETWEEN(1, 2);
 			std::fstream* f{};
 			if (!TryGetUserdata(argv[0], "__File", &f)) {
@@ -5832,7 +5830,7 @@ class ValueError(Exception):
 			return Wg_NewStringBuffer(context, buf.data(), (int)buf.size());
 		}
 
-		inline Wg_Obj* File_readline(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* File_readline(Wg_Context* context, Wg_Obj** argv, int argc) {
 			WG_EXPECT_ARG_COUNT(1);
 			std::fstream* f{};
 			if (!TryGetUserdata(argv[0], "__File", &f)) {
@@ -5851,7 +5849,7 @@ class ValueError(Exception):
 			return Wg_NewString(context, s.c_str());
 		}
 
-		inline Wg_Obj* File_readlines(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* File_readlines(Wg_Context* context, Wg_Obj** argv, int argc) {
 			WG_EXPECT_ARG_COUNT(1);
 			if (!Wg_TryGetUserdata(argv[0], "__File", nullptr)) {
 				Wg_RaiseArgumentTypeError(context, 0, "__File");
@@ -5861,7 +5859,7 @@ class ValueError(Exception):
 			return Wg_Call(context->builtins.list, argv, 1);
 		}
 
-		inline Wg_Obj* File_closex(Wg_Context* context, Wg_Obj** argv, int) {
+		static Wg_Obj* File_closex(Wg_Context* context, Wg_Obj** argv, int) {
 			std::fstream* f{};
 			if (!TryGetUserdata(argv[0], "__File", &f)) {
 				Wg_RaiseArgumentTypeError(context, 0, "__File");
@@ -5874,17 +5872,17 @@ class ValueError(Exception):
 			return Wg_None(context);
 		}
 
-		inline Wg_Obj* File_close(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* File_close(Wg_Context* context, Wg_Obj** argv, int argc) {
 			WG_EXPECT_ARG_COUNT(1);
 			return File_closex(context, argv, argc);
 		}
 
-		inline Wg_Obj* File_exit(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* File_exit(Wg_Context* context, Wg_Obj** argv, int argc) {
 			WG_EXPECT_ARG_COUNT(4);
 			return File_closex(context, argv, argc);
 		}
 
-		inline Wg_Obj* File_seekable(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* File_seekable(Wg_Context* context, Wg_Obj** argv, int argc) {
 			WG_EXPECT_ARG_COUNT(1);
 			if (!Wg_TryGetUserdata(argv[0], "__File", nullptr)) {
 				Wg_RaiseArgumentTypeError(context, 0, "__File");
@@ -5894,7 +5892,7 @@ class ValueError(Exception):
 			return Wg_NewBool(context, true);
 		}
 
-		inline Wg_Obj* File_readable(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* File_readable(Wg_Context* context, Wg_Obj** argv, int argc) {
 			WG_EXPECT_ARG_COUNT(1);
 			if (!Wg_TryGetUserdata(argv[0], "__File", nullptr)) {
 				Wg_RaiseArgumentTypeError(context, 0, "__File");
@@ -5904,7 +5902,7 @@ class ValueError(Exception):
 			return Wg_GetAttribute(argv[0], "_readable");
 		}
 
-		inline Wg_Obj* File_writable(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* File_writable(Wg_Context* context, Wg_Obj** argv, int argc) {
 			WG_EXPECT_ARG_COUNT(1);
 			if (!Wg_TryGetUserdata(argv[0], "__File", nullptr)) {
 				Wg_RaiseArgumentTypeError(context, 0, "__File");
@@ -5914,7 +5912,7 @@ class ValueError(Exception):
 			return Wg_GetAttribute(argv[0], "_writable");
 		}
 
-		inline Wg_Obj* File_seek(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* File_seek(Wg_Context* context, Wg_Obj** argv, int argc) {
 			WG_EXPECT_ARG_COUNT(2);
 			WG_EXPECT_ARG_TYPE_INT(1);
 			std::fstream* f{};
@@ -5928,7 +5926,7 @@ class ValueError(Exception):
 			return Wg_None(context);
 		}
 
-		inline Wg_Obj* File_tell(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* File_tell(Wg_Context* context, Wg_Obj** argv, int argc) {
 			WG_EXPECT_ARG_COUNT(1);
 			std::fstream* f{};
 			if (!TryGetUserdata(argv[0], "__File", &f)) {
@@ -5939,7 +5937,7 @@ class ValueError(Exception):
 			return Wg_NewInt(context, (Wg_int)f->tellg());
 		}
 
-		inline Wg_Obj* File_flush(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* File_flush(Wg_Context* context, Wg_Obj** argv, int argc) {
 			WG_EXPECT_ARG_COUNT(1);
 			std::fstream* f{};
 			if (!TryGetUserdata(argv[0], "__File", &f)) {
@@ -5952,7 +5950,7 @@ class ValueError(Exception):
 			return Wg_None(context);
 		}
 
-		inline Wg_Obj* File_write(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* File_write(Wg_Context* context, Wg_Obj** argv, int argc) {
 			WG_EXPECT_ARG_COUNT(2);
 			WG_EXPECT_ARG_TYPE_STRING(1);
 			std::fstream* f{};
@@ -5968,7 +5966,7 @@ class ValueError(Exception):
 			return Wg_None(context);
 		}
 
-		inline Wg_Obj* File_writelines(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* File_writelines(Wg_Context* context, Wg_Obj** argv, int argc) {
 			WG_EXPECT_ARG_COUNT(2);
 			if (!Wg_TryGetUserdata(argv[0], "__File", nullptr)) {
 				Wg_RaiseArgumentTypeError(context, 0, "__File");
@@ -5986,7 +5984,7 @@ class ValueError(Exception):
 			return Wg_None(context);
 		}
 		
-		inline Wg_Obj* self(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* self(Wg_Context* context, Wg_Obj** argv, int argc) {
 			WG_EXPECT_ARG_COUNT(1);
 			return argv[0];
 		}
@@ -5996,7 +5994,7 @@ class ValueError(Exception):
 	namespace lib {
 
 		template <size_t base>
-		inline Wg_Obj* base_str(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* base_str(Wg_Context* context, Wg_Obj** argv, int argc) {
 			WG_EXPECT_ARG_COUNT(1);
 
 			Wg_Obj* val = Wg_UnaryOp(WG_UOP_INDEX, argv[0]);
@@ -6023,7 +6021,7 @@ class ValueError(Exception):
 			return Wg_NewString(context, s.c_str());
 		}
 
-		inline Wg_Obj* callable(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* callable(Wg_Context* context, Wg_Obj** argv, int argc) {
 			WG_EXPECT_ARG_COUNT(1);
 			
 			if (Wg_IsFunction(argv[0])) {
@@ -6033,7 +6031,7 @@ class ValueError(Exception):
 			}
 		}
 
-		inline Wg_Obj* chr(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* chr(Wg_Context* context, Wg_Obj** argv, int argc) {
 			WG_EXPECT_ARG_COUNT(1);
 			WG_EXPECT_ARG_TYPE_INT(0);
 			
@@ -6042,7 +6040,7 @@ class ValueError(Exception):
 			return Wg_NewString(context, s);
 		}
 
-		inline Wg_Obj* compile(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* compile(Wg_Context* context, Wg_Obj** argv, int argc) {
 			WG_EXPECT_ARG_COUNT(3);
 			WG_EXPECT_ARG_TYPE_STRING(0);
 			WG_EXPECT_ARG_TYPE_STRING(1);
@@ -6067,7 +6065,7 @@ class ValueError(Exception):
 			return Wg_Call(context->builtins.codeObject, &fn, 1);
 		}
 
-		inline Wg_Obj* eval(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* eval(Wg_Context* context, Wg_Obj** argv, int argc) {
 			WG_EXPECT_ARG_COUNT(1);
 			
 			if (Wg_IsInstance(argv[0], &context->builtins.codeObject, 1)) {
@@ -6079,7 +6077,7 @@ class ValueError(Exception):
 			}
 		}
 
-		inline Wg_Obj* exec(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* exec(Wg_Context* context, Wg_Obj** argv, int argc) {
 			WG_EXPECT_ARG_COUNT(1);
 
 			if (Wg_IsInstance(argv[0], &context->builtins.codeObject, 1)) {
@@ -6097,12 +6095,12 @@ class ValueError(Exception):
 			return Wg_None(context);
 		}
 
-		inline Wg_Obj* exit(Wg_Context* context, Wg_Obj**, int) {
+		static Wg_Obj* exit(Wg_Context* context, Wg_Obj**, int) {
 			Wg_RaiseException(context, WG_EXC_SYSTEMEXIT);
 			return nullptr;
 		}
 
-		inline Wg_Obj* getattr(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* getattr(Wg_Context* context, Wg_Obj** argv, int argc) {
 			WG_EXPECT_ARG_COUNT(2);
 			WG_EXPECT_ARG_TYPE_STRING(1);
 			
@@ -6110,12 +6108,12 @@ class ValueError(Exception):
 			return Wg_GetAttribute(argv[0], name);
 		}
 		
-		inline Wg_Obj* id(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* id(Wg_Context* context, Wg_Obj** argv, int argc) {
 			WG_EXPECT_ARG_COUNT(1);
 			return Wg_NewInt(context, (Wg_int)argv[0]);
 		}
 
-		inline Wg_Obj* input(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* input(Wg_Context* context, Wg_Obj** argv, int argc) {
 			WG_EXPECT_ARG_COUNT_BETWEEN(0, 1);
 			
 			if (argc == 1) {
@@ -6132,7 +6130,7 @@ class ValueError(Exception):
 			return Wg_NewString(context, s.c_str());
 		}
 
-		inline Wg_Obj* isinstance(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* isinstance(Wg_Context* context, Wg_Obj** argv, int argc) {
 			WG_EXPECT_ARG_COUNT(2);
 			bool ret{};
 			if (Wg_IsTuple(argv[1])) {
@@ -6144,7 +6142,7 @@ class ValueError(Exception):
 			return Wg_NewBool(context, ret);
 		}
 
-		inline Wg_Obj* ord(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* ord(Wg_Context* context, Wg_Obj** argv, int argc) {
 			WG_EXPECT_ARG_COUNT(1);
 			WG_EXPECT_ARG_TYPE_STRING(0);
 
@@ -6160,12 +6158,12 @@ class ValueError(Exception):
 			}
 		}
 
-		inline Wg_Obj* pow(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* pow(Wg_Context* context, Wg_Obj** argv, int argc) {
 			WG_EXPECT_ARG_COUNT(2);
 			return Wg_BinaryOp(WG_BOP_POW, argv[0], argv[1]);
 		}
 
-		inline Wg_Obj* print(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* print(Wg_Context* context, Wg_Obj** argv, int argc) {
 			Wg_Obj* kwargs = Wg_GetKwargs(context);
 			if (kwargs == nullptr)
 				return nullptr;
@@ -6199,7 +6197,7 @@ class ValueError(Exception):
 			return Wg_None(context);
 		}
 
-		inline Wg_Obj* round(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* round(Wg_Context* context, Wg_Obj** argv, int argc) {
 			WG_EXPECT_ARG_COUNT_BETWEEN(1, 2);
 			WG_EXPECT_ARG_TYPE_INT_OR_FLOAT(0);
 
@@ -6221,7 +6219,7 @@ class ValueError(Exception):
 			}
 		}
 
-		inline Wg_Obj* setattr(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* setattr(Wg_Context* context, Wg_Obj** argv, int argc) {
 			WG_EXPECT_ARG_COUNT(3);
 			WG_EXPECT_ARG_TYPE_STRING(1);
 
@@ -6232,7 +6230,7 @@ class ValueError(Exception):
 
 	} // namespace lib
 
-	inline bool ImportBuiltins(Wg_Context* context) {
+	bool ImportBuiltins(Wg_Context* context) {
 		try {
 			auto getGlobal = [&](const char* name) {
 				if (Wg_Obj* v = Wg_GetGlobal(context, name))
@@ -7092,9 +7090,9 @@ namespace wings {
 
 namespace wings {
 
-	inline std::atomic<Wg_ErrorCallback> errorCallback;
+	std::atomic<Wg_ErrorCallback> errorCallback;
 	
-	inline Wg_Obj* Alloc(Wg_Context* context) {
+	Wg_Obj* Alloc(Wg_Context* context) {
 		// Objects should never be allocated while the garbage collector is running.
 		WG_ASSERT(!context->gcRunning);
 		
@@ -7124,7 +7122,7 @@ namespace wings {
 		return p;
 	}
 
-	inline void CallErrorCallback(const char* message) {
+	void CallErrorCallback(const char* message) {
 		Wg_ErrorCallback cb = errorCallback;
 
 		if (cb) {
@@ -7134,12 +7132,12 @@ namespace wings {
 		}
 	}
 
-	inline size_t Guid() {
+	size_t Guid() {
 		static std::atomic_size_t i = 0;
 		return ++i;
 	}
 
-	inline std::string WObjTypeToString(const Wg_Obj* obj) {
+	std::string WObjTypeToString(const Wg_Obj* obj) {
 		if (Wg_IsNone(obj)) {
 			return "NoneType";
 		} else if (Wg_IsBool(obj)) {
@@ -7169,7 +7167,7 @@ namespace wings {
 		}
 	}
 
-	inline std::string CodeError::ToString() const {
+	std::string CodeError::ToString() const {
 		if (good) {
 			return "Success";
 		} else {
@@ -7179,15 +7177,15 @@ namespace wings {
 		}
 	}
 
-	inline CodeError::operator bool() const {
+	CodeError::operator bool() const {
 		return !good;
 	}
 
-	inline CodeError CodeError::Good() {
+	CodeError CodeError::Good() {
 		return CodeError{ true, {}, {} };
 	}
 
-	inline CodeError CodeError::Bad(std::string message, SourcePosition srcPos) {
+	CodeError CodeError::Bad(std::string message, SourcePosition srcPos) {
 		return CodeError{
 			.good = false,
 			.srcPos = srcPos,
@@ -7195,19 +7193,19 @@ namespace wings {
 		};
 	}
 
-	inline size_t WObjHasher::operator()(Wg_Obj* obj) const {
+	size_t WObjHasher::operator()(Wg_Obj* obj) const {
 		if (Wg_Obj* hash = Wg_UnaryOp(WG_UOP_HASH, obj))
 			return (size_t)Wg_GetInt(hash);
 		throw HashException();
 	}
 
-	inline bool WObjComparer::operator()(Wg_Obj* lhs, Wg_Obj* rhs) const {
+	bool WObjComparer::operator()(Wg_Obj* lhs, Wg_Obj* rhs) const {
 		if (Wg_Obj* eq = Wg_BinaryOp(WG_BOP_EQ, lhs, rhs))
 			return Wg_GetBool(eq);
 		throw HashException();
 	}
 
-	inline const std::unordered_set<std::string_view> RESERVED = {
+	static const std::unordered_set<std::string_view> RESERVED = {
 		"True", "False", "None",
 		"and", "or", "not",
 		"if", "else", "elif", "while", "for",
@@ -7220,11 +7218,11 @@ namespace wings {
 		"await", "async", "yield",
 	};
 
-	inline bool IsKeyword(std::string_view s) {
+	bool IsKeyword(std::string_view s) {
 		return RESERVED.contains(s);
 	}
 
-	inline bool IsValidIdentifier(std::string_view s) {
+	bool IsValidIdentifier(std::string_view s) {
 		if (s.empty())
 			return false;
 
@@ -7241,7 +7239,7 @@ namespace wings {
 			&& !IsKeyword(s);
 	}
 	
-	inline void RegisterMethod(Wg_Obj* klass, const char* name, Wg_Function fptr) {
+	void RegisterMethod(Wg_Obj* klass, const char* name, Wg_Function fptr) {
 		if (Wg_IsClass(klass)) {
 			if (Wg_BindMethod(klass, name, fptr, nullptr) == nullptr)
 				throw LibraryInitException();
@@ -7254,7 +7252,7 @@ namespace wings {
 		}
 	}
 
-	inline Wg_Obj* RegisterFunction(Wg_Context* context, const char* name, Wg_Function fptr) {
+	Wg_Obj* RegisterFunction(Wg_Context* context, const char* name, Wg_Function fptr) {
 		Wg_Obj* obj = Wg_NewFunction(context, fptr, nullptr, name);
 		if (obj == nullptr)
 			throw LibraryInitException();
@@ -7262,12 +7260,12 @@ namespace wings {
 		return obj;
 	}
 
-	inline void AddAttributeToClass(Wg_Obj* klass, const char* attribute, Wg_Obj* value) {
+	void AddAttributeToClass(Wg_Obj* klass, const char* attribute, Wg_Obj* value) {
 		WG_ASSERT_VOID(klass && attribute && value && Wg_IsClass(klass) && IsValidIdentifier(attribute));
 		klass->Get<Wg_Obj::Class>().instanceAttributes.Set(attribute, value);
 	}
 
-	inline Wg_Obj* Compile(Wg_Context* context, const char* code, const char* module, const char* prettyName, bool expr) {
+	Wg_Obj* Compile(Wg_Context* context, const char* code, const char* module, const char* prettyName, bool expr) {
 		WG_ASSERT(context && code);
 
 		if (prettyName == nullptr)
@@ -7340,7 +7338,7 @@ namespace wings {
 		return obj;
 	}
 
-	inline Wg_Obj* Execute(Wg_Context* context, const char* code, const char* module) {
+	Wg_Obj* Execute(Wg_Context* context, const char* code, const char* module) {
 		if (Wg_Obj* fn = Compile(context, code, module, module, false)) {
 			return Wg_Call(fn, nullptr, 0);
 		} else {
@@ -7348,21 +7346,21 @@ namespace wings {
 		}
 	}
 
-	inline Rng::Rng() :
+	Rng::Rng() :
 		engine(std::random_device()())
 	{
 	}
 
-	inline void Rng::Seed(Wg_int seed) {
+	void Rng::Seed(Wg_int seed) {
 		engine.seed((unsigned long long)seed);
 		dist.reset();
 	}
 
-	inline Wg_float Rng::Rand() {
+	Wg_float Rng::Rand() {
 		return dist(engine);
 	}
 
-	inline Wg_int Rng::Int(Wg_int minIncl, Wg_int maxIncl) {
+	Wg_int Rng::Int(Wg_int minIncl, Wg_int maxIncl) {
 		auto i = (Wg_int)((maxIncl - minIncl + 1) * Rand() + minIncl);
 
 		if (i > maxIncl) // Just in case
@@ -7371,15 +7369,15 @@ namespace wings {
 		return i;
 	}
 
-	inline Wg_float Rng::Float(Wg_float minIncl, Wg_float maxIncl) {
+	Wg_float Rng::Float(Wg_float minIncl, Wg_float maxIncl) {
 		return (maxIncl - minIncl) * Rand() + minIncl;
 	}
 
-	inline std::mt19937_64& Rng::Engine() {
+	std::mt19937_64& Rng::Engine() {
 		return engine;
 	}
 	
-	inline bool InitArgv(Wg_Context* context, const char* const* argv, int argc) {
+	bool InitArgv(Wg_Context* context, const char* const* argv, int argc) {
 		Wg_Obj* list = Wg_NewList(context);
 		if (list == nullptr)
 			return false;
@@ -7408,14 +7406,14 @@ namespace wings {
 
 namespace wings {
 
-	inline thread_local std::vector<size_t> breakInstructions;
-	inline thread_local std::vector<size_t> continueInstructions;
+	static thread_local std::vector<size_t> breakInstructions;
+	static thread_local std::vector<size_t> continueInstructions;
 
-	inline void CompileBody(const std::vector<Statement>& body, std::vector<Instruction>& instructions);
-	inline void CompileExpression(const Expression& expression, std::vector<Instruction>& instructions);
-	inline void CompileFunction(const Expression& node, std::vector<Instruction>& instructions);
+	static void CompileBody(const std::vector<Statement>& body, std::vector<Instruction>& instructions);
+	static void CompileExpression(const Expression& expression, std::vector<Instruction>& instructions);
+	static void CompileFunction(const Expression& node, std::vector<Instruction>& instructions);
 
-	inline const std::unordered_map<Operation, std::string> OP_METHODS = {
+	static const std::unordered_map<Operation, std::string> OP_METHODS = {
 		{ Operation::Index,  "__getitem__"  },
 		{ Operation::Pos,	 "__pos__"      },
 		{ Operation::Neg,	 "__neg__"      },
@@ -7454,7 +7452,7 @@ namespace wings {
 		{ Operation::ShiftRAssign, "__irshift__" },
 	};
 
-	inline const std::unordered_set<Operation> COMPOUND_OPS = {
+	static const std::unordered_set<Operation> COMPOUND_OPS = {
 		Operation::AddAssign,
 		Operation::SubAssign,
 		Operation::MulAssign,
@@ -7469,7 +7467,7 @@ namespace wings {
 		Operation::XorAssign,
 	};
 
-	inline void CompileInlineIfElse(const Expression& expression, std::vector<Instruction>& instructions) {
+	static void CompileInlineIfElse(const Expression& expression, std::vector<Instruction>& instructions) {
 		const auto& condition = expression.children[0];
 		const auto& trueCase = expression.children[1];
 		const auto& falseCase = expression.children[2];
@@ -7499,7 +7497,7 @@ namespace wings {
 		instructions[trueJumpIndex].jump->location = instructions.size();
 	}
 
-	inline void CompileShortcircuitLogical(const Expression& expr, std::vector<Instruction>& instructions) {
+	static void CompileShortcircuitLogical(const Expression& expr, std::vector<Instruction>& instructions) {
 		const auto& lhs = expr.children[0];
 		const auto& rhs = expr.children[1];
 
@@ -7521,7 +7519,7 @@ namespace wings {
 		instructions[jmpInstrIndex].jump->location = instructions.size();
 	}
 
-	inline void CompileIn(const Expression& expression, std::vector<Instruction>& instructions) {
+	static void CompileIn(const Expression& expression, std::vector<Instruction>& instructions) {
 		Instruction argFrame{};
 		argFrame.srcPos = expression.srcPos;
 		argFrame.type = Instruction::Type::PushArgFrame;
@@ -7551,7 +7549,7 @@ namespace wings {
 		}
 	}
 
-	inline void CompileAssignment(
+	static void CompileAssignment(
 		const AssignTarget& assignTarget,
 		const Expression& assignee,
 		const Expression& value,
@@ -7616,7 +7614,7 @@ namespace wings {
 		instructions.push_back(std::move(instr));
 	}
 
-	inline void CompileExpression(const Expression& expression, std::vector<Instruction>& instructions) {
+	static void CompileExpression(const Expression& expression, std::vector<Instruction>& instructions) {
 		if (expression.operation == Operation::Assign) {
 			CompileAssignment(expression.assignTarget, expression.children[0], expression.children[1], expression.srcPos, instructions);
 			return;
@@ -7821,7 +7819,7 @@ namespace wings {
 		instructions.push_back(std::move(instr));
 	}
 
-	inline void CompileExpressionStatement(const Statement& node, std::vector<Instruction>& instructions) {
+	static void CompileExpressionStatement(const Statement& node, std::vector<Instruction>& instructions) {
 		CompileExpression(node.expr, instructions);
 
 		Instruction instr{};
@@ -7830,7 +7828,7 @@ namespace wings {
 		instructions.push_back(std::move(instr));
 	}
 
-	inline void CompileIf(const Statement& node, std::vector<Instruction>& instructions) {
+	static void CompileIf(const Statement& node, std::vector<Instruction>& instructions) {
 		CompileExpression(node.expr, instructions);
 
 		size_t falseJumpInstrIndex = instructions.size();
@@ -7860,7 +7858,7 @@ namespace wings {
 		}
 	}
 
-	inline void CompileWhile(const Statement& node, std::vector<Instruction>& instructions) {
+	static void CompileWhile(const Statement& node, std::vector<Instruction>& instructions) {
 		size_t conditionLocation = instructions.size();
 		CompileExpression(node.expr, instructions);
 		
@@ -7896,7 +7894,7 @@ namespace wings {
 		continueInstructions.clear();
 	}
 
-	inline void CompileBreak(const Statement& node, std::vector<Instruction>& instructions) {
+	static void CompileBreak(const Statement& node, std::vector<Instruction>& instructions) {
 		breakInstructions.push_back(instructions.size());
 
 		Instruction jump{};
@@ -7906,7 +7904,7 @@ namespace wings {
 		instructions.push_back(std::move(jump));
 	}
 
-	inline void CompileContinue(const Statement& node, std::vector<Instruction>& instructions) {
+	static void CompileContinue(const Statement& node, std::vector<Instruction>& instructions) {
 		continueInstructions.push_back(instructions.size());
 
 		Instruction jump{};
@@ -7916,7 +7914,7 @@ namespace wings {
 		instructions.push_back(std::move(jump));
 	}
 
-	inline void CompileReturn(const Statement& node, std::vector<Instruction>& instructions) {
+	static void CompileReturn(const Statement& node, std::vector<Instruction>& instructions) {
 		CompileExpression(node.expr, instructions);
 
 		Instruction in{};
@@ -7925,7 +7923,7 @@ namespace wings {
 		instructions.push_back(std::move(in));
 	}
 
-	inline void CompileFunction(const Expression& node, std::vector<Instruction>& instructions) {
+	static void CompileFunction(const Expression& node, std::vector<Instruction>& instructions) {
 		const auto& parameters = node.def.parameters;
 		size_t defaultParamCount = 0;
 		for (size_t i = parameters.size(); i-- > 0; ) {
@@ -7971,7 +7969,7 @@ namespace wings {
 		instructions.push_back(std::move(def));
 	}
 
-	inline void CompileDef(const Statement& node, std::vector<Instruction>& instructions) {
+	static void CompileDef(const Statement& node, std::vector<Instruction>& instructions) {
 		CompileFunction(node.expr, instructions);
 
 		Instruction assign{};
@@ -7988,7 +7986,7 @@ namespace wings {
 		instructions.push_back(std::move(pop));
 	}
 
-	inline void CompileClass(const Statement& node, std::vector<Instruction>& instructions) {
+	static void CompileClass(const Statement& node, std::vector<Instruction>& instructions) {
 		for (const auto& child : node.body) {
 			CompileDef(child, instructions);
 			instructions.pop_back();
@@ -8027,7 +8025,7 @@ namespace wings {
 		instructions.push_back(std::move(pop));
 	}
 
-	inline void CompileImportFrom(const Statement& node, std::vector<Instruction>& instructions) {
+	static void CompileImportFrom(const Statement& node, std::vector<Instruction>& instructions) {
 		Instruction instr{};
 		instr.srcPos = node.srcPos;
 		instr.type = Instruction::Type::ImportFrom;
@@ -8038,7 +8036,7 @@ namespace wings {
 		instructions.push_back(std::move(instr));
 	}
 
-	inline void CompileImport(const Statement& node, std::vector<Instruction>& instructions) {
+	static void CompileImport(const Statement& node, std::vector<Instruction>& instructions) {
 		Instruction instr{};
 		instr.srcPos = node.srcPos;
 		instr.type = Instruction::Type::Import;
@@ -8048,7 +8046,7 @@ namespace wings {
 		instructions.push_back(std::move(instr));
 	}
 
-	inline void CompileRaise(const Statement& node, std::vector<Instruction>& instructions) {
+	static void CompileRaise(const Statement& node, std::vector<Instruction>& instructions) {
 		CompileExpression(node.expr, instructions);
 
 		Instruction raise{};
@@ -8057,7 +8055,7 @@ namespace wings {
 		instructions.push_back(std::move(raise));
 	}
 
-	inline void CompileTry(const Statement& node, std::vector<Instruction>& instructions) {
+	static void CompileTry(const Statement& node, std::vector<Instruction>& instructions) {
 		/* 
 		 * Push try
 		 * Try body
@@ -8175,7 +8173,7 @@ namespace wings {
 
 	using CompileFn = void(*)(const Statement&, std::vector<Instruction>&);
 
-	inline const std::unordered_map<Statement::Type, CompileFn> COMPILE_FUNCTIONS = {
+	static const std::unordered_map<Statement::Type, CompileFn> COMPILE_FUNCTIONS = {
 		{ Statement::Type::Expr, CompileExpressionStatement },
 		{ Statement::Type::If, CompileIf },
 		{ Statement::Type::While, CompileWhile },
@@ -8193,17 +8191,17 @@ namespace wings {
 		{ Statement::Type::Nonlocal, [](auto, auto) {}},
 	};
 
-	inline void CompileStatement(const Statement& node, std::vector<Instruction>& instructions) {
+	static void CompileStatement(const Statement& node, std::vector<Instruction>& instructions) {
 		COMPILE_FUNCTIONS.at(node.type)(node, instructions);
 	}
 
-	inline void CompileBody(const std::vector<Statement>& body, std::vector<Instruction>& instructions) {
+	static void CompileBody(const std::vector<Statement>& body, std::vector<Instruction>& instructions) {
 		for (const auto& child : body) {
 			CompileStatement(child, instructions);
 		}
 	}
 
-	inline std::vector<Instruction> Compile(const Statement& parseTree) {
+	std::vector<Instruction> Compile(const Statement& parseTree) {
 		breakInstructions.clear();
 		continueInstructions.clear();
 
@@ -8225,7 +8223,7 @@ namespace wings {
 
 namespace wings {
 	namespace dismodule {
-		inline std::string AssignTargetToString(const AssignTarget& target) {
+		static std::string AssignTargetToString(const AssignTarget& target) {
 			if (target.type == AssignType::Direct) {
 				return target.direct;
 			} else {
@@ -8240,7 +8238,7 @@ namespace wings {
 			}
 		}
 
-		inline std::string LiteralToString(const LiteralInstruction& literal) {
+		static std::string LiteralToString(const LiteralInstruction& literal) {
 			if (std::holds_alternative<std::nullptr_t>(literal)) {
 				return "None";
 			} else if (std::holds_alternative<bool>(literal)) {
@@ -8256,14 +8254,14 @@ namespace wings {
 			}
 		}
 
-		inline std::string PadLeft(size_t i, size_t size) {
+		static std::string PadLeft(size_t i, size_t size) {
 			auto n = std::to_string(i);
 			while (n.size() < size)
 				n.insert(0, 1, ' ');
 			return n;
 		}
 
-		inline Wg_Obj* dis(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* dis(Wg_Context* context, Wg_Obj** argv, int argc) {
 			WG_EXPECT_ARG_COUNT(1);
 			WG_EXPECT_ARG_TYPE_FUNC(0);
 
@@ -8448,7 +8446,7 @@ namespace wings {
 		}
 	}
 
-	inline bool ImportDis(Wg_Context* context) {
+	bool ImportDis(Wg_Context* context) {
 		using namespace dismodule;
 		try {
 			RegisterFunction(context, "dis", dis);
@@ -8462,7 +8460,7 @@ namespace wings {
 
 namespace wings {
 
-	inline Wg_Obj* DefObject::Run(Wg_Context* context, Wg_Obj** args, int argc) {
+	Wg_Obj* DefObject::Run(Wg_Context* context, Wg_Obj** args, int argc) {
 		DefObject* def = (DefObject*)Wg_GetFunctionUserdata(context);
 		Wg_Obj* kwargs = Wg_GetKwargs(context);
 		if (kwargs == nullptr)
@@ -8597,40 +8595,40 @@ namespace wings {
 		return result;
 	}
 
-	inline void  Executor::PushStack(Wg_Obj* obj) {
+	void  Executor::PushStack(Wg_Obj* obj) {
 		stack.push_back(obj);
 	}
 
-	inline Wg_Obj* Executor::PopStack() {
+	Wg_Obj* Executor::PopStack() {
 		auto obj = stack.back();
 		stack.pop_back();
 		return obj;
 	}
 
-	inline void Executor::PopStackUntil(size_t size) {
+	void Executor::PopStackUntil(size_t size) {
 		while (stack.size() > size)
 			PopStack();
 	}
 
-	inline Wg_Obj* Executor::PeekStack() {
+	Wg_Obj* Executor::PeekStack() {
 		return stack.back();
 	}
 
-	inline void Executor::ClearStack() {
+	void Executor::ClearStack() {
 		while (!stack.empty())
 			PopStack();
 		argFrames = {};
 		kwargsStack = {};
 	}
 
-	inline size_t Executor::PopArgFrame() {
+	size_t Executor::PopArgFrame() {
 		kwargsStack.pop_back();
 		size_t ret = stack.size() - argFrames.top();
 		argFrames.pop();
 		return ret;
 	}
 
-	inline Wg_Obj* Executor::GetVariable(const std::string& name) {
+	Wg_Obj* Executor::GetVariable(const std::string& name) {
 		auto it = variables.find(name);
 		if (it != variables.end()) {
 			return *it->second;
@@ -8639,7 +8637,7 @@ namespace wings {
 		}
 	}
 
-	inline void Executor::SetVariable(const std::string& name, Wg_Obj* value) {
+	void Executor::SetVariable(const std::string& name, Wg_Obj* value) {
 		auto it = variables.find(name);
 		if (it != variables.end()) {
 			*it->second = value;
@@ -8648,7 +8646,7 @@ namespace wings {
 		}
 	}
 
-	inline Wg_Obj* Executor::DirectAssign(const AssignTarget& target, Wg_Obj* value) {
+	Wg_Obj* Executor::DirectAssign(const AssignTarget& target, Wg_Obj* value) {
 		switch (target.type) {
 		case AssignType::Direct:
 			SetVariable(target.direct, value);
@@ -8682,7 +8680,7 @@ namespace wings {
 		}
 	}
 
-	inline Wg_Obj* Executor::Run() {
+	Wg_Obj* Executor::Run() {
 		auto& frame = context->currentTrace.back();
 		frame.module = def->module;
 		frame.func = def->prettyName;
@@ -8731,7 +8729,7 @@ namespace wings {
 		}
 	}
 
-	inline void Executor::DoInstruction(const Instruction& instr) {
+	void Executor::DoInstruction(const Instruction& instr) {
 		switch (instr.type) {
 		case Instruction::Type::Jump:
 			pc = instr.jump->location - 1;
@@ -9111,7 +9109,7 @@ namespace wings {
 		}
 	}
 
-	inline void Executor::GetReferences(std::deque<const Wg_Obj*>& refs) {
+	void Executor::GetReferences(std::deque<const Wg_Obj*>& refs) {
 		for (const auto& var : variables)
 			refs.push_back(*var.second);
 		for (const auto& frame : kwargsStack)
@@ -9127,47 +9125,47 @@ namespace wings {
 
 namespace wings {
 
-	inline thread_local bool disableInOperator;
+	static thread_local bool disableInOperator;
 
-	inline CodeError ParseExpression(TokenIter& p, Expression& out, size_t minPrecedence, std::optional<Expression> preParsedArg = std::nullopt);
+	static CodeError ParseExpression(TokenIter& p, Expression& out, size_t minPrecedence, std::optional<Expression> preParsedArg = std::nullopt);
 
-	inline TokenIter::TokenIter(const std::vector<Token>& tokens) :
+	TokenIter::TokenIter(const std::vector<Token>& tokens) :
 		index(0),
 		tokens(&tokens)
 	{
 	}
 
-	inline TokenIter& TokenIter::operator++() {
+	TokenIter& TokenIter::operator++() {
 		index++;
 		return *this;
 	}
 
-	inline TokenIter& TokenIter::operator--() {
+	TokenIter& TokenIter::operator--() {
 		index--;
 		return *this;
 	}
 
-	inline const Token& TokenIter::operator*() const {
+	const Token& TokenIter::operator*() const {
 		return (*tokens)[index];
 	}
 
-	inline const Token* TokenIter::operator->() const {
+	const Token* TokenIter::operator->() const {
 		return &(*tokens)[index];
 	}
 
-	inline bool TokenIter::operator==(const TokenIter& rhs) const {
+	bool TokenIter::operator==(const TokenIter& rhs) const {
 		return index == rhs.index && tokens == rhs.tokens;
 	}
 
-	inline bool TokenIter::operator!=(const TokenIter& rhs) const {
+	bool TokenIter::operator!=(const TokenIter& rhs) const {
 		return !(*this == rhs);
 	}
 
-	inline bool TokenIter::EndReached() const {
+	bool TokenIter::EndReached() const {
 		return index >= tokens->size();
 	}
 
-	inline const std::unordered_map<std::string, Operation> BINARY_OP_STRINGS = {
+	static const std::unordered_map<std::string, Operation> BINARY_OP_STRINGS = {
 		{ "+",  Operation::Add },
 		{ "-",  Operation::Sub },
 		{ "*",  Operation::Mul },
@@ -9209,14 +9207,14 @@ namespace wings {
 		{ ".", Operation::Dot },
 	};
 
-	inline const std::unordered_map<std::string, Operation> PREFIX_UNARY_OP_STRINGS = {
+	static const std::unordered_map<std::string, Operation> PREFIX_UNARY_OP_STRINGS = {
 		{ "+", Operation::Pos },
 		{ "-", Operation::Neg },
 		{ "~", Operation::BitNot },
 		{ "not", Operation::Not },
 	};
 
-	inline const std::unordered_set<Operation> BINARY_OPS = {
+	static const std::unordered_set<Operation> BINARY_OPS = {
 		Operation::Add,
 		Operation::Sub,
 		Operation::Mul,
@@ -9258,7 +9256,7 @@ namespace wings {
 		Operation::XorAssign,
 	};
 
-	inline const std::unordered_set<Operation> BINARY_RIGHT_ASSOCIATIVE_OPS = {
+	static const std::unordered_set<Operation> BINARY_RIGHT_ASSOCIATIVE_OPS = {
 		Operation::Assign,
 		Operation::AddAssign,
 		Operation::SubAssign,
@@ -9274,14 +9272,14 @@ namespace wings {
 		Operation::XorAssign,
 	};
 
-	inline const std::unordered_set<Operation> PREFIX_UNARY_OPS = {
+	static const std::unordered_set<Operation> PREFIX_UNARY_OPS = {
 		Operation::Pos,
 		Operation::Neg,
 		Operation::Not,
 		Operation::BitNot,
 	};
 
-	inline const std::vector<std::vector<Operation>> PRECEDENCE = {
+	static const std::vector<std::vector<Operation>> PRECEDENCE = {
 		{ Operation::Call, Operation::Index, Operation::Slice, Operation::Dot },
 		{ Operation::Pow },
 		{ Operation::Pos, Operation::Neg, Operation::BitNot },
@@ -9307,7 +9305,7 @@ namespace wings {
 		},
 	};
 
-	inline size_t PrecedenceOf(Operation op) {
+	static size_t PrecedenceOf(Operation op) {
 		auto it = std::find_if(
 			PRECEDENCE.begin(),
 			PRECEDENCE.end(),
@@ -9316,7 +9314,7 @@ namespace wings {
 		return std::distance(it, PRECEDENCE.end());
 	}
 
-	inline bool IsAssignableExpression(const Expression& expr, AssignTarget& target, bool onlyDirectOrPack) {
+	bool IsAssignableExpression(const Expression& expr, AssignTarget& target, bool onlyDirectOrPack) {
 		target.type = AssignType::None;
 		switch (expr.operation) {
 		case Operation::Variable:
@@ -9346,7 +9344,7 @@ namespace wings {
 		}
 	}
 
-	inline CodeError ParseExpressionList(TokenIter& p, const std::string& terminate, std::vector<Expression>& out, bool isFnCall, bool* seenComma) {
+	CodeError ParseExpressionList(TokenIter& p, const std::string& terminate, std::vector<Expression>& out, bool isFnCall, bool* seenComma) {
 		bool mustTerminate = false;
 		bool seenKwarg = false;
 		if (seenComma) *seenComma = false;
@@ -9429,7 +9427,7 @@ namespace wings {
 		}
 	}
 
-	inline CodeError ParsePostfix(TokenIter& p, Expression arg, Expression& out) {
+	static CodeError ParsePostfix(TokenIter& p, Expression arg, Expression& out) {
 		if (p.EndReached()) {
 			out = std::move(arg);
 			return CodeError::Good();
@@ -9568,7 +9566,7 @@ namespace wings {
 		return CodeError::Good();
 	}
 
-	inline CodeError ParseTuple(TokenIter& p, Expression& out) {
+	static CodeError ParseTuple(TokenIter& p, Expression& out) {
 		out.srcPos = p->srcPos;
 		out.operation = Operation::Tuple;
 		++p;
@@ -9590,7 +9588,7 @@ namespace wings {
 		return CodeError::Good();
 	}
 
-	inline CodeError ParseList(TokenIter& p, Expression& out) {
+	static CodeError ParseList(TokenIter& p, Expression& out) {
 		out.srcPos = p->srcPos;
 		out.operation = Operation::List;
 		++p;
@@ -9606,7 +9604,7 @@ namespace wings {
 		return CodeError::Good();
 	}
 
-	inline CodeError ParseSet(TokenIter& p, Expression& out) {
+	static CodeError ParseSet(TokenIter& p, Expression& out) {
 		out.srcPos = p->srcPos;
 		out.operation = Operation::Set;
 		++p;
@@ -9622,7 +9620,7 @@ namespace wings {
 		return CodeError::Good();
 	}
 
-	inline CodeError ParseMap(TokenIter& p, Expression& out) {
+	static CodeError ParseMap(TokenIter& p, Expression& out) {
 		out.srcPos = p->srcPos;
 		out.operation = Operation::Map;
 		++p;
@@ -9687,7 +9685,7 @@ namespace wings {
 		}
 	}
 
-	inline CodeError TryParseListComprehension(TokenIter& p, Expression& out, bool& isListComp) {
+	static CodeError TryParseListComprehension(TokenIter& p, Expression& out, bool& isListComp) {
 		isListComp = false;
 		out.srcPos = p->srcPos;
 		out.operation = Operation::ListComprehension;
@@ -9802,7 +9800,7 @@ namespace wings {
 		return CodeError::Good();
 	}
 
-	inline CodeError ParseLambda(TokenIter& p, Expression& out) {
+	static CodeError ParseLambda(TokenIter& p, Expression& out) {
 		out.srcPos = p->srcPos;
 		++p;
 
@@ -9843,7 +9841,7 @@ namespace wings {
 		return CodeError::Good();
 	}
 
-	inline CodeError ParseValue(TokenIter& p, Expression& out) {
+	static CodeError ParseValue(TokenIter& p, Expression& out) {
 		// Parse standalone values
 		out = {};
 		if (p->text == "(") {
@@ -9922,7 +9920,7 @@ namespace wings {
 		return CodeError::Good();
 	}
 
-	inline CodeError ParsePrefix(TokenIter& p, Expression& out) {
+	static CodeError ParsePrefix(TokenIter& p, Expression& out) {
 		if (PREFIX_UNARY_OP_STRINGS.contains(p->text)) {
 			Operation op = PREFIX_UNARY_OP_STRINGS.at(p->text);
 			out.srcPos = p->srcPos;
@@ -9938,7 +9936,7 @@ namespace wings {
 		}
 	}
 
-	inline CodeError ParseExpression(TokenIter& p, Expression& out, size_t minPrecedence, std::optional<Expression> preParsedArg) {
+	static CodeError ParseExpression(TokenIter& p, Expression& out, size_t minPrecedence, std::optional<Expression> preParsedArg) {
 		Expression lhs{};
 		if (preParsedArg.has_value()) {
 			lhs = std::move(preParsedArg.value());
@@ -10029,7 +10027,7 @@ namespace wings {
 		}
 	}
 
-	inline CodeError ParseExpression(TokenIter& p, Expression& out, bool disableInOp) {
+	CodeError ParseExpression(TokenIter& p, Expression& out, bool disableInOp) {
 		disableInOperator = disableInOp;
 		if (p.EndReached()) {
 			return CodeError::Bad("Expected an expression", (--p)->srcPos);
@@ -10046,7 +10044,7 @@ namespace wings {
 
 namespace wings {
 
-	inline std::string Token::ToString() const {
+	std::string Token::ToString() const {
 		std::vector<std::pair<std::string, std::string>> props;
 
 		props.push_back({ "text", '"' + text + '"' });
@@ -10088,7 +10086,7 @@ namespace wings {
 		return s + "}";
 	}
 
-	inline const std::vector<std::string> SYMBOLS = {
+	static const std::vector<std::string> SYMBOLS = {
 		"(", ")", "[", "]", "{", "}", ":", ".", ",",
 		"+", "-", "*", "**", "/", "//", "%",
 		"<", ">", "<=", ">=", "==", "!=",
@@ -10098,17 +10096,17 @@ namespace wings {
 		">>=", "<<=", "|=", "&=", "^=", ";", "--", "++"
 	};
 
-	inline std::string NormalizeLineEndings(const std::string& text) {
+	static std::string NormalizeLineEndings(const std::string& text) {
 		auto s = std::regex_replace(text, std::regex("\r\n"), "\n");
 		std::replace(s.begin(), s.end(), '\r', '\n');
 		return s;
 	}
 
-	inline bool IsAlpha(char c) {
+	static bool IsAlpha(char c) {
 		return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || c == '_';
 	}
 
-	inline bool IsDigit(char c, int base = 10) {
+	static bool IsDigit(char c, int base = 10) {
 		switch (base) {
 		case 2: return c >= '0' && c <= '1';
 		case 8: return c >= '0' && c <= '7';
@@ -10118,7 +10116,7 @@ namespace wings {
 		}
 	}
 
-	inline int DigitValueOf(char c, int base) {
+	static int DigitValueOf(char c, int base) {
 		switch (base) {
 		case 2:
 		case 8:
@@ -10137,34 +10135,34 @@ namespace wings {
 		}
 	}
 
-	inline bool IsAlphaNum(char c) {
+	static bool IsAlphaNum(char c) {
 		return IsAlpha(c) || IsDigit(c);
 	}
 
-	inline bool IsWhitespace(const std::string& s) {
+	static bool IsWhitespace(const std::string& s) {
 		return s.find_first_not_of(" \t") == std::string::npos;
 	}
 
-	inline bool IsWhitespaceChar(char c) {
+	static bool IsWhitespaceChar(char c) {
 		return c == ' ' || c == '\t';
 	}
 
-	inline void StripComments(std::string& s) {
+	static void StripComments(std::string& s) {
 		s.erase(
 			std::find(s.begin(), s.end(), '#'),
 			s.end()
 		);
 	}
 
-	inline bool IsPossibleSymbol(const std::string& s) {
+	static bool IsPossibleSymbol(const std::string& s) {
 		return std::any_of(SYMBOLS.begin(), SYMBOLS.end(), [&](const auto& x) { return x.starts_with(s); });
 	}
 
-	inline bool IsPossibleSymbol(char c) {
+	static bool IsPossibleSymbol(char c) {
 		return IsPossibleSymbol(std::string(1, c));
 	}
 
-	inline std::vector<std::string> SplitLines(const std::string& s) {
+	static std::vector<std::string> SplitLines(const std::string& s) {
 		std::vector<std::string> v;
 		size_t last = 0;
 		size_t next = 0;
@@ -10176,7 +10174,7 @@ namespace wings {
 		return v;
 	}
 
-	inline int IndentOf(const std::string& line, std::optional<std::string>& indentString, size_t& indent) {
+	static int IndentOf(const std::string& line, std::optional<std::string>& indentString, size_t& indent) {
 		size_t i = 0;
 		while (true) {
 			// Reached end of line or comment before any code
@@ -10221,7 +10219,7 @@ namespace wings {
 
 	using StringIter = const char*;
 
-	inline Token ConsumeWord(StringIter& p) {
+	static Token ConsumeWord(StringIter& p) {
 		Token t{};
 		for (; *p && IsAlphaNum(*p); ++p) {
 			t.text += *p;
@@ -10238,7 +10236,7 @@ namespace wings {
 		return t;
 	}
 
-	inline CodeError ConsumeNumber(StringIter& p, Token& out) {
+	static CodeError ConsumeNumber(StringIter& p, Token& out) {
 		StringIter start = p;
 
 		Token t{};
@@ -10300,7 +10298,7 @@ namespace wings {
 		return CodeError::Good();
 	}
 
-	inline bool IsHexDigit(char c, int& val) {
+	static bool IsHexDigit(char c, int& val) {
 		if (c >= '0' && c <= '9') {
 			val = c - '0';
 			return true;
@@ -10315,7 +10313,7 @@ namespace wings {
 		}
 	}
 
-	inline CodeError ConsumeString(StringIter& p, Token& out) {
+	static CodeError ConsumeString(StringIter& p, Token& out) {
 		char quote = *p;
 		++p;
 
@@ -10382,12 +10380,12 @@ namespace wings {
 		return CodeError::Good();
 	}
 
-	inline void ConsumeWhitespace(StringIter& p) {
+	static void ConsumeWhitespace(StringIter& p) {
 		while (*p && IsWhitespaceChar(*p))
 			++p;
 	}
 
-	inline CodeError ConsumeSymbol(StringIter& p, Token& t) {
+	static CodeError ConsumeSymbol(StringIter& p, Token& t) {
 		for (; *p && IsPossibleSymbol(t.text + *p); ++p) {
 			t.text += *p;
 		}
@@ -10400,7 +10398,7 @@ namespace wings {
 		}
 	}
 
-	inline CodeError TokenizeLine(const std::string& line, std::vector<Token>& out) {
+	static CodeError TokenizeLine(const std::string& line, std::vector<Token>& out) {
 		std::vector<Token> tokens;
 		CodeError error = CodeError::Good();
 
@@ -10451,7 +10449,7 @@ namespace wings {
 	}
 
 	// Returns [no. of open brackets] minus [no. close brackets]
-	inline int BracketBalance(std::vector<Token>& tokens) {
+	static int BracketBalance(std::vector<Token>& tokens) {
 		int balance = 0;
 		for (const auto& t : tokens) {
 			if (t.text.size() == 1) {
@@ -10464,7 +10462,7 @@ namespace wings {
 		return balance;
 	}
 
-	inline LexResult Lex(std::string code) {
+	LexResult Lex(std::string code) {
 		code = NormalizeLineEndings(code);
 		auto originalSource = SplitLines(code);
 
@@ -10669,7 +10667,7 @@ def radians(x):
 	return x * pi / 180.0
 )";
 
-		inline Wg_Obj* ceil(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* ceil(Wg_Context* context, Wg_Obj** argv, int argc) {
 			WG_EXPECT_ARG_COUNT(1);
 			if (Wg_IsIntOrFloat(argv[0])) {
 				return Wg_NewInt(context, (Wg_int)std::ceil(Wg_GetFloat(argv[0])));
@@ -10677,7 +10675,7 @@ def radians(x):
 			return Wg_CallMethod(argv[0], "__ceil__", nullptr, 0);
 		}
 
-		inline Wg_Obj* floor(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* floor(Wg_Context* context, Wg_Obj** argv, int argc) {
 			WG_EXPECT_ARG_COUNT(1);
 			if (Wg_IsIntOrFloat(argv[0])) {
 				return Wg_NewInt(context, (Wg_int)std::floor(Wg_GetFloat(argv[0])));
@@ -10688,25 +10686,25 @@ def radians(x):
 		using FpCheck = bool(*)(Wg_float);
 
 		template <FpCheck f>
-		inline Wg_Obj* isx(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* isx(Wg_Context* context, Wg_Obj** argv, int argc) {
 			WG_EXPECT_ARG_COUNT(1);
 			WG_EXPECT_ARG_TYPE_INT_OR_FLOAT(0);
 			return Wg_NewBool(context, f(Wg_GetFloat(argv[0])));
 		}
 
-		inline Wg_Obj* isfinite(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* isfinite(Wg_Context* context, Wg_Obj** argv, int argc) {
 			return isx<std::isfinite>(context, argv, argc);
 		}
 
-		inline Wg_Obj* isinf(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* isinf(Wg_Context* context, Wg_Obj** argv, int argc) {
 			return isx<std::isinf>(context, argv, argc);
 		}
 
-		inline Wg_Obj* isnan(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* isnan(Wg_Context* context, Wg_Obj** argv, int argc) {
 			return isx<std::isnan>(context, argv, argc);
 		}
 
-		inline Wg_Obj* log(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* log(Wg_Context* context, Wg_Obj** argv, int argc) {
 			WG_EXPECT_ARG_COUNT_BETWEEN(1, 2);
 			WG_EXPECT_ARG_TYPE_INT_OR_FLOAT(0);
 			Wg_float base = std::numbers::e_v<Wg_float>;
@@ -10720,77 +10718,77 @@ def radians(x):
 		using Op = Wg_float(*)(Wg_float);
 
 		template <Op op>
-		inline Wg_Obj* opx(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* opx(Wg_Context* context, Wg_Obj** argv, int argc) {
 			WG_EXPECT_ARG_COUNT(1);
 			WG_EXPECT_ARG_TYPE_INT_OR_FLOAT(0);
 			return Wg_NewFloat(context, op(Wg_GetFloat(argv[0])));
 		}
 
-		inline Wg_Obj* cos(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* cos(Wg_Context* context, Wg_Obj** argv, int argc) {
 			return opx<std::cos>(context, argv, argc);
 		}
 
-		inline Wg_Obj* sin(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* sin(Wg_Context* context, Wg_Obj** argv, int argc) {
 			return opx<std::sin>(context, argv, argc);
 		}
 
-		inline Wg_Obj* tan(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* tan(Wg_Context* context, Wg_Obj** argv, int argc) {
 			return opx<std::tan>(context, argv, argc);
 		}
 
-		inline Wg_Obj* acos(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* acos(Wg_Context* context, Wg_Obj** argv, int argc) {
 			return opx<std::acos>(context, argv, argc);
 		}
 
-		inline Wg_Obj* asin(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* asin(Wg_Context* context, Wg_Obj** argv, int argc) {
 			return opx<std::asin>(context, argv, argc);
 		}
 
-		inline Wg_Obj* atan(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* atan(Wg_Context* context, Wg_Obj** argv, int argc) {
 			return opx<std::atan>(context, argv, argc);
 		}
 
-		inline Wg_Obj* cosh(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* cosh(Wg_Context* context, Wg_Obj** argv, int argc) {
 			return opx<std::cosh>(context, argv, argc);
 		}
 
-		inline Wg_Obj* sinh(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* sinh(Wg_Context* context, Wg_Obj** argv, int argc) {
 			return opx<std::sinh>(context, argv, argc);
 		}
 
-		inline Wg_Obj* tanh(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* tanh(Wg_Context* context, Wg_Obj** argv, int argc) {
 			return opx<std::tanh>(context, argv, argc);
 		}
 
-		inline Wg_Obj* acosh(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* acosh(Wg_Context* context, Wg_Obj** argv, int argc) {
 			return opx<std::acosh>(context, argv, argc);
 		}
 
-		inline Wg_Obj* asinh(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* asinh(Wg_Context* context, Wg_Obj** argv, int argc) {
 			return opx<std::asinh>(context, argv, argc);
 		}
 
-		inline Wg_Obj* atanh(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* atanh(Wg_Context* context, Wg_Obj** argv, int argc) {
 			return opx<std::atanh>(context, argv, argc);
 		}
 
-		inline Wg_Obj* erf(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* erf(Wg_Context* context, Wg_Obj** argv, int argc) {
 			return opx<std::erf>(context, argv, argc);
 		}
 
-		inline Wg_Obj* erfc(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* erfc(Wg_Context* context, Wg_Obj** argv, int argc) {
 			return opx<std::erfc>(context, argv, argc);
 		}
 
-		inline Wg_Obj* gamma(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* gamma(Wg_Context* context, Wg_Obj** argv, int argc) {
 			return opx<std::tgamma>(context, argv, argc);
 		}
 
-		inline Wg_Obj* lgamma(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* lgamma(Wg_Context* context, Wg_Obj** argv, int argc) {
 			return opx<std::lgamma>(context, argv, argc);
 		}
 
-		inline Wg_Obj* atan2(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* atan2(Wg_Context* context, Wg_Obj** argv, int argc) {
 			WG_EXPECT_ARG_COUNT(2);
 			WG_EXPECT_ARG_TYPE_INT_OR_FLOAT(0);
 			WG_EXPECT_ARG_TYPE_INT_OR_FLOAT(1);
@@ -10798,7 +10796,7 @@ def radians(x):
 		}
 	}
 	
-	inline bool ImportMath(Wg_Context* context) {
+	bool ImportMath(Wg_Context* context) {
 		using namespace mathmodule;
 		try {
 			RegisterFunction(context, "ceil", ceil);
@@ -10854,14 +10852,14 @@ namespace wings {
 	namespace osmodule {
 		namespace fs = std::filesystem;
 
-		inline Wg_Obj* system(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* system(Wg_Context* context, Wg_Obj** argv, int argc) {
 			WG_EXPECT_ARG_COUNT(1);
 			WG_EXPECT_ARG_TYPE_STRING(0);
 			int ec = std::system(Wg_GetString(argv[0]));
 			return Wg_NewInt(context, (Wg_int)ec);
 		}
 
-		inline Wg_Obj* mkdir(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* mkdir(Wg_Context* context, Wg_Obj** argv, int argc) {
 			WG_EXPECT_ARG_COUNT(1);
 			WG_EXPECT_ARG_TYPE_STRING(0);
 			const char* path = Wg_GetString(argv[0]);
@@ -10873,7 +10871,7 @@ namespace wings {
 			return Wg_None(context);
 		}
 
-		inline Wg_Obj* makedirs(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* makedirs(Wg_Context* context, Wg_Obj** argv, int argc) {
 			WG_EXPECT_ARG_COUNT(1);
 			WG_EXPECT_ARG_TYPE_STRING(0);
 			const char* path = Wg_GetString(argv[0]);
@@ -10885,7 +10883,7 @@ namespace wings {
 			return Wg_None(context);
 		}
 
-		inline Wg_Obj* remove(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* remove(Wg_Context* context, Wg_Obj** argv, int argc) {
 			WG_EXPECT_ARG_COUNT(1);
 			WG_EXPECT_ARG_TYPE_STRING(0);
 			const char* path = Wg_GetString(argv[0]);
@@ -10904,7 +10902,7 @@ namespace wings {
 			return Wg_None(context);
 		}
 
-		inline Wg_Obj* rmdir(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* rmdir(Wg_Context* context, Wg_Obj** argv, int argc) {
 			WG_EXPECT_ARG_COUNT(1);
 			WG_EXPECT_ARG_TYPE_STRING(0);
 			const char* path = Wg_GetString(argv[0]);
@@ -10923,7 +10921,7 @@ namespace wings {
 			return Wg_None(context);
 		}
 
-		inline Wg_Obj* rename(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* rename(Wg_Context* context, Wg_Obj** argv, int argc) {
 			WG_EXPECT_ARG_COUNT(2);
 			WG_EXPECT_ARG_TYPE_STRING(0);
 			WG_EXPECT_ARG_TYPE_STRING(1);
@@ -10940,7 +10938,7 @@ namespace wings {
 			return Wg_None(context);
 		}
 
-		inline Wg_Obj* listdir(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* listdir(Wg_Context* context, Wg_Obj** argv, int argc) {
 			WG_EXPECT_ARG_COUNT_BETWEEN(0, 1);
 			const char* path = ".";
 			if (argc == 1) {
@@ -10975,12 +10973,12 @@ namespace wings {
 			return list;
 		}
 
-		inline Wg_Obj* abort(Wg_Context* context, Wg_Obj**, int argc) {
+		static Wg_Obj* abort(Wg_Context* context, Wg_Obj**, int argc) {
 			WG_EXPECT_ARG_COUNT(0);
 			std::abort();
 		}
 
-		inline Wg_Obj* chdir(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* chdir(Wg_Context* context, Wg_Obj** argv, int argc) {
 			WG_EXPECT_ARG_COUNT(1);
 			WG_EXPECT_ARG_TYPE_STRING(0);
 			const char* path = Wg_GetString(argv[0]);
@@ -10995,14 +10993,14 @@ namespace wings {
 			return Wg_None(context);
 		}
 
-		inline Wg_Obj* getcwd(Wg_Context* context, Wg_Obj**, int argc) {
+		static Wg_Obj* getcwd(Wg_Context* context, Wg_Obj**, int argc) {
 			WG_EXPECT_ARG_COUNT(0);
 			auto path = fs::current_path().string();
 			return Wg_NewString(context, path.c_str());
 		}
 	}
 
-	inline bool ImportOS(Wg_Context* context) {
+	bool ImportOS(Wg_Context* context) {
 		using namespace osmodule;
 		try {
 			RegisterFunction(context, "system", system);
@@ -11040,11 +11038,11 @@ namespace wings {
 
 namespace wings {
 
-	inline thread_local std::vector<Statement::Type> statementHierarchy;
+	static thread_local std::vector<Statement::Type> statementHierarchy;
 
-	inline CodeError ParseBody(const LexTree& node, Statement::Type statType, std::vector<Statement>& out);
+	static CodeError ParseBody(const LexTree& node, Statement::Type statType, std::vector<Statement>& out);
 
-	inline CodeError CheckTrailingTokens(const TokenIter& p) {
+	static CodeError CheckTrailingTokens(const TokenIter& p) {
 		if (!p.EndReached()) {
 			return CodeError::Bad("Unexpected trailing tokens", p->srcPos);
 		} else {
@@ -11052,7 +11050,7 @@ namespace wings {
 		}
 	}
 
-	inline CodeError ExpectColonEnding(TokenIter& p) {
+	static CodeError ExpectColonEnding(TokenIter& p) {
 		if (p.EndReached()) {
 			return CodeError::Bad("Expected a ':'", (--p)->srcPos);
 		} else if (p->text != ":") {
@@ -11063,7 +11061,7 @@ namespace wings {
 		return CheckTrailingTokens(p);
 	}
 
-	inline CodeError ParseConditionalBlock(const LexTree& node, Statement& out, Statement::Type type) {
+	static CodeError ParseConditionalBlock(const LexTree& node, Statement& out, Statement::Type type) {
 		TokenIter p(node.tokens);
 		++p;
 
@@ -11079,15 +11077,15 @@ namespace wings {
 		return ParseBody(node, type, out.body);
 	}
 
-	inline CodeError ParseIf(const LexTree& node, Statement& out) {
+	static CodeError ParseIf(const LexTree& node, Statement& out) {
 		return ParseConditionalBlock(node, out, Statement::Type::If);
 	}
 
-	inline CodeError ParseElif(const LexTree& node, Statement& out) {
+	static CodeError ParseElif(const LexTree& node, Statement& out) {
 		return ParseConditionalBlock(node, out, Statement::Type::Elif);
 	}
 
-	inline CodeError ParseElse(const LexTree& node, Statement& out) {
+	static CodeError ParseElse(const LexTree& node, Statement& out) {
 		TokenIter p(node.tokens);
 		++p;
 
@@ -11099,11 +11097,11 @@ namespace wings {
 		return ParseBody(node, Statement::Type::Else, out.body);
 	}
 
-	inline CodeError ParseWhile(const LexTree& node, Statement& out) {
+	static CodeError ParseWhile(const LexTree& node, Statement& out) {
 		return ParseConditionalBlock(node, out, Statement::Type::While);
 	}
 
-	inline CodeError ParseVariableList(TokenIter& p, std::vector<std::string>& out) {
+	static CodeError ParseVariableList(TokenIter& p, std::vector<std::string>& out) {
 		out.clear();
 		if (p.EndReached()) {
 			return CodeError::Bad("Expected a variable name", (--p)->srcPos);
@@ -11130,7 +11128,7 @@ namespace wings {
 		}
 	}
 
-	inline Statement TransformForToWhile(Statement forLoop) {
+	Statement TransformForToWhile(Statement forLoop) {
 		// __VarXXX = expression.__iter__()
 		std::string rangeVarName = "__For" + std::to_string(Guid());
 
@@ -11234,7 +11232,7 @@ namespace wings {
 		return out;
 	}
 
-	inline CodeError ParseForLoopVariableList(TokenIter& p, std::vector<std::string>& vars, bool& isTuple) {
+	CodeError ParseForLoopVariableList(TokenIter& p, std::vector<std::string>& vars, bool& isTuple) {
 		bool mustTerminate = false;
 		isTuple = false;
 		while (true) {
@@ -11263,7 +11261,7 @@ namespace wings {
 		}
 	}
 
-	inline CodeError ParseFor(const LexTree& node, Statement& out) {
+	static CodeError ParseFor(const LexTree& node, Statement& out) {
 		TokenIter p(node.tokens);
 		++p;
 		out.type = Statement::Type::For;
@@ -11304,7 +11302,7 @@ namespace wings {
 		return CodeError::Good();
 	}
 
-	inline CodeError ParseParameterList(TokenIter& p, std::vector<Parameter>& out) {
+	CodeError ParseParameterList(TokenIter& p, std::vector<Parameter>& out) {
 		out.clear();
 		Parameter::Type type = Parameter::Type::Named;
 		while (true) {
@@ -11383,7 +11381,7 @@ namespace wings {
 		}
 	}
 
-	inline std::unordered_set<std::string> GetReferencedVariables(const AssignTarget& target) {
+	std::unordered_set<std::string> GetReferencedVariables(const AssignTarget& target) {
 		if (target.type == AssignType::Direct) {
 			return { target.direct };
 		} else {
@@ -11395,7 +11393,7 @@ namespace wings {
 	}
 
 	// Get a set of variables referenced by an expression
-	inline std::unordered_set<std::string> GetReferencedVariables(const Expression& expr) {
+	std::unordered_set<std::string> GetReferencedVariables(const Expression& expr) {
 		std::unordered_set<std::string> variables;
 		if (expr.operation == Operation::Variable) {
 			variables.insert(expr.variableName);
@@ -11408,7 +11406,7 @@ namespace wings {
 	}
 
 	// Get a set of variables directly written to by the '=' operator. This excludes compound assignment.
-	inline std::unordered_set<std::string> GetWriteVariables(const Expression& expr) {
+	static std::unordered_set<std::string> GetWriteVariables(const Expression& expr) {
 		if (expr.operation == Operation::Assign && (expr.assignTarget.type == AssignType::Direct || expr.assignTarget.type == AssignType::Pack)) {
 			return GetReferencedVariables(expr.assignTarget);
 		} else {
@@ -11420,7 +11418,7 @@ namespace wings {
 	}
 
 	template <typename T, typename Subtract, typename... Args>
-	inline std::unordered_set<T> SetDifference(const std::unordered_set<T>& set, const Subtract& subtract, const Args&... args) {
+	static std::unordered_set<T> SetDifference(const std::unordered_set<T>& set, const Subtract& subtract, const Args&... args) {
 		if constexpr (sizeof...(args) == 0) {
 			std::unordered_set<T> diff = set;
 			for (const auto& sub : subtract)
@@ -11431,7 +11429,7 @@ namespace wings {
 		}
 	}
 
-	inline void ResolveCaptures(Statement& defNode) {
+	static void ResolveCaptures(Statement& defNode) {
 		std::unordered_set<std::string> writeVars;
 		std::unordered_set<std::string> allVars;
 
@@ -11490,7 +11488,7 @@ namespace wings {
 		defNode.expr.def.variables = SetDifference(writeVars, defNode.expr.def.globalCaptures, defNode.expr.def.localCaptures, parameterVars);
 	}
 
-	inline CodeError ParseDef(const LexTree& node, Statement& out) {
+	static CodeError ParseDef(const LexTree& node, Statement& out) {
 		TokenIter p(node.tokens);
 		out.type = Statement::Type::Def;
 		++p;
@@ -11540,7 +11538,7 @@ namespace wings {
 		return CodeError::Good();
 	}
 
-	inline CodeError ParseClass(const LexTree& node, Statement& out) {
+	static CodeError ParseClass(const LexTree& node, Statement& out) {
 		TokenIter p(node.tokens);
 		out.type = Statement::Type::Class;
 		++p;
@@ -11590,7 +11588,7 @@ namespace wings {
 		return CodeError::Good();
 	}
 
-	inline CodeError ParseTry(const LexTree& node, Statement& out) {
+	static CodeError ParseTry(const LexTree& node, Statement& out) {
 		TokenIter p(node.tokens);
 		++p;
 
@@ -11602,7 +11600,7 @@ namespace wings {
 		return ParseBody(node, Statement::Type::Try, out.body);
 	}
 
-	inline CodeError ParseExcept(const LexTree& node, Statement& out) {
+	static CodeError ParseExcept(const LexTree& node, Statement& out) {
 		TokenIter p(node.tokens);
 		++p;
 
@@ -11642,7 +11640,7 @@ namespace wings {
 		return ParseBody(node, Statement::Type::Except, out.body);
 	}
 
-	inline CodeError ParseFinally(const LexTree& node, Statement& out) {
+	static CodeError ParseFinally(const LexTree& node, Statement& out) {
 		TokenIter p(node.tokens);
 		++p;
 
@@ -11654,7 +11652,7 @@ namespace wings {
 		return ParseBody(node, Statement::Type::Finally, out.body);
 	}
 
-	inline CodeError ParseRaise(const LexTree& node, Statement& out) {
+	static CodeError ParseRaise(const LexTree& node, Statement& out) {
 		TokenIter p(node.tokens);
 		++p;
 
@@ -11666,7 +11664,7 @@ namespace wings {
 		}
 	}
 
-	inline CodeError ParseWith(const LexTree& node, Statement& out) {
+	static CodeError ParseWith(const LexTree& node, Statement& out) {
 		TokenIter p(node.tokens);
 		SourcePosition srcPos = p->srcPos;
 		++p;
@@ -11709,9 +11707,9 @@ namespace wings {
 		/*
 		 * __WithMgr = <expr>
 		 * [<var> =] __WithMgr.__enter__()
-		 inline * try:
+		 * try:
 		 *		<body>
-		 inline * finally:
+		 * finally:
 		 * 		__WithMgr.__exit__(None, None, None)
 		 */
 
@@ -11812,7 +11810,7 @@ namespace wings {
 		return CodeError::Good();
 	}
 
-	inline CodeError ParseReturn(const LexTree& node, Statement& out) {
+	static CodeError ParseReturn(const LexTree& node, Statement& out) {
 		TokenIter p(node.tokens);
 		++p;
 
@@ -11828,14 +11826,14 @@ namespace wings {
 		}
 	}
 
-	inline CodeError ParseSingleToken(const LexTree& node, Statement& out, Statement::Type type) {
+	static CodeError ParseSingleToken(const LexTree& node, Statement& out, Statement::Type type) {
 		TokenIter p(node.tokens);
 		++p;
 		out.type = type;
 		return CheckTrailingTokens(p);
 	}
 
-	inline CodeError CheckBreakable(const LexTree& node) {
+	static CodeError CheckBreakable(const LexTree& node) {
 		auto it = statementHierarchy.rbegin();
 		while (true) {
 			if (*it == Statement::Type::Def || *it == Statement::Type::Root) {
@@ -11847,25 +11845,25 @@ namespace wings {
 		}
 	}
 
-	inline CodeError ParseBreak(const LexTree& node, Statement& out) {
+	static CodeError ParseBreak(const LexTree& node, Statement& out) {
 		if (auto error = CheckBreakable(node)) {
 			return error;
 		}
 		return ParseSingleToken(node, out, Statement::Type::Break);
 	}
 
-	inline CodeError ParseContinue(const LexTree& node, Statement& out) {
+	static CodeError ParseContinue(const LexTree& node, Statement& out) {
 		if (auto error = CheckBreakable(node)) {
 			return error;
 		}
 		return ParseSingleToken(node, out, Statement::Type::Continue);
 	}
 
-	inline CodeError ParsePass(const LexTree& node, Statement& out) {
+	static CodeError ParsePass(const LexTree& node, Statement& out) {
 		return ParseSingleToken(node, out, Statement::Type::Pass);
 	}
 
-	inline CodeError ParseCapture(const LexTree& node, Statement& out, Statement::Type type) {
+	static CodeError ParseCapture(const LexTree& node, Statement& out, Statement::Type type) {
 		TokenIter p(node.tokens);
 		++p;
 
@@ -11885,15 +11883,15 @@ namespace wings {
 		return CheckTrailingTokens(p);
 	}
 
-	inline CodeError ParseNonlocal(const LexTree& node, Statement& out) {
+	static CodeError ParseNonlocal(const LexTree& node, Statement& out) {
 		return ParseCapture(node, out, Statement::Type::Nonlocal);
 	}
 
-	inline CodeError ParseGlobal(const LexTree& node, Statement& out) {
+	static CodeError ParseGlobal(const LexTree& node, Statement& out) {
 		return ParseCapture(node, out, Statement::Type::Global);
 	}
 
-	inline CodeError ParseExpressionStatement(const LexTree& node, Statement& out) {
+	static CodeError ParseExpressionStatement(const LexTree& node, Statement& out) {
 		TokenIter p(node.tokens);
 		out.type = Statement::Type::Expr;
 		if (auto error = ParseExpression(p, out.expr)) {
@@ -11903,7 +11901,7 @@ namespace wings {
 		}
 	}
 
-	inline CodeError ParseImportFrom(const LexTree& node, Statement& out) {
+	static CodeError ParseImportFrom(const LexTree& node, Statement& out) {
 		TokenIter p(node.tokens);
 		out.type = Statement::Type::ImportFrom;
 		++p;
@@ -11965,7 +11963,7 @@ namespace wings {
 		return CheckTrailingTokens(p);
 	}
 
-	inline CodeError ParseImport(const LexTree& node, Statement& out) {
+	static CodeError ParseImport(const LexTree& node, Statement& out) {
 		TokenIter p(node.tokens);
 		out.type = Statement::Type::Import;
 		++p;
@@ -11995,7 +11993,7 @@ namespace wings {
 
 	using ParseFn = CodeError(*)(const LexTree& node, Statement& out);
 
-	inline const std::unordered_map<std::string, ParseFn> STATEMENT_STARTINGS = {
+	static const std::unordered_map<std::string, ParseFn> STATEMENT_STARTINGS = {
 		{ "if", ParseIf },
 		{ "elif", ParseElif },
 		{ "else", ParseElse },
@@ -12018,7 +12016,7 @@ namespace wings {
 		{ "import", ParseImport },
 	};
 
-	inline CodeError ParseStatement(const LexTree& node, Statement& out) {
+	static CodeError ParseStatement(const LexTree& node, Statement& out) {
 		const auto& firstToken = node.tokens[0].text;
 		if (STATEMENT_STARTINGS.contains(firstToken)) {
 			if (auto error = STATEMENT_STARTINGS.at(firstToken)(node, out)) {
@@ -12034,7 +12032,7 @@ namespace wings {
 		return CodeError::Good();
 	}
 
-	inline void ExpandCompositeStatements(std::vector<Statement>& statements) {
+	void ExpandCompositeStatements(std::vector<Statement>& statements) {
 		for (size_t i = 0; i < statements.size(); i++) {
 			if (statements[i].type == Statement::Type::Composite) {
 				for (size_t j = 0; j < statements[i].body.size(); j++) {
@@ -12046,7 +12044,7 @@ namespace wings {
 		}
 	}
 
-	inline CodeError ParseBody(const LexTree& node, Statement::Type statType, std::vector<Statement>& out) {
+	static CodeError ParseBody(const LexTree& node, Statement::Type statType, std::vector<Statement>& out) {
 		out.clear();
 
 		if (node.children.empty()) {
@@ -12163,7 +12161,7 @@ namespace wings {
 		return CodeError::Good();
 	}
 
-	inline ParseResult Parse(const LexTree& lexTree) {
+	ParseResult Parse(const LexTree& lexTree) {
 		ParseResult result{};
 		result.parseTree.type = Statement::Type::Root;
 
@@ -12210,7 +12208,7 @@ def randrange(*args):
 	return choice(range(*args))
 		)";
 
-		inline Wg_Obj* randint(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* randint(Wg_Context* context, Wg_Obj** argv, int argc) {
 			WG_EXPECT_ARG_COUNT(2);
 			WG_EXPECT_ARG_TYPE_INT(0);
 			WG_EXPECT_ARG_TYPE_INT(1);
@@ -12219,19 +12217,19 @@ def randrange(*args):
 			return Wg_NewInt(context, context->rng.Int(lower, upper));
 		}
 
-		inline Wg_Obj* random(Wg_Context* context, Wg_Obj**, int argc) {
+		static Wg_Obj* random(Wg_Context* context, Wg_Obj**, int argc) {
 			WG_EXPECT_ARG_COUNT(0);
 			return Wg_NewFloat(context, context->rng.Rand());
 		}
 
-		inline Wg_Obj* seed(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* seed(Wg_Context* context, Wg_Obj** argv, int argc) {
 			WG_EXPECT_ARG_COUNT(1);
 			WG_EXPECT_ARG_TYPE_INT(0);
 			context->rng.Seed(Wg_GetInt(argv[0]));
 			return Wg_None(context);
 		}
 
-		inline Wg_Obj* shuffle(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* shuffle(Wg_Context* context, Wg_Obj** argv, int argc) {
 			WG_EXPECT_ARG_COUNT(1);
 			WG_EXPECT_ARG_TYPE_LIST(0);
 			auto& li = argv[0]->Get<std::vector<Wg_Obj*>>();
@@ -12239,7 +12237,7 @@ def randrange(*args):
 			return Wg_None(context);
 		}
 
-		inline Wg_Obj* uniform(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* uniform(Wg_Context* context, Wg_Obj** argv, int argc) {
 			WG_EXPECT_ARG_COUNT(2);
 			WG_EXPECT_ARG_TYPE_INT_OR_FLOAT(0);
 			WG_EXPECT_ARG_TYPE_INT_OR_FLOAT(1);
@@ -12253,7 +12251,7 @@ def randrange(*args):
 		}
 	}
 
-	inline bool ImportRandom(Wg_Context* context) {
+	bool ImportRandom(Wg_Context* context) {
 		using namespace randommodule;
 		try {
 			RegisterFunction(context, "seed", seed);
@@ -12280,13 +12278,13 @@ namespace wings {
 
 namespace wings {
 	namespace sysmodule {
-		inline Wg_Obj* exit(Wg_Context* context, Wg_Obj**, int) {
+		static Wg_Obj* exit(Wg_Context* context, Wg_Obj**, int) {
 			Wg_RaiseException(context, WG_EXC_SYSTEMEXIT);
 			return nullptr;
 		}
 	}
 	
-	inline bool ImportSys(Wg_Context* context) {
+	bool ImportSys(Wg_Context* context) {
 		using namespace sysmodule;
 		try {
 			RegisterFunction(context, "exit", exit);
@@ -12309,7 +12307,7 @@ namespace wings {
 
 namespace wings {
 	namespace timemodule {
-		inline Wg_Obj* sleep(Wg_Context* context, Wg_Obj** argv, int argc) {
+		static Wg_Obj* sleep(Wg_Context* context, Wg_Obj** argv, int argc) {
 			WG_EXPECT_ARG_COUNT(1);
 			WG_EXPECT_ARG_TYPE_INT_OR_FLOAT(0);
 			Wg_float secs = Wg_GetFloat(argv[0]);
@@ -12318,7 +12316,7 @@ namespace wings {
 			return Wg_None(context);
 		}
 
-		inline Wg_Obj* time(Wg_Context* context, Wg_Obj**, int argc) {
+		static Wg_Obj* time(Wg_Context* context, Wg_Obj**, int argc) {
 			WG_EXPECT_ARG_COUNT(0);
 			auto now = std::chrono::system_clock::now();
 			auto now_ms = std::chrono::time_point_cast<std::chrono::milliseconds>(now);
@@ -12327,7 +12325,7 @@ namespace wings {
 		}
 	}
 	
-	inline bool ImportTime(Wg_Context* context) {
+	bool ImportTime(Wg_Context* context) {
 		using namespace timemodule;
 		try {
 			RegisterFunction(context, "time", time);
@@ -12351,9 +12349,10 @@ namespace wings {
 #include <sstream>
 #include <queue>
 #include <unordered_set>
+#include <cstring>
 
 namespace wings {
-	inline bool ReadFromFile(const std::string& path, std::string& data) {
+	static bool ReadFromFile(const std::string& path, std::string& data) {
 		std::ifstream f(path);
 		if (!f.is_open())
 			return false;
@@ -12368,7 +12367,7 @@ namespace wings {
 		return true;
 	}
 
-	inline bool LoadFileModule(Wg_Context* context, const std::string& module) {
+	static bool LoadFileModule(Wg_Context* context, const std::string& module) {
 		std::string path = context->importPath + module + ".py";
 		std::string source;
 		if (!ReadFromFile(path, source)) {
@@ -12384,7 +12383,7 @@ namespace wings {
 		return Wg_Call(fn, nullptr, 0) != nullptr;
 	}
 
-	inline bool LoadModule(Wg_Context* context, const std::string& name) {
+	static bool LoadModule(Wg_Context* context, const std::string& name) {
 		if (!context->globals.contains(name)) {
 			bool success{};
 			context->globals.insert({ std::string(name), {} });
@@ -12411,7 +12410,7 @@ namespace wings {
 }
 
 extern "C" {
-	inline void Wg_DefaultConfig(Wg_Config* config) {
+	void Wg_DefaultConfig(Wg_Config* config) {
 		WG_ASSERT_VOID(config);
 		config->maxAlloc = 1'000'000;
 		config->maxRecursion = 50;
@@ -12425,7 +12424,7 @@ extern "C" {
 		};
 	}
 
-	inline Wg_Context* Wg_CreateContext(const Wg_Config* config) {
+	Wg_Context* Wg_CreateContext(const Wg_Config* config) {
 		Wg_Context* context = new Wg_Context();
 		
 		context->currentModule.push("__main__");
@@ -12473,52 +12472,52 @@ extern "C" {
 		return context;
 	}
 
-	inline void Wg_DestroyContext(Wg_Context* context) {
+	void Wg_DestroyContext(Wg_Context* context) {
 		WG_ASSERT_VOID(context);
 		context->closing = true;
 		Wg_CollectGarbage(context);
 		delete context;
 	}
 
-	inline void Wg_Print(const Wg_Context* context, const char* message, int len) {
+	void Wg_Print(const Wg_Context* context, const char* message, int len) {
 		WG_ASSERT_VOID(context && message);
 		if (context->config.print) {
 			context->config.print(len ? message : "", len, context->config.printUserdata);
 		}
 	}
 
-	inline void Wg_PrintString(const Wg_Context* context, const char* message) {
+	void Wg_PrintString(const Wg_Context* context, const char* message) {
 		WG_ASSERT_VOID(context && message);
 		Wg_Print(context, message, (int)std::strlen(message));
 	}
 
-	inline void Wg_SetErrorCallback(Wg_ErrorCallback callback) {
+	void Wg_SetErrorCallback(Wg_ErrorCallback callback) {
 		wings::errorCallback = callback;
 	}
 
-	inline Wg_Obj* Wg_Compile(Wg_Context* context, const char* script, const char* prettyName) {
+	Wg_Obj* Wg_Compile(Wg_Context* context, const char* script, const char* prettyName) {
 		return wings::Compile(context, script, "__main__", prettyName, false);
 	}
 
-	inline Wg_Obj* Wg_CompileExpression(Wg_Context* context, const char* script, const char* prettyName) {
+	Wg_Obj* Wg_CompileExpression(Wg_Context* context, const char* script, const char* prettyName) {
 		return wings::Compile(context, script, "__main__", prettyName, true);
 	}
 
-	inline bool Wg_Execute(Wg_Context* context, const char* script, const char* prettyName) {
+	bool Wg_Execute(Wg_Context* context, const char* script, const char* prettyName) {
 		if (Wg_Obj* fn = Wg_Compile(context, script, prettyName)) {
 			return Wg_Call(fn, nullptr, 0) != nullptr;
 		}
 		return false;
 	}
 	
-	inline Wg_Obj* Wg_ExecuteExpression(Wg_Context* context, const char* script, const char* prettyName) {
+	Wg_Obj* Wg_ExecuteExpression(Wg_Context* context, const char* script, const char* prettyName) {
 		if (Wg_Obj* fn = Wg_CompileExpression(context, script, prettyName)) {
 			return Wg_Call(fn, nullptr, 0);
 		}
 		return nullptr;
 	}
 
-	inline Wg_Obj* Wg_GetGlobal(Wg_Context* context, const char* name) {
+	Wg_Obj* Wg_GetGlobal(Wg_Context* context, const char* name) {
 		WG_ASSERT(context && name && wings::IsValidIdentifier(name));
 		auto module = std::string(context->currentModule.top());
 		auto& globals = context->globals.at(module);
@@ -12530,7 +12529,7 @@ extern "C" {
 		}
 	}
 
-	inline void Wg_SetGlobal(Wg_Context* context, const char* name, Wg_Obj* value) {
+	void Wg_SetGlobal(Wg_Context* context, const char* name, Wg_Obj* value) {
 		WG_ASSERT_VOID(context && name && value && wings::IsValidIdentifier(name));
 		const auto& module = std::string(context->currentModule.top());
 		auto& globals = context->globals.at(module);
@@ -12542,12 +12541,12 @@ extern "C" {
 		}
 	}
 
-	inline void Wg_RegisterModule(Wg_Context* context, const char* name, Wg_ModuleLoader loader) {
+	void Wg_RegisterModule(Wg_Context* context, const char* name, Wg_ModuleLoader loader) {
 		WG_ASSERT_VOID(context && name && loader && wings::IsValidIdentifier(name));
 		context->moduleLoaders.insert({ std::string(name), loader });
 	}
 
-	inline Wg_Obj* Wg_ImportModule(Wg_Context* context, const char* module, const char* alias) {
+	Wg_Obj* Wg_ImportModule(Wg_Context* context, const char* module, const char* alias) {
 		WG_ASSERT(context && module && wings::IsValidIdentifier(module));
 		if (alias) {
 			WG_ASSERT(wings::IsValidIdentifier(alias));
@@ -12569,7 +12568,7 @@ extern "C" {
 		return moduleObject;
 	}
 
-	inline Wg_Obj* Wg_ImportFromModule(Wg_Context* context, const char* module, const char* name, const char* alias) {
+	Wg_Obj* Wg_ImportFromModule(Wg_Context* context, const char* module, const char* name, const char* alias) {
 		WG_ASSERT(context && module && name && wings::IsValidIdentifier(module));
 		if (alias) {
 			WG_ASSERT(wings::IsValidIdentifier(alias));
@@ -12593,7 +12592,7 @@ extern "C" {
 		return *it->second;
 	}
 
-	inline bool Wg_ImportAllFromModule(Wg_Context* context, const char* module) {
+	bool Wg_ImportAllFromModule(Wg_Context* context, const char* module) {
 		WG_ASSERT(context && module && wings::IsValidIdentifier(module));
 
 		if (!wings::LoadModule(context, module))
@@ -12606,12 +12605,12 @@ extern "C" {
 		return true;
 	}
 
-	inline Wg_Obj* Wg_None(Wg_Context* context) {
+	Wg_Obj* Wg_None(Wg_Context* context) {
 		WG_ASSERT(context);
 		return context->builtins.none;
 	}
 
-	inline Wg_Obj* Wg_NewBool(Wg_Context* context, bool value) {
+	Wg_Obj* Wg_NewBool(Wg_Context* context, bool value) {
 		WG_ASSERT(context);
 		if (value && context->builtins._true) {
 			return context->builtins._true;
@@ -12622,7 +12621,7 @@ extern "C" {
 		}
 	}
 
-	inline Wg_Obj* Wg_NewInt(Wg_Context* context, Wg_int value) {
+	Wg_Obj* Wg_NewInt(Wg_Context* context, Wg_int value) {
 		WG_ASSERT(context);
 		if (Wg_Obj* v = Wg_Call(context->builtins._int, nullptr, 0)) {
 			v->Get<Wg_int>() = value;
@@ -12632,7 +12631,7 @@ extern "C" {
 		}
 	}
 
-	inline Wg_Obj* Wg_NewFloat(Wg_Context* context, Wg_float value) {
+	Wg_Obj* Wg_NewFloat(Wg_Context* context, Wg_float value) {
 		WG_ASSERT(context);
 		if (Wg_Obj* v = Wg_Call(context->builtins._float, nullptr, 0)) {
 			v->Get<Wg_float>() = value;
@@ -12642,7 +12641,7 @@ extern "C" {
 		}
 	}
 
-	inline Wg_Obj* Wg_NewString(Wg_Context* context, const char* value) {
+	Wg_Obj* Wg_NewString(Wg_Context* context, const char* value) {
 		WG_ASSERT(context);
 		if (Wg_Obj* v = Wg_Call(context->builtins.str, nullptr, 0)) {
 			v->Get<std::string>() = value ? value : "";
@@ -12652,7 +12651,7 @@ extern "C" {
 		}
 	}
 
-	inline Wg_Obj* Wg_NewStringBuffer(Wg_Context* context, const char* buffer, int length) {
+	Wg_Obj* Wg_NewStringBuffer(Wg_Context* context, const char* buffer, int length) {
 		WG_ASSERT(context && buffer && length >= 0);
 		if (Wg_Obj* v = Wg_Call(context->builtins.str, nullptr, 0)) {
 			v->Get<std::string>() = std::string(buffer, length);
@@ -12662,7 +12661,7 @@ extern "C" {
 		}
 	}
 
-	inline Wg_Obj* Wg_NewTuple(Wg_Context* context, Wg_Obj** argv, int argc) {
+	Wg_Obj* Wg_NewTuple(Wg_Context* context, Wg_Obj** argv, int argc) {
 		std::vector<wings::Wg_ObjRef> refs;
 		WG_ASSERT(context && argc >= 0);
 		if (argc > 0) {
@@ -12681,7 +12680,7 @@ extern "C" {
 		}
 	}
 
-	inline Wg_Obj* Wg_NewList(Wg_Context* context, Wg_Obj** argv, int argc) {
+	Wg_Obj* Wg_NewList(Wg_Context* context, Wg_Obj** argv, int argc) {
 		std::vector<wings::Wg_ObjRef> refs;
 		WG_ASSERT(context && argc >= 0);
 		if (argc > 0) {
@@ -12700,7 +12699,7 @@ extern "C" {
 		}
 	}
 
-	inline Wg_Obj* Wg_NewDictionary(Wg_Context* context, Wg_Obj** keys, Wg_Obj** values, int argc) {
+	Wg_Obj* Wg_NewDictionary(Wg_Context* context, Wg_Obj** keys, Wg_Obj** values, int argc) {
 		std::vector<wings::Wg_ObjRef> refs;
 		WG_ASSERT(context && argc >= 0);
 		if (argc > 0) {
@@ -12735,7 +12734,7 @@ extern "C" {
 		}
 	}
 
-	inline Wg_Obj* Wg_NewSet(Wg_Context* context, Wg_Obj** argv, int argc) {
+	Wg_Obj* Wg_NewSet(Wg_Context* context, Wg_Obj** argv, int argc) {
 		std::vector<wings::Wg_ObjRef> refs;
 		WG_ASSERT(context && argc >= 0);
 		if (argc > 0) {
@@ -12760,7 +12759,7 @@ extern "C" {
 		}
 	}
 
-	inline Wg_Obj* Wg_NewFunction(Wg_Context* context, Wg_Function fptr, void* userdata, const char* prettyName) {
+	Wg_Obj* Wg_NewFunction(Wg_Context* context, Wg_Function fptr, void* userdata, const char* prettyName) {
 		WG_ASSERT(context && fptr);
 
 		Wg_Obj* obj = wings::Alloc(context);
@@ -12783,7 +12782,7 @@ extern "C" {
 		return obj;
 	}
 
-	inline Wg_Obj* Wg_BindMethod(Wg_Obj* klass, const char* name, Wg_Function fptr, void* userdata) {
+	Wg_Obj* Wg_BindMethod(Wg_Obj* klass, const char* name, Wg_Function fptr, void* userdata) {
 		WG_ASSERT(klass && fptr && Wg_IsClass(klass));
 		Wg_Context* context = klass->context;
 		wings::Wg_ObjRef ref(klass);
@@ -12795,7 +12794,7 @@ extern "C" {
 		return fn;
 	}
 
-	inline Wg_Obj* Wg_NewClass(Wg_Context* context, const char* name, Wg_Obj** bases, int basesLen) {
+	Wg_Obj* Wg_NewClass(Wg_Context* context, const char* name, Wg_Obj** bases, int basesLen) {
 		std::vector<wings::Wg_ObjRef> refs;
 		WG_ASSERT(context && name && basesLen >= 0);
 		if (basesLen > 0) {
@@ -12905,79 +12904,79 @@ extern "C" {
 		return klass;
 	}
 
-	inline bool Wg_IsNone(const Wg_Obj* obj) {
+	bool Wg_IsNone(const Wg_Obj* obj) {
 		WG_ASSERT(obj);
 		return obj == obj->context->builtins.none;
 	}
 
-	inline bool Wg_IsBool(const Wg_Obj* obj) {
+	bool Wg_IsBool(const Wg_Obj* obj) {
 		WG_ASSERT(obj);
 		return obj == obj->context->builtins._true
 			|| obj == obj->context->builtins._false;
 	}
 
-	inline bool Wg_IsInt(const Wg_Obj* obj) {
+	bool Wg_IsInt(const Wg_Obj* obj) {
 		WG_ASSERT(obj);
 		return obj->type == "__int";
 	}
 
-	inline bool Wg_IsIntOrFloat(const Wg_Obj* obj) {
+	bool Wg_IsIntOrFloat(const Wg_Obj* obj) {
 		WG_ASSERT(obj);
 		return obj->type == "__int" || obj->type == "__float";
 	}
 
-	inline bool Wg_IsString(const Wg_Obj* obj) {
+	bool Wg_IsString(const Wg_Obj* obj) {
 		WG_ASSERT(obj);
 		return obj->type == "__str";
 	}
 
-	inline bool Wg_IsTuple(const Wg_Obj* obj) {
+	bool Wg_IsTuple(const Wg_Obj* obj) {
 		WG_ASSERT(obj);
 		return obj->type == "__tuple";
 	}
 
-	inline bool Wg_IsList(const Wg_Obj* obj) {
+	bool Wg_IsList(const Wg_Obj* obj) {
 		WG_ASSERT(obj);
 		return obj->type == "__list";
 	}
 
-	inline bool Wg_IsDictionary(const Wg_Obj* obj) {
+	bool Wg_IsDictionary(const Wg_Obj* obj) {
 		WG_ASSERT(obj);
 		return obj->type == "__map";
 	}
 
-	inline bool Wg_IsSet(const Wg_Obj* obj) {
+	bool Wg_IsSet(const Wg_Obj* obj) {
 		WG_ASSERT(obj);
 		return obj->type == "__set";
 	}
 
-	inline bool Wg_IsClass(const Wg_Obj* obj) {
+	bool Wg_IsClass(const Wg_Obj* obj) {
 		WG_ASSERT(obj);
 		return obj->type == "__class";
 	}
 
-	inline bool Wg_IsFunction(const Wg_Obj* obj) {
+	bool Wg_IsFunction(const Wg_Obj* obj) {
 		WG_ASSERT(obj);
 		return obj->type == "__func";
 	}
 
-	inline bool Wg_GetBool(const Wg_Obj* obj) {
+	bool Wg_GetBool(const Wg_Obj* obj) {
 		WG_ASSERT(obj && Wg_IsBool(obj));
 		return obj->Get<bool>();
 	}
 
-	inline Wg_int Wg_GetInt(const Wg_Obj* obj) {
+	Wg_int Wg_GetInt(const Wg_Obj* obj) {
 		WG_ASSERT(obj && Wg_IsInt(obj));
 		return obj->Get<Wg_int>();
 	}
 
-	inline Wg_float Wg_GetFloat(const Wg_Obj* obj) {
+	Wg_float Wg_GetFloat(const Wg_Obj* obj) {
 		WG_ASSERT(obj && Wg_IsIntOrFloat(obj));
 		if (Wg_IsInt(obj)) return (Wg_float)obj->Get<Wg_int>();
 		else return obj->Get<Wg_float>();
 	}
 
-	inline const char* Wg_GetString(const Wg_Obj* obj, int* len) {
+	const char* Wg_GetString(const Wg_Obj* obj, int* len) {
 		WG_ASSERT(obj && Wg_IsString(obj));
 		const auto& s = obj->Get<std::string>();
 		if (len)
@@ -12985,12 +12984,12 @@ extern "C" {
 		return s.c_str();
 	}
 
-	inline void Wg_SetUserdata(Wg_Obj* obj, void* userdata) {
+	void Wg_SetUserdata(Wg_Obj* obj, void* userdata) {
 		WG_ASSERT_VOID(obj);
 		obj->data = userdata;
 	}
 
-	inline bool Wg_TryGetUserdata(const Wg_Obj* obj, const char* type, void** out) {
+	bool Wg_TryGetUserdata(const Wg_Obj* obj, const char* type, void** out) {
 		WG_ASSERT(obj && type);
 		if (obj->type == std::string(type)) {
 			if (out)
@@ -13001,12 +13000,12 @@ extern "C" {
 		}
 	}
 
-	inline void Wg_RegisterFinalizer(Wg_Obj* obj, Wg_Finalizer finalizer, void* userdata) {
+	void Wg_RegisterFinalizer(Wg_Obj* obj, Wg_Finalizer finalizer, void* userdata) {
 		WG_ASSERT_VOID(obj && finalizer);
 		obj->finalizers.push_back({ finalizer, userdata });
 	}
 
-	inline Wg_Obj* Wg_HasAttribute(Wg_Obj* obj, const char* attribute) {
+	Wg_Obj* Wg_HasAttribute(Wg_Obj* obj, const char* attribute) {
 		WG_ASSERT(obj && attribute && wings::IsValidIdentifier(attribute));
 		Wg_Obj* mem = obj->attributes.Get(attribute);
 		if (mem && Wg_IsFunction(mem) && mem->Get<Wg_Obj::Func>().isMethod) {
@@ -13015,7 +13014,7 @@ extern "C" {
 		return mem;
 	}
 
-	inline Wg_Obj* Wg_GetAttribute(Wg_Obj* obj, const char* attribute) {
+	Wg_Obj* Wg_GetAttribute(Wg_Obj* obj, const char* attribute) {
 		WG_ASSERT(obj && attribute && wings::IsValidIdentifier(attribute));
 		Wg_Obj* mem = obj->attributes.Get(attribute);
 		if (mem == nullptr) {
@@ -13026,12 +13025,12 @@ extern "C" {
 		return mem;
 	}
 
-	inline void Wg_SetAttribute(Wg_Obj* obj, const char* attribute, Wg_Obj* value) {
+	void Wg_SetAttribute(Wg_Obj* obj, const char* attribute, Wg_Obj* value) {
 		WG_ASSERT_VOID(obj && attribute && value && wings::IsValidIdentifier(attribute));
 		obj->attributes.Set(attribute, value);
 	}
 
-	inline Wg_Obj* Wg_GetAttributeFromBase(Wg_Obj* obj, const char* attribute, Wg_Obj* baseClass) {
+	Wg_Obj* Wg_GetAttributeFromBase(Wg_Obj* obj, const char* attribute, Wg_Obj* baseClass) {
 		WG_ASSERT(obj && attribute && wings::IsValidIdentifier(attribute));
 
 		Wg_Obj* mem{};
@@ -13047,7 +13046,7 @@ extern "C" {
 		return mem;
 	}
 
-	inline Wg_Obj* Wg_IsInstance(const Wg_Obj* instance, Wg_Obj* const* types, int typesLen) {
+	Wg_Obj* Wg_IsInstance(const Wg_Obj* instance, Wg_Obj* const* types, int typesLen) {
 		WG_ASSERT(instance && typesLen >= 0 && (types || typesLen == 0));
 		for (int i = 0; i < typesLen; i++)
 			WG_ASSERT(types[i] && Wg_IsClass(types[i]));
@@ -13077,7 +13076,7 @@ extern "C" {
 		return nullptr;
 	}
 
-	inline bool Wg_Iterate(Wg_Obj* obj, void* userdata, Wg_IterationCallback callback) {
+	bool Wg_Iterate(Wg_Obj* obj, void* userdata, Wg_IterationCallback callback) {
 		WG_ASSERT(obj && callback);
 		Wg_Context* context = obj->context;
 
@@ -13111,7 +13110,7 @@ extern "C" {
 		}
 	}
 
-	inline bool Wg_Unpack(Wg_Obj* obj, int count, Wg_Obj** out) {
+	bool Wg_Unpack(Wg_Obj* obj, int count, Wg_Obj** out) {
 		WG_ASSERT(obj && (count == 0 || out));
 
 		Wg_Context* context = obj->context;
@@ -13147,7 +13146,7 @@ extern "C" {
 		}
 	}
 
-	inline Wg_Obj* Wg_GetKwargs(Wg_Context* context) {
+	Wg_Obj* Wg_GetKwargs(Wg_Context* context) {
 		WG_ASSERT(context && !context->kwargs.empty());
 		if (context->kwargs.back() == nullptr) {
 			context->kwargs.back() = Wg_NewDictionary(context);
@@ -13155,12 +13154,12 @@ extern "C" {
 		return context->kwargs.back();
 	}
 
-	inline void* Wg_GetFunctionUserdata(Wg_Context* context) {
+	void* Wg_GetFunctionUserdata(Wg_Context* context) {
 		WG_ASSERT(context && !context->kwargs.empty());
 		return context->userdata.back();
 	}
 
-	inline Wg_Obj* Wg_Call(Wg_Obj* callable, Wg_Obj** argv, int argc, Wg_Obj* kwargsDict) {
+	Wg_Obj* Wg_Call(Wg_Obj* callable, Wg_Obj** argv, int argc, Wg_Obj* kwargsDict) {
 		WG_ASSERT(callable && argc >= 0 && (argc == 0 || argv));
 		if (argc)
 			WG_ASSERT(argv);
@@ -13261,7 +13260,7 @@ extern "C" {
 		return ret;
 	}
 
-	inline Wg_Obj* Wg_CallMethod(Wg_Obj* obj, const char* member, Wg_Obj** argv, int argc, Wg_Obj* kwargsDict) {
+	Wg_Obj* Wg_CallMethod(Wg_Obj* obj, const char* member, Wg_Obj** argv, int argc, Wg_Obj* kwargsDict) {
 		WG_ASSERT(obj && member && wings::IsValidIdentifier(member));
 		if (argc)
 			WG_ASSERT(argv);
@@ -13275,7 +13274,7 @@ extern "C" {
 		}
 	}
 
-	inline Wg_Obj* Wg_CallMethodFromBase(Wg_Obj* obj, const char* member, Wg_Obj** argv, int argc, Wg_Obj* kwargsDict, Wg_Obj* baseClass) {
+	Wg_Obj* Wg_CallMethodFromBase(Wg_Obj* obj, const char* member, Wg_Obj** argv, int argc, Wg_Obj* kwargsDict, Wg_Obj* baseClass) {
 		WG_ASSERT(obj && member && wings::IsValidIdentifier(member));
 		if (argc)
 			WG_ASSERT(argv);
@@ -13290,7 +13289,7 @@ extern "C" {
 		}
 	}
 
-	inline bool Wg_ParseKwargs(Wg_Obj* kwargs, const char* const* keys, int count, Wg_Obj** out) {
+	bool Wg_ParseKwargs(Wg_Obj* kwargs, const char* const* keys, int count, Wg_Obj** out) {
 		WG_ASSERT(kwargs && keys && out && count > 0 && Wg_IsDictionary(kwargs));
 
 		wings::Wg_ObjRef ref(kwargs);
@@ -13316,18 +13315,18 @@ extern "C" {
 		return true;
 	}
 
-	inline Wg_Obj* Wg_GetIndex(Wg_Obj* obj, Wg_Obj* index) {
+	Wg_Obj* Wg_GetIndex(Wg_Obj* obj, Wg_Obj* index) {
 		WG_ASSERT(obj && index);
 		return Wg_CallMethod(obj, "__getitem__", &index, 1);
 	}
 
-	inline Wg_Obj* Wg_SetIndex(Wg_Obj* obj, Wg_Obj* index, Wg_Obj* value) {
+	Wg_Obj* Wg_SetIndex(Wg_Obj* obj, Wg_Obj* index, Wg_Obj* value) {
 		WG_ASSERT(obj && index && value);
 		Wg_Obj* argv[2] = { index, value };
 		return Wg_CallMethod(obj, "__setitem__", argv, 2);
 	}
 
-	inline Wg_Obj* Wg_UnaryOp(Wg_UnOp op, Wg_Obj* arg) {
+	Wg_Obj* Wg_UnaryOp(Wg_UnOp op, Wg_Obj* arg) {
 		WG_ASSERT(arg);
 		Wg_Context* context = arg->context;
 		switch (op) {
@@ -13375,7 +13374,7 @@ extern "C" {
 		}
 	}
 
-	inline const std::unordered_map<Wg_BinOp, const char*> OP_METHOD_NAMES = {
+	static const std::unordered_map<Wg_BinOp, const char*> OP_METHOD_NAMES = {
 		{ WG_BOP_ADD, "__add__" },
 		{ WG_BOP_SUB, "__sub__" },
 		{ WG_BOP_MUL, "__mul__" },
@@ -13397,7 +13396,7 @@ extern "C" {
 		{ WG_BOP_GE, "__ge__" },
 	};
 
-	inline Wg_Obj* Wg_BinaryOp(Wg_BinOp op, Wg_Obj* lhs, Wg_Obj* rhs) {
+	Wg_Obj* Wg_BinaryOp(Wg_BinOp op, Wg_Obj* lhs, Wg_Obj* rhs) {
 		WG_ASSERT(lhs && rhs);
 
 		if (op == WG_BOP_IN)
@@ -13462,7 +13461,7 @@ extern "C" {
 		}
 	}
 
-	inline const char* Wg_GetErrorMessage(Wg_Context* context) {
+	const char* Wg_GetErrorMessage(Wg_Context* context) {
 		WG_ASSERT(context);
 
 		if (context->currentException == nullptr) {
@@ -13521,12 +13520,12 @@ extern "C" {
 		return context->traceMessage.c_str();
 	}
 
-	inline Wg_Obj* Wg_GetException(Wg_Context* context) {
+	Wg_Obj* Wg_GetException(Wg_Context* context) {
 		WG_ASSERT(context);
 		return context->currentException;
 	}
 
-	inline void Wg_ClearException(Wg_Context* context) {
+	void Wg_ClearException(Wg_Context* context) {
 		WG_ASSERT_VOID(context);
 		context->currentException = nullptr;
 		context->exceptionTrace.clear();
@@ -13534,7 +13533,7 @@ extern "C" {
 		context->traceMessage.clear();
 	}
 
-	inline void Wg_RaiseException(Wg_Context* context, Wg_Exc type, const char* message) {
+	void Wg_RaiseException(Wg_Context* context, Wg_Exc type, const char* message) {
 		WG_ASSERT_VOID(context);
 		switch (type) {
 		case WG_EXC_BASEEXCEPTION:
@@ -13586,7 +13585,7 @@ extern "C" {
 		}
 	}
 
-	inline void Wg_RaiseExceptionClass(Wg_Obj* klass, const char* message) {
+	void Wg_RaiseExceptionClass(Wg_Obj* klass, const char* message) {
 		WG_ASSERT_VOID(klass);
 		wings::Wg_ObjRef ref(klass);
 
@@ -13602,7 +13601,7 @@ extern "C" {
 		}
 	}
 
-	inline void Wg_RaiseExceptionObject(Wg_Obj* obj) {
+	void Wg_RaiseExceptionObject(Wg_Obj* obj) {
 		WG_ASSERT_VOID(obj);
 		Wg_Context* context = obj->context;
 		if (Wg_IsInstance(obj, &context->builtins.baseException, 1)) {
@@ -13615,7 +13614,7 @@ extern "C" {
 		}
 	}
 
-	inline void Wg_RaiseArgumentCountError(Wg_Context* context, int given, int expected) {
+	void Wg_RaiseArgumentCountError(Wg_Context* context, int given, int expected) {
 		WG_ASSERT_VOID(context && given >= 0 && expected >= -1);
 		std::string msg;
 		if (expected != -1) {
@@ -13632,31 +13631,31 @@ extern "C" {
 		Wg_RaiseException(context, WG_EXC_TYPEERROR, msg.c_str());
 	}
 
-	inline void Wg_RaiseArgumentTypeError(Wg_Context* context, int index, const char* expected) {
+	void Wg_RaiseArgumentTypeError(Wg_Context* context, int index, const char* expected) {
 		WG_ASSERT_VOID(context && index >= 0 && expected);
 		std::string msg = "Argument " + std::to_string(index + 1)
 			+ " Expected type " + expected;
 		Wg_RaiseException(context, WG_EXC_TYPEERROR, msg.c_str());
 	}
 
-	inline void Wg_RaiseAttributeError(const Wg_Obj* obj, const char* attribute) {
+	void Wg_RaiseAttributeError(const Wg_Obj* obj, const char* attribute) {
 		WG_ASSERT_VOID(obj && attribute);
 		std::string msg = "'" + wings::WObjTypeToString(obj) +
 			"' object has no attribute '" + attribute + "'";
 		Wg_RaiseException(obj->context, WG_EXC_ATTRIBUTEERROR, msg.c_str());
 	}
 
-	inline void Wg_RaiseZeroDivisionError(Wg_Context* context) {
+	void Wg_RaiseZeroDivisionError(Wg_Context* context) {
 		WG_ASSERT_VOID(context);
 		Wg_RaiseException(context, WG_EXC_ZERODIVISIONERROR, "division by zero");
 	}
 
-	inline void Wg_RaiseIndexError(Wg_Context* context) {
+	void Wg_RaiseIndexError(Wg_Context* context) {
 		WG_ASSERT_VOID(context);
 		Wg_RaiseException(context, WG_EXC_INDEXERROR, "index out of range");
 	}
 
-	inline void Wg_RaiseKeyError(Wg_Context* context, Wg_Obj* key) {
+	void Wg_RaiseKeyError(Wg_Context* context, Wg_Obj* key) {
 		WG_ASSERT_VOID(context);
 
 		if (key == nullptr) {
@@ -13669,7 +13668,7 @@ extern "C" {
 		}
 	}
 
-	inline void Wg_RaiseNameError(Wg_Context* context, const char* name) {
+	void Wg_RaiseNameError(Wg_Context* context, const char* name) {
 		WG_ASSERT_VOID(context && name);
 		std::string msg = "The name '";
 		msg += name;
@@ -13677,7 +13676,7 @@ extern "C" {
 		Wg_RaiseException(context, WG_EXC_NAMEERROR, msg.c_str());
 	}
 
-	inline void Wg_CollectGarbage(Wg_Context* context) {
+	void Wg_CollectGarbage(Wg_Context* context) {
 		WG_ASSERT_VOID(context);
 
 		std::deque<const Wg_Obj*> inUse;
@@ -13772,13 +13771,13 @@ extern "C" {
 		context->lastObjectCountAfterGC = context->mem.size();
 	}
 
-	inline void Wg_IncRef(const Wg_Obj* obj) {
+	void Wg_IncRef(const Wg_Obj* obj) {
 		WG_ASSERT_VOID(obj);
 		size_t& refCount = obj->context->protectedObjects[obj];
 		refCount++;
 	}
 
-	inline void Wg_DecRef(const Wg_Obj* obj) {
+	void Wg_DecRef(const Wg_Obj* obj) {
 		WG_ASSERT_VOID(obj);
 		auto it = obj->context->protectedObjects.find(obj);
 		WG_ASSERT_VOID(it != obj->context->protectedObjects.end());
@@ -13790,5 +13789,3 @@ extern "C" {
 	}
 
 } // extern "C"
-
-#endif // #ifndef WINGS_H

@@ -1,19 +1,24 @@
 import pathlib
 import re
-from os import sep
+import os
+from os import path, sep
 
 IGNORE = ["main.cpp", "tests.h", "tests.cpp", "cpp.hint"]
 
-cur_path = pathlib.Path(__file__).parent
-input_folder = f"{str(cur_path.parent)}{sep}wings{sep}"
-h_output_folder = f"{str(cur_path)}{sep}single_header{sep}"
-hs_output_folder = f"{str(cur_path)}{sep}header_and_source{sep}"
+cur_path = pathlib.Path(__file__).parent.absolute()
+input_folder = f"{str(cur_path.absolute())}{sep}"
+h_output_folder = f"{str(cur_path)}{sep}..{sep}single_include{sep}"
+hs_output_folder = f"{str(cur_path)}{sep}..{sep}header_and_source{sep}"
+
 filenames = [
     str(f.absolute()) for f in pathlib.Path(input_folder).glob("*.[ch]*")
     if not f.name.startswith("test.")
 ]
 source_files = [f for f in filenames if f.endswith(".cpp")]
 seen = set()
+
+os.makedirs(h_output_folder, exist_ok=True)
+os.makedirs(hs_output_folder, exist_ok=True)
 
 def get_includes(s):
     lines = [x for x in s.splitlines() if x.startswith("#include \"")]
@@ -35,7 +40,7 @@ def process_file(filename, inline):
 
     content = ""
     for include in get_includes(raw):
-        content += process_file(input_folder + include, inline)
+        content += process_file(os.path.abspath(input_folder + include), inline)
     content += remove_includes(raw)
     if inline:
         content = inline_symbols(content)
