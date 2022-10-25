@@ -7422,11 +7422,12 @@ namespace wings {
 
 
 #include <unordered_map>
+#include <stack>
 
 namespace wings {
 
-	inline thread_local std::vector<size_t> breakInstructions;
-	inline thread_local std::vector<size_t> continueInstructions;
+	inline thread_local std::stack<std::vector<size_t>> breakInstructions;
+	inline thread_local std::stack<std::vector<size_t>> continueInstructions;
 
 	inline void CompileBody(const std::vector<Statement>& body, std::vector<Instruction>& instructions);
 	inline void CompileExpression(const Expression& expression, std::vector<Instruction>& instructions);
@@ -7888,6 +7889,9 @@ namespace wings {
 		terminateJump.jump = std::make_unique<JumpInstruction>();
 		instructions.push_back(std::move(terminateJump));
 
+		breakInstructions.emplace();
+		continueInstructions.emplace();
+
 		CompileBody(node.body, instructions);
 
 		Instruction loopJump{};
@@ -7903,18 +7907,18 @@ namespace wings {
 			CompileBody(node.elseClause->body, instructions);
 		}
 
-		for (size_t index : breakInstructions) {
+		for (size_t index : breakInstructions.top()) {
 			instructions[index].jump->location = instructions.size();
 		}
-		for (size_t index : continueInstructions) {
+		for (size_t index : continueInstructions.top()) {
 			instructions[index].jump->location = conditionLocation;
 		}
-		breakInstructions.clear();
-		continueInstructions.clear();
+		breakInstructions.pop();
+		continueInstructions.pop();
 	}
 
 	inline void CompileBreak(const Statement& node, std::vector<Instruction>& instructions) {
-		breakInstructions.push_back(instructions.size());
+		breakInstructions.top().push_back(instructions.size());
 
 		Instruction jump{};
 		jump.srcPos = node.srcPos;
@@ -7924,7 +7928,7 @@ namespace wings {
 	}
 
 	inline void CompileContinue(const Statement& node, std::vector<Instruction>& instructions) {
-		continueInstructions.push_back(instructions.size());
+		continueInstructions.top().push_back(instructions.size());
 
 		Instruction jump{};
 		jump.srcPos = node.srcPos;
@@ -8221,9 +8225,6 @@ namespace wings {
 	}
 
 	inline std::vector<Instruction> Compile(const Statement& parseTree) {
-		breakInstructions.clear();
-		continueInstructions.clear();
-
 		std::vector<Instruction> instructions;
 		CompileBody(parseTree.expr.def.body, instructions);
 
