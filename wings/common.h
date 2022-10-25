@@ -250,6 +250,7 @@ struct Wg_Obj {
 	wings::AttributeTable attributes;
 	std::vector<std::pair<Wg_Finalizer, void*>> finalizers;
 	Wg_Context* context;
+	uint32_t refCount = 0;
 };
 
 struct Wg_Context {
@@ -261,7 +262,6 @@ struct Wg_Context {
 	// Garbage collection
 	size_t lastObjectCountAfterGC = 0;
 	std::deque<std::unique_ptr<Wg_Obj>> mem;
-	std::unordered_map<const Wg_Obj*, size_t> protectedObjects;
 	std::vector<wings::Executor*> executors;
 
 	// Object instances

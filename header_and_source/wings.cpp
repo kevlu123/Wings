@@ -776,6 +776,16 @@ WG_DLL_EXPORT
 void Wg_ClearException(Wg_Context* context);
 
 /**
+* @brief Get the context associated with an object.
+* 
+* @param obj The object.
+* @return The associated context.
+*/
+
+WG_DLL_EXPORT
+Wg_Context* Wg_GetContextFromObject(Wg_Obj* obj);
+
+/**
 * @brief Check if an object's class derives from any of the specified classes.
 * 
 * @param instance The object to be checked.
@@ -857,7 +867,7 @@ void Wg_CollectGarbage(Wg_Context* context);
 * @see Wg_DecRef
 */
 WG_DLL_EXPORT
-void Wg_IncRef(const Wg_Obj* obj);
+void Wg_IncRef(Wg_Obj* obj);
 
 /**
 * @brief Decrement the reference count of an object.
@@ -870,7 +880,7 @@ void Wg_IncRef(const Wg_Obj* obj);
 * @see Wg_IncRef
 */
 WG_DLL_EXPORT
-void Wg_DecRef(const Wg_Obj* obj);
+void Wg_DecRef(Wg_Obj* obj);
 
 /**
 * @brief Get the None singleton value.
@@ -2366,6 +2376,7 @@ struct Wg_Obj {
 	wings::AttributeTable attributes;
 	std::vector<std::pair<Wg_Finalizer, void*>> finalizers;
 	Wg_Context* context;
+	uint32_t refCount = 0;
 };
 
 struct Wg_Context {
@@ -2377,7 +2388,6 @@ struct Wg_Context {
 	// Garbage collection
 	size_t lastObjectCountAfterGC = 0;
 	std::deque<std::unique_ptr<Wg_Obj>> mem;
-	std::unordered_map<const Wg_Obj*, size_t> protectedObjects;
 	std::vector<wings::Executor*> executors;
 
 	// Object instances
@@ -13683,8 +13693,9 @@ extern "C" {
 		if (!context->closing) {
 			if (context->currentException)
 				inUse.push_back(context->currentException);
-			for (const auto& [obj, _] : context->protectedObjects)
-				inUse.push_back(obj);
+			for (const auto& obj : context->mem)
+				if (obj->refCount)
+					inUse.push_back(obj.get());
 			for (auto& [_, globals] : context->globals)
 				for (auto& var : globals)
 					inUse.push_back(*var.second);
@@ -13771,21 +13782,19 @@ extern "C" {
 		context->lastObjectCountAfterGC = context->mem.size();
 	}
 
-	void Wg_IncRef(const Wg_Obj* obj) {
+	void Wg_IncRef(Wg_Obj* obj) {
 		WG_ASSERT_VOID(obj);
-		size_t& refCount = obj->context->protectedObjects[obj];
-		refCount++;
+		obj->refCount++;
 	}
 
-	void Wg_DecRef(const Wg_Obj* obj) {
-		WG_ASSERT_VOID(obj);
-		auto it = obj->context->protectedObjects.find(obj);
-		WG_ASSERT_VOID(it != obj->context->protectedObjects.end());
-		if (it->second == 1) {
-			obj->context->protectedObjects.erase(it);
-		} else {
-			it->second--;
-		}
+	void Wg_DecRef(Wg_Obj* obj) {
+		WG_ASSERT_VOID(obj && obj->refCount > 0);
+		obj->refCount--;
+	}
+
+	Wg_Context* Wg_GetContextFromObject(Wg_Obj* obj) {
+		WG_ASSERT(obj);
+		return obj->context;
 	}
 
 } // extern "C"

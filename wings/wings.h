@@ -777,6 +777,16 @@ WG_DLL_EXPORT
 void Wg_ClearException(Wg_Context* context);
 
 /**
+* @brief Get the context associated with an object.
+* 
+* @param obj The object.
+* @return The associated context.
+*/
+
+WG_DLL_EXPORT
+Wg_Context* Wg_GetContextFromObject(Wg_Obj* obj);
+
+/**
 * @brief Check if an object's class derives from any of the specified classes.
 * 
 * @param instance The object to be checked.
@@ -858,7 +868,7 @@ void Wg_CollectGarbage(Wg_Context* context);
 * @see Wg_DecRef
 */
 WG_DLL_EXPORT
-void Wg_IncRef(const Wg_Obj* obj);
+void Wg_IncRef(Wg_Obj* obj);
 
 /**
 * @brief Decrement the reference count of an object.
@@ -871,7 +881,7 @@ void Wg_IncRef(const Wg_Obj* obj);
 * @see Wg_IncRef
 */
 WG_DLL_EXPORT
-void Wg_DecRef(const Wg_Obj* obj);
+void Wg_DecRef(Wg_Obj* obj);
 
 /**
 * @brief Get the None singleton value.
