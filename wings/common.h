@@ -293,12 +293,19 @@ struct Wg_Context {
 #define WG_STRINGIZE2_HELPER(x) #x
 #define WG_LINE_AS_STRING WG_STRINGIZE_HELPER(__LINE__)
 
+// Automatically define WG_NO_ASSERT if compiling in release mode in Visual Studio
+#if defined(_WIN32) && !defined(_DEBUG)
+	#ifndef WG_NO_ASSERT
+		#define WG_NO_ASSERT
+	#endif
+#endif
+
 #ifndef WG_NO_ASSERT
 	#define WG_ASSERT_RET(ret, assertion) do { if (!(assertion)) { wings::CallErrorCallback( \
 	WG_LINE_AS_STRING " " __FILE__ " " #assertion \
 	); return ret; } } while (0)
 #else
-	#define WG_ASSERT_RET(ret, assertion)
+	#define WG_ASSERT_RET(ret, assertion) (void)0
 #endif
 
 #define WG_ASSERT(assertion) WG_ASSERT_RET({}, assertion)
