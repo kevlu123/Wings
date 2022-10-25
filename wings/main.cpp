@@ -32,7 +32,7 @@ int main(int argc, char** argv) {
 		
 		if (Wg_Context* context = Wg_CreateContext(&cfg)) {
 			if (!Wg_Execute(context, script.data(), "test.py")) {
-				std::cout << Wg_GetErrorMessage(context) << std::endl;
+				std::cout << Wg_GetErrorMessage(context);
 			}
 			Wg_DestroyContext(context);
 		} else {
