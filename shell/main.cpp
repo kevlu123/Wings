@@ -22,6 +22,7 @@ int RunFile(int argc, char** argv) {
 	std::vector<char> script;
 	if (!ReadFromFile(argv[1], script))
 		return 1;
+	script.push_back(0); // Add null terminator
 
 	Wg_Config cfg{};
 	Wg_DefaultConfig(&cfg);
