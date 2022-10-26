@@ -800,12 +800,14 @@ class ValueError(Exception):
 				if (!Wg_Iterate(iterable, data, f))
 					return nullptr;
 			}
-
-			for (const auto& [k, v] : Wg_GetKwargs(context)->Get<WDict>()) {
-				try {
-					data->operator[](k) = v;
-				} catch (HashException&) {
-					return nullptr;
+			
+			if (Wg_Obj* kw = Wg_GetKwargs(context)) {
+				for (const auto& [k, v] : kw->Get<WDict>()) {
+					try {
+						data->operator[](k) = v;
+					} catch (HashException&) {
+						return nullptr;
+					}
 				}
 			}
 
@@ -2683,8 +2685,6 @@ class ValueError(Exception):
 			WG_EXPECT_ARG_TYPE_LIST(0);
 
 			Wg_Obj* kwargs = Wg_GetKwargs(context);
-			if (kwargs == nullptr)
-				return nullptr;
 
 			Wg_Obj* kw[2]{};
 			const char* keys[2] = { "reverse", "key" };
@@ -3729,8 +3729,6 @@ class ValueError(Exception):
 
 		static Wg_Obj* print(Wg_Context* context, Wg_Obj** argv, int argc) {
 			Wg_Obj* kwargs = Wg_GetKwargs(context);
-			if (kwargs == nullptr)
-				return nullptr;
 			
 			Wg_Obj* kw[3]{};
 			const char* keys[3] = { "sep", "end", "flush" };

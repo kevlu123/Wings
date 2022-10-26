@@ -1347,11 +1347,12 @@ bool Wg_Unpack(Wg_Obj* obj, int count, Wg_Obj** values);
 * @brief Get the keyword arguments dictionary passed to the current function.
 * 
 * @note This function must be called inside a function bound with Wg_NewFunction() or Wg_BindMethod().
+* @note This function can return NULL to indicate an empty dictionary.
 * 
 * @param context The associated context.
-* @return The keywords arguments dictionary, or NULL on failure.
+* @return The keywords arguments dictionary.
 * 
-* @see Wg_Call, Wg_CallMethod, Wg_GetException, Wg_GetErrorMessage
+* @see Wg_Call, Wg_CallMethod
 */
 WG_DLL_EXPORT
 Wg_Obj* Wg_GetKwargs(Wg_Context* context);
@@ -1442,6 +1443,7 @@ Wg_Obj* Wg_CallMethodFromBase(Wg_Obj* obj, const char* method, Wg_Obj** argv, in
 * other than the one returned by Wg_GetKwargs().
 *
 * @param dict The dictionary to get the values from.
+*			  If this is NULL, then an empty dictionary is assumed.
 * @param keys The keys to look up.
 * @param keysLen The length of the keys array.
 * @param[out] values The values in the dictionary corresponding to the keys.

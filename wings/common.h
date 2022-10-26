@@ -261,7 +261,7 @@ struct Wg_Context {
 	
 	// Garbage collection
 	size_t lastObjectCountAfterGC = 0;
-	std::deque<std::unique_ptr<Wg_Obj>> mem;
+	std::vector<std::unique_ptr<Wg_Obj>> mem;
 	std::vector<wings::Executor*> executors;
 
 	// Object instances

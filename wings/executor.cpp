@@ -6,8 +6,6 @@ namespace wings {
 	Wg_Obj* DefObject::Run(Wg_Context* context, Wg_Obj** args, int argc) {
 		DefObject* def = (DefObject*)Wg_GetFunctionUserdata(context);
 		Wg_Obj* kwargs = Wg_GetKwargs(context);
-		if (kwargs == nullptr)
-			return nullptr;
 
 		Executor executor{};
 		executor.def = def;

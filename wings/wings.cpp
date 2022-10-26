@@ -517,9 +517,6 @@ extern "C" {
 			if (Wg_Obj* init = Wg_HasAttribute(instance, "__init__")) {
 				if (Wg_IsFunction(init)) {
 					Wg_Obj* kwargs = Wg_GetKwargs(context);
-					if (kwargs == nullptr)
-						return nullptr;
-
 					Wg_Obj* ret = Wg_Call(init, argv, argc, kwargs);
 					if (ret == nullptr) {
 						return nullptr;
@@ -547,9 +544,6 @@ extern "C" {
 
 			if (Wg_Obj* baseInit = Wg_GetAttributeFromBase(argv[0], "__init__", bases[0])) {
 				Wg_Obj* kwargs = Wg_GetKwargs(context);
-				if (kwargs == nullptr)
-					return nullptr;
-
 				Wg_Obj* ret = Wg_Call(baseInit, argv + 1, argc - 1, kwargs);
 				if (ret == nullptr) {
 					return nullptr;
@@ -818,9 +812,6 @@ extern "C" {
 
 	Wg_Obj* Wg_GetKwargs(Wg_Context* context) {
 		WG_ASSERT(context && !context->kwargs.empty());
-		if (context->kwargs.back() == nullptr) {
-			context->kwargs.back() = Wg_NewDictionary(context);
-		}
 		return context->kwargs.back();
 	}
 
@@ -960,7 +951,13 @@ extern "C" {
 	}
 
 	bool Wg_ParseKwargs(Wg_Obj* kwargs, const char* const* keys, int count, Wg_Obj** out) {
-		WG_ASSERT(kwargs && keys && out && count > 0 && Wg_IsDictionary(kwargs));
+		WG_ASSERT(keys && out && count > 0 && (!kwargs || Wg_IsDictionary(kwargs)));
+
+		if (kwargs == nullptr) {
+			for (int i = 0; i < count; i++)
+				out[i] = nullptr;
+			return true;
+		}
 
 		wings::Wg_ObjRef ref(kwargs);
 		auto& buf = kwargs->Get<wings::WDict>();

@@ -1344,11 +1344,12 @@ bool Wg_Unpack(Wg_Obj* obj, int count, Wg_Obj** values);
 * @brief Get the keyword arguments dictionary passed to the current function.
 * 
 * @note This function must be called inside a function bound with Wg_NewFunction() or Wg_BindMethod().
+* @note This function can return NULL to indicate an empty dictionary.
 * 
 * @param context The associated context.
-* @return The keywords arguments dictionary, or NULL on failure.
+* @return The keywords arguments dictionary.
 * 
-* @see Wg_Call, Wg_CallMethod, Wg_GetException, Wg_GetErrorMessage
+* @see Wg_Call, Wg_CallMethod
 */
 WG_DLL_EXPORT
 Wg_Obj* Wg_GetKwargs(Wg_Context* context);
@@ -1439,6 +1440,7 @@ Wg_Obj* Wg_CallMethodFromBase(Wg_Obj* obj, const char* method, Wg_Obj** argv, in
 * other than the one returned by Wg_GetKwargs().
 *
 * @param dict The dictionary to get the values from.
+*			  If this is NULL, then an empty dictionary is assumed.
 * @param keys The keys to look up.
 * @param keysLen The length of the keys array.
 * @param[out] values The values in the dictionary corresponding to the keys.
@@ -2387,7 +2389,7 @@ struct Wg_Context {
 	
 	// Garbage collection
 	size_t lastObjectCountAfterGC = 0;
-	std::deque<std::unique_ptr<Wg_Obj>> mem;
+	std::vector<std::unique_ptr<Wg_Obj>> mem;
 	std::vector<wings::Executor*> executors;
 
 	// Object instances
@@ -3253,12 +3255,14 @@ class ValueError(Exception):
 				if (!Wg_Iterate(iterable, data, f))
 					return nullptr;
 			}
-
-			for (const auto& [k, v] : Wg_GetKwargs(context)->Get<WDict>()) {
-				try {
-					data->operator[](k) = v;
-				} catch (HashException&) {
-					return nullptr;
+			
+			if (Wg_Obj* kw = Wg_GetKwargs(context)) {
+				for (const auto& [k, v] : kw->Get<WDict>()) {
+					try {
+						data->operator[](k) = v;
+					} catch (HashException&) {
+						return nullptr;
+					}
 				}
 			}
 
@@ -5136,8 +5140,6 @@ class ValueError(Exception):
 			WG_EXPECT_ARG_TYPE_LIST(0);
 
 			Wg_Obj* kwargs = Wg_GetKwargs(context);
-			if (kwargs == nullptr)
-				return nullptr;
 
 			Wg_Obj* kw[2]{};
 			const char* keys[2] = { "reverse", "key" };
@@ -6182,8 +6184,6 @@ class ValueError(Exception):
 
 		static Wg_Obj* print(Wg_Context* context, Wg_Obj** argv, int argc) {
 			Wg_Obj* kwargs = Wg_GetKwargs(context);
-			if (kwargs == nullptr)
-				return nullptr;
 			
 			Wg_Obj* kw[3]{};
 			const char* keys[3] = { "sep", "end", "flush" };
@@ -8481,8 +8481,6 @@ namespace wings {
 	Wg_Obj* DefObject::Run(Wg_Context* context, Wg_Obj** args, int argc) {
 		DefObject* def = (DefObject*)Wg_GetFunctionUserdata(context);
 		Wg_Obj* kwargs = Wg_GetKwargs(context);
-		if (kwargs == nullptr)
-			return nullptr;
 
 		Executor executor{};
 		executor.def = def;
@@ -12865,9 +12863,6 @@ extern "C" {
 			if (Wg_Obj* init = Wg_HasAttribute(instance, "__init__")) {
 				if (Wg_IsFunction(init)) {
 					Wg_Obj* kwargs = Wg_GetKwargs(context);
-					if (kwargs == nullptr)
-						return nullptr;
-
 					Wg_Obj* ret = Wg_Call(init, argv, argc, kwargs);
 					if (ret == nullptr) {
 						return nullptr;
@@ -12895,9 +12890,6 @@ extern "C" {
 
 			if (Wg_Obj* baseInit = Wg_GetAttributeFromBase(argv[0], "__init__", bases[0])) {
 				Wg_Obj* kwargs = Wg_GetKwargs(context);
-				if (kwargs == nullptr)
-					return nullptr;
-
 				Wg_Obj* ret = Wg_Call(baseInit, argv + 1, argc - 1, kwargs);
 				if (ret == nullptr) {
 					return nullptr;
@@ -13166,9 +13158,6 @@ extern "C" {
 
 	Wg_Obj* Wg_GetKwargs(Wg_Context* context) {
 		WG_ASSERT(context && !context->kwargs.empty());
-		if (context->kwargs.back() == nullptr) {
-			context->kwargs.back() = Wg_NewDictionary(context);
-		}
 		return context->kwargs.back();
 	}
 
@@ -13308,7 +13297,13 @@ extern "C" {
 	}
 
 	bool Wg_ParseKwargs(Wg_Obj* kwargs, const char* const* keys, int count, Wg_Obj** out) {
-		WG_ASSERT(kwargs && keys && out && count > 0 && Wg_IsDictionary(kwargs));
+		WG_ASSERT(keys && out && count > 0 && (!kwargs || Wg_IsDictionary(kwargs)));
+
+		if (kwargs == nullptr) {
+			for (int i = 0; i < count; i++)
+				out[i] = nullptr;
+			return true;
+		}
 
 		wings::Wg_ObjRef ref(kwargs);
 		auto& buf = kwargs->Get<wings::WDict>();
