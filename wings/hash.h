@@ -4,6 +4,7 @@
 #include <vector>
 #include <stdexcept>
 #include <utility>
+#include <algorithm>
 
 /*
 * The RelaxedSet and RelaxedMap are versions of std::unordered_set
