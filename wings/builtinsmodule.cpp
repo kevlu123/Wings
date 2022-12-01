@@ -11,7 +11,6 @@
 #include <optional>
 #include <cmath>
 #include <algorithm>
-#include <bit>
 #include <cstring>
 
 namespace wings {
@@ -1345,7 +1344,12 @@ class ValueError(Exception):
 			WG_EXPECT_ARG_TYPE_INT(0);
 
 			Wg_uint n = (Wg_uint)Wg_GetInt(argv[0]);
-			return Wg_NewInt(context, (Wg_int)std::bit_width(n));
+			for (int i = sizeof(Wg_uint) * 8; i --> 0; ) {
+				if (n & ((Wg_uint)1 << (Wg_uint)i)) {
+					return Wg_NewInt(context, i + 1);
+				}
+			}
+			return Wg_NewInt(context, 0);
 		}
 
 		static Wg_Obj* int_bit_count(Wg_Context* context, Wg_Obj** argv, int argc) {

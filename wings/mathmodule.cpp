@@ -2,7 +2,6 @@
 #include "common.h"
 
 #include <cmath>
-#include <numbers>
 #include <limits>
 
 namespace wings {
@@ -278,11 +277,11 @@ def radians(x):
 			RegisterFunction(context, "gamma", gamma);
 			RegisterFunction(context, "lgamma", lgamma);
 
-			RegisterConstant(context, "e", Wg_NewFloat, std::numbers::e_v<Wg_float>);
+			RegisterConstant(context, "e", Wg_NewFloat, (Wg_float)2.71828182845904523536);
 			RegisterConstant(context, "inf", Wg_NewFloat, std::numeric_limits<Wg_float>::infinity());
 			RegisterConstant(context, "nan", Wg_NewFloat, std::numeric_limits<Wg_float>::quiet_NaN());
-			RegisterConstant(context, "pi", Wg_NewFloat, std::numbers::pi_v<Wg_float>);
-			RegisterConstant(context, "tau", Wg_NewFloat, 2 * std::numbers::pi_v<Wg_float>);
+			RegisterConstant(context, "pi", Wg_NewFloat, (Wg_float)3.14159265358979323846);
+			RegisterConstant(context, "tau", Wg_NewFloat, (Wg_float)6.28318530717958647692);
 
 			if (Execute(context, MATH_CODE, "math") == nullptr)
 				throw LibraryInitException();
