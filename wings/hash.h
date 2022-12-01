@@ -353,13 +353,13 @@ namespace wings {
 		Value& at(const Key& key) {
 			if (auto* value = try_at(key))
 				return *value;
-			throw std::out_of_range();
+			throw std::out_of_range("Key not found");
 		}
 		
 		const Value& at(const Key& key) const {
 			if (auto* value = try_at(key))
 				return *value;
-			throw std::out_of_range();
+			throw std::out_of_range("Key not found");
 		}
 
 		Value& operator[](const Key& key) {
