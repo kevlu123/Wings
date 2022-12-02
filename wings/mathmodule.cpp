@@ -121,6 +121,9 @@ def radians(x):
 	return x * pi / 180.0
 )";
 
+		constexpr Wg_float MATH_E = (Wg_float)2.71828182845904523536;
+		constexpr Wg_float MATH_PI = (Wg_float)3.14159265358979323846;
+
 		static Wg_Obj* ceil(Wg_Context* context, Wg_Obj** argv, int argc) {
 			WG_EXPECT_ARG_COUNT(1);
 			if (Wg_IsIntOrFloat(argv[0])) {
@@ -161,7 +164,7 @@ def radians(x):
 		static Wg_Obj* log(Wg_Context* context, Wg_Obj** argv, int argc) {
 			WG_EXPECT_ARG_COUNT_BETWEEN(1, 2);
 			WG_EXPECT_ARG_TYPE_INT_OR_FLOAT(0);
-			Wg_float base = std::numbers::e_v<Wg_float>;
+			Wg_float base = MATH_E;
 			if (argc == 2) {
 				WG_EXPECT_ARG_TYPE_INT_OR_FLOAT(1);
 				base = Wg_GetFloat(argv[1]);
@@ -277,11 +280,11 @@ def radians(x):
 			RegisterFunction(context, "gamma", gamma);
 			RegisterFunction(context, "lgamma", lgamma);
 
-			RegisterConstant(context, "e", Wg_NewFloat, (Wg_float)2.71828182845904523536);
+			RegisterConstant(context, "e", Wg_NewFloat, MATH_E);
 			RegisterConstant(context, "inf", Wg_NewFloat, std::numeric_limits<Wg_float>::infinity());
 			RegisterConstant(context, "nan", Wg_NewFloat, std::numeric_limits<Wg_float>::quiet_NaN());
-			RegisterConstant(context, "pi", Wg_NewFloat, (Wg_float)3.14159265358979323846);
-			RegisterConstant(context, "tau", Wg_NewFloat, (Wg_float)6.28318530717958647692);
+			RegisterConstant(context, "pi", Wg_NewFloat, MATH_PI);
+			RegisterConstant(context, "tau", Wg_NewFloat, 2 * MATH_PI);
 
 			if (Execute(context, MATH_CODE, "math") == nullptr)
 				throw LibraryInitException();
