@@ -2414,6 +2414,7 @@ struct Wg_Context {
 #include <cmath>
 #include <algorithm>
 #include <cstring>
+#include <bit>
 
 namespace wings {
 	static const char* const BUILTINS_CODE = R"(
