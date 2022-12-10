@@ -84,7 +84,7 @@ extern "C" {
 		WG_ASSERT_VOID(config);
 		config->maxAlloc = 1'000'000;
 		config->maxRecursion = 50;
-		config->gcRunFactor = 2.0f;
+		config->gcRunFactor = 20.0f;
 		config->printUserdata = nullptr;
 		config->argv = nullptr;
 		config->argc = 0;
@@ -514,7 +514,11 @@ extern "C" {
 			instance->attributes = _classObj->Get<Wg_Obj::Class>().instanceAttributes.Copy();
 			instance->type = _classObj->Get<Wg_Obj::Class>().name;
 
-			if (Wg_Obj* init = Wg_HasAttribute(instance, "__init__")) {
+			if (Wg_HasAttribute(instance, "__init__")) {
+				Wg_Obj* init = Wg_GetAttribute(instance, "__init__");
+				if (init == nullptr)
+					return nullptr;
+
 				if (Wg_IsFunction(init)) {
 					Wg_Obj* kwargs = Wg_GetKwargs(context);
 					Wg_Obj* ret = Wg_Call(init, argv, argc, kwargs);
@@ -668,14 +672,30 @@ extern "C" {
 		WG_ASSERT_VOID(obj && finalizer);
 		obj->finalizers.push_back({ finalizer, userdata });
 	}
-
-	Wg_Obj* Wg_HasAttribute(Wg_Obj* obj, const char* attribute) {
-		WG_ASSERT(obj && attribute && wings::IsValidIdentifier(attribute));
-		Wg_Obj* mem = obj->attributes.Get(attribute);
-		if (mem && Wg_IsFunction(mem) && mem->Get<Wg_Obj::Func>().isMethod) {
-			mem->Get<Wg_Obj::Func>().self = obj;
+	
+	static Wg_Obj* DuplicateMethod(Wg_Obj* method, Wg_Obj* self) {
+		const auto& func = method->Get<Wg_Obj::Func>();
+		if (func.self == self) {
+			return method;
 		}
-		return mem;
+		
+		wings::Wg_ObjRef ref(method);
+		wings::Wg_ObjRef ref2(self);
+		
+		Wg_Obj* dup = Wg_NewFunction(
+			method->context,
+			func.fptr,
+			func.userdata,
+			func.prettyName.c_str());
+		if (dup) {
+			dup->Get<Wg_Obj::Func>().self = self;
+		}
+		
+		return dup;
+	}
+
+	bool Wg_HasAttribute(Wg_Obj* obj, const char* attribute) {
+		return Wg_GetAttributeNoExcept(obj, attribute) != nullptr;
 	}
 
 	Wg_Obj* Wg_GetAttribute(Wg_Obj* obj, const char* attribute) {
@@ -684,9 +704,14 @@ extern "C" {
 		if (mem == nullptr) {
 			Wg_RaiseAttributeError(obj, attribute);
 		} else if (Wg_IsFunction(mem) && mem->Get<Wg_Obj::Func>().isMethod) {
-			mem->Get<Wg_Obj::Func>().self = obj;
+			return DuplicateMethod(mem, obj);
 		}
 		return mem;
+	}
+
+	Wg_Obj* Wg_GetAttributeNoExcept(Wg_Obj* obj, const char* attribute) {
+		WG_ASSERT(obj && attribute && wings::IsValidIdentifier(attribute));
+		return obj->attributes.Get(attribute);
 	}
 
 	void Wg_SetAttribute(Wg_Obj* obj, const char* attribute, Wg_Obj* value) {
@@ -730,7 +755,7 @@ extern "C" {
 			if (it != end)
 				return *it;
 
-			Wg_Obj* bases = Wg_HasAttribute(toCheck.front().Get(), "__bases__");
+			Wg_Obj* bases = Wg_GetAttributeNoExcept(toCheck.front().Get(), "__bases__");
 			if (bases && Wg_IsTuple(bases))
 				for (Wg_Obj* base : bases->Get<std::vector<Wg_Obj*>>())
 					toCheck.emplace(base);
@@ -1178,7 +1203,7 @@ extern "C" {
 		}
 
 		ss << context->currentException->type;
-		if (Wg_Obj* msg = Wg_HasAttribute(context->currentException, "_message"))
+		if (Wg_Obj* msg = Wg_GetAttributeNoExcept(context->currentException, "_message"))
 			if (Wg_IsString(msg) && *Wg_GetString(msg))
 				ss << ": " << Wg_GetString(msg);
 		ss << "\n";

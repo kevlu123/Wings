@@ -294,7 +294,7 @@ struct Wg_Context {
 #define WG_LINE_AS_STRING WG_STRINGIZE_HELPER(__LINE__)
 
 // Automatically define WG_NO_ASSERT if compiling in release mode in Visual Studio
-#if defined(_WIN32) && !defined(_DEBUG)
+#if (defined(_WIN32) && !defined(_DEBUG)) || defined(NDEBUG)
 	#ifndef WG_NO_ASSERT
 		#define WG_NO_ASSERT
 	#endif

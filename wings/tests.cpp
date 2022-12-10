@@ -558,7 +558,7 @@ void TestSlices() {
 }
 
 namespace wings {
-	void RunTests() {
+	int RunTests() {
 		TestPrint();
 		TestConditional();
 		TestWhile();
@@ -567,5 +567,6 @@ namespace wings {
 		TestSlices();
 
 		std::cout << testsPassed << "/" << testsRun << " tests passed." << std::endl << std::endl;
+		return (int)(testsPassed < testsRun);
 	}
 }

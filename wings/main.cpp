@@ -40,6 +40,5 @@ int main(int argc, char** argv) {
 		}
 	}
 	
-	wings::RunTests();
-	return 0;
+	return wings::RunTests();
 }

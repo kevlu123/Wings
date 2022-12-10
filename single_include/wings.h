@@ -1255,31 +1255,47 @@ WG_DLL_EXPORT
 void Wg_RegisterFinalizer(Wg_Obj* obj, Wg_Finalizer finalizer, void* userdata WG_DEFAULT_ARG(nullptr));
 
 /**
-* @brief Get an attribute of an object if it exists.
+* @brief Check if an object has an attribute.
 *
-* @param obj The object to get the attribute from.
-* @param attribute The attribute to get.
-* @return The attribute value, or NULL if the attribute does not exist.
+* @param obj The object to check.
+* @param attribute The attribute to check.
+* @return A boolean indicating whether the object has the attribute.
 * 
-* @see Wg_GetAttribute, Wg_GetAttributeFromBase, Wg_SetAttribute
+* @see Wg_GetAttribute, Wg_GetAttributeFromBase, Wg_GetAttributeNoExcept, Wg_SetAttribute
 */
 WG_DLL_EXPORT
-Wg_Obj* Wg_HasAttribute(Wg_Obj* obj, const char* attribute);
+bool Wg_HasAttribute(Wg_Obj* obj, const char* attribute);
 
 /**
 * @brief Get an attribute of an object.
 * If the attribute does not exist, an AttributeError is raised.
-* 
-* To get an attribute without raising an AttributeError, see Wg_HasAttribute().
+* If the attribute is an unbound method object,
+* a new method object is allocated with obj bound.
+* If this allocation fails, a MemoryError is raised.
 * 
 * @param obj The object to get the attribute from.
 * @param attribute The attribute to get.
-* @return The attribute value, or NULL if the attribute does not exist.
+* @return The attribute value, or NULL if the attribute
+*		  does not exist or there is an error.
 * 
-* @see Wg_GetAttributeFromBase, Wg_SetAttribute, Wg_GetException, Wg_GetErrorMessage
+* @see Wg_HasAttribute, Wg_GetAttributeFromBase, Wg_GetAttributeNoExcept, Wg_SetAttribute, Wg_GetException, Wg_GetErrorMessage
 */
 WG_DLL_EXPORT
 Wg_Obj* Wg_GetAttribute(Wg_Obj* obj, const char* attribute);
+
+/**
+* @brief Get an attribute of an object.
+* Unlike, Wg_GetAttribute(), this function does not raise exceptions.
+* @warning This function will not bind unbound method objects to obj.
+*
+* @param obj The object to get the attribute from.
+* @param attribute The attribute to get.
+* @return The attribute value, or NULL if the attribute does not exist.
+*
+* @see Wg_HasAttribute, Wg_GetAttribute, Wg_GetAttributeFromBase, Wg_SetAttribute
+*/
+WG_DLL_EXPORT
+Wg_Obj* Wg_GetAttributeNoExcept(Wg_Obj* obj, const char* attribute);
 
 /**
 * @brief Set an attribute of an object.
@@ -1288,7 +1304,7 @@ Wg_Obj* Wg_GetAttribute(Wg_Obj* obj, const char* attribute);
 * @param attribute The attribute to set.
 * @param value The attribute value.
 * 
-* @see Wg_HasAttribute, Wg_GetAttribute, Wg_GetAttributeFromBase
+* @see Wg_HasAttribute, Wg_GetAttribute, Wg_GetAttributeNoExcept, Wg_GetAttributeFromBase
 */
 WG_DLL_EXPORT
 void Wg_SetAttribute(Wg_Obj* obj, const char* attribute, Wg_Obj* value);
@@ -1304,7 +1320,7 @@ void Wg_SetAttribute(Wg_Obj* obj, const char* attribute, Wg_Obj* value);
 * @param baseClass The base class to search in, or NULL to search in all bases.
 * @return The attribute value, or NULL if the attribute does not exist.
 * 
-* @see Wg_HasAttribute, Wg_GetAttribute, Wg_GetAttributeFromBase
+* @see Wg_HasAttribute, Wg_GetAttribute, Wg_GetAttributeNoExcept, Wg_SetAttribute
 */
 WG_DLL_EXPORT
 Wg_Obj* Wg_GetAttributeFromBase(Wg_Obj* obj, const char* attribute, Wg_Obj* baseClass WG_DEFAULT_ARG(nullptr));
@@ -2425,7 +2441,7 @@ struct Wg_Context {
 #define WG_LINE_AS_STRING WG_STRINGIZE_HELPER(__LINE__)
 
 // Automatically define WG_NO_ASSERT if compiling in release mode in Visual Studio
-#if defined(_WIN32) && !defined(_DEBUG)
+#if (defined(_WIN32) && !defined(_DEBUG)) || defined(NDEBUG)
 	#ifndef WG_NO_ASSERT
 		#define WG_NO_ASSERT
 	#endif
@@ -12433,7 +12449,7 @@ extern "C" {
 		WG_ASSERT_VOID(config);
 		config->maxAlloc = 1'000'000;
 		config->maxRecursion = 50;
-		config->gcRunFactor = 2.0f;
+		config->gcRunFactor = 20.0f;
 		config->printUserdata = nullptr;
 		config->argv = nullptr;
 		config->argc = 0;
@@ -12863,7 +12879,11 @@ extern "C" {
 			instance->attributes = _classObj->Get<Wg_Obj::Class>().instanceAttributes.Copy();
 			instance->type = _classObj->Get<Wg_Obj::Class>().name;
 
-			if (Wg_Obj* init = Wg_HasAttribute(instance, "__init__")) {
+			if (Wg_HasAttribute(instance, "__init__")) {
+				Wg_Obj* init = Wg_GetAttribute(instance, "__init__");
+				if (init == nullptr)
+					return nullptr;
+
 				if (Wg_IsFunction(init)) {
 					Wg_Obj* kwargs = Wg_GetKwargs(context);
 					Wg_Obj* ret = Wg_Call(init, argv, argc, kwargs);
@@ -13017,14 +13037,30 @@ extern "C" {
 		WG_ASSERT_VOID(obj && finalizer);
 		obj->finalizers.push_back({ finalizer, userdata });
 	}
-
-	Wg_Obj* Wg_HasAttribute(Wg_Obj* obj, const char* attribute) {
-		WG_ASSERT(obj && attribute && wings::IsValidIdentifier(attribute));
-		Wg_Obj* mem = obj->attributes.Get(attribute);
-		if (mem && Wg_IsFunction(mem) && mem->Get<Wg_Obj::Func>().isMethod) {
-			mem->Get<Wg_Obj::Func>().self = obj;
+	
+	static Wg_Obj* DuplicateMethod(Wg_Obj* method, Wg_Obj* self) {
+		const auto& func = method->Get<Wg_Obj::Func>();
+		if (func.self == self) {
+			return method;
 		}
-		return mem;
+		
+		wings::Wg_ObjRef ref(method);
+		wings::Wg_ObjRef ref2(self);
+		
+		Wg_Obj* dup = Wg_NewFunction(
+			method->context,
+			func.fptr,
+			func.userdata,
+			func.prettyName.c_str());
+		if (dup) {
+			dup->Get<Wg_Obj::Func>().self = self;
+		}
+		
+		return dup;
+	}
+
+	bool Wg_HasAttribute(Wg_Obj* obj, const char* attribute) {
+		return Wg_GetAttributeNoExcept(obj, attribute) != nullptr;
 	}
 
 	Wg_Obj* Wg_GetAttribute(Wg_Obj* obj, const char* attribute) {
@@ -13033,9 +13069,14 @@ extern "C" {
 		if (mem == nullptr) {
 			Wg_RaiseAttributeError(obj, attribute);
 		} else if (Wg_IsFunction(mem) && mem->Get<Wg_Obj::Func>().isMethod) {
-			mem->Get<Wg_Obj::Func>().self = obj;
+			return DuplicateMethod(mem, obj);
 		}
 		return mem;
+	}
+
+	Wg_Obj* Wg_GetAttributeNoExcept(Wg_Obj* obj, const char* attribute) {
+		WG_ASSERT(obj && attribute && wings::IsValidIdentifier(attribute));
+		return obj->attributes.Get(attribute);
 	}
 
 	void Wg_SetAttribute(Wg_Obj* obj, const char* attribute, Wg_Obj* value) {
@@ -13079,7 +13120,7 @@ extern "C" {
 			if (it != end)
 				return *it;
 
-			Wg_Obj* bases = Wg_HasAttribute(toCheck.front().Get(), "__bases__");
+			Wg_Obj* bases = Wg_GetAttributeNoExcept(toCheck.front().Get(), "__bases__");
 			if (bases && Wg_IsTuple(bases))
 				for (Wg_Obj* base : bases->Get<std::vector<Wg_Obj*>>())
 					toCheck.emplace(base);
@@ -13527,7 +13568,7 @@ extern "C" {
 		}
 
 		ss << context->currentException->type;
-		if (Wg_Obj* msg = Wg_HasAttribute(context->currentException, "_message"))
+		if (Wg_Obj* msg = Wg_GetAttributeNoExcept(context->currentException, "_message"))
 			if (Wg_IsString(msg) && *Wg_GetString(msg))
 				ss << ": " << Wg_GetString(msg);
 		ss << "\n";

@@ -23,3 +23,16 @@ add_executable(dev
     timemodule.cpp timemodule.h
     wings.cpp wings.h
     )
+
+IF(WIN32)
+    set(PYTHON_EXECUTABLE python)
+ELSE()
+    set(PYTHON_EXECUTABLE python3)
+ENDIF()
+
+add_custom_target(
+    merge ALL
+    COMMAND ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/merge.py
+)
+
+add_dependencies(dev merge)

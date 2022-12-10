@@ -1255,31 +1255,47 @@ WG_DLL_EXPORT
 void Wg_RegisterFinalizer(Wg_Obj* obj, Wg_Finalizer finalizer, void* userdata WG_DEFAULT_ARG(nullptr));
 
 /**
-* @brief Get an attribute of an object if it exists.
+* @brief Check if an object has an attribute.
 *
-* @param obj The object to get the attribute from.
-* @param attribute The attribute to get.
-* @return The attribute value, or NULL if the attribute does not exist.
+* @param obj The object to check.
+* @param attribute The attribute to check.
+* @return A boolean indicating whether the object has the attribute.
 * 
-* @see Wg_GetAttribute, Wg_GetAttributeFromBase, Wg_SetAttribute
+* @see Wg_GetAttribute, Wg_GetAttributeFromBase, Wg_GetAttributeNoExcept, Wg_SetAttribute
 */
 WG_DLL_EXPORT
-Wg_Obj* Wg_HasAttribute(Wg_Obj* obj, const char* attribute);
+bool Wg_HasAttribute(Wg_Obj* obj, const char* attribute);
 
 /**
 * @brief Get an attribute of an object.
 * If the attribute does not exist, an AttributeError is raised.
-* 
-* To get an attribute without raising an AttributeError, see Wg_HasAttribute().
+* If the attribute is an unbound method object,
+* a new method object is allocated with obj bound.
+* If this allocation fails, a MemoryError is raised.
 * 
 * @param obj The object to get the attribute from.
 * @param attribute The attribute to get.
-* @return The attribute value, or NULL if the attribute does not exist.
+* @return The attribute value, or NULL if the attribute
+*		  does not exist or there is an error.
 * 
-* @see Wg_GetAttributeFromBase, Wg_SetAttribute, Wg_GetException, Wg_GetErrorMessage
+* @see Wg_HasAttribute, Wg_GetAttributeFromBase, Wg_GetAttributeNoExcept, Wg_SetAttribute, Wg_GetException, Wg_GetErrorMessage
 */
 WG_DLL_EXPORT
 Wg_Obj* Wg_GetAttribute(Wg_Obj* obj, const char* attribute);
+
+/**
+* @brief Get an attribute of an object.
+* Unlike, Wg_GetAttribute(), this function does not raise exceptions.
+* @warning This function will not bind unbound method objects to obj.
+*
+* @param obj The object to get the attribute from.
+* @param attribute The attribute to get.
+* @return The attribute value, or NULL if the attribute does not exist.
+*
+* @see Wg_HasAttribute, Wg_GetAttribute, Wg_GetAttributeFromBase, Wg_SetAttribute
+*/
+WG_DLL_EXPORT
+Wg_Obj* Wg_GetAttributeNoExcept(Wg_Obj* obj, const char* attribute);
 
 /**
 * @brief Set an attribute of an object.
@@ -1288,7 +1304,7 @@ Wg_Obj* Wg_GetAttribute(Wg_Obj* obj, const char* attribute);
 * @param attribute The attribute to set.
 * @param value The attribute value.
 * 
-* @see Wg_HasAttribute, Wg_GetAttribute, Wg_GetAttributeFromBase
+* @see Wg_HasAttribute, Wg_GetAttribute, Wg_GetAttributeNoExcept, Wg_GetAttributeFromBase
 */
 WG_DLL_EXPORT
 void Wg_SetAttribute(Wg_Obj* obj, const char* attribute, Wg_Obj* value);
@@ -1304,7 +1320,7 @@ void Wg_SetAttribute(Wg_Obj* obj, const char* attribute, Wg_Obj* value);
 * @param baseClass The base class to search in, or NULL to search in all bases.
 * @return The attribute value, or NULL if the attribute does not exist.
 * 
-* @see Wg_HasAttribute, Wg_GetAttribute, Wg_GetAttributeFromBase
+* @see Wg_HasAttribute, Wg_GetAttribute, Wg_GetAttributeNoExcept, Wg_SetAttribute
 */
 WG_DLL_EXPORT
 Wg_Obj* Wg_GetAttributeFromBase(Wg_Obj* obj, const char* attribute, Wg_Obj* baseClass WG_DEFAULT_ARG(nullptr));
