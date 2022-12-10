@@ -7,6 +7,7 @@
 #include <vector>
 #include <algorithm>
 #include <stack>
+#include <string.h>
 
 static bool ReadFromFile(const std::string& path, std::vector<char>& data) {
 	std::ifstream f(path, std::ios::binary | std::ios::ate);
@@ -42,6 +43,16 @@ int RunFile(int argc, char** argv) {
 	return 0;
 }
 
+void PrintVersion() {
+#ifdef WINGS_SHELL_VERSION
+#define STRINGIFY(s) #s
+#define XSTRINGIFY(s) STRINGIFY(s)
+	std::cout << "Wings Shell v" XSTRINGIFY(WINGS_SHELL_VERSION) << std::endl;
+#else
+	std::cout << "Wings Shell" << std::endl;
+#endif
+}
+
 int RunRepl() {
 	Wg_Config cfg{};
 	Wg_DefaultConfig(&cfg);
@@ -62,6 +73,8 @@ int RunRepl() {
 		Wg_DestroyContext(context);
 		return 2;
 	}
+
+	PrintVersion();
 	
 	std::string input;
 	bool indented = false;
@@ -119,8 +132,14 @@ int RunRepl() {
 }
 
 int main(int argc, char** argv) {
-	if (argc > 1) {
-		return RunFile(argc, argv);
+	if (argc <= 1) {
+		return RunRepl();
 	}
-	return RunRepl();
+
+	if (std::strcmp(argv[1], "--version") == 0) {
+		PrintVersion();
+		return 0;
+	}
+
+	return RunFile(argc, argv);
 }
