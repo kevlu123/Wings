@@ -4,7 +4,9 @@ project(wings)
 
 set (CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 
-if(NOT DEFINED WINGS_NO_DEV)
+option(WINGS_NO_DEV "Build the development project" OFF)
+
+if(NOT WINGS_NO_DEV)
 	add_subdirectory(wings)
 endif()
 

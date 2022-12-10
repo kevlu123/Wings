@@ -47,7 +47,7 @@ void PrintVersion() {
 #ifdef WINGS_SHELL_VERSION
 #define STRINGIFY(s) #s
 #define XSTRINGIFY(s) STRINGIFY(s)
-	std::cout << "Wings Shell v" XSTRINGIFY(WINGS_SHELL_VERSION) << std::endl;
+	std::cout << "Wings Shell " XSTRINGIFY(WINGS_SHELL_VERSION) << std::endl;
 #else
 	std::cout << "Wings Shell" << std::endl;
 #endif

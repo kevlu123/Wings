@@ -1,0 +1,43 @@
+name: CMake
+
+on:
+  push:
+    tags:
+      - '*'
+
+env:
+  BUILD_TYPE: Release
+
+jobs:
+  build:
+    runs-on: ${{ matrix.os }}
+    
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Configure CMake
+      run: cmake -B ${{github.workspace}}/build -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} -DWINGS_SHELL_VERSION='${{github.ref_name}}' -DWINGS_NO_DEV=ON
+
+    - name: Build
+      run: |
+        cmake --build ${{github.workspace}}/build --config ${{env.BUILD_TYPE}}
+
+    - name: Release-Linux
+      uses: softprops/action-gh-release@v1
+      if: matrix.os == 'ubuntu-latest'
+      with:
+        prerelease: true
+        files: |
+            build/bin/wings
+            
+    - name: Release-Windows
+      uses: softprops/action-gh-release@v1
+      if: matrix.os == 'windows-latest'
+      with:
+        prerelease: true
+        files: |
+            build/bin/${{env.BUILD_TYPE}}/wings.exe
