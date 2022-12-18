@@ -48,6 +48,11 @@ namespace wings {
 		size_t finallyJump;
 	};
 
+	struct QueuedJumpInstruction {
+		size_t location;
+		size_t finallyCount;
+	};
+
 	struct ImportInstruction {
 		std::string module;
 		std::string alias;
@@ -83,13 +88,15 @@ namespace wings {
 			JumpIfFalse,
 			JumpIfTrue,
 			Return,
+			QueueJump,
 
 			Raise,
 			PushTry,
 			PopTry,
-			Except,
+			ClearException,
 			CurrentException,
 			IsInstance,
+			EndFinally,
 
 			Call,
 			PushArgFrame,
@@ -106,6 +113,7 @@ namespace wings {
 		std::unique_ptr<ClassInstruction> klass;
 		std::unique_ptr<JumpInstruction> jump;
 		std::unique_ptr<TryFrameInstruction> pushTry;
+		std::unique_ptr<QueuedJumpInstruction> queuedJump;
 		std::unique_ptr<ImportInstruction> import;
 		std::unique_ptr<ImportFromInstruction> importFrom;
 

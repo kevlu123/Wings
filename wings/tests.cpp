@@ -3,82 +3,95 @@
 
 #include <iostream>
 #include <string>
+#include <string_view>
+#include <memory>
 
 static std::string output;
 static size_t testsPassed;
 static size_t testsRun;
 
+static void PrintFailure(const char* code, size_t line, std::string_view reason) {
+	std::cout
+		<< "===========================================================================\n"
+		<< "Test on line " << line << " failed.\n"
+		<< "----------------------------------- Code ----------------------------------\n"
+		<< code
+		<< "---------------------------------- Reason ---------------------------------\n"
+		<< reason
+		<< "===========================================================================\n\n"
+		<< std::endl;
+}
+
+static void PrintFailure(const char* code, size_t line, std::string_view expected, std::string_view actual) {
+	std::cout
+		<< "===========================================================================\n"
+		<< "Test on line " << line << " failed.\n"
+		<< "----------------------------------- Code ----------------------------------\n"
+		<< code
+		<< "--------------------------------- Expected --------------------------------\n"
+		<< expected << "\n"
+		<< "----------------------------------- Got -----------------------------------\n"
+		<< actual << "\n"
+		<< "===========================================================================\n\n"
+		<< std::endl;
+}
+
+static auto CreateContext() {
+	Wg_Config cfg{};
+	Wg_DefaultConfig(&cfg);
+	output.clear();
+	cfg.print = [](const char* message, int len, void*) {
+		output += std::string(message, len);
+	};
+	
+	auto deleter = [](Wg_Context* ctx) {
+		Wg_DestroyContext(ctx);
+	};
+	return std::unique_ptr<Wg_Context, decltype(deleter)>(Wg_CreateContext(&cfg));
+}
+
 static void Expect(const char* code, const char* expected, size_t line) {
 	testsRun++;
-	output.clear();
+	
+	auto context = CreateContext();
 
-	Wg_Context* context{};
-	try {
-		Wg_Config cfg{};
-		Wg_DefaultConfig(&cfg);
-		cfg.print = [](const char* message, int len, void*) {
-			output += std::string(message, len);
-		};
-		
-		context = Wg_CreateContext(&cfg);
-		if (context == nullptr)
-			throw std::string("Context creation failed");
-
-		Wg_Obj* exe = Wg_Compile(context, code);
-		if (exe == nullptr)
-			throw std::string(Wg_GetErrorMessage(context));
-
-		if (Wg_Call(exe, nullptr, 0) == nullptr)
-			throw std::string(Wg_GetErrorMessage(context));
-
-		std::string trimmed = output.substr(0, output.size() - 1);
-		if (trimmed != std::string(expected)) {
-			throw std::string("Test on line ")
-				+ std::to_string(line)
-				+ " failed. Expected "
-				+ expected
-				+ ". Got "
-				+ trimmed
-				+ ".";
-		}
-
-		testsPassed++;
-	} catch (std::string& err) {
-		std::cout << err << std::endl;
+	Wg_Obj* exe = Wg_Compile(context.get(), code);
+	if (exe == nullptr) {
+		PrintFailure(code, line, Wg_GetErrorMessage(context.get()));
+		return;
 	}
 
-	Wg_DestroyContext(context);
+	if (Wg_Call(exe, nullptr, 0) == nullptr) {
+		PrintFailure(code, line, Wg_GetErrorMessage(context.get()));
+		return;
+	}
+
+	output.pop_back();
+	if (output != expected) {
+		PrintFailure(code, line, expected, output);
+		return;
+	}
+
+	testsPassed++;
 }
 
 static void ExpectFailure(const char* code, size_t line) {
 	testsRun++;
-	output.clear();
 	
-	Wg_Context* context{};
-	try {
-		Wg_Config cfg{};
-		Wg_DefaultConfig(&cfg);
-		cfg.print = [](const char* message, int len, void*) {
-			output += std::string(message, len);
-		};
-		
-		context = Wg_CreateContext(&cfg);
-		if (context == nullptr)
-			throw std::string("Context creation failed");
+	auto context = CreateContext();
 
-		Wg_Obj* exe = Wg_Compile(context, code);
-		if (exe == nullptr)
-			throw std::string(Wg_GetErrorMessage(context));
-
-		if (Wg_Call(exe, nullptr, 0) == nullptr)
-			throw std::string(Wg_GetErrorMessage(context));
-
-		std::cout << "Test on line " << line << " did not fail as expected." << std::endl;
-	} catch (std::string&) {
+	Wg_Obj* exe = Wg_Compile(context.get(), code);
+	if (exe == nullptr) {
 		testsPassed++;
+		return;
+	}
+	
+	if (Wg_Call(exe, nullptr, 0) == nullptr) {
+		testsPassed++;
+		return;
 	}
 
-	Wg_DestroyContext(context);
+	PrintFailure(code, line, "Test did not fail as expected.");
 }
 
 #define T(code, expected) Expect(code, expected, __LINE__)
@@ -493,6 +506,28 @@ finally:
 )"
 ,
 "try\nexcept1\nfinally"
+);
+
+	T(R"(
+def f():
+    try:
+        a = 0
+        while True:
+            if a:
+                return
+            try:
+                print('try1')
+                raise Exception
+            finally:
+                print('finally1')
+                a = 1
+                continue
+    finally:
+        print('finally0')
+f()
+)"
+,
+"try1\nfinally1\nfinally0"
 );
 }
 

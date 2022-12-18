@@ -642,7 +642,7 @@ void Wg_SetErrorCallback(Wg_ErrorCallback callback);
 * @param context The associated context.
 * @return The current error string.
 * 
-* @see Wg_GetException, Wg_RaiseException, Wg_RaiseExceptionClass, Wg_RaiseExceptionObject
+* @see Wg_GetException, Wg_RaiseException, Wg_RaiseExceptionClass, Wg_RaiseExceptionObject, Wg_ReraiseExceptionObject
 */
 WG_DLL_EXPORT
 const char* Wg_GetErrorMessage(Wg_Context* context);
@@ -653,7 +653,7 @@ const char* Wg_GetErrorMessage(Wg_Context* context);
 * @param context The associated context.
 * @return The current exception object, or NULL if there is no exception.
 * 
-* @see Wg_GetErrorMessage, Wg_RaiseException, Wg_RaiseExceptionClass, Wg_RaiseExceptionObject
+* @see Wg_GetErrorMessage, Wg_RaiseException, Wg_RaiseExceptionClass, Wg_RaiseExceptionObject, Wg_ReraiseExceptionObject
 */
 WG_DLL_EXPORT
 Wg_Obj* Wg_GetException(Wg_Context* context);
@@ -667,7 +667,7 @@ Wg_Obj* Wg_GetException(Wg_Context* context);
 * @param type The exception type.
 * @param message The error message, or NULL for an empty string.
 * 
-* @see Wg_RaiseExceptionClass, Wg_RaiseExceptionObject
+* @see Wg_RaiseExceptionClass, Wg_RaiseExceptionObject, Wg_ReraiseExceptionObject
 */
 WG_DLL_EXPORT
 void Wg_RaiseException(Wg_Context* context, Wg_Exc type, const char* message WG_DEFAULT_ARG(nullptr));
@@ -682,7 +682,7 @@ void Wg_RaiseException(Wg_Context* context, Wg_Exc type, const char* message WG_
 * @param klass The exception class.
 * @param message The error message, or NULL for an empty string.
 * 
-* @see Wg_RaiseException, Wg_RaiseExceptionObject
+* @see Wg_RaiseException, Wg_RaiseExceptionObject, Wg_ReraiseExceptionObject
 */
 WG_DLL_EXPORT
 void Wg_RaiseExceptionClass(Wg_Obj* klass, const char* message WG_DEFAULT_ARG(nullptr));
@@ -696,10 +696,24 @@ void Wg_RaiseExceptionClass(Wg_Obj* klass, const char* message WG_DEFAULT_ARG(nu
 *
 * @param obj The exception object to raise. The type must be a subclass of BaseException.
 * 
-* @see Wg_RaiseException, Wg_RaiseExceptionClass
+* @see Wg_RaiseException, Wg_RaiseExceptionClass, Wg_ReraiseExceptionObject
 */
 WG_DLL_EXPORT
 void Wg_RaiseExceptionObject(Wg_Obj* obj);
+
+/**
+* @brief Raise an existing exception object without affecting the stack trace.
+*
+* The object's type must derive from BaseException, otherwise a TypeError is raised.
+*
+* If an exception is already set, the old exception will be overwritten.
+*
+* @param obj The exception object to raise. The type must be a subclass of BaseException.
+*
+* @see Wg_RaiseException, Wg_RaiseExceptionClass, Wg_RaiseExceptionObject
+*/
+WG_DLL_EXPORT
+void Wg_ReraiseExceptionObject(Wg_Obj* obj);
 
 /**
 * @brief Raise a TypeError with a formatted message.

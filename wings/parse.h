@@ -31,6 +31,10 @@ namespace wings {
 		std::unique_ptr<Statement> elseClause;
 
 		struct {
+			size_t finallyCount;
+			bool exitForNormally = false;
+		} exitBlock;
+		struct {
 			AssignTarget assignTarget;
 		} forLoop;
 		struct {

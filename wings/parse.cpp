@@ -141,6 +141,8 @@ namespace wings {
 		Statement brk{};
 		brk.srcPos = forLoop.expr.srcPos;
 		brk.type = Statement::Type::Break;
+		brk.exitBlock.finallyCount = 1;
+		brk.exitBlock.exitForNormally = true;
 
 		Expression stopIter{};
 		stopIter.srcPos = forLoop.expr.srcPos;
@@ -779,6 +781,55 @@ namespace wings {
 		return CodeError::Good();
 	}
 
+	static CodeError CheckBreakable(const LexTree& node) {
+		auto it = statementHierarchy.rbegin();
+		while (true) {
+			switch (*it) {
+			case Statement::Type::Def:
+			case Statement::Type::Root:
+				return CodeError::Bad("'break' or 'continue' outside of loop", node.tokens[0].srcPos);
+			case Statement::Type::For:
+			case Statement::Type::While:
+				return CodeError::Good();
+			}
+			++it;
+		}
+	}
+
+	static size_t BreakableTryExceptCount() {
+		size_t count = 0;
+		auto it = statementHierarchy.rbegin();
+		while (true) {
+			switch (*it) {
+			case Statement::Type::Def:
+			case Statement::Type::Root:
+			case Statement::Type::For:
+			case Statement::Type::While:
+				return count;
+			case Statement::Type::Try:
+				count++;
+				break;
+			}
+			++it;
+		}
+	}
+
+	static size_t TotalTryExceptCount() {
+		size_t count = 0;
+		auto it = statementHierarchy.rbegin();
+		while (true) {
+			switch (*it) {
+			case Statement::Type::Def:
+			case Statement::Type::Root:
+				return count;
+			case Statement::Type::Try:
+				count++;
+				break;
+			}
+			++it;
+		}
+	}
+
 	static CodeError ParseReturn(const LexTree& node, Statement& out) {
 		TokenIter p(node.tokens);
 		++p;
@@ -787,10 +838,13 @@ namespace wings {
 		if (p.EndReached()) {
 			out.expr.operation = Operation::Literal;
 			out.expr.literalValue.type = LiteralValue::Type::Null;
+			out.expr.srcPos = (--p)->srcPos;
+			out.exitBlock.finallyCount = TotalTryExceptCount();
 			return CodeError::Good();
 		} else if (auto error = ParseExpression(p, out.expr)) {
 			return error;
 		} else {
+			out.exitBlock.finallyCount = TotalTryExceptCount();
 			return CheckTrailingTokens(p);
 		}
 	}
@@ -802,30 +856,24 @@ namespace wings {
 		return CheckTrailingTokens(p);
 	}
 
-	static CodeError CheckBreakable(const LexTree& node) {
-		auto it = statementHierarchy.rbegin();
-		while (true) {
-			if (*it == Statement::Type::Def || *it == Statement::Type::Root) {
-				return CodeError::Bad("'break' or 'continue' outside of loop", node.tokens[0].srcPos);
-			} else if (*it == Statement::Type::For || *it == Statement::Type::While) {
-				return CodeError::Good();
-			}
-			++it;
-		}
-	}
-
 	static CodeError ParseBreak(const LexTree& node, Statement& out) {
 		if (auto error = CheckBreakable(node)) {
 			return error;
+		} else if (auto error = ParseSingleToken(node, out, Statement::Type::Break)) {
+			return error;
 		}
-		return ParseSingleToken(node, out, Statement::Type::Break);
+		out.exitBlock.finallyCount = BreakableTryExceptCount();
+		return CodeError::Good();
 	}
 
 	static CodeError ParseContinue(const LexTree& node, Statement& out) {
 		if (auto error = CheckBreakable(node)) {
 			return error;
+		} else if (auto error = ParseSingleToken(node, out, Statement::Type::Continue)) {
+			return error;
 		}
-		return ParseSingleToken(node, out, Statement::Type::Continue);
+		out.exitBlock.finallyCount = BreakableTryExceptCount();
+		return CodeError::Good();
 	}
 
 	static CodeError ParsePass(const LexTree& node, Statement& out) {

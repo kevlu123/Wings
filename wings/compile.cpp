@@ -8,6 +8,7 @@ namespace wings {
 
 	static thread_local std::stack<std::vector<size_t>> breakInstructions;
 	static thread_local std::stack<std::vector<size_t>> continueInstructions;
+	static thread_local std::stack<std::optional<size_t>> forLoopBreakInstructions;
 
 	static void CompileBody(const std::vector<Statement>& body, std::vector<Instruction>& instructions);
 	static void CompileExpression(const Expression& expression, std::vector<Instruction>& instructions);
@@ -471,7 +472,8 @@ namespace wings {
 
 		breakInstructions.emplace();
 		continueInstructions.emplace();
-
+		forLoopBreakInstructions.emplace();
+		
 		CompileBody(node.body, instructions);
 
 		Instruction loopJump{};
@@ -483,27 +485,38 @@ namespace wings {
 
 		instructions[terminateJumpInstrIndex].jump->location = instructions.size();
 
+		if (forLoopBreakInstructions.top()) {
+			instructions[forLoopBreakInstructions.top().value()].queuedJump->location = instructions.size();
+		}
+
 		if (node.elseClause) {
 			CompileBody(node.elseClause->body, instructions);
 		}
 
 		for (size_t index : breakInstructions.top()) {
-			instructions[index].jump->location = instructions.size();
+			instructions[index].queuedJump->location = instructions.size();
 		}
 		for (size_t index : continueInstructions.top()) {
-			instructions[index].jump->location = conditionLocation;
+			instructions[index].queuedJump->location = conditionLocation;
 		}
+		
 		breakInstructions.pop();
 		continueInstructions.pop();
+		forLoopBreakInstructions.pop();
 	}
 
 	static void CompileBreak(const Statement& node, std::vector<Instruction>& instructions) {
-		breakInstructions.top().push_back(instructions.size());
+		if (node.exitBlock.exitForNormally) {
+			forLoopBreakInstructions.top() = instructions.size();
+		} else {
+			breakInstructions.top().push_back(instructions.size());
+		}
 
 		Instruction jump{};
 		jump.srcPos = node.srcPos;
-		jump.type = Instruction::Type::Jump;
-		jump.jump = std::make_unique<JumpInstruction>();
+		jump.type = Instruction::Type::QueueJump;
+		jump.queuedJump = std::make_unique<QueuedJumpInstruction>();
+		jump.queuedJump->finallyCount = node.exitBlock.finallyCount;
 		instructions.push_back(std::move(jump));
 	}
 
@@ -512,8 +525,9 @@ namespace wings {
 
 		Instruction jump{};
 		jump.srcPos = node.srcPos;
-		jump.type = Instruction::Type::Jump;
-		jump.jump = std::make_unique<JumpInstruction>();
+		jump.type = Instruction::Type::QueueJump;
+		jump.queuedJump = std::make_unique<QueuedJumpInstruction>();
+		jump.queuedJump->finallyCount = node.exitBlock.finallyCount;
 		instructions.push_back(std::move(jump));
 	}
 
@@ -523,6 +537,8 @@ namespace wings {
 		Instruction in{};
 		in.srcPos = node.srcPos;
 		in.type = Instruction::Type::Return;
+		in.queuedJump = std::make_unique<QueuedJumpInstruction>();
+		in.queuedJump->finallyCount = node.exitBlock.finallyCount;
 		instructions.push_back(std::move(in));
 	}
 
@@ -660,27 +676,35 @@ namespace wings {
 
 	static void CompileTry(const Statement& node, std::vector<Instruction>& instructions) {
 		/* 
-		 * Push try
-		 * Try body
-		 * Jump to finally
-		 * Check exception type
-		 * Except body
-		 * Jump to finally
-		 * Finally body
-		 * Pop try
+		 * [Try block]
+		 * Push except location and finally location
+		 * Run try body
+		 * Queue jump to end with 1 finally queued
+		 * 
+		 * [Except block]
+		 * Check exception type. If not match, jump to next except block
+		 * Clear exception
+		 * Run except body
+		 * Queue jump to end with 1 finally queued
+		 * 
+		 * [Finally block]
+		 * Pop except and finally location
+		 * Run finally body
+		 * Jump to next queued finally if it exists or go to queued jump
 		 */
 
-		std::vector<size_t> jumpToFinallyInstructs;
+		std::vector<size_t> jumpToEndInstructs;
 		auto jumpToFinally = [&] {
-			jumpToFinallyInstructs.push_back(instructions.size());
-			Instruction tryEnd{};
-			tryEnd.srcPos = node.srcPos;
-			tryEnd.type = Instruction::Type::Jump;
-			tryEnd.jump = std::make_unique<JumpInstruction>();
-			instructions.push_back(std::move(tryEnd));
+			jumpToEndInstructs.push_back(instructions.size());
+			Instruction jump{};
+			jump.srcPos = instructions.back().srcPos;
+			jump.type = Instruction::Type::QueueJump;
+			jump.queuedJump = std::make_unique<QueuedJumpInstruction>();
+			jump.queuedJump->finallyCount = 1;
+			instructions.push_back(std::move(jump));
 		};
-
-
+		
+		// Try block
 		size_t pushTryIndex = instructions.size();
 		Instruction pushTry{};
 		pushTry.srcPos = node.srcPos;
@@ -692,9 +716,12 @@ namespace wings {
 
 		jumpToFinally();
 
+		// Except blocks		
 		instructions[pushTryIndex].pushTry->exceptJump = instructions.size();
-		for (const auto& exceptClause : node.tryBlock.exceptClauses) {
+		for (const auto& exceptClause : node.tryBlock.exceptClauses) {			
 			std::optional<size_t> jumpToNextExceptIndex;
+			
+			// Check exception type
 			if (exceptClause.exceptBlock.exceptType.has_value()) {
 				Instruction argFrame{};
 				argFrame.srcPos = exceptClause.srcPos;
@@ -725,6 +752,7 @@ namespace wings {
 				jumpToNextExcept.jump = std::make_unique<JumpInstruction>();
 				instructions.push_back(std::move(jumpToNextExcept));
 
+				// Assign exception to variable
 				if (!exceptClause.exceptBlock.var.empty()) {
 					Instruction curExcept{};
 					curExcept.srcPos = exceptClause.srcPos;
@@ -748,7 +776,7 @@ namespace wings {
 
 			Instruction except{};
 			except.srcPos = exceptClause.srcPos;
-			except.type = Instruction::Type::Except;
+			except.type = Instruction::Type::ClearException;
 			instructions.push_back(std::move(except));
 
 			CompileBody(exceptClause.body, instructions);
@@ -759,19 +787,26 @@ namespace wings {
 				instructions[jumpToNextExceptIndex.value()].jump->location = instructions.size();
 			}
 		}
-		
-		instructions[pushTryIndex].pushTry->finallyJump = instructions.size();
-		for (size_t instrIndex : jumpToFinallyInstructs) {
-			instructions[instrIndex].jump->location = instructions.size();
-		}
 
-		CompileBody(node.tryBlock.finallyClause, instructions);
-		
+		// Finally block
+		instructions[pushTryIndex].pushTry->finallyJump = instructions.size();
+
 		Instruction popTry{};
 		popTry.srcPos = node.srcPos;
 		popTry.type = Instruction::Type::PopTry;
 		popTry.jump = std::make_unique<JumpInstruction>();
 		instructions.push_back(std::move(popTry));
+
+		CompileBody(node.tryBlock.finallyClause, instructions);
+
+		Instruction endFinally{};
+		endFinally.srcPos = node.srcPos;
+		endFinally.type = Instruction::Type::EndFinally;
+		instructions.push_back(std::move(endFinally));
+
+		for (size_t instrIndex : jumpToEndInstructs) {
+			instructions[instrIndex].queuedJump->location = instructions.size();
+		}
 	}
 
 	using CompileFn = void(*)(const Statement&, std::vector<Instruction>&);

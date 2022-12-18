@@ -160,9 +160,6 @@ namespace wings {
 					case Instruction::Type::IsInstance:
 						s += "LOAD_IS_INSTANCE";
 						break;
-					case Instruction::Type::Except:
-						s += "HANDLE_EXCEPT";
-						break;
 					case Instruction::Type::Import:
 						s += "IMPORT\t\t" + instr.import->module;
 						if (!instr.import->alias.empty())

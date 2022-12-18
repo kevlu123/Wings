@@ -235,71 +235,63 @@ namespace wings {
 
 			DoInstruction(instr);
 
-			if (!exitValue.has_value())
-				continue;
+			if (Wg_GetException(context)) {
+				// No handlers so propagate
+				if (tryFrames.empty()) {
+					return nullptr;
+				}
 
-			// Return normally
-			if (exitValue.value() != nullptr)
-				break;
-
-			// New exception thrown
-			if (tryFrames.empty()) {
-				// No handlers. Propagate to next function.
-				break;
-			}
-			
-			PopStackUntil(tryFrames.top().stackSize);
-			if (tryFrames.top().isHandlingException) {
-				// Was already handling an exception. Jump to finally.
-				pc = tryFrames.top().finallyJump - 1;
-				exitValue.reset();
-			} else {
-				// Jump to handler
-				pc = tryFrames.top().exceptJump - 1;
-				tryFrames.top().isHandlingException = true;
-				exitValue.reset();
+				storedException = Wg_GetException(context);
+				Wg_ClearException(context);
+				PopStackUntil(tryFrames.back().stackSize);
+				
+				auto& back = tryFrames.back();
+				if (!back.exceptTaken) {
+					// Jump to except block
+					pc = back.exceptJump - 1;
+					back.exceptTaken = true;
+				} else {
+					// Another exception occurred while handling exception.
+					// Jump to finally block
+					queuedFinallyCount = 1;
+					DequeueJump();
+				}
 			}
 		}
 
-		ClearStack();
-
-		if (exitValue.has_value()) {
-			return exitValue.value();
-		} else {
-			return Wg_None(context);
-		}
+		return returnValue ? returnValue : Wg_None(context);
 	}
 
 	void Executor::DoInstruction(const Instruction& instr) {
 		switch (instr.type) {
 		case Instruction::Type::Jump:
 			pc = instr.jump->location - 1;
-			break;
+			return;
 		case Instruction::Type::JumpIfFalsePop:
 			if (Wg_Obj* truthy = Wg_UnaryOp(WG_UOP_BOOL, PopStack())) {
 				if (!Wg_GetBool(truthy)) {
 					pc = instr.jump->location - 1;
 				}
-			} else {
-				exitValue = nullptr;
 			}
-			break;
+			return;
 		case Instruction::Type::JumpIfFalse:
 		case Instruction::Type::JumpIfTrue:
 			if (Wg_Obj* truthy = Wg_UnaryOp(WG_UOP_BOOL, PeekStack())) {
 				if (Wg_GetBool(truthy) == (instr.type == Instruction::Type::JumpIfTrue)) {
 					pc = instr.jump->location - 1;
 				}
-			} else {
-				exitValue = nullptr;
 			}
-			break;
+			return;
 		case Instruction::Type::Pop:
 			PopStack();
-			break;
+			return;
 		case Instruction::Type::Return:
-			exitValue = PopStack();
-			break;
+			storedException = nullptr;
+			queuedFinallyCount = instr.queuedJump->finallyCount;
+			queuedJump = def->instructions->size();
+			returnValue = PopStack();
+			DequeueJump();
+			return;
 		case Instruction::Type::Def: {
 			DefObject* def = new DefObject();
 			def->context = context;
@@ -336,7 +328,6 @@ namespace wings {
 			Wg_Obj* obj = Wg_NewFunction(context, &DefObject::Run, def, instr.def->prettyName.c_str());
 			if (obj == nullptr) {
 				delete def;
-				exitValue = nullptr;
 				return;
 			}
 			obj->Get<Wg_Obj::Func>().isMethod = instr.def->isMethod;
@@ -344,7 +335,7 @@ namespace wings {
 			Wg_RegisterFinalizer(obj, [](void* userdata) { delete (DefObject*)userdata; }, def);
 
 			PushStack(obj);
-			break;
+			return;
 		}
 		case Instruction::Type::Class: {
 			size_t methodCount = instr.klass->methodNames.size();
@@ -359,10 +350,8 @@ namespace wings {
 			Wg_Obj** methods = stackEnd - methodCount - baseCount;
 
 			Wg_Obj* klass = Wg_NewClass(context, instr.klass->prettyName.c_str(), bases, (int)baseCount);
-			if (klass == nullptr) {
-				exitValue = nullptr;
+			if (klass == nullptr)
 				return;
-			}
 
 			for (size_t i = 0; i < methodCount; i++)
 				AddAttributeToClass(klass, instr.klass->methodNames[i].c_str(), methods[i]);
@@ -370,12 +359,10 @@ namespace wings {
 			for (size_t i = 0; i < methodCount + baseCount; i++)
 				PopStack();
 
-			if (klass == nullptr) {
-				exitValue = nullptr;
-			} else {
+			if (klass) {
 				PushStack(klass);
 			}
-			break;
+			return;
 		}
 		case Instruction::Type::Literal: {
 			Wg_Obj* value{};
@@ -395,10 +382,8 @@ namespace wings {
 
 			if (value) {
 				PushStack(value);
-			} else {
-				exitValue = nullptr;
 			}
-			break;
+			return;
 		}
 		case Instruction::Type::Tuple:
 		case Instruction::Type::List:
@@ -415,10 +400,8 @@ namespace wings {
 				for (size_t i = 0; i < argc; i++)
 					PopStack();
 				PushStack(li);
-			} else {
-				exitValue = nullptr;
 			}
-			break;
+			return;
 		}
 		case Instruction::Type::Map:
 			if (Wg_Obj* dict = Wg_NewDictionary(context)) {
@@ -431,7 +414,6 @@ namespace wings {
 					try {
 						dict->Get<WDict>()[key] = val;
 					} catch (HashException&) {
-						exitValue = nullptr;
 						return;
 					}
 				}
@@ -439,37 +421,31 @@ namespace wings {
 				for (size_t i = 0; i < argc; i++)
 					PopStack();
 				PushStack(dict);
-			} else {
-				exitValue = nullptr;
 			}
-			break;
+			return;
 		case Instruction::Type::Variable:
 			if (Wg_Obj* value = GetVariable(instr.string->string)) {
 				PushStack(value);
 			} else {
 				Wg_RaiseNameError(context, instr.string->string.c_str());
-				exitValue = nullptr;
 			}
-			break;
-		case Instruction::Type::DirectAssign: {
+			return;
+		case Instruction::Type::DirectAssign:
 			if (Wg_Obj* v = DirectAssign(instr.directAssign->assignTarget, PopStack())) {
 				PushStack(v);
-			} else {
-				exitValue = nullptr;
 			}
-			break;
-		}
+			return;
 		case Instruction::Type::MemberAssign: {
 			Wg_Obj* value = PopStack();
 			Wg_Obj* obj = PopStack();
 			Wg_SetAttribute(obj, instr.string->string.c_str(), value);
 			PushStack(value);
-			break;
+			return;
 		}
 		case Instruction::Type::PushArgFrame:
 			argFrames.push(stack.size());
 			kwargsStack.push_back({});
-			break;
+			return;
 		case Instruction::Type::Call: {
 			size_t kwargc = kwargsStack.back().size();
 			size_t argc = stack.size() - argFrames.top() - kwargc - 1;
@@ -481,50 +457,34 @@ namespace wings {
 			Wg_Obj* kwargs = nullptr;
 			if (kwargc) {
 				kwargs = Wg_NewDictionary(context, kwargsStack.back().data(), kwargsv, (int)kwargc);
-				if (kwargs == nullptr) {
-					exitValue = nullptr;
+				if (kwargs == nullptr)
 					return;
-				}
 			}
 
 			if (Wg_Obj* ret = Wg_Call(fn, args, (int)argc, kwargs)) {
 				for (size_t i = 0; i < argc + kwargc + 1; i++)
 					PopStack();
 				PushStack(ret);
-			} else {
-				exitValue = nullptr;
 			}
 			PopArgFrame();
-			break;
+			return;
 		}
-		case Instruction::Type::Dot: {
-			Wg_Obj* obj = PopStack();
-			if (Wg_Obj* attr = Wg_GetAttribute(obj, instr.string->string.c_str())) {
+		case Instruction::Type::Dot:
+			if (Wg_Obj* attr = Wg_GetAttribute(PopStack(), instr.string->string.c_str())) {
 				PushStack(attr);
-			} else {
-				exitValue = nullptr;
 			}
-			break;
-		}
-		case Instruction::Type::Unpack: {
-			Wg_Obj* iterable = PopStack();
-
-			auto f = [](Wg_Obj* value, void* userdata) {
+			return;
+		case Instruction::Type::Unpack:
+			Wg_Iterate(PopStack(), this, [](Wg_Obj* value, void* userdata) {
 				Executor* executor = (Executor*)userdata;
 				executor->PushStack(value);
 				return true;
-			};
-
-			if (!Wg_Iterate(iterable, this, f)) {
-				exitValue = nullptr;
-			}
-			break;
-		}
+			});
+			return;
 		case Instruction::Type::UnpackMapForMapCreation: {
 			Wg_Obj* map = PopStack();
 			if (!Wg_IsDictionary(map)) {
 				Wg_RaiseException(context, WG_EXC_TYPEERROR, "Unary '**' must be applied to a dictionary");
-				exitValue = nullptr;
 				return;
 			}
 
@@ -532,47 +492,41 @@ namespace wings {
 				PushStack(key);
 				PushStack(value);
 			}
-			break;
+			return;
 		}
 		case Instruction::Type::UnpackMapForCall: {
 			Wg_Obj* map = PopStack();
 			if (!Wg_IsDictionary(map)) {
 				Wg_RaiseException(context, WG_EXC_TYPEERROR, "Unary '**' must be applied to a dictionary");
-				exitValue = nullptr;
 				return;
 			}
 
 			for (const auto& [key, value] : map->Get<WDict>()) {
 				if (!Wg_IsString(key)) {
 					Wg_RaiseException(context, WG_EXC_TYPEERROR, "Keywords must be strings");
-					exitValue = nullptr;
 					return;
 				}
 				kwargsStack.back().push_back(key);
 				PushStack(value);
 			}
-			break;
+			return;
 		}
 		case Instruction::Type::PushKwarg:
 			kwargsStack.back().push_back(PopStack());
-			break;
+			return;
 		case Instruction::Type::Not: {
 			Wg_Obj* arg = Wg_UnaryOp(WG_UOP_BOOL, PopStack());
-			if (arg == nullptr) {
-				exitValue = nullptr;
-				break;
-			}
+			if (arg == nullptr)
+				return;
 
 			if (Wg_Obj* value = Wg_NewBool(context, !Wg_GetBool(arg))) {
 				PushStack(value);
-			} else {
-				exitValue = nullptr;
 			}
-			break;
+			return;
 		}
 		case Instruction::Type::Is:
 			PushStack(Wg_NewBool(context, PopStack() == PopStack()));
-			break;
+			return;
 		case Instruction::Type::Raise: {
 			Wg_Obj* expr = PopStack();
 			if (Wg_IsClass(expr)) {
@@ -580,37 +534,48 @@ namespace wings {
 			} else {
 				Wg_RaiseExceptionObject(expr);
 			}
-			exitValue = nullptr;
-			break;
+			return;
 		}
 		case Instruction::Type::PushTry:
-			tryFrames.push({
+			tryFrames.push_back({
 				instr.pushTry->exceptJump,
 				instr.pushTry->finallyJump,
+				stack.size(),
 				false,
-				stack.size()
 				});
-			break;
+			return;
 		case Instruction::Type::PopTry:
-			tryFrames.pop();
-			if (Wg_GetException(context))
-				exitValue = nullptr;
-			break;
-		case Instruction::Type::Except:
-			Wg_ClearException(context);
-			break;
+			tryFrames.pop_back();
+			if (queuedFinallyCount > 0) {
+				queuedFinallyCount--;
+			}
+			return;
+		case Instruction::Type::ClearException:
+			storedException = nullptr;
+			return;
 		case Instruction::Type::CurrentException:
-			PushStack(Wg_GetException(context));
-			break;
+			PushStack(storedException);
+			return;
+		case Instruction::Type::QueueJump:
+			storedException = nullptr;
+			queuedFinallyCount = instr.queuedJump->finallyCount;
+			queuedJump = instr.queuedJump->location;
+			DequeueJump();
+			return;
+		case Instruction::Type::EndFinally:
+			if (storedException) {
+				Wg_ReraiseExceptionObject(storedException);
+				storedException = nullptr;
+			}
+			DequeueJump();
+			return;
 		case Instruction::Type::IsInstance:
 			PushStack(context->builtins.isinstance);
-			break;
+			return;
 		case Instruction::Type::Slice: {
 			Wg_Obj* slice = Wg_Call(context->builtins.slice, &context->builtins.none, 1);
-			if (slice == nullptr) {
-				exitValue = nullptr;
-				break;
-			}
+			if (slice == nullptr)
+				return;
 
 			Wg_Obj* step = PopStack();
 			Wg_Obj* stop = PopStack();
@@ -619,34 +584,42 @@ namespace wings {
 			Wg_SetAttribute(slice, "stop", stop);
 			Wg_SetAttribute(slice, "start", start);
 			PushStack(slice);
-			break;
+			return;
 		}
 		case Instruction::Type::Import: {
 			const char* alias = instr.import->alias.empty() ? nullptr : instr.import->alias.c_str();
-			if (Wg_ImportModule(context, instr.import->module.c_str(), alias) == nullptr)
-				exitValue = nullptr;
-			break;
+			Wg_ImportModule(context, instr.import->module.c_str(), alias);
+			return;
 		}
 		case Instruction::Type::ImportFrom: {
 			const char* moduleName = instr.importFrom->module.c_str();
 			if (instr.importFrom->names.empty()) {
-				if (!Wg_ImportAllFromModule(context, moduleName))
-					exitValue = nullptr;
+				Wg_ImportAllFromModule(context, moduleName);
 			} else if (!instr.importFrom->alias.empty()) {
-				if (!Wg_ImportFromModule(context, moduleName, instr.importFrom->names[0].c_str(), instr.importFrom->alias.c_str()))
-					exitValue = nullptr;
+				Wg_ImportFromModule(
+					context,
+					moduleName,
+					instr.importFrom->names[0].c_str(),
+					instr.importFrom->alias.c_str()
+				);
 			} else {
-				for (const auto& name : instr.importFrom->names) {
-					if (!Wg_ImportFromModule(context, moduleName, name.c_str())) {
-						exitValue = nullptr;
+				for (const auto& name : instr.importFrom->names)
+					if (!Wg_ImportFromModule(context, moduleName, name.c_str()))
 						break;
-					}
-				}
 			}
-			break;
+			return;
 		}
 		default:
 			WG_UNREACHABLE();
+		}
+	}
+
+	void Executor::DequeueJump() {
+		if (queuedFinallyCount) {
+			pc = tryFrames.back().finallyJump - 1;
+		} else {
+			pc = queuedJump - 1;
+			queuedJump = (size_t)-1;
 		}
 	}
 
@@ -658,5 +631,9 @@ namespace wings {
 				refs.push_back(kwarg);
 		for (const auto& val : this->stack)
 			refs.push_back(val);
+		if (storedException)
+			refs.push_back(storedException);
+		if (returnValue)
+			refs.push_back(returnValue);
 	}
 }

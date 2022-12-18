@@ -1220,8 +1220,6 @@ extern "C" {
 	void Wg_ClearException(Wg_Context* context) {
 		WG_ASSERT_VOID(context);
 		context->currentException = nullptr;
-		context->exceptionTrace.clear();
-		//context->currentTrace.clear();
 		context->traceMessage.clear();
 	}
 
@@ -1290,6 +1288,16 @@ extern "C" {
 		// Otherwise the exception will already be set by some other code.
 		if (Wg_Obj* exceptionObject = Wg_Call(klass, &msg, msg ? 1 : 0)) {
 			Wg_RaiseExceptionObject(exceptionObject);
+		}
+	}
+
+	void Wg_ReraiseExceptionObject(Wg_Obj* obj) {
+		WG_ASSERT_VOID(obj);
+		Wg_Context* context = obj->context;
+		if (Wg_IsInstance(obj, &context->builtins.baseException, 1)) {
+			context->currentException = obj;
+		} else {
+			Wg_RaiseException(context, WG_EXC_TYPEERROR, "exceptions must derive from BaseException");
 		}
 	}
 

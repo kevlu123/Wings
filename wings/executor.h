@@ -29,8 +29,8 @@ namespace wings {
 	struct TryFrame {
 		size_t exceptJump;
 		size_t finallyJump;
-		bool isHandlingException;
 		size_t stackSize;
+		bool exceptTaken;
 	};
 
 	struct Executor {
@@ -44,13 +44,13 @@ namespace wings {
 		Wg_Obj* PeekStack();
 		void ClearStack();
 		size_t PopArgFrame();
-
+		Wg_Obj* DirectAssign(const AssignTarget& target, Wg_Obj* value);
+		void DequeueJump();
 		void DoInstruction(const Instruction& instr);
 
 		Wg_Obj* GetVariable(const std::string& name);
 		void SetVariable(const std::string& name, Wg_Obj* value);
 
-		Wg_Obj* DirectAssign(const AssignTarget& target, Wg_Obj* value);
 
 		DefObject* def;
 		Wg_Context* context;
@@ -59,9 +59,12 @@ namespace wings {
 		std::stack<size_t> argFrames;
 		std::vector<std::vector<Wg_Obj*>> kwargsStack;
 		std::unordered_map<std::string, RcPtr<Wg_Obj*>> variables;
-		std::optional<Wg_Obj*> exitValue;
+		Wg_Obj* returnValue;
 
-		std::stack<TryFrame> tryFrames;
+		std::vector<TryFrame> tryFrames;
+		Wg_Obj* storedException = nullptr;
+		size_t queuedFinallyCount = 0;
+		size_t queuedJump = 0;
 	};
 
 }
