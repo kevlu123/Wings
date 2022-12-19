@@ -657,19 +657,23 @@ namespace wings {
 
 		Statement appendStat{};
 		appendStat.srcPos = out.srcPos;
-		appendStat.type = Statement::Type::Expr;
-		appendStat.expr = std::move(appendCall);
+		{
+			stat::Expr expr;
+			expr.expr = std::move(appendCall);
+			appendStat.data = std::move(expr);
+		}
 
 		Statement ifStat{};
 		ifStat.srcPos = out.srcPos;
-		ifStat.type = Statement::Type::If;
-		ifStat.expr = std::move(condition);
-		ifStat.body.push_back(std::move(appendStat));
-
-		Statement forLoop{};
-		forLoop.srcPos = out.srcPos;
-		forLoop.type = Statement::Type::For;
-		forLoop.forLoop.assignTarget = std::move(assignTarget);
+		{
+			stat::If ifStatData;
+			ifStatData.expr = std::move(condition);
+			ifStatData.body.push_back(std::move(appendStat));
+			ifStat.data = std::move(ifStatData);
+		}
+		
+		stat::For forLoop;
+		forLoop.assignTarget = std::move(assignTarget);
 		forLoop.expr = std::move(iterable);
 		forLoop.body.push_back(std::move(ifStat));
 
@@ -709,8 +713,11 @@ namespace wings {
 
 		Statement lambdaRet{};
 		lambdaRet.srcPos = out.srcPos;
-		lambdaRet.type = Statement::Type::Return;
-		lambdaRet.expr = std::move(lambdaExpr);
+		{
+			stat::Return ret;
+			ret.expr = std::move(lambdaExpr);
+			lambdaRet.data = std::move(ret);
+		}
 
 		out.operation = Operation::Function;
 		out.def.localCaptures = std::move(captures);

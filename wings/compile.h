@@ -120,5 +120,5 @@ namespace wings {
 		SourcePosition srcPos;
 	};
 
-	std::vector<Instruction> Compile(const Statement& parseTree);
+	std::vector<Instruction> Compile(const stat::Root& parseTree);
 }

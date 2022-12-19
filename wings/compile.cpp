@@ -421,16 +421,20 @@ namespace wings {
 	}
 
 	static void CompileExpressionStatement(const Statement& node, std::vector<Instruction>& instructions) {
-		CompileExpression(node.expr, instructions);
+		auto& expr = node.Get<stat::Expr>();
+		
+		CompileExpression(expr.expr, instructions);
 
 		Instruction instr{};
-		instr.srcPos = node.expr.srcPos;
+		instr.srcPos = expr.expr.srcPos;
 		instr.type = Instruction::Type::Pop;
 		instructions.push_back(std::move(instr));
 	}
 
 	static void CompileIf(const Statement& node, std::vector<Instruction>& instructions) {
-		CompileExpression(node.expr, instructions);
+		auto& ifStat = node.Get<stat::If>();
+		
+		CompileExpression(ifStat.expr, instructions);
 
 		size_t falseJumpInstrIndex = instructions.size();
 		Instruction falseJump{};
@@ -439,19 +443,19 @@ namespace wings {
 		falseJump.jump = std::make_unique<JumpInstruction>();
 		instructions.push_back(std::move(falseJump));
 
-		CompileBody(node.body, instructions);
+		CompileBody(ifStat.body, instructions);
 
-		if (node.elseClause) {
+		if (ifStat.elseClause) {
 			size_t trueJumpInstrIndex = instructions.size();
 			Instruction trueJump{};
-			trueJump.srcPos = node.elseClause->srcPos;
+			trueJump.srcPos = ifStat.elseClause->srcPos;
 			trueJump.type = Instruction::Type::Jump;
 			trueJump.jump = std::make_unique<JumpInstruction>();
 			instructions.push_back(std::move(trueJump));
 
 			instructions[falseJumpInstrIndex].jump->location = instructions.size();
 
-			CompileBody(node.elseClause->body, instructions);
+			CompileBody(ifStat.elseClause->Get<stat::Else>().body, instructions);
 
 			instructions[trueJumpInstrIndex].jump->location = instructions.size();
 		} else {
@@ -460,8 +464,10 @@ namespace wings {
 	}
 
 	static void CompileWhile(const Statement& node, std::vector<Instruction>& instructions) {
+		auto& whileStat = node.Get<stat::While>();
+		
 		size_t conditionLocation = instructions.size();
-		CompileExpression(node.expr, instructions);
+		CompileExpression(whileStat.expr, instructions);
 		
 		size_t terminateJumpInstrIndex = instructions.size();
 		Instruction terminateJump{};
@@ -474,7 +480,7 @@ namespace wings {
 		continueInstructions.emplace();
 		forLoopBreakInstructions.emplace();
 		
-		CompileBody(node.body, instructions);
+		CompileBody(whileStat.body, instructions);
 
 		Instruction loopJump{};
 		loopJump.srcPos = node.srcPos;
@@ -489,8 +495,8 @@ namespace wings {
 			instructions[forLoopBreakInstructions.top().value()].queuedJump->location = instructions.size();
 		}
 
-		if (node.elseClause) {
-			CompileBody(node.elseClause->body, instructions);
+		if (whileStat.elseClause) {
+			CompileBody(whileStat.elseClause->Get<stat::Else>().body, instructions);
 		}
 
 		for (size_t index : breakInstructions.top()) {
@@ -506,7 +512,9 @@ namespace wings {
 	}
 
 	static void CompileBreak(const Statement& node, std::vector<Instruction>& instructions) {
-		if (node.exitBlock.exitForNormally) {
+		auto& brk = node.Get<stat::Break>();
+
+		if (brk.exitForLoopNormally) {
 			forLoopBreakInstructions.top() = instructions.size();
 		} else {
 			breakInstructions.top().push_back(instructions.size());
@@ -516,7 +524,7 @@ namespace wings {
 		jump.srcPos = node.srcPos;
 		jump.type = Instruction::Type::QueueJump;
 		jump.queuedJump = std::make_unique<QueuedJumpInstruction>();
-		jump.queuedJump->finallyCount = node.exitBlock.finallyCount;
+		jump.queuedJump->finallyCount = brk.finallyCount;
 		instructions.push_back(std::move(jump));
 	}
 
@@ -527,18 +535,19 @@ namespace wings {
 		jump.srcPos = node.srcPos;
 		jump.type = Instruction::Type::QueueJump;
 		jump.queuedJump = std::make_unique<QueuedJumpInstruction>();
-		jump.queuedJump->finallyCount = node.exitBlock.finallyCount;
+		jump.queuedJump->finallyCount = node.Get<stat::Continue>().finallyCount;
 		instructions.push_back(std::move(jump));
 	}
 
 	static void CompileReturn(const Statement& node, std::vector<Instruction>& instructions) {
-		CompileExpression(node.expr, instructions);
+		auto& ret = node.Get<stat::Return>();
+		CompileExpression(ret.expr, instructions);
 
 		Instruction in{};
 		in.srcPos = node.srcPos;
 		in.type = Instruction::Type::Return;
 		in.queuedJump = std::make_unique<QueuedJumpInstruction>();
-		in.queuedJump->finallyCount = node.exitBlock.finallyCount;
+		in.queuedJump->finallyCount = ret.finallyCount;
 		instructions.push_back(std::move(in));
 	}
 
@@ -589,14 +598,15 @@ namespace wings {
 	}
 
 	static void CompileDef(const Statement& node, std::vector<Instruction>& instructions) {
-		CompileFunction(node.expr, instructions);
+		auto& def = node.Get<stat::Def>().expr;
+		CompileFunction(def, instructions);
 
 		Instruction assign{};
 		assign.srcPos = node.srcPos;
 		assign.type = Instruction::Type::DirectAssign;
 		assign.directAssign = std::make_unique<DirectAssignInstruction>();
 		assign.directAssign->assignTarget.type = AssignType::Direct;
-		assign.directAssign->assignTarget.direct = node.expr.def.name;
+		assign.directAssign->assignTarget.direct = def.def.name;
 		instructions.push_back(std::move(assign));
 
 		Instruction pop{};
@@ -606,7 +616,8 @@ namespace wings {
 	}
 
 	static void CompileClass(const Statement& node, std::vector<Instruction>& instructions) {
-		for (const auto& child : node.body) {
+		auto& klass = node.Get<stat::Class>();
+		for (const auto& child :klass .body) {
 			CompileDef(child, instructions);
 			instructions.pop_back();
 			instructions.pop_back();
@@ -618,24 +629,24 @@ namespace wings {
 		argFrame.type = Instruction::Type::PushArgFrame;
 		instructions.push_back(std::move(argFrame));
 
-		for (const auto& base : node.klass.bases) {
+		for (const auto& base : klass.bases) {
 			CompileExpression(base, instructions);
 		}
 
-		Instruction klass{};
-		klass.srcPos = node.srcPos;
-		klass.type = Instruction::Type::Class;
-		klass.klass = std::make_unique<ClassInstruction>();
-		klass.klass->methodNames = node.klass.methodNames;
-		klass.klass->prettyName = node.klass.name;
-		instructions.push_back(std::move(klass));
+		Instruction klassCreate{};
+		klassCreate.srcPos = node.srcPos;
+		klassCreate.type = Instruction::Type::Class;
+		klassCreate.klass = std::make_unique<ClassInstruction>();
+		klassCreate.klass->methodNames = klass.methodNames;
+		klassCreate.klass->prettyName = klass.name;
+		instructions.push_back(std::move(klassCreate));
 
 		Instruction assign{};
 		assign.srcPos = node.srcPos;
 		assign.type = Instruction::Type::DirectAssign;
 		assign.directAssign = std::make_unique<DirectAssignInstruction>();
 		assign.directAssign->assignTarget.type = AssignType::Direct;
-		assign.directAssign->assignTarget.direct = node.klass.name;
+		assign.directAssign->assignTarget.direct = klass.name;
 		instructions.push_back(std::move(assign));
 
 		Instruction pop{};
@@ -645,28 +656,30 @@ namespace wings {
 	}
 
 	static void CompileImportFrom(const Statement& node, std::vector<Instruction>& instructions) {
+		auto& importFrom = node.Get<stat::ImportFrom>();
 		Instruction instr{};
 		instr.srcPos = node.srcPos;
 		instr.type = Instruction::Type::ImportFrom;
 		instr.importFrom = std::make_unique<ImportFromInstruction>();
-		instr.importFrom->module = node.importFrom.module;
-		instr.importFrom->names = node.importFrom.names;
-		instr.importFrom->alias = node.importFrom.alias;
+		instr.importFrom->module = importFrom.module;
+		instr.importFrom->names = importFrom.names;
+		instr.importFrom->alias = importFrom.alias;
 		instructions.push_back(std::move(instr));
 	}
 
 	static void CompileImport(const Statement& node, std::vector<Instruction>& instructions) {
+		auto& import = node.Get<stat::Import>();
 		Instruction instr{};
 		instr.srcPos = node.srcPos;
 		instr.type = Instruction::Type::Import;
 		instr.import = std::make_unique<ImportInstruction>();
-		instr.import->module = node.import.module;
-		instr.import->alias = node.import.alias;
+		instr.import->module = import.module;
+		instr.import->alias = import.alias;
 		instructions.push_back(std::move(instr));
 	}
 
 	static void CompileRaise(const Statement& node, std::vector<Instruction>& instructions) {
-		CompileExpression(node.expr, instructions);
+		CompileExpression(node.Get<stat::Raise>().expr, instructions);
 
 		Instruction raise{};
 		raise.srcPos = node.srcPos;
@@ -693,6 +706,8 @@ namespace wings {
 		 * Jump to next queued finally if it exists or go to queued jump
 		 */
 
+		auto& tr = node.Get<stat::Try>();
+
 		std::vector<size_t> jumpToEndInstructs;
 		auto jumpToFinally = [&] {
 			jumpToEndInstructs.push_back(instructions.size());
@@ -712,17 +727,18 @@ namespace wings {
 		pushTry.pushTry = std::make_unique<TryFrameInstruction>();
 		instructions.push_back(std::move(pushTry));
 
-		CompileBody(node.body, instructions);
+		CompileBody(tr.body, instructions);
 
 		jumpToFinally();
 
 		// Except blocks		
 		instructions[pushTryIndex].pushTry->exceptJump = instructions.size();
-		for (const auto& exceptClause : node.tryBlock.exceptClauses) {			
+		for (const auto& exceptClause : tr.exceptBlocks) {
+			auto& except = exceptClause.Get<stat::Except>();
 			std::optional<size_t> jumpToNextExceptIndex;
 			
 			// Check exception type
-			if (exceptClause.exceptBlock.exceptType.has_value()) {
+			if (except.type) {
 				Instruction argFrame{};
 				argFrame.srcPos = exceptClause.srcPos;
 				argFrame.type = Instruction::Type::PushArgFrame;
@@ -738,7 +754,7 @@ namespace wings {
 				curExcept.type = Instruction::Type::CurrentException;
 				instructions.push_back(std::move(curExcept));
 
-				CompileExpression(exceptClause.exceptBlock.exceptType.value(), instructions);
+				CompileExpression(except.type.value(), instructions);
 
 				Instruction call{};
 				call.srcPos = exceptClause.srcPos;
@@ -753,7 +769,7 @@ namespace wings {
 				instructions.push_back(std::move(jumpToNextExcept));
 
 				// Assign exception to variable
-				if (!exceptClause.exceptBlock.var.empty()) {
+				if (!except.variable.empty()) {
 					Instruction curExcept{};
 					curExcept.srcPos = exceptClause.srcPos;
 					curExcept.type = Instruction::Type::CurrentException;
@@ -764,7 +780,7 @@ namespace wings {
 					assign.type = Instruction::Type::DirectAssign;
 					assign.directAssign = std::make_unique<DirectAssignInstruction>();
 					assign.directAssign->assignTarget.type = AssignType::Direct;
-					assign.directAssign->assignTarget.direct = exceptClause.exceptBlock.var;
+					assign.directAssign->assignTarget.direct = except.variable;
 					instructions.push_back(std::move(assign));
 
 					Instruction pop{};
@@ -774,12 +790,12 @@ namespace wings {
 				}
 			}
 
-			Instruction except{};
-			except.srcPos = exceptClause.srcPos;
-			except.type = Instruction::Type::ClearException;
-			instructions.push_back(std::move(except));
+			Instruction exc{};
+			exc.srcPos = exceptClause.srcPos;
+			exc.type = Instruction::Type::ClearException;
+			instructions.push_back(std::move(exc));
 
-			CompileBody(exceptClause.body, instructions);
+			CompileBody(except.body, instructions);
 
 			jumpToFinally();
 
@@ -797,7 +813,7 @@ namespace wings {
 		popTry.jump = std::make_unique<JumpInstruction>();
 		instructions.push_back(std::move(popTry));
 
-		CompileBody(node.tryBlock.finallyClause, instructions);
+		CompileBody(tr.finallyBody, instructions);
 
 		Instruction endFinally{};
 		endFinally.srcPos = node.srcPos;
@@ -811,26 +827,26 @@ namespace wings {
 
 	using CompileFn = void(*)(const Statement&, std::vector<Instruction>&);
 
-	static const std::unordered_map<Statement::Type, CompileFn> COMPILE_FUNCTIONS = {
-		{ Statement::Type::Expr, CompileExpressionStatement },
-		{ Statement::Type::If, CompileIf },
-		{ Statement::Type::While, CompileWhile },
-		{ Statement::Type::Break, CompileBreak },
-		{ Statement::Type::Continue, CompileContinue },
-		{ Statement::Type::Return, CompileReturn },
-		{ Statement::Type::Def, CompileDef },
-		{ Statement::Type::Class, CompileClass },
-		{ Statement::Type::Try, CompileTry },
-		{ Statement::Type::Raise, CompileRaise },
-		{ Statement::Type::Import, CompileImport },
-		{ Statement::Type::ImportFrom, CompileImportFrom },
-		{ Statement::Type::Pass, [](auto, auto) {}},
-		{ Statement::Type::Global, [](auto, auto) {}},
-		{ Statement::Type::Nonlocal, [](auto, auto) {}},
+	static const std::unordered_map<size_t, CompileFn> COMPILE_FUNCTIONS = {
+		{ StatIndex<stat::Expr>(), CompileExpressionStatement },
+		{ StatIndex<stat::If>(), CompileIf },
+		{ StatIndex<stat::While>(), CompileWhile },
+		{ StatIndex<stat::Break>(), CompileBreak },
+		{ StatIndex<stat::Continue>(), CompileContinue },
+		{ StatIndex<stat::Return>(), CompileReturn },
+		{ StatIndex<stat::Def>(), CompileDef },
+		{ StatIndex<stat::Class>(), CompileClass },
+		{ StatIndex<stat::Try>(), CompileTry },
+		{ StatIndex<stat::Raise>(), CompileRaise },
+		{ StatIndex<stat::Import>(), CompileImport },
+		{ StatIndex<stat::ImportFrom>(), CompileImportFrom },
+		{ StatIndex<stat::Pass>(), [](auto, auto) {}},
+		{ StatIndex<stat::Global>(), [](auto, auto) {}},
+		{ StatIndex<stat::NonLocal>(), [](auto, auto) {}},
 	};
 
 	static void CompileStatement(const Statement& node, std::vector<Instruction>& instructions) {
-		COMPILE_FUNCTIONS.at(node.type)(node, instructions);
+		COMPILE_FUNCTIONS.at(node.data.index())(node, instructions);
 	}
 
 	static void CompileBody(const std::vector<Statement>& body, std::vector<Instruction>& instructions) {
@@ -839,7 +855,7 @@ namespace wings {
 		}
 	}
 
-	std::vector<Instruction> Compile(const Statement& parseTree) {
+	std::vector<Instruction> Compile(const stat::Root& parseTree) {
 		std::vector<Instruction> instructions;
 		CompileBody(parseTree.expr.def.body, instructions);
 

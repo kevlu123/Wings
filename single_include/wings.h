@@ -2177,6 +2177,7 @@ namespace wings {
 #include <cstdlib>
 #include <atomic>
 #include <random>
+#include <variant>
 
 static_assert(sizeof(Wg_int) == sizeof(Wg_uint));
 
@@ -2369,6 +2370,18 @@ namespace wings {
 	};
 	
 	constexpr const char* DEFAULT_FUNC_NAME = "<unnamed>";
+	
+	template<typename VariantType, typename T, std::size_t index = 0>
+	constexpr std::size_t variant_index() {
+		static_assert(std::variant_size_v<VariantType> > index, "Type not found in variant");
+		if constexpr (index == std::variant_size_v<VariantType>) {
+			return index;
+		} else if constexpr (std::is_same_v<std::variant_alternative_t<index, VariantType>, T>) {
+			return index;
+		} else {
+			return variant_index<VariantType, T, index + 1>();
+		}
+	}
 }
 
 struct Wg_Obj {
@@ -6897,63 +6910,160 @@ namespace wings {
 
 namespace wings {
 
-	struct Statement {
-		enum class Type {
-			Root,
-			Pass,
-			Expr,
-			Nonlocal, Global,
-			Def, Class, Return,
-			If, Elif, Else,
-			While, For,
-			Try, Except, Finally, Raise,
-			Break, Continue,
-			Composite,
-			Import, ImportFrom,
-		} type;
+	namespace stat {
+		struct Root {
+			Expression expr;
+		};
+		
+		struct Def {
+			Expression expr;
+		};
 
-		SourcePosition srcPos;
-		Expression expr;
-		std::vector<Statement> body;
-		std::unique_ptr<Statement> elseClause;
-
-		struct {
-			size_t finallyCount;
-			bool exitForNormally = false;
-		} exitBlock;
-		struct {
-			AssignTarget assignTarget;
-		} forLoop;
-		struct {
-			std::string name;
-		} capture;
-		struct {
+		struct Class {
 			std::string name;
 			std::vector<std::string> methodNames;
 			std::vector<Expression> bases;
-		} klass;
-		struct {
-			std::vector<Statement> exceptClauses;
-			std::vector<Statement> finallyClause;
-		} tryBlock;
-		struct {
-			std::string var;
-			std::optional<Expression> exceptType;
-		} exceptBlock;
-		struct {
+			std::vector<Statement> body;
+		};
+		
+		struct Pass {};
+		
+		struct Expr {
+			Expression expr;
+		};
+
+		struct Else {
+			std::vector<Statement> body;
+		};
+
+		struct If {
+			Expression expr;
+			std::vector<Statement> body;
+			std::unique_ptr<Statement> elseClause;
+		};
+
+		struct Elif {
+			Expression expr;
+			std::vector<Statement> body;
+			std::unique_ptr<Statement> elseClause;
+		};
+		
+		struct While {
+			Expression expr;
+			std::vector<Statement> body;
+			std::unique_ptr<Statement> elseClause;
+		};
+
+		struct For {
+			Expression expr;
+			AssignTarget assignTarget;
+			std::vector<Statement> body;
+			std::unique_ptr<Statement> elseClause;
+		};
+
+		struct Try {
+			std::vector<Statement> body;
+			std::vector<Statement> exceptBlocks;
+			std::vector<Statement> finallyBody;
+		};
+
+		struct Except {
+			std::vector<Statement> body;
+			std::optional<Expression> type;
+			std::string variable;
+		};
+
+		struct Finally {
+			std::vector<Statement> body;
+		};
+
+		struct Raise {
+			Expression expr;
+		};
+
+		struct Import {
 			std::string module;
 			std::string alias;
-		} import;
-		struct {
+		};
+
+		struct ImportFrom {
 			std::string module;
 			std::vector<std::string> names;
 			std::string alias;
-		} importFrom;
+		};
+
+		struct Break {
+			size_t finallyCount = 0;
+			bool exitForLoopNormally = false;
+		};
+
+		struct Continue {
+			size_t finallyCount = 0;
+		};
+
+		struct Return {
+			size_t finallyCount = 0;
+			Expression expr;
+		};
+
+		struct Composite {
+			std::vector<Statement> body;
+		};
+
+		struct NonLocal {
+			std::string name;
+		};
+
+		struct Global {
+			std::string name;
+		};
+	}
+
+	using StatData = std::variant<
+		std::monostate,
+		stat::Root,
+		stat::Def,
+		stat::Class,
+		stat::Pass,
+		stat::Expr,
+		stat::If,
+		stat::Elif,
+		stat::Else,
+		stat::While,
+		stat::For,
+		stat::Try,
+		stat::Except,
+		stat::Finally,
+		stat::Raise,
+		stat::Import,
+		stat::ImportFrom,
+		stat::Break,
+		stat::Continue,
+		stat::Return,
+		stat::Composite,
+		stat::NonLocal,
+		stat::Global
+	>;
+
+	struct Statement {
+		SourcePosition srcPos;
+		StatData data;
+		
+		template <class T> T& Get() { return std::get<T>(data); }
+		template <class T> const T& Get() const { return std::get<T>(data); }
+		template <class T> T* GetIf() { return std::get_if<T>(&data); }
+		template <class T> const T* GetIf() const { return std::get_if<T>(&data); }
+		template <class T> bool Is() const { return std::holds_alternative<T>(data); }
 	};
+
+	template <class T>
+	constexpr size_t StatIndex() {
+		return variant_index<StatData, T>();
+	}
 
 	struct ParseResult {
 		CodeError error;
-		Statement parseTree; // Root is treated similar to a def
+		stat::Root parseTree;
 	};
 
 	ParseResult Parse(const LexTree& lexTree);
@@ -6961,7 +7071,7 @@ namespace wings {
 	std::unordered_set<std::string> GetReferencedVariables(const Expression& expr);
 	CodeError ParseParameterList(TokenIter& p, std::vector<Parameter>& out);
 	CodeError ParseForLoopVariableList(TokenIter& p, std::vector<std::string>& vars, bool& isTuple);
-	Statement TransformForToWhile(Statement forLoop);
+	Statement TransformForToWhile(stat::For forLoop);
 	void ExpandCompositeStatements(std::vector<Statement>& statements);
 
 }
@@ -7084,7 +7194,7 @@ namespace wings {
 		SourcePosition srcPos;
 	};
 
-	std::vector<Instruction> Compile(const Statement& parseTree);
+	std::vector<Instruction> Compile(const stat::Root& parseTree);
 }
 
 
@@ -7375,18 +7485,19 @@ namespace wings {
 
 		if (expr) {
 			std::vector<Statement> body = std::move(parseResult.parseTree.expr.def.body);
-			if (body.size() != 1 || body[0].type != Statement::Type::Expr) {
+			if (body.size() != 1 || !std::holds_alternative<stat::Expr>(body[0].data)) {
 				raiseException(CodeError::Bad("Invalid syntax"));
 				return nullptr;
 			}
 
-			Statement ret{};
-			ret.srcPos = body[0].srcPos;
-			ret.type = Statement::Type::Return;
-			ret.expr = std::move(body[0].expr);
+			stat::Return ret;
+			ret.expr = std::move(body[0].Get<stat::Expr>().expr);
+			Statement stat;
+			stat.srcPos = body[0].srcPos;
+			stat.data = std::move(ret);
 
 			parseResult.parseTree.expr.def.body.clear();
-			parseResult.parseTree.expr.def.body.push_back(std::move(ret));
+			parseResult.parseTree.expr.def.body.push_back(std::move(stat));
 		}
 
 		auto* def = new DefObject();
@@ -7892,16 +8003,20 @@ namespace wings {
 	}
 
 	static void CompileExpressionStatement(const Statement& node, std::vector<Instruction>& instructions) {
-		CompileExpression(node.expr, instructions);
+		auto& expr = node.Get<stat::Expr>();
+		
+		CompileExpression(expr.expr, instructions);
 
 		Instruction instr{};
-		instr.srcPos = node.expr.srcPos;
+		instr.srcPos = expr.expr.srcPos;
 		instr.type = Instruction::Type::Pop;
 		instructions.push_back(std::move(instr));
 	}
 
 	static void CompileIf(const Statement& node, std::vector<Instruction>& instructions) {
-		CompileExpression(node.expr, instructions);
+		auto& ifStat = node.Get<stat::If>();
+		
+		CompileExpression(ifStat.expr, instructions);
 
 		size_t falseJumpInstrIndex = instructions.size();
 		Instruction falseJump{};
@@ -7910,19 +8025,19 @@ namespace wings {
 		falseJump.jump = std::make_unique<JumpInstruction>();
 		instructions.push_back(std::move(falseJump));
 
-		CompileBody(node.body, instructions);
+		CompileBody(ifStat.body, instructions);
 
-		if (node.elseClause) {
+		if (ifStat.elseClause) {
 			size_t trueJumpInstrIndex = instructions.size();
 			Instruction trueJump{};
-			trueJump.srcPos = node.elseClause->srcPos;
+			trueJump.srcPos = ifStat.elseClause->srcPos;
 			trueJump.type = Instruction::Type::Jump;
 			trueJump.jump = std::make_unique<JumpInstruction>();
 			instructions.push_back(std::move(trueJump));
 
 			instructions[falseJumpInstrIndex].jump->location = instructions.size();
 
-			CompileBody(node.elseClause->body, instructions);
+			CompileBody(ifStat.elseClause->Get<stat::Else>().body, instructions);
 
 			instructions[trueJumpInstrIndex].jump->location = instructions.size();
 		} else {
@@ -7931,8 +8046,10 @@ namespace wings {
 	}
 
 	static void CompileWhile(const Statement& node, std::vector<Instruction>& instructions) {
+		auto& whileStat = node.Get<stat::While>();
+		
 		size_t conditionLocation = instructions.size();
-		CompileExpression(node.expr, instructions);
+		CompileExpression(whileStat.expr, instructions);
 		
 		size_t terminateJumpInstrIndex = instructions.size();
 		Instruction terminateJump{};
@@ -7945,7 +8062,7 @@ namespace wings {
 		continueInstructions.emplace();
 		forLoopBreakInstructions.emplace();
 		
-		CompileBody(node.body, instructions);
+		CompileBody(whileStat.body, instructions);
 
 		Instruction loopJump{};
 		loopJump.srcPos = node.srcPos;
@@ -7960,8 +8077,8 @@ namespace wings {
 			instructions[forLoopBreakInstructions.top().value()].queuedJump->location = instructions.size();
 		}
 
-		if (node.elseClause) {
-			CompileBody(node.elseClause->body, instructions);
+		if (whileStat.elseClause) {
+			CompileBody(whileStat.elseClause->Get<stat::Else>().body, instructions);
 		}
 
 		for (size_t index : breakInstructions.top()) {
@@ -7977,7 +8094,9 @@ namespace wings {
 	}
 
 	static void CompileBreak(const Statement& node, std::vector<Instruction>& instructions) {
-		if (node.exitBlock.exitForNormally) {
+		auto& brk = node.Get<stat::Break>();
+
+		if (brk.exitForLoopNormally) {
 			forLoopBreakInstructions.top() = instructions.size();
 		} else {
 			breakInstructions.top().push_back(instructions.size());
@@ -7987,7 +8106,7 @@ namespace wings {
 		jump.srcPos = node.srcPos;
 		jump.type = Instruction::Type::QueueJump;
 		jump.queuedJump = std::make_unique<QueuedJumpInstruction>();
-		jump.queuedJump->finallyCount = node.exitBlock.finallyCount;
+		jump.queuedJump->finallyCount = brk.finallyCount;
 		instructions.push_back(std::move(jump));
 	}
 
@@ -7998,18 +8117,19 @@ namespace wings {
 		jump.srcPos = node.srcPos;
 		jump.type = Instruction::Type::QueueJump;
 		jump.queuedJump = std::make_unique<QueuedJumpInstruction>();
-		jump.queuedJump->finallyCount = node.exitBlock.finallyCount;
+		jump.queuedJump->finallyCount = node.Get<stat::Continue>().finallyCount;
 		instructions.push_back(std::move(jump));
 	}
 
 	static void CompileReturn(const Statement& node, std::vector<Instruction>& instructions) {
-		CompileExpression(node.expr, instructions);
+		auto& ret = node.Get<stat::Return>();
+		CompileExpression(ret.expr, instructions);
 
 		Instruction in{};
 		in.srcPos = node.srcPos;
 		in.type = Instruction::Type::Return;
 		in.queuedJump = std::make_unique<QueuedJumpInstruction>();
-		in.queuedJump->finallyCount = node.exitBlock.finallyCount;
+		in.queuedJump->finallyCount = ret.finallyCount;
 		instructions.push_back(std::move(in));
 	}
 
@@ -8060,14 +8180,15 @@ namespace wings {
 	}
 
 	static void CompileDef(const Statement& node, std::vector<Instruction>& instructions) {
-		CompileFunction(node.expr, instructions);
+		auto& def = node.Get<stat::Def>().expr;
+		CompileFunction(def, instructions);
 
 		Instruction assign{};
 		assign.srcPos = node.srcPos;
 		assign.type = Instruction::Type::DirectAssign;
 		assign.directAssign = std::make_unique<DirectAssignInstruction>();
 		assign.directAssign->assignTarget.type = AssignType::Direct;
-		assign.directAssign->assignTarget.direct = node.expr.def.name;
+		assign.directAssign->assignTarget.direct = def.def.name;
 		instructions.push_back(std::move(assign));
 
 		Instruction pop{};
@@ -8077,7 +8198,8 @@ namespace wings {
 	}
 
 	static void CompileClass(const Statement& node, std::vector<Instruction>& instructions) {
-		for (const auto& child : node.body) {
+		auto& klass = node.Get<stat::Class>();
+		for (const auto& child :klass .body) {
 			CompileDef(child, instructions);
 			instructions.pop_back();
 			instructions.pop_back();
@@ -8089,24 +8211,24 @@ namespace wings {
 		argFrame.type = Instruction::Type::PushArgFrame;
 		instructions.push_back(std::move(argFrame));
 
-		for (const auto& base : node.klass.bases) {
+		for (const auto& base : klass.bases) {
 			CompileExpression(base, instructions);
 		}
 
-		Instruction klass{};
-		klass.srcPos = node.srcPos;
-		klass.type = Instruction::Type::Class;
-		klass.klass = std::make_unique<ClassInstruction>();
-		klass.klass->methodNames = node.klass.methodNames;
-		klass.klass->prettyName = node.klass.name;
-		instructions.push_back(std::move(klass));
+		Instruction klassCreate{};
+		klassCreate.srcPos = node.srcPos;
+		klassCreate.type = Instruction::Type::Class;
+		klassCreate.klass = std::make_unique<ClassInstruction>();
+		klassCreate.klass->methodNames = klass.methodNames;
+		klassCreate.klass->prettyName = klass.name;
+		instructions.push_back(std::move(klassCreate));
 
 		Instruction assign{};
 		assign.srcPos = node.srcPos;
 		assign.type = Instruction::Type::DirectAssign;
 		assign.directAssign = std::make_unique<DirectAssignInstruction>();
 		assign.directAssign->assignTarget.type = AssignType::Direct;
-		assign.directAssign->assignTarget.direct = node.klass.name;
+		assign.directAssign->assignTarget.direct = klass.name;
 		instructions.push_back(std::move(assign));
 
 		Instruction pop{};
@@ -8116,28 +8238,30 @@ namespace wings {
 	}
 
 	static void CompileImportFrom(const Statement& node, std::vector<Instruction>& instructions) {
+		auto& importFrom = node.Get<stat::ImportFrom>();
 		Instruction instr{};
 		instr.srcPos = node.srcPos;
 		instr.type = Instruction::Type::ImportFrom;
 		instr.importFrom = std::make_unique<ImportFromInstruction>();
-		instr.importFrom->module = node.importFrom.module;
-		instr.importFrom->names = node.importFrom.names;
-		instr.importFrom->alias = node.importFrom.alias;
+		instr.importFrom->module = importFrom.module;
+		instr.importFrom->names = importFrom.names;
+		instr.importFrom->alias = importFrom.alias;
 		instructions.push_back(std::move(instr));
 	}
 
 	static void CompileImport(const Statement& node, std::vector<Instruction>& instructions) {
+		auto& import = node.Get<stat::Import>();
 		Instruction instr{};
 		instr.srcPos = node.srcPos;
 		instr.type = Instruction::Type::Import;
 		instr.import = std::make_unique<ImportInstruction>();
-		instr.import->module = node.import.module;
-		instr.import->alias = node.import.alias;
+		instr.import->module = import.module;
+		instr.import->alias = import.alias;
 		instructions.push_back(std::move(instr));
 	}
 
 	static void CompileRaise(const Statement& node, std::vector<Instruction>& instructions) {
-		CompileExpression(node.expr, instructions);
+		CompileExpression(node.Get<stat::Raise>().expr, instructions);
 
 		Instruction raise{};
 		raise.srcPos = node.srcPos;
@@ -8164,6 +8288,8 @@ namespace wings {
 		 * Jump to next queued finally if it exists or go to queued jump
 		 */
 
+		auto& tr = node.Get<stat::Try>();
+
 		std::vector<size_t> jumpToEndInstructs;
 		auto jumpToFinally = [&] {
 			jumpToEndInstructs.push_back(instructions.size());
@@ -8183,17 +8309,18 @@ namespace wings {
 		pushTry.pushTry = std::make_unique<TryFrameInstruction>();
 		instructions.push_back(std::move(pushTry));
 
-		CompileBody(node.body, instructions);
+		CompileBody(tr.body, instructions);
 
 		jumpToFinally();
 
 		// Except blocks		
 		instructions[pushTryIndex].pushTry->exceptJump = instructions.size();
-		for (const auto& exceptClause : node.tryBlock.exceptClauses) {			
+		for (const auto& exceptClause : tr.exceptBlocks) {
+			auto& except = exceptClause.Get<stat::Except>();
 			std::optional<size_t> jumpToNextExceptIndex;
 			
 			// Check exception type
-			if (exceptClause.exceptBlock.exceptType.has_value()) {
+			if (except.type) {
 				Instruction argFrame{};
 				argFrame.srcPos = exceptClause.srcPos;
 				argFrame.type = Instruction::Type::PushArgFrame;
@@ -8209,7 +8336,7 @@ namespace wings {
 				curExcept.type = Instruction::Type::CurrentException;
 				instructions.push_back(std::move(curExcept));
 
-				CompileExpression(exceptClause.exceptBlock.exceptType.value(), instructions);
+				CompileExpression(except.type.value(), instructions);
 
 				Instruction call{};
 				call.srcPos = exceptClause.srcPos;
@@ -8224,7 +8351,7 @@ namespace wings {
 				instructions.push_back(std::move(jumpToNextExcept));
 
 				// Assign exception to variable
-				if (!exceptClause.exceptBlock.var.empty()) {
+				if (!except.variable.empty()) {
 					Instruction curExcept{};
 					curExcept.srcPos = exceptClause.srcPos;
 					curExcept.type = Instruction::Type::CurrentException;
@@ -8235,7 +8362,7 @@ namespace wings {
 					assign.type = Instruction::Type::DirectAssign;
 					assign.directAssign = std::make_unique<DirectAssignInstruction>();
 					assign.directAssign->assignTarget.type = AssignType::Direct;
-					assign.directAssign->assignTarget.direct = exceptClause.exceptBlock.var;
+					assign.directAssign->assignTarget.direct = except.variable;
 					instructions.push_back(std::move(assign));
 
 					Instruction pop{};
@@ -8245,12 +8372,12 @@ namespace wings {
 				}
 			}
 
-			Instruction except{};
-			except.srcPos = exceptClause.srcPos;
-			except.type = Instruction::Type::ClearException;
-			instructions.push_back(std::move(except));
+			Instruction exc{};
+			exc.srcPos = exceptClause.srcPos;
+			exc.type = Instruction::Type::ClearException;
+			instructions.push_back(std::move(exc));
 
-			CompileBody(exceptClause.body, instructions);
+			CompileBody(except.body, instructions);
 
 			jumpToFinally();
 
@@ -8268,7 +8395,7 @@ namespace wings {
 		popTry.jump = std::make_unique<JumpInstruction>();
 		instructions.push_back(std::move(popTry));
 
-		CompileBody(node.tryBlock.finallyClause, instructions);
+		CompileBody(tr.finallyBody, instructions);
 
 		Instruction endFinally{};
 		endFinally.srcPos = node.srcPos;
@@ -8282,26 +8409,26 @@ namespace wings {
 
 	using CompileFn = void(*)(const Statement&, std::vector<Instruction>&);
 
-	static const std::unordered_map<Statement::Type, CompileFn> COMPILE_FUNCTIONS = {
-		{ Statement::Type::Expr, CompileExpressionStatement },
-		{ Statement::Type::If, CompileIf },
-		{ Statement::Type::While, CompileWhile },
-		{ Statement::Type::Break, CompileBreak },
-		{ Statement::Type::Continue, CompileContinue },
-		{ Statement::Type::Return, CompileReturn },
-		{ Statement::Type::Def, CompileDef },
-		{ Statement::Type::Class, CompileClass },
-		{ Statement::Type::Try, CompileTry },
-		{ Statement::Type::Raise, CompileRaise },
-		{ Statement::Type::Import, CompileImport },
-		{ Statement::Type::ImportFrom, CompileImportFrom },
-		{ Statement::Type::Pass, [](auto, auto) {}},
-		{ Statement::Type::Global, [](auto, auto) {}},
-		{ Statement::Type::Nonlocal, [](auto, auto) {}},
+	static const std::unordered_map<size_t, CompileFn> COMPILE_FUNCTIONS = {
+		{ StatIndex<stat::Expr>(), CompileExpressionStatement },
+		{ StatIndex<stat::If>(), CompileIf },
+		{ StatIndex<stat::While>(), CompileWhile },
+		{ StatIndex<stat::Break>(), CompileBreak },
+		{ StatIndex<stat::Continue>(), CompileContinue },
+		{ StatIndex<stat::Return>(), CompileReturn },
+		{ StatIndex<stat::Def>(), CompileDef },
+		{ StatIndex<stat::Class>(), CompileClass },
+		{ StatIndex<stat::Try>(), CompileTry },
+		{ StatIndex<stat::Raise>(), CompileRaise },
+		{ StatIndex<stat::Import>(), CompileImport },
+		{ StatIndex<stat::ImportFrom>(), CompileImportFrom },
+		{ StatIndex<stat::Pass>(), [](auto, auto) {}},
+		{ StatIndex<stat::Global>(), [](auto, auto) {}},
+		{ StatIndex<stat::NonLocal>(), [](auto, auto) {}},
 	};
 
 	static void CompileStatement(const Statement& node, std::vector<Instruction>& instructions) {
-		COMPILE_FUNCTIONS.at(node.type)(node, instructions);
+		COMPILE_FUNCTIONS.at(node.data.index())(node, instructions);
 	}
 
 	static void CompileBody(const std::vector<Statement>& body, std::vector<Instruction>& instructions) {
@@ -8310,7 +8437,7 @@ namespace wings {
 		}
 	}
 
-	std::vector<Instruction> Compile(const Statement& parseTree) {
+	std::vector<Instruction> Compile(const stat::Root& parseTree) {
 		std::vector<Instruction> instructions;
 		CompileBody(parseTree.expr.def.body, instructions);
 
@@ -9855,19 +9982,23 @@ namespace wings {
 
 		Statement appendStat{};
 		appendStat.srcPos = out.srcPos;
-		appendStat.type = Statement::Type::Expr;
-		appendStat.expr = std::move(appendCall);
+		{
+			stat::Expr expr;
+			expr.expr = std::move(appendCall);
+			appendStat.data = std::move(expr);
+		}
 
 		Statement ifStat{};
 		ifStat.srcPos = out.srcPos;
-		ifStat.type = Statement::Type::If;
-		ifStat.expr = std::move(condition);
-		ifStat.body.push_back(std::move(appendStat));
-
-		Statement forLoop{};
-		forLoop.srcPos = out.srcPos;
-		forLoop.type = Statement::Type::For;
-		forLoop.forLoop.assignTarget = std::move(assignTarget);
+		{
+			stat::If ifStatData;
+			ifStatData.expr = std::move(condition);
+			ifStatData.body.push_back(std::move(appendStat));
+			ifStat.data = std::move(ifStatData);
+		}
+		
+		stat::For forLoop;
+		forLoop.assignTarget = std::move(assignTarget);
 		forLoop.expr = std::move(iterable);
 		forLoop.body.push_back(std::move(ifStat));
 
@@ -9907,8 +10038,11 @@ namespace wings {
 
 		Statement lambdaRet{};
 		lambdaRet.srcPos = out.srcPos;
-		lambdaRet.type = Statement::Type::Return;
-		lambdaRet.expr = std::move(lambdaExpr);
+		{
+			stat::Return ret;
+			ret.expr = std::move(lambdaExpr);
+			lambdaRet.data = std::move(ret);
+		}
 
 		out.operation = Operation::Function;
 		out.def.localCaptures = std::move(captures);
@@ -11118,9 +11252,10 @@ namespace wings {
 
 namespace wings {
 
-	static thread_local std::vector<Statement::Type> statementHierarchy;
+	static thread_local std::vector<size_t> statementHierarchy;
 
-	static CodeError ParseBody(const LexTree& node, Statement::Type statType, std::vector<Statement>& out);
+	template <class StatType>
+	static CodeError ParseBody(const LexTree& node, std::vector<Statement>& out);
 
 	static CodeError CheckTrailingTokens(const TokenIter& p) {
 		if (!p.EndReached()) {
@@ -11141,44 +11276,55 @@ namespace wings {
 		return CheckTrailingTokens(p);
 	}
 
-	static CodeError ParseConditionalBlock(const LexTree& node, Statement& out, Statement::Type type) {
+	template <class StatType>
+	static CodeError ParseConditionalBlock(const LexTree& node, Statement& out) {
 		TokenIter p(node.tokens);
 		++p;
 
-		if (auto error = ParseExpression(p, out.expr)) {
+		StatType data{};
+		if (auto error = ParseExpression(p, data.expr)) {
 			return error;
 		}
 
 		if (auto error = ExpectColonEnding(p)) {
 			return error;
 		}
-
-		out.type = type;
-		return ParseBody(node, type, out.body);
+		
+		if (auto error = ParseBody<StatType>(node, data.body)) {
+			return error;
+		}
+		
+		out.data = std::move(data);
+		return CodeError::Good();
 	}
 
 	static CodeError ParseIf(const LexTree& node, Statement& out) {
-		return ParseConditionalBlock(node, out, Statement::Type::If);
+		return ParseConditionalBlock<stat::If>(node, out);
 	}
 
 	static CodeError ParseElif(const LexTree& node, Statement& out) {
-		return ParseConditionalBlock(node, out, Statement::Type::Elif);
+		return ParseConditionalBlock<stat::Elif>(node, out);
 	}
 
 	static CodeError ParseElse(const LexTree& node, Statement& out) {
 		TokenIter p(node.tokens);
 		++p;
-
-		out.type = Statement::Type::Else;
+		
 		if (auto error = ExpectColonEnding(p)) {
 			return error;
 		}
 
-		return ParseBody(node, Statement::Type::Else, out.body);
+		stat::Else elseStat;
+		if (auto error = ParseBody<stat::Else>(node, elseStat.body)) {
+			return error;
+		}
+
+		out.data = std::move(elseStat);
+		return CodeError::Good();
 	}
 
 	static CodeError ParseWhile(const LexTree& node, Statement& out) {
-		return ParseConditionalBlock(node, out, Statement::Type::While);
+		return ParseConditionalBlock<stat::While>(node, out);
 	}
 
 	static CodeError ParseVariableList(TokenIter& p, std::vector<std::string>& out) {
@@ -11208,109 +11354,131 @@ namespace wings {
 		}
 	}
 
-	Statement TransformForToWhile(Statement forLoop) {
+	Statement TransformForToWhile(stat::For forLoop) {
 		// __VarXXX = expression.__iter__()
 		std::string rangeVarName = "__For" + std::to_string(Guid());
 
-		Expression loadIter{};
+		Expression loadIter;
 		loadIter.srcPos = forLoop.expr.srcPos;
 		loadIter.operation = Operation::Dot;
 		loadIter.variableName = "__iter__";
 		loadIter.children.push_back(std::move(forLoop.expr));
 
-		Expression callIter{};
+		Expression callIter;
 		callIter.srcPos = forLoop.expr.srcPos;
 		callIter.operation = Operation::Call;
 		callIter.children.push_back(std::move(loadIter));
 		
-		Statement rangeEval{};
+		Statement rangeEval;
 		rangeEval.srcPos = forLoop.expr.srcPos;
-		rangeEval.type = Statement::Type::Expr;
-		rangeEval.expr.operation = Operation::Assign;
-		rangeEval.expr.srcPos = forLoop.expr.srcPos;
-		rangeEval.expr.assignTarget.type = AssignType::Direct;
-		rangeEval.expr.assignTarget.direct = rangeVarName;
-		rangeEval.expr.children.push_back({}); // Dummy
-		rangeEval.expr.children.push_back(std::move(callIter));
+		{
+			stat::Expr assign;
+			assign.expr.operation = Operation::Assign;
+			assign.expr.srcPos = forLoop.expr.srcPos;
+			assign.expr.assignTarget.type = AssignType::Direct;
+			assign.expr.assignTarget.direct = rangeVarName;
+			assign.expr.children.push_back({}); // Dummy
+			assign.expr.children.push_back(std::move(callIter));
+			rangeEval.data = std::move(assign);
+		}
 
 		// while True:
-		Expression condition{};
+		Expression condition;
 		condition.srcPos = forLoop.expr.srcPos;
 		condition.operation = Operation::Literal;
 		condition.literalValue.type = LiteralValue::Type::Bool;
 		condition.literalValue.b = true;
 
-		Statement wh{};
+		Statement wh;
 		wh.srcPos = forLoop.expr.srcPos;
-		wh.type = Statement::Type::While;
-		wh.expr = std::move(condition);
+		{
+			stat::While w;
+			w.expr = std::move(condition);
+			wh.data = std::move(w);
+		}
 
 		// try:
 		//		__VarXXX = __VarXXX.__next__()
 		// except StopIteration:
 		//		break
-		Statement brk{};
+		Statement brk;
 		brk.srcPos = forLoop.expr.srcPos;
-		brk.type = Statement::Type::Break;
-		brk.exitBlock.finallyCount = 1;
-		brk.exitBlock.exitForNormally = true;
+		{
+			stat::Break b;
+			b.finallyCount = 1;
+			b.exitForLoopNormally = true;
+			brk.data = std::move(b);
+		}
 
-		Expression stopIter{};
+		Expression stopIter;
 		stopIter.srcPos = forLoop.expr.srcPos;
 		stopIter.operation = Operation::Variable;
 		stopIter.variableName = "StopIteration";
 
-		Statement except{};
+		Statement except;
 		except.srcPos = forLoop.expr.srcPos;
-		except.type = Statement::Type::Except;
-		except.exceptBlock.exceptType = std::move(stopIter);
-		except.body.push_back(std::move(brk));
+		{
+			stat::Except exc;
+			exc.type = std::move(stopIter);
+			exc.body.push_back(std::move(brk));
+			except.data = std::move(exc);
+		}
 
-		Statement tryExcept{};
+		Statement tryExcept;
 		tryExcept.srcPos = forLoop.expr.srcPos;
-		tryExcept.type = Statement::Type::Try;
-		tryExcept.tryBlock.exceptClauses.push_back(std::move(except));
+		{
+			stat::Try tr;
+			tr.exceptBlocks.push_back(std::move(except));
+			tryExcept.data = std::move(tr);
+		}
 
 		// vars = __VarXXX.__next__()
-		Expression rangeVar{};
+		Expression rangeVar;
 		rangeVar.srcPos = forLoop.expr.srcPos;
 		rangeVar.operation = Operation::Variable;
 		rangeVar.variableName = rangeVarName;
 
-		Expression loadNext{};
+		Expression loadNext;
 		loadNext.srcPos = forLoop.expr.srcPos;
 		loadNext.operation = Operation::Dot;
 		loadNext.variableName = "__next__";
 		loadNext.children.push_back(std::move(rangeVar));
 
-		Expression callNext{};
+		Expression callNext;
 		callNext.srcPos = forLoop.expr.srcPos;
 		callNext.operation = Operation::Call;
 		callNext.children.push_back(std::move(loadNext));
 
-		Expression iterAssign{};
+		Expression iterAssign;
 		iterAssign.srcPos = forLoop.expr.srcPos;
 		iterAssign.operation = Operation::Assign;
-		iterAssign.assignTarget = forLoop.forLoop.assignTarget;
+		iterAssign.assignTarget = forLoop.assignTarget;
 		iterAssign.children.push_back({}); // Dummy
 		iterAssign.children.push_back(std::move(callNext));
 
-		Statement iterAssignStat{};
+		Statement iterAssignStat;
 		iterAssignStat.srcPos = forLoop.expr.srcPos;
-		iterAssignStat.type = Statement::Type::Expr;
-		iterAssignStat.expr = std::move(iterAssign);
-		tryExcept.body.push_back(std::move(iterAssignStat));
+		{
+			stat::Expr expr;
+			expr.expr = std::move(iterAssign);
+			iterAssignStat.data = std::move(expr);
+		}
+		tryExcept.Get<stat::Try>().body.push_back(std::move(iterAssignStat));
 
 		// Transfer body over
-		wh.body.push_back(std::move(tryExcept));
+		auto& whileBody = wh.Get<stat::While>().body;
+		whileBody.push_back(std::move(tryExcept));
 		for (auto& child : forLoop.body)
-			wh.body.push_back(std::move(child));
+			whileBody.push_back(std::move(child));
 
-		Statement out{};
+		Statement out;
 		out.srcPos = forLoop.expr.srcPos;
-		out.type = Statement::Type::Composite;
-		out.body.push_back(std::move(rangeEval));
-		out.body.push_back(std::move(wh));
+		{
+			stat::Composite comp;
+			comp.body.push_back(std::move(rangeEval));
+			comp.body.push_back(std::move(wh));
+			out.data = std::move(comp);
+		}
 		return out;
 	}
 
@@ -11346,7 +11514,6 @@ namespace wings {
 	static CodeError ParseFor(const LexTree& node, Statement& out) {
 		TokenIter p(node.tokens);
 		++p;
-		out.type = Statement::Type::For;
 
 		std::vector<std::string> vars;
 		bool isTuple{};
@@ -11355,20 +11522,22 @@ namespace wings {
 		}
 		++p;
 
+		stat::For forLoop;
+
 		if (!isTuple) {
-			out.forLoop.assignTarget.type = AssignType::Direct;
-			out.forLoop.assignTarget.direct = vars[0];
+			forLoop.assignTarget.type = AssignType::Direct;
+			forLoop.assignTarget.direct = vars[0];
 		} else {
-			out.forLoop.assignTarget.type = AssignType::Pack;
+			forLoop.assignTarget.type = AssignType::Pack;
 			for (auto& var : vars) {
 				AssignTarget elem{};
 				elem.type = AssignType::Direct;
 				elem.direct = std::move(var);
-				out.forLoop.assignTarget.pack.push_back(std::move(elem));
+				forLoop.assignTarget.pack.push_back(std::move(elem));
 			}
 		}
 
-		if (auto error = ParseExpression(p, out.expr)) {
+		if (auto error = ParseExpression(p, forLoop.expr)) {
 			return error;
 		}
 
@@ -11376,11 +11545,11 @@ namespace wings {
 			return error;
 		}
 
-		if (auto error = ParseBody(node, Statement::Type::For, out.body)) {
+		if (auto error = ParseBody<stat::For>(node, forLoop.body)) {
 			return error;
 		}
 
-		out = TransformForToWhile(std::move(out));
+		out = TransformForToWhile(std::move(forLoop));
 		return CodeError::Good();
 	}
 
@@ -11511,68 +11680,71 @@ namespace wings {
 		}
 	}
 
-	static void ResolveCaptures(Statement& defNode) {
+	static void ResolveCaptures(Expression& func) {
 		std::unordered_set<std::string> writeVars;
 		std::unordered_set<std::string> allVars;
-
-		std::function<void(const std::vector<Statement>&)> scanNode = [&](const std::vector<Statement>& body) {
-			for (const auto& child : body) {
-				bool isFn = child.expr.operation == Operation::Function;
-				switch (child.type) {
-				case Statement::Type::Expr:
-				case Statement::Type::If:
-				case Statement::Type::Elif:
-				case Statement::Type::While:
-				case Statement::Type::Return:
-					if (isFn) {
-						writeVars.insert(child.expr.def.name);
-						allVars.insert(child.expr.def.name);
-						for (const auto& parameter : child.expr.def.parameters) {
-							if (parameter.defaultValue) {
-								writeVars.merge(GetWriteVariables(parameter.defaultValue.value()));
-								allVars.merge(GetReferencedVariables(parameter.defaultValue.value()));
-							}
-						}
-						allVars.insert(child.expr.def.localCaptures.begin(), child.expr.def.localCaptures.end());
-					} else {
-						writeVars.merge(GetWriteVariables(child.expr));
-						allVars.merge(GetReferencedVariables(child.expr));
+		
+		auto processExpression = [&]<class T>(const T* data) {
+			const Expression& expr = data->expr;
+			if (expr.operation == Operation::Function) {
+				writeVars.insert(expr.def.name);
+				allVars.insert(expr.def.name);
+				for (const auto& parameter : expr.def.parameters) {
+					if (parameter.defaultValue) {
+						writeVars.merge(GetWriteVariables(parameter.defaultValue.value()));
+						allVars.merge(GetReferencedVariables(parameter.defaultValue.value()));
 					}
-					break;
-				case Statement::Type::Class:
-					writeVars.insert(child.klass.name);
-					allVars.insert(child.klass.name);
-					break;
-				case Statement::Type::Def:
-					writeVars.insert(child.expr.def.name);
-					allVars.insert(child.expr.def.name);
-					break;
-				case Statement::Type::Global:
-					defNode.expr.def.globalCaptures.insert(child.capture.name);
-					break;
-				case Statement::Type::Nonlocal:
-					defNode.expr.def.localCaptures.insert(child.capture.name);
-					break;
 				}
+				allVars.insert(expr.def.localCaptures.begin(), expr.def.localCaptures.end());
+			} else {
+				writeVars.merge(GetWriteVariables(expr));
+				allVars.merge(GetReferencedVariables(expr));
+			}
+		};
 
-				if (!isFn) {
-					scanNode(child.body);
+		std::function<void(const std::vector<Statement>&)> scan =
+		[&](const std::vector<Statement>& body) {
+			for (const auto& child : body) {
+				if (auto* node = child.GetIf<stat::Expr>()) {
+					processExpression(node);
+				} else if (auto* node = child.GetIf<stat::If>()) {
+					processExpression(node);
+					scan(node->body);
+					if (node->elseClause)
+						scan(node->elseClause->Get<stat::Else>().body);
+				} else if (auto* node = child.GetIf<stat::Elif>()) {
+					processExpression(node);
+					scan(node->body);
+				} else if (auto* node = child.GetIf<stat::While>()) {
+					processExpression(node);
+					scan(node->body);
+				} else if (auto* node = child.GetIf<stat::Return>()) {
+					processExpression(node);
+				} else if (auto* node = child.GetIf<stat::Class>()) {
+					writeVars.insert(node->name);
+					allVars.insert(node->name);
+				} else if (auto* node = child.GetIf<stat::Def>()) {
+					writeVars.insert(node->expr.def.name);
+					allVars.insert(node->expr.def.name);
+				} else if (auto* node = child.GetIf<stat::Global>()) {
+					func.def.globalCaptures.insert(node->name);
+				} else if (auto* node = child.GetIf<stat::NonLocal>()) {
+					func.def.localCaptures.insert(node->name);
 				}
 			}
 		};
 
-		scanNode(defNode.expr.def.body);
+		scan(func.def.body);
 
 		std::vector<std::string> parameterVars;
-		for (const auto& param : defNode.expr.def.parameters)
+		for (const auto& param : func.def.parameters)
 			parameterVars.push_back(param.name);
-		defNode.expr.def.localCaptures.merge(SetDifference(allVars, writeVars, parameterVars));
-		defNode.expr.def.variables = SetDifference(writeVars, defNode.expr.def.globalCaptures, defNode.expr.def.localCaptures, parameterVars);
+		func.def.localCaptures.merge(SetDifference(allVars, writeVars, parameterVars));
+		func.def.variables = SetDifference(writeVars, func.def.globalCaptures, func.def.localCaptures, parameterVars);
 	}
 
-	static CodeError ParseDef(const LexTree& node, Statement& out) {
+	static CodeError ParseDef(const LexTree& node, Statement& out) {		
 		TokenIter p(node.tokens);
-		out.type = Statement::Type::Def;
 		++p;
 
 		Expression fn{};
@@ -11609,20 +11781,20 @@ namespace wings {
 			return error;
 		}
 
-		if (auto error = ParseBody(node, Statement::Type::Def, fn.def.body)) {
+		if (auto error = ParseBody<stat::Def>(node, fn.def.body)) {
 			return error;
 		}
-
-		out.expr = std::move(fn);
-
-		ResolveCaptures(out);
-
+		
+		ResolveCaptures(fn);
+		
+		stat::Def def;
+		def.expr = std::move(fn);
+		out.data = std::move(def);
 		return CodeError::Good();
 	}
 
 	static CodeError ParseClass(const LexTree& node, Statement& out) {
 		TokenIter p(node.tokens);
-		out.type = Statement::Type::Class;
 		++p;
 
 		if (p.EndReached()) {
@@ -11630,14 +11802,15 @@ namespace wings {
 		} else if (p->type != Token::Type::Word) {
 			return CodeError::Bad("Expected a class name", p->srcPos);
 		}
-		out.klass.name = p->text;
+		stat::Class klass;
+		klass.name = p->text;
 		++p;
 
 		if (p.EndReached()) {
 			return CodeError::Bad("Expected a ':'", (--p)->srcPos);
 		} else if (p->text == "(") {
 			++p;
-			if (auto error = ParseExpressionList(p, ")", out.klass.bases)) {
+			if (auto error = ParseExpressionList(p, ")", klass.bases)) {
 				return error;
 			}
 			++p;
@@ -11658,15 +11831,16 @@ namespace wings {
 				return CodeError::Bad("Expected a method definition");
 			}
 
-			Statement stat{};
+			Statement stat;
 			if (auto error = ParseDef(method, stat)) {
 				return error;
 			}
 			stat.srcPos = method.tokens[0].srcPos;
-			out.klass.methodNames.push_back(stat.expr.def.name);
-			out.body.push_back(std::move(stat));
+			klass.methodNames.push_back(stat.Get<stat::Def>().expr.def.name);
+			klass.body.push_back(std::move(stat));
 		}
 
+		out.data = std::move(klass);
 		return CodeError::Good();
 	}
 
@@ -11677,14 +11851,21 @@ namespace wings {
 		if (auto error = ExpectColonEnding(p)) {
 			return error;
 		}
+		
+		stat::Try tr;
+		if (auto error = ParseBody<stat::Try>(node, tr.body)) {
+			return error;
+		}
 
-		out.type = Statement::Type::Try;
-		return ParseBody(node, Statement::Type::Try, out.body);
+		out.data = std::move(tr);
+		return CodeError::Good();
 	}
 
 	static CodeError ParseExcept(const LexTree& node, Statement& out) {
 		TokenIter p(node.tokens);
 		++p;
+
+		stat::Except exc;
 
 		Expression exceptType{};
 		if (p.EndReached()) {
@@ -11694,7 +11875,7 @@ namespace wings {
 		} else if (auto error = ParseExpression(p, exceptType)) {
 			return error;
 		}
-		out.exceptBlock.exceptType = std::move(exceptType);
+		exc.type = std::move(exceptType);
 
 		if (p.EndReached()) {
 			return CodeError::Bad("Expected a ':'", (--p)->srcPos);
@@ -11710,7 +11891,7 @@ namespace wings {
 		} else if (p->type != Token::Type::Word) {
 			return CodeError::Bad("Expected an identifier", p->srcPos);
 		}
-		out.exceptBlock.var = p->text;
+		exc.variable = p->text;
 		++p;
 		
 	end:
@@ -11718,8 +11899,12 @@ namespace wings {
 			return error;
 		}
 
-		out.type = Statement::Type::Except;
-		return ParseBody(node, Statement::Type::Except, out.body);
+		if (auto error = ParseBody<stat::Except>(node, exc.body)) {
+			return error;
+		}
+		
+		out.data = std::move(exc);
+		return CodeError::Good();
 	}
 
 	static CodeError ParseFinally(const LexTree& node, Statement& out) {
@@ -11730,20 +11915,26 @@ namespace wings {
 			return error;
 		}
 
-		out.type = Statement::Type::Finally;
-		return ParseBody(node, Statement::Type::Finally, out.body);
+		stat::Finally fin;
+		if (auto error = ParseBody<stat::Finally>(node, fin.body)) {
+			return error;
+		}
+
+		out.data = std::move(fin);
+		return CodeError::Good();
 	}
 
 	static CodeError ParseRaise(const LexTree& node, Statement& out) {
 		TokenIter p(node.tokens);
 		++p;
 
-		out.type = Statement::Type::Raise;
-		if (auto error = ParseExpression(p, out.expr)) {
+		stat::Raise raise;
+		if (auto error = ParseExpression(p, raise.expr)) {
 			return error;
-		} else {
-			return CheckTrailingTokens(p);
 		}
+		
+		out.data = std::move(raise);
+		return CheckTrailingTokens(p);
 	}
 
 	static CodeError ParseWith(const LexTree& node, Statement& out) {
@@ -11782,7 +11973,7 @@ namespace wings {
 		}
 
 		std::vector<Statement> body;
-		if (auto error = ParseBody(node, Statement::Type::Composite, body)) {
+		if (auto error = ParseBody<stat::Composite>(node, body)) {
 			return error;
 		}
 
@@ -11807,10 +11998,13 @@ namespace wings {
 		assignMgr.children.push_back({}); // Dummy
 		assignMgr.children.push_back(std::move(manager));
 
-		Statement assignMgrStat{};
+		Statement assignMgrStat;
 		assignMgrStat.srcPos = srcPos;
-		assignMgrStat.type = Statement::Type::Expr;
-		assignMgrStat.expr = std::move(assignMgr);
+		{
+			stat::Expr expr;
+			expr.expr = std::move(assignMgr);
+			assignMgrStat.data = std::move(expr);
+		}
 		mainBody.push_back(std::move(assignMgrStat));
 
 		// [<var> =] __WithMgr.__enter__()
@@ -11822,36 +12016,37 @@ namespace wings {
 			return load;
 		};
 
-		Expression enter{};
+		Expression enter;
 		enter.srcPos = srcPos;
 		enter.operation = Operation::Dot;
 		enter.variableName = "__enter__";
 		enter.children.push_back(loadMgr());
 
-		Expression enterCall{};
+		Expression enterCall;
 		enterCall.srcPos = srcPos;
 		enterCall.operation = Operation::Call;
 		enterCall.children.push_back(std::move(enter));
 
-		Statement enterStat{};
+		Statement enterStat;
 		enterStat.srcPos = srcPos;
-		enterStat.type = Statement::Type::Expr;
 		if (!var.empty()) {
-			Expression assign{};
-			assign.srcPos = srcPos;
-			assign.operation = Operation::Assign;
-			assign.assignTarget.type = AssignType::Direct;
-			assign.assignTarget.direct = std::move(var);
-			assign.children.push_back({}); // Dummy
-			assign.children.push_back(std::move(enterCall));
-			enterStat.expr = std::move(assign);
+			stat::Expr assign;
+			assign.expr.srcPos = srcPos;
+			assign.expr.operation = Operation::Assign;
+			assign.expr.assignTarget.type = AssignType::Direct;
+			assign.expr.assignTarget.direct = std::move(var);
+			assign.expr.children.push_back({}); // Dummy
+			assign.expr.children.push_back(std::move(enterCall));
+			enterStat.data = std::move(assign);
 		} else {
-			enterStat.expr = std::move(enterCall);
+			stat::Expr expr;
+			expr.expr = std::move(enterCall);
+			enterStat.data = std::move(expr);
 		}
 		mainBody.push_back(std::move(enterStat));
 
 		// __WithMgr.__exit__(None, None, None)
-		Expression loadExit{};
+		Expression loadExit;
 		loadExit.srcPos = srcPos;
 		loadExit.operation = Operation::Dot;
 		loadExit.variableName = "__exit__";
@@ -11865,7 +12060,7 @@ namespace wings {
 			return none;
 		};
 		
-		Expression exit{};
+		Expression exit;
 		exit.srcPos = srcPos;
 		exit.operation = Operation::Call;
 		exit.children.push_back(std::move(loadExit));
@@ -11873,22 +12068,29 @@ namespace wings {
 		exit.children.push_back(loadNone());
 		exit.children.push_back(loadNone());
 
-		Statement exitStat{};
+		Statement exitStat;
 		exitStat.srcPos = srcPos;
-		exitStat.type = Statement::Type::Expr;
-		exitStat.expr = std::move(exit);
+		{
+			stat::Expr expr;
+			expr.expr = std::move(exit);
+			exitStat.data = std::move(expr);
+		}
 
 		// try/finally
 		Statement tryBlock{};
 		tryBlock.srcPos = srcPos;
-		tryBlock.type = Statement::Type::Try;
-		tryBlock.body = std::move(body);
-		tryBlock.tryBlock.finallyClause.push_back(std::move(exitStat));
+		{
+			stat::Try tryStat;
+			tryStat.body = std::move(body);
+			tryStat.finallyBody.push_back(std::move(exitStat));
+			tryBlock.data = std::move(tryStat);
+		}
 		mainBody.push_back(std::move(tryBlock));
 
 		// Produce composite statement
-		out.type = Statement::Type::Composite;
-		out.body = std::move(mainBody);
+		stat::Composite comp;
+		comp.body = std::move(mainBody);
+		out.data = std::move(comp);
 		return CodeError::Good();
 	}
 
@@ -11896,11 +12098,11 @@ namespace wings {
 		auto it = statementHierarchy.rbegin();
 		while (true) {
 			switch (*it) {
-			case Statement::Type::Def:
-			case Statement::Type::Root:
+			case StatIndex<stat::Def>():
+			case StatIndex<stat::Root>():
 				return CodeError::Bad("'break' or 'continue' outside of loop", node.tokens[0].srcPos);
-			case Statement::Type::For:
-			case Statement::Type::While:
+			case StatIndex<stat::For>():
+			case StatIndex<stat::While>():
 				return CodeError::Good();
 			}
 			++it;
@@ -11909,93 +12111,96 @@ namespace wings {
 
 	static size_t BreakableTryExceptCount() {
 		size_t count = 0;
-		auto it = statementHierarchy.rbegin();
-		while (true) {
+		for (auto it = statementHierarchy.rbegin(); ; ++it) {
 			switch (*it) {
-			case Statement::Type::Def:
-			case Statement::Type::Root:
-			case Statement::Type::For:
-			case Statement::Type::While:
+			case StatIndex<stat::Def>():
+			case StatIndex<stat::Root>():
+			case StatIndex<stat::For>():
+			case StatIndex<stat::While>():
 				return count;
-			case Statement::Type::Try:
+			case StatIndex<stat::Try>():
 				count++;
 				break;
 			}
-			++it;
 		}
 	}
 
 	static size_t TotalTryExceptCount() {
 		size_t count = 0;
-		auto it = statementHierarchy.rbegin();
-		while (true) {
+		for (auto it = statementHierarchy.rbegin(); ; ++it) {
 			switch (*it) {
-			case Statement::Type::Def:
-			case Statement::Type::Root:
+			case StatIndex<stat::Def>():
+			case StatIndex<stat::Root>():
 				return count;
-			case Statement::Type::Try:
+			case StatIndex<stat::Try>():
 				count++;
 				break;
 			}
-			++it;
 		}
 	}
-
+	
 	static CodeError ParseReturn(const LexTree& node, Statement& out) {
 		TokenIter p(node.tokens);
 		++p;
+		
+		stat::Return expr;
+		expr.finallyCount = TotalTryExceptCount();
 
-		out.type = Statement::Type::Return;
 		if (p.EndReached()) {
-			out.expr.operation = Operation::Literal;
-			out.expr.literalValue.type = LiteralValue::Type::Null;
-			out.expr.srcPos = (--p)->srcPos;
-			out.exitBlock.finallyCount = TotalTryExceptCount();
+			expr.expr.operation = Operation::Literal;
+			expr.expr.literalValue.type = LiteralValue::Type::Null;
+			expr.expr.srcPos = (--p)->srcPos;
+			out.data = std::move(expr);
 			return CodeError::Good();
-		} else if (auto error = ParseExpression(p, out.expr)) {
+		} else if (auto error = ParseExpression(p, expr.expr)) {
 			return error;
 		} else {
-			out.exitBlock.finallyCount = TotalTryExceptCount();
+			out.data = std::move(expr);
 			return CheckTrailingTokens(p);
 		}
 	}
 
-	static CodeError ParseSingleToken(const LexTree& node, Statement& out, Statement::Type type) {
+	static CodeError ValidateSingleToken(const LexTree& node) {
 		TokenIter p(node.tokens);
 		++p;
-		out.type = type;
 		return CheckTrailingTokens(p);
 	}
 
 	static CodeError ParseBreak(const LexTree& node, Statement& out) {
 		if (auto error = CheckBreakable(node)) {
 			return error;
-		} else if (auto error = ParseSingleToken(node, out, Statement::Type::Break)) {
+		} else if (auto error = ValidateSingleToken(node)) {
 			return error;
 		}
-		out.exitBlock.finallyCount = BreakableTryExceptCount();
+		stat::Break brk;
+		brk.finallyCount = BreakableTryExceptCount();
+		out.data = std::move(brk);
 		return CodeError::Good();
 	}
 
 	static CodeError ParseContinue(const LexTree& node, Statement& out) {
 		if (auto error = CheckBreakable(node)) {
 			return error;
-		} else if (auto error = ParseSingleToken(node, out, Statement::Type::Continue)) {
+		} else if (auto error = ValidateSingleToken(node)) {
 			return error;
 		}
-		out.exitBlock.finallyCount = BreakableTryExceptCount();
+		stat::Continue cont;
+		cont.finallyCount = BreakableTryExceptCount();
+		out.data = std::move(cont);
 		return CodeError::Good();
 	}
 
 	static CodeError ParsePass(const LexTree& node, Statement& out) {
-		return ParseSingleToken(node, out, Statement::Type::Pass);
+		out.data = stat::Pass();
+		return ValidateSingleToken(node);
 	}
 
-	static CodeError ParseCapture(const LexTree& node, Statement& out, Statement::Type type) {
+	template <class StatType>
+	static CodeError ParseCapture(const LexTree& node, Statement& out) {
 		TokenIter p(node.tokens);
 		++p;
 
-		if (statementHierarchy.back() == Statement::Type::Root) {
+		if (statementHierarchy.back() == StatIndex<stat::Root>()) {
 			return CodeError::Bad("Cannot capture at top level", (--p)->srcPos);
 		}
 
@@ -12005,33 +12210,33 @@ namespace wings {
 			return CodeError::Bad("Expected a variable name", p->srcPos);
 		}
 
-		out.type = type;
-		out.capture.name = p->text;
+		StatType stat{};
+		stat.name = p->text;
+		out.data = std::move(stat);
 		++p;
 		return CheckTrailingTokens(p);
 	}
 
 	static CodeError ParseNonlocal(const LexTree& node, Statement& out) {
-		return ParseCapture(node, out, Statement::Type::Nonlocal);
+		return ParseCapture<stat::NonLocal>(node, out);
 	}
 
 	static CodeError ParseGlobal(const LexTree& node, Statement& out) {
-		return ParseCapture(node, out, Statement::Type::Global);
+		return ParseCapture<stat::Global>(node, out);
 	}
 
 	static CodeError ParseExpressionStatement(const LexTree& node, Statement& out) {
 		TokenIter p(node.tokens);
-		out.type = Statement::Type::Expr;
-		if (auto error = ParseExpression(p, out.expr)) {
+		stat::Expr expr;
+		if (auto error = ParseExpression(p, expr.expr)) {
 			return error;
-		} else {
-			return CheckTrailingTokens(p);
 		}
+		out.data = std::move(expr);
+		return CheckTrailingTokens(p);
 	}
 
 	static CodeError ParseImportFrom(const LexTree& node, Statement& out) {
 		TokenIter p(node.tokens);
-		out.type = Statement::Type::ImportFrom;
 		++p;
 
 		if (p.EndReached()) {
@@ -12040,7 +12245,8 @@ namespace wings {
 			return CodeError::Bad("Expected a module name", p->srcPos);
 		}
 
-		out.importFrom.module = p->text;
+		stat::ImportFrom importFrom;
+		importFrom.module = p->text;
 		++p;
 
 		if (p.EndReached()) {
@@ -12061,7 +12267,7 @@ namespace wings {
 				if (p->type != Token::Type::Word) {
 					return CodeError::Bad("Expected a name", p->srcPos);
 				}
-				out.importFrom.names.push_back(p->text);
+				importFrom.names.push_back(p->text);
 				++p;
 
 				if (p.EndReached()) {
@@ -12075,7 +12281,7 @@ namespace wings {
 					} else if (p->type != Token::Type::Word) {
 						return CodeError::Bad("Expected a name", p->srcPos);
 					}
-					out.importFrom.alias = p->text;
+					importFrom.alias = p->text;
 					++p;
 					break;
 				}
@@ -12088,12 +12294,12 @@ namespace wings {
 			}
 		}
 
+		out.data = std::move(importFrom);
 		return CheckTrailingTokens(p);
 	}
 
 	static CodeError ParseImport(const LexTree& node, Statement& out) {
 		TokenIter p(node.tokens);
-		out.type = Statement::Type::Import;
 		++p;
 		
 		if (p.EndReached()) {
@@ -12102,7 +12308,8 @@ namespace wings {
 			return CodeError::Bad("Expected a module name", p->srcPos);
 		}
 
-		out.import.module = p->text;
+		stat::Import import;
+		import.module = p->text;
 		++p;
 
 		if (!p.EndReached() && p->text == "as") {
@@ -12112,10 +12319,11 @@ namespace wings {
 			} else if (p->type != Token::Type::Word) {
 				return CodeError::Bad("Expected an alias name", p->srcPos);
 			}
-			out.import.alias = p->text;
+			import.alias = p->text;
 			++p;
 		}
 		
+		out.data = std::move(import);
 		return CheckTrailingTokens(p);
 	}
 
@@ -12161,10 +12369,14 @@ namespace wings {
 	}
 
 	void ExpandCompositeStatements(std::vector<Statement>& statements) {
+		auto get = [&](size_t i) {
+			return statements[i].GetIf<stat::Composite>();
+		};
+		
 		for (size_t i = 0; i < statements.size(); i++) {
-			if (statements[i].type == Statement::Type::Composite) {
-				for (size_t j = 0; j < statements[i].body.size(); j++) {
-					auto& child = statements[i].body[j];
+			if (auto* comp = get(i)) {
+				for (size_t j = 0; j < get(i)->body.size(); j++) {
+					auto& child = get(i)->body[j];
 					statements.insert(statements.begin() + i + j + 1, std::move(child));
 				}
 				statements.erase(statements.begin() + i);
@@ -12172,14 +12384,15 @@ namespace wings {
 		}
 	}
 
-	static CodeError ParseBody(const LexTree& node, Statement::Type statType, std::vector<Statement>& out) {
+	template <class StatType>
+	static CodeError ParseBody(const LexTree& node, std::vector<Statement>& out) {
 		out.clear();
 
 		if (node.children.empty()) {
 			return CodeError::Bad("Expected a statement", node.tokens.back().srcPos);
 		}
 
-		statementHierarchy.push_back(statType);
+		statementHierarchy.push_back(StatIndex<StatType>());
 		for (auto& node : node.children) {
 			Statement statement;
 			if (auto error = ParseStatement(node, statement)) {
@@ -12195,17 +12408,17 @@ namespace wings {
 		// Validate elif and else
 		for (size_t i = 0; i < out.size(); i++) {
 			auto& stat = out[i];
-			Statement::Type lastType = i ? out[i - 1].type : Statement::Type::Pass;
+			size_t lastType = i ? out[i - 1].data.index() : 0;
 
-			if (stat.type == Statement::Type::Elif) {
-				if (lastType != Statement::Type::If && lastType != Statement::Type::Elif) {
+			if (stat.Is<stat::Elif>()) {
+				if (lastType != StatIndex<stat::If>() && lastType != StatIndex<stat::Elif>()) {
 					return CodeError::Bad(
 						"An 'elif' clause may only appear after an 'if' or 'elif' clause",
 						stat.srcPos
 					);
 				}
-			} else if (stat.type == Statement::Type::Else) {
-				if (lastType != Statement::Type::If && lastType != Statement::Type::Elif && lastType != Statement::Type::While) {
+			} else if (stat.Is<stat::Else>()) {
+				if (lastType != StatIndex<stat::If>() && lastType != StatIndex<stat::Elif>() && lastType != StatIndex<stat::While>()) {
 					return CodeError::Bad(
 						"An 'else' clause may only appear after an 'if', 'elif', 'while', or 'for' clause",
 						stat.srcPos
@@ -12216,69 +12429,100 @@ namespace wings {
 
 		// Rearrange elif and else nodes
 		for (size_t i = 0; i < out.size(); i++) {
-			auto& stat = out[i];
+			auto& cur = out[i];
 
 			std::optional<Statement> elseClause;
-			if (stat.type == Statement::Type::Elif) {
+			if (auto* elif = cur.GetIf<stat::Elif>()) {
 				// Transform elif into an else and if statement
-				stat.type = Statement::Type::If;
-				elseClause = Statement{};
-				elseClause.value().srcPos = stat.srcPos;
-				elseClause.value().type = Statement::Type::Else;
-				elseClause.value().body.push_back(std::move(stat));
+				stat::If ifStat;
+				ifStat.expr = std::move(elif->expr);
+				ifStat.body = std::move(elif->body);
+				ifStat.elseClause = std::move(elif->elseClause);
+				cur.data = std::move(ifStat);
+				
+				SourcePosition srcPos = cur.srcPos;
+				stat::Else elseStat;
+				elseStat.body.push_back(std::move(cur));
+				Statement stat;
+				stat.srcPos = srcPos;
+				stat.data = std::move(elseStat);
+				elseClause = std::move(stat);
 				out.erase(out.begin() + i);
 				i--;
-
-			} else if (stat.type == Statement::Type::Else) {
-				elseClause = std::move(stat);
+			} else if (cur.Is<stat::Else>()) {
+				elseClause = std::move(cur);
 				out.erase(out.begin() + i);
 				i--;
 			}
 
 			if (elseClause) {
+				auto getElse = [](Statement* parent) -> stat::Else* {
+					std::unique_ptr<Statement>* els = nullptr;
+					if (auto* ifStat = parent->GetIf<stat::If>()) {
+						if (ifStat->elseClause)
+							els = &ifStat->elseClause;
+					} else if (auto* elif = parent->GetIf<stat::Elif>()) {
+						if (elif->elseClause)
+							els = &elif->elseClause;
+					} else if (auto* wh = parent->GetIf<stat::While>()) {
+						if (wh->elseClause)
+							els = &wh->elseClause;
+					} else {
+						return nullptr;
+					}
+					return els ? &(*els)->Get<stat::Else>() : nullptr;
+				};
+
 				Statement* parent = &out[i];
-				while (parent->elseClause) {
-					parent = &parent->elseClause->body.back();
+				while (auto* els = getElse(parent)) {
+					parent = &els->body.back();
 				}
-				parent->elseClause = std::make_unique<Statement>(std::move(elseClause.value()));
+				
+				auto els = std::make_unique<Statement>(std::move(elseClause.value()));
+				if (auto* ifStat = parent->GetIf<stat::If>()) {
+					ifStat->elseClause = std::move(els);
+				} else if (auto* elif = parent->GetIf<stat::Elif>()) {
+					elif->elseClause = std::move(els);
+				} else if (auto* wh = parent->GetIf<stat::While>()) {
+					wh->elseClause = std::move(els);
+				} else {
+					WG_UNREACHABLE();
+				}
 			}
 		}
 
 		for (size_t i = 0; i < out.size(); i++) {
 			SourcePosition srcPos = out[i].srcPos;
-			switch (out[i].type) {
-			case Statement::Type::Except:
+			switch (out[i].data.index()) {
+			case StatIndex<stat::Except>():
 				return CodeError::Bad("An 'except' clause may only appear after a 'try' or 'except' clause", srcPos);
-			case Statement::Type::Finally:
+			case StatIndex<stat::Finally>():
 				return CodeError::Bad("A 'finally' clause may only appear after a 'try' or 'except' clause", srcPos);
-			case Statement::Type::Try: {
-				auto& tryStat = out[i];
+			case StatIndex<stat::Try>(): {
+				auto& tryStat = out[i].Get<stat::Try>();
 				
 				for (i++; i < out.size(); i++) {
-					srcPos = out[i].srcPos;
-					switch (out[i].type) {
-					case Statement::Type::Except: {
-						auto& exceptClauses = tryStat.tryBlock.exceptClauses;
-						if (!exceptClauses.empty() && !exceptClauses.back().exceptBlock.exceptType.has_value()) {
+					auto& cur = out[i];
+					srcPos = cur.srcPos;
+					
+					if (cur.Is<stat::Except>()) {
+						auto& exceptClauses = tryStat.exceptBlocks;
+						if (!exceptClauses.empty() && !exceptClauses.back().Get<stat::Except>().type) {
 							return CodeError::Bad("Default 'except' clause must be last", srcPos);
 						}
-						exceptClauses.push_back(std::move(out[i]));
+						exceptClauses.push_back(std::move(cur));
 						out.erase(out.begin() + i);
 						i--;
-						break;
-					}
-					case Statement::Type::Finally:
-						tryStat.tryBlock.finallyClause = std::move(out[i].body);
+						continue;
+					} else if (auto* fin = cur.GetIf<stat::Finally>()) {
+						tryStat.finallyBody = std::move(fin->body);
 						out.erase(out.begin() + i);
 						i--;
-						goto end;
-					default:
-						goto end;
 					}
+					break;
 				}
-
-			end:
-				if (tryStat.tryBlock.exceptClauses.empty() && tryStat.tryBlock.finallyClause.empty()) {
+				
+				if (tryStat.exceptBlocks.empty() && tryStat.finallyBody.empty()) {
 					return CodeError::Bad("Expected an 'except' or 'finally' clause", srcPos);
 				}
 				i--;
@@ -12290,21 +12534,21 @@ namespace wings {
 	}
 
 	ParseResult Parse(const LexTree& lexTree) {
+		if (lexTree.children.empty())
+			return {};
+
+		statementHierarchy.clear();
+		stat::Root root;
+		auto error = ParseBody<stat::Root>(lexTree, root.expr.def.body);
+		statementHierarchy.clear();
+		
+		ResolveCaptures(root.expr);
+		root.expr.def.variables.merge(root.expr.def.localCaptures);
+		root.expr.def.localCaptures.clear();
+
 		ParseResult result{};
-		result.parseTree.type = Statement::Type::Root;
-
-		if (lexTree.children.empty()) {
-			return result;
-		}
-
-		statementHierarchy.clear();
-		result.error = ParseBody(lexTree, Statement::Type::Root, result.parseTree.expr.def.body);
-		statementHierarchy.clear();
-
-		ResolveCaptures(result.parseTree);
-		result.parseTree.expr.def.variables.merge(result.parseTree.expr.def.localCaptures);
-		result.parseTree.expr.def.localCaptures.clear();
-
+		result.error = std::move(error);
+		result.parseTree = std::move(root);
 		return result;
 	}
 }

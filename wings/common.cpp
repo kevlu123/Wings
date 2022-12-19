@@ -223,18 +223,19 @@ namespace wings {
 
 		if (expr) {
 			std::vector<Statement> body = std::move(parseResult.parseTree.expr.def.body);
-			if (body.size() != 1 || body[0].type != Statement::Type::Expr) {
+			if (body.size() != 1 || !std::holds_alternative<stat::Expr>(body[0].data)) {
 				raiseException(CodeError::Bad("Invalid syntax"));
 				return nullptr;
 			}
 
-			Statement ret{};
-			ret.srcPos = body[0].srcPos;
-			ret.type = Statement::Type::Return;
-			ret.expr = std::move(body[0].expr);
+			stat::Return ret;
+			ret.expr = std::move(body[0].Get<stat::Expr>().expr);
+			Statement stat;
+			stat.srcPos = body[0].srcPos;
+			stat.data = std::move(ret);
 
 			parseResult.parseTree.expr.def.body.clear();
-			parseResult.parseTree.expr.def.body.push_back(std::move(ret));
+			parseResult.parseTree.expr.def.body.push_back(std::move(stat));
 		}
 
 		auto* def = new DefObject();
