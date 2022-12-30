@@ -537,9 +537,10 @@ typedef enum Wg_Exc {
 * @brief Create an instance of an interpreter.
 * 
 * The returned context must be freed with Wg_DestroyContext().
+* This function does not fail.
 * 
 * @param config The configuration to use, or NULL to use the default configuration.
-* @return A newly created context, or NULL on failure.
+* @return A newly created context.
 */
 WG_DLL_EXPORT
 Wg_Context* Wg_CreateContext(const Wg_Config* config WG_DEFAULT_ARG(nullptr));
@@ -2192,7 +2193,6 @@ namespace wings {
 	bool IsValidIdentifier(std::string_view s);
 	Wg_Obj* Compile(Wg_Context* context, const char* code, const char* module, const char* prettyName, bool expr);
 	Wg_Obj* Execute(Wg_Context* context, const char* code, const char* module);
-	bool InitArgv(Wg_Context* context, const char* const* argv, int argc);
 	void RegisterMethod(Wg_Obj* klass, const char* name, Wg_Function fptr);
 	Wg_Obj* RegisterFunction(Wg_Context* context, const char* name, Wg_Function fptr);
 	void AddAttributeToClass(Wg_Obj* klass, const char* attribute, Wg_Obj* value);
@@ -2432,6 +2432,7 @@ struct Wg_Context {
 	wings::Rng rng;
 	bool closing = false;
 	bool gcRunning = false;
+	std::vector<std::string> argv;
 	
 	// Garbage collection
 	size_t lastObjectCountAfterGC = 0;
@@ -2442,7 +2443,6 @@ struct Wg_Context {
 	using Globals = std::unordered_map<std::string, wings::RcPtr<Wg_Obj*>>;
 	std::unordered_map<std::string, Globals> globals;
 	wings::Builtins builtins{};
-	Wg_Obj* argv = nullptr;
 	
 	// Exception info
 	std::vector<wings::TraceFrame> currentTrace;
@@ -7557,29 +7557,6 @@ namespace wings {
 	std::mt19937_64& Rng::Engine() {
 		return engine;
 	}
-	
-	bool InitArgv(Wg_Context* context, const char* const* argv, int argc) {
-		Wg_Obj* list = Wg_NewList(context);
-		if (list == nullptr)
-			return false;
-
-		const char* empty = "";
-		if (argc == 0) {
-			argv = &empty;
-			argc = 1;
-		}
-		
-		for (int i = 0; i < argc; i++) {
-			Wg_Obj* str = Wg_NewString(context, argv[i]);
-			if (str == nullptr)
-				return false;
-			if (Wg_CallMethod(list, "append", &str, 1) == nullptr)
-				return false;
-		}
-		
-		context->argv = list;
-		return true;
-	}
 }
 
 
@@ -12659,8 +12636,24 @@ namespace wings {
 	bool ImportSys(Wg_Context* context) {
 		using namespace sysmodule;
 		try {
+			Wg_Obj* list = Wg_NewList(context);
+			if (list == nullptr)
+				return false;
+			Wg_SetGlobal(context, "argv", list);
+
+			if (context->argv.empty()) {
+				context->argv.push_back("");
+			}
+
+			for (const std::string& arg : context->argv) {
+				Wg_Obj* str = Wg_NewString(context, arg.c_str());
+				if (str == nullptr)
+					return false;
+				if (Wg_CallMethod(list, "append", &str, 1) == nullptr)
+					return false;
+			}
+
 			RegisterFunction(context, "exit", exit);
-			Wg_SetGlobal(context, "argv", context->argv);
 			return true;
 		} catch (LibraryInitException&) {
 			return false;
@@ -12838,8 +12831,9 @@ extern "C" {
 			Wg_RegisterModule(context, "os", wings::ImportOS);
 		}
 		
-		if (!wings::InitArgv(context, context->config.argv, context->config.argc))
-			return nullptr;
+		for (int i = 0; i < context->config.argc; i++) {
+			context->argv.push_back(context->config.argv[i]);
+		}
 		
 		return context;
 	}
@@ -14097,8 +14091,6 @@ extern "C" {
 			for (auto& obj : context->builtins.GetAll())
 				if (obj)
 					inUse.push_back(obj);
-			if (context->argv)
-				inUse.push_back(context->argv);
 			for (const auto& executor : context->executors)
 				executor->GetReferences(inUse);
 		}

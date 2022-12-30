@@ -31,7 +31,6 @@ namespace wings {
 	bool IsValidIdentifier(std::string_view s);
 	Wg_Obj* Compile(Wg_Context* context, const char* code, const char* module, const char* prettyName, bool expr);
 	Wg_Obj* Execute(Wg_Context* context, const char* code, const char* module);
-	bool InitArgv(Wg_Context* context, const char* const* argv, int argc);
 	void RegisterMethod(Wg_Obj* klass, const char* name, Wg_Function fptr);
 	Wg_Obj* RegisterFunction(Wg_Context* context, const char* name, Wg_Function fptr);
 	void AddAttributeToClass(Wg_Obj* klass, const char* attribute, Wg_Obj* value);
@@ -271,6 +270,7 @@ struct Wg_Context {
 	wings::Rng rng;
 	bool closing = false;
 	bool gcRunning = false;
+	std::vector<std::string> argv;
 	
 	// Garbage collection
 	size_t lastObjectCountAfterGC = 0;
@@ -281,7 +281,6 @@ struct Wg_Context {
 	using Globals = std::unordered_map<std::string, wings::RcPtr<Wg_Obj*>>;
 	std::unordered_map<std::string, Globals> globals;
 	wings::Builtins builtins{};
-	Wg_Obj* argv = nullptr;
 	
 	// Exception info
 	std::vector<wings::TraceFrame> currentTrace;

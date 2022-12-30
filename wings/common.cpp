@@ -295,27 +295,4 @@ namespace wings {
 	std::mt19937_64& Rng::Engine() {
 		return engine;
 	}
-	
-	bool InitArgv(Wg_Context* context, const char* const* argv, int argc) {
-		Wg_Obj* list = Wg_NewList(context);
-		if (list == nullptr)
-			return false;
-
-		const char* empty = "";
-		if (argc == 0) {
-			argv = &empty;
-			argc = 1;
-		}
-		
-		for (int i = 0; i < argc; i++) {
-			Wg_Obj* str = Wg_NewString(context, argv[i]);
-			if (str == nullptr)
-				return false;
-			if (Wg_CallMethod(list, "append", &str, 1) == nullptr)
-				return false;
-		}
-		
-		context->argv = list;
-		return true;
-	}
 }

@@ -136,8 +136,9 @@ extern "C" {
 			Wg_RegisterModule(context, "os", wings::ImportOS);
 		}
 		
-		if (!wings::InitArgv(context, context->config.argv, context->config.argc))
-			return nullptr;
+		for (int i = 0; i < context->config.argc; i++) {
+			context->argv.push_back(context->config.argv[i]);
+		}
 		
 		return context;
 	}
@@ -1395,8 +1396,6 @@ extern "C" {
 			for (auto& obj : context->builtins.GetAll())
 				if (obj)
 					inUse.push_back(obj);
-			if (context->argv)
-				inUse.push_back(context->argv);
 			for (const auto& executor : context->executors)
 				executor->GetReferences(inUse);
 		}

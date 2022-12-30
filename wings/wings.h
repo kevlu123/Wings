@@ -537,9 +537,10 @@ typedef enum Wg_Exc {
 * @brief Create an instance of an interpreter.
 * 
 * The returned context must be freed with Wg_DestroyContext().
+* This function does not fail.
 * 
 * @param config The configuration to use, or NULL to use the default configuration.
-* @return A newly created context, or NULL on failure.
+* @return A newly created context.
 */
 WG_DLL_EXPORT
 Wg_Context* Wg_CreateContext(const Wg_Config* config WG_DEFAULT_ARG(nullptr));
