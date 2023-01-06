@@ -100,15 +100,17 @@ extern "C" {
 		context->currentModule.push("__main__");
 		context->globals.insert({ std::string("__main__"), {} });
 
-		// Initialise the library without restriction
-		Wg_DefaultConfig(&context->config);
-		
 		Wg_RegisterModule(context, "__builtins__", wings::ImportBuiltins);
 		Wg_RegisterModule(context, "dis", wings::ImportDis);
 		Wg_RegisterModule(context, "math", wings::ImportMath);
 		Wg_RegisterModule(context, "random", wings::ImportRandom);
 		Wg_RegisterModule(context, "sys", wings::ImportSys);
 		Wg_RegisterModule(context, "time", wings::ImportTime);
+
+		// Initialise the library without restriction
+		Wg_DefaultConfig(&context->config);
+		if (config)
+			context->config.enableOSAccess = config->enableOSAccess;
 		Wg_ImportAllFromModule(context, "__builtins__");
 		
 		if (config) {
