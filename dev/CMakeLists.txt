@@ -32,7 +32,13 @@ ENDIF()
 
 add_custom_target(
     merge ALL
-    COMMAND ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/merge.py
+    COMMAND ${PYTHON_EXECUTABLE} "${PROJECT_SOURCE_DIR}/scripts/merge.py"
+)
+
+add_custom_target(
+    cs_bindgen ALL
+    COMMAND ${PYTHON_EXECUTABLE} "${PROJECT_SOURCE_DIR}/scripts/cs_bindgen.py"
 )
 
 add_dependencies(dev merge)
+add_dependencies(dev cs_bindgen)

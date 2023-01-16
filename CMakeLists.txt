@@ -12,7 +12,7 @@ option(WINGS_BUILD_STATIC_LIB "Build a static library" OFF)
 option(WINGS_BUILD_SHARED_LIB "Build a shared library" OFF)
 
 if (WINGS_BUILD_DEV)
-	add_subdirectory(wings)
+	add_subdirectory(dev)
 endif()
 
 if (WINGS_BUILD_SHELL)

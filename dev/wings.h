@@ -127,6 +127,10 @@ typedef bool (*Wg_IterationCallback)(Wg_Obj* obj, void* userdata);
 */
 typedef bool (*Wg_ModuleLoader)(Wg_Context* context);
 
+#ifdef _WIN32
+#pragma pack(push, 1)
+#endif
+#define WG_PACK_BEGIN 
 /**
 * @brief The configuration used to initialise an interpreter.
 * 
@@ -192,7 +196,7 @@ typedef struct Wg_Config {
 	* @brief The commandline arguments passed to the interpreter.
 	* If argc is 0, then this can be NULL.
 	*/
-	const char* const* argv;
+	const char*const* argv;
 	/**
 	* @brief The length of the argv array.
 	* If argc is 0, then a length 1 array with an empty string is implied.
@@ -200,7 +204,15 @@ typedef struct Wg_Config {
 	* This is set to 0 by default.
 	*/
 	int argc;
-} Wg_Config;
+}
+#ifndef _WIN32
+__attribute__((packed))
+#endif
+Wg_Config;
+
+#ifdef _WIN32
+#pragma pack(pop)
+#endif
 
 /**
 * @brief The unary operation to be used Wg_UnaryOp.
@@ -1391,6 +1403,7 @@ Wg_Obj* Wg_GetKwargs(Wg_Context* context);
 *
 * @note This function must be called inside a function bound with Wg_NewFunction() or Wg_BindMethod().
 *
+* @param context The associated context.
 * @return The userdata associated with the current function.
 * 
 * @see Wg_NewFunction, Wg_BindMethod

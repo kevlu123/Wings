@@ -2,6 +2,7 @@ test.py
 
 .vscode/
 .vs/
+__pycache__/
 
 /out/
 /build/

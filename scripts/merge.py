@@ -1,3 +1,4 @@
+from common import *
 from pathlib import Path
 from os import sep
 import os
@@ -44,10 +45,10 @@ def process_file(path: Path):
     return content + "\n\n"
 
 def main():
-    # .
-    input_path = Path(__file__).parent.absolute()
-    # ../single_include
-    output_path = Path(__file__).parent.parent.joinpath("single_include").absolute()
+    # /dev
+    input_path = PROJECT_ROOT.joinpath("dev").absolute()
+    # /single_include
+    output_path = PROJECT_ROOT.joinpath("single_include").absolute()
 
     source = [f for f in input_path.glob("*.cpp") if not should_ignore(f)]
     main_header = input_path.joinpath("wings.h")
