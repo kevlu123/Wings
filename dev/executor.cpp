@@ -349,6 +349,13 @@ namespace wings {
 			Wg_Obj** bases = stackEnd - baseCount;
 			Wg_Obj** methods = stackEnd - methodCount - baseCount;
 
+			for (int i = 0; i < baseCount; i++) {
+				if (!Wg_IsClass(bases[i])) {
+					Wg_RaiseException(context, Wg_Exc::WG_EXC_TYPEERROR, "Base class must be a class");
+					return;
+				}
+			}
+
 			Wg_Obj* klass = Wg_NewClass(context, instr.klass->prettyName.c_str(), bases, (int)baseCount);
 			if (klass == nullptr)
 				return;
