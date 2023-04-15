@@ -914,12 +914,22 @@ extern "C" {
 		}
 
 		// Prepare arguments into a contiguous buffer
-		std::vector<Wg_Obj*> argsWithSelf;
-		if (self) {
-			argsWithSelf.push_back(self);
-			refs.emplace_back(self);
+		std::vector<Wg_Obj*> argsHeap;
+		std::array<Wg_Obj*, 4> argsStack;
+		Wg_Obj** contiguousArgs;
+		int totalArgc = argc + (self ? 1 : 0);
+		if (totalArgc <= argsStack.size()) {
+			contiguousArgs = argsStack.data();
+		} else {
+			argsHeap.resize(totalArgc);
+			contiguousArgs = argsHeap.data();
 		}
-		argsWithSelf.insert(argsWithSelf.end(), argv, argv + argc);
+		if (self) {
+			contiguousArgs[0] = self;
+		}
+		for (int i = 0; i < argc; i++) {
+			contiguousArgs[i + (self ? 1 : 0)] = argv[i];
+		}
 
 		// Push various data onto stacks
 		context->currentModule.push(module);
@@ -938,7 +948,7 @@ extern "C" {
 		// Perform the call
 		Wg_Obj* ret = nullptr;
 		try {
-			ret = fptr(context, argsWithSelf.data(), (int)argsWithSelf.size());
+			ret = fptr(context, contiguousArgs, totalArgc);
 		} catch (std::bad_alloc&) {
 			Wg_RaiseException(context, WG_EXC_MEMORYERROR);
 		}
