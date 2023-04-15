@@ -20,6 +20,7 @@
 #include <queue>
 #include <unordered_set>
 #include <cstring>
+#include <chrono>
 
 namespace wings {
 	static bool ReadFromFile(const std::string& path, std::string& data) {
@@ -857,6 +858,10 @@ extern "C" {
 
 		Wg_Context* context = callable->context;
 		
+		if (Wg_CheckTimeout(context)) {
+			return nullptr;
+		}
+		
 		// Check recursion limit
 		if (context->kwargs.size() >= (size_t)context->config.maxRecursion) {
 			Wg_RaiseException(context, WG_EXC_RECURSIONERROR);
@@ -1037,19 +1042,19 @@ extern "C" {
 			return Wg_Call(context->builtins.len, &arg, 1);
 		case WG_UOP_BOOL:
 			if (Wg_IsBool(arg))
-				return arg;
+				return Wg_CheckTimeout(context) ? nullptr : arg;
 			return Wg_Call(context->builtins._bool, &arg, 1);
 		case WG_UOP_INT:
 			if (Wg_IsInt(arg))
-				return arg;
+				return Wg_CheckTimeout(context) ? nullptr : arg;
 			return Wg_Call(context->builtins._int, &arg, 1);
 		case WG_UOP_FLOAT:
 			if (Wg_IsIntOrFloat(arg))
-				return arg;
+				return Wg_CheckTimeout(context) ? nullptr : arg;
 			return Wg_Call(context->builtins._float, &arg, 1);
 		case WG_UOP_STR:
 			if (Wg_IsString(arg))
-				return arg;
+				return Wg_CheckTimeout(context) ? nullptr : arg;
 			return Wg_Call(context->builtins.str, &arg, 1);
 		case WG_UOP_REPR:
 			return Wg_Call(context->builtins.repr, &arg, 1);
@@ -1231,6 +1236,8 @@ extern "C" {
 		switch (type) {
 		case WG_EXC_BASEEXCEPTION:
 			return Wg_RaiseExceptionClass(context->builtins.baseException, message);
+		case WG_EXC_WINGSTIMEOUTERROR:
+			return Wg_RaiseExceptionClass(context->builtins.wingsTimeoutError, message);
 		case WG_EXC_SYSTEMEXIT:
 			return Wg_RaiseExceptionClass(context->builtins.systemExit, message);
 		case WG_EXC_EXCEPTION:
@@ -1488,4 +1495,38 @@ extern "C" {
 		return obj->context;
 	}
 
+	void Wg_SetTimeout(Wg_Context* context, int milliseconds) {
+		WG_ASSERT_VOID(context && milliseconds >= 0);
+		uint64_t now = std::chrono::duration_cast<std::chrono::milliseconds>(
+			std::chrono::system_clock::now().time_since_epoch()
+		).count();
+		context->timeouts.push_back({ now, (uint64_t)milliseconds });
+	}
+
+	void Wg_ClearTimeout(Wg_Context* context) {
+		WG_ASSERT_VOID(context && context->timeouts.size() > 0);
+		context->timeouts.pop_back();
+	}
+	
+	bool Wg_CheckTimeout(Wg_Context* context) {
+		uint64_t now = std::chrono::duration_cast<std::chrono::milliseconds>(
+			std::chrono::system_clock::now().time_since_epoch()
+		).count();
+		
+		for (auto& timeout : context->timeouts) {
+			if (timeout.start && now >= timeout.start + timeout.time) {
+				std::string msg = "Time exceeded " + std::to_string(timeout.time) + "ms";
+
+				// Temporarily disable timeout to prevent timeout being hit again in Wg_RaiseException
+				timeout.start = 0;
+				
+				Wg_RaiseException(context, Wg_Exc::WG_EXC_WINGSTIMEOUTERROR, msg.c_str());
+
+				// Re-enable timeout
+				timeout.start = 1;
+				return true;
+			}
+		}
+		return false;
+	}
 } // extern "C"

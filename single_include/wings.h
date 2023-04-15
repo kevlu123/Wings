@@ -460,6 +460,10 @@ typedef enum Wg_Exc {
 	*/
 	WG_EXC_BASEEXCEPTION,
 	/**
+	* @brief WingsTimeoutError
+	*/
+	WG_EXC_WINGSTIMEOUTERROR,
+	/**
 	* @brief SystemExit
 	*/
 	WG_EXC_SYSTEMEXIT,
@@ -670,6 +674,42 @@ const char* Wg_GetErrorMessage(Wg_Context* context);
 */
 WG_DLL_EXPORT
 Wg_Obj* Wg_GetException(Wg_Context* context);
+
+
+/**
+* @brief Set a timeout before a WingTimeoutError is raised.
+*
+* Call Wg_ClearTimeout() after the timeout is no longer needed.
+* This function may be called multiple times and will stack.
+* 
+* @param context The associated context.
+* @param milliseconds The timeout in milliseconds.
+* 
+* @see Wg_ClearTimeout, Wg_CheckTimeout
+*/
+WG_DLL_EXPORT
+void Wg_SetTimeout(Wg_Context* context, int milliseconds);
+
+/**
+* @brief Pop the previous timeout.
+*
+* @param context The associated context.
+* 
+* @see Wg_SetTimeout, Wg_CheckTimeout
+*/
+WG_DLL_EXPORT
+void Wg_ClearTimeout(Wg_Context* context);
+
+/**
+* @brief Check if any timeout has occurred.
+*
+* @param context The associated context.
+* @return True if any timeout has occurred, otherwise false.
+* 
+* @see Wg_SetTimeout, Wg_ClearTimeout
+*/
+WG_DLL_EXPORT
+bool Wg_CheckTimeout(Wg_Context* context);
 
 /**
 * @brief Create and raise an exception.
@@ -2327,6 +2367,7 @@ namespace wings {
 
 		// Exception types
 		Wg_Obj* baseException;
+		Wg_Obj* wingsTimeoutError;
 		Wg_Obj* systemExit;
 		Wg_Obj* exception;
 		Wg_Obj* stopIteration;
@@ -2369,7 +2410,7 @@ namespace wings {
 				dictKeysIter, dictValuesIter, dictItemsIter, setIter,
 				codeObject, moduleObject, file, readlineIter,
 
-				baseException, systemExit, exception, stopIteration, arithmeticError,
+				baseException, wingsTimeoutError, systemExit, exception, stopIteration, arithmeticError,
 				overflowError, zeroDivisionError, attributeError, importError,
 				syntaxError, lookupError, indexError, keyError, memoryError,
 				osError, isADirectoryError, nameError, runtimeError, notImplementedError, recursionError,
@@ -2395,6 +2436,11 @@ namespace wings {
 			return variant_index<VariantType, T, index + 1>();
 		}
 	}
+	
+	struct Timeout {
+		uint64_t start;
+		uint64_t time;
+	};
 }
 
 struct Wg_Obj {
@@ -2446,6 +2492,7 @@ struct Wg_Context {
 	bool closing = false;
 	bool gcRunning = false;
 	std::vector<std::string> argv;
+	std::vector<wings::Timeout> timeouts;
 	
 	// Garbage collection
 	size_t lastObjectCountAfterGC = 0;
@@ -2801,6 +2848,9 @@ class BaseException:
 		self._message = message
 	def __str__(self):
 		return self._message
+
+class WingsTimeoutError(BaseException):
+	pass
 
 class SystemExit(BaseException):
 	pass
@@ -6708,6 +6758,7 @@ class ValueError(Exception):
 			b.readlineIter = getGlobal("__ReadLineIter");
 			
 			b.baseException = getGlobal("BaseException");
+			b.wingsTimeoutError = getGlobal("WingsTimeoutError");
 			b.systemExit = getGlobal("SystemExit");
 			b.exception = getGlobal("Exception");
 			b.stopIteration = getGlobal("StopIteration");
@@ -12735,6 +12786,7 @@ namespace wings {
 #include <queue>
 #include <unordered_set>
 #include <cstring>
+#include <chrono>
 
 namespace wings {
 	static bool ReadFromFile(const std::string& path, std::string& data) {
@@ -13572,6 +13624,10 @@ extern "C" {
 
 		Wg_Context* context = callable->context;
 		
+		if (Wg_CheckTimeout(context)) {
+			return nullptr;
+		}
+		
 		// Check recursion limit
 		if (context->kwargs.size() >= (size_t)context->config.maxRecursion) {
 			Wg_RaiseException(context, WG_EXC_RECURSIONERROR);
@@ -13752,19 +13808,19 @@ extern "C" {
 			return Wg_Call(context->builtins.len, &arg, 1);
 		case WG_UOP_BOOL:
 			if (Wg_IsBool(arg))
-				return arg;
+				return Wg_CheckTimeout(context) ? nullptr : arg;
 			return Wg_Call(context->builtins._bool, &arg, 1);
 		case WG_UOP_INT:
 			if (Wg_IsInt(arg))
-				return arg;
+				return Wg_CheckTimeout(context) ? nullptr : arg;
 			return Wg_Call(context->builtins._int, &arg, 1);
 		case WG_UOP_FLOAT:
 			if (Wg_IsIntOrFloat(arg))
-				return arg;
+				return Wg_CheckTimeout(context) ? nullptr : arg;
 			return Wg_Call(context->builtins._float, &arg, 1);
 		case WG_UOP_STR:
 			if (Wg_IsString(arg))
-				return arg;
+				return Wg_CheckTimeout(context) ? nullptr : arg;
 			return Wg_Call(context->builtins.str, &arg, 1);
 		case WG_UOP_REPR:
 			return Wg_Call(context->builtins.repr, &arg, 1);
@@ -13946,6 +14002,8 @@ extern "C" {
 		switch (type) {
 		case WG_EXC_BASEEXCEPTION:
 			return Wg_RaiseExceptionClass(context->builtins.baseException, message);
+		case WG_EXC_WINGSTIMEOUTERROR:
+			return Wg_RaiseExceptionClass(context->builtins.wingsTimeoutError, message);
 		case WG_EXC_SYSTEMEXIT:
 			return Wg_RaiseExceptionClass(context->builtins.systemExit, message);
 		case WG_EXC_EXCEPTION:
@@ -14203,6 +14261,40 @@ extern "C" {
 		return obj->context;
 	}
 
+	void Wg_SetTimeout(Wg_Context* context, int milliseconds) {
+		WG_ASSERT_VOID(context && milliseconds >= 0);
+		uint64_t now = std::chrono::duration_cast<std::chrono::milliseconds>(
+			std::chrono::system_clock::now().time_since_epoch()
+		).count();
+		context->timeouts.push_back({ now, (uint64_t)milliseconds });
+	}
+
+	void Wg_ClearTimeout(Wg_Context* context) {
+		WG_ASSERT_VOID(context && context->timeouts.size() > 0);
+		context->timeouts.pop_back();
+	}
+	
+	bool Wg_CheckTimeout(Wg_Context* context) {
+		uint64_t now = std::chrono::duration_cast<std::chrono::milliseconds>(
+			std::chrono::system_clock::now().time_since_epoch()
+		).count();
+		
+		for (auto& timeout : context->timeouts) {
+			if (timeout.start && now >= timeout.start + timeout.time) {
+				std::string msg = "Time exceeded " + std::to_string(timeout.time) + "ms";
+
+				// Temporarily disable timeout to prevent timeout being hit again in Wg_RaiseException
+				timeout.start = 0;
+				
+				Wg_RaiseException(context, Wg_Exc::WG_EXC_WINGSTIMEOUTERROR, msg.c_str());
+
+				// Re-enable timeout
+				timeout.start = 1;
+				return true;
+			}
+		}
+		return false;
+	}
 } // extern "C"
 
 

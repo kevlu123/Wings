@@ -152,6 +152,7 @@ namespace wings {
 
 		// Exception types
 		Wg_Obj* baseException;
+		Wg_Obj* wingsTimeoutError;
 		Wg_Obj* systemExit;
 		Wg_Obj* exception;
 		Wg_Obj* stopIteration;
@@ -194,7 +195,7 @@ namespace wings {
 				dictKeysIter, dictValuesIter, dictItemsIter, setIter,
 				codeObject, moduleObject, file, readlineIter,
 
-				baseException, systemExit, exception, stopIteration, arithmeticError,
+				baseException, wingsTimeoutError, systemExit, exception, stopIteration, arithmeticError,
 				overflowError, zeroDivisionError, attributeError, importError,
 				syntaxError, lookupError, indexError, keyError, memoryError,
 				osError, isADirectoryError, nameError, runtimeError, notImplementedError, recursionError,
@@ -220,6 +221,11 @@ namespace wings {
 			return variant_index<VariantType, T, index + 1>();
 		}
 	}
+	
+	struct Timeout {
+		uint64_t start;
+		uint64_t time;
+	};
 }
 
 struct Wg_Obj {
@@ -271,6 +277,7 @@ struct Wg_Context {
 	bool closing = false;
 	bool gcRunning = false;
 	std::vector<std::string> argv;
+	std::vector<wings::Timeout> timeouts;
 	
 	// Garbage collection
 	size_t lastObjectCountAfterGC = 0;

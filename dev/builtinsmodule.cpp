@@ -288,6 +288,9 @@ class BaseException:
 	def __str__(self):
 		return self._message
 
+class WingsTimeoutError(BaseException):
+	pass
+
 class SystemExit(BaseException):
 	pass
 
@@ -4194,6 +4197,7 @@ class ValueError(Exception):
 			b.readlineIter = getGlobal("__ReadLineIter");
 			
 			b.baseException = getGlobal("BaseException");
+			b.wingsTimeoutError = getGlobal("WingsTimeoutError");
 			b.systemExit = getGlobal("SystemExit");
 			b.exception = getGlobal("Exception");
 			b.stopIteration = getGlobal("StopIteration");

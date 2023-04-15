@@ -1,4 +1,6 @@
+using System;
 using System.Text;
+using System.Linq;
 using System.Runtime.InteropServices;
 
 namespace Wings {
@@ -290,6 +292,10 @@ namespace Wings {
 			/// BaseException
 			/// </summary>
 			BASEEXCEPTION,
+			/// <summary>
+			/// WingsTimeoutError
+			/// </summary>
+			WINGSTIMEOUTERROR,
 			/// <summary>
 			/// SystemExit
 			/// </summary>
@@ -640,6 +646,71 @@ namespace Wings {
 
 		[DllImport("wings", CallingConvention = CallingConvention.Cdecl)]
 		private static extern unsafe Obj Wg_GetException(Context context);
+
+		/// <summary>
+		/// Set a timeout before a WingTimeoutError is raised.
+		/// </summary>
+		/// <param name="context">
+		/// The associated context.
+		/// </param>
+		/// <param name="milliseconds">
+		/// The timeout in milliseconds.
+		/// </param>
+		/// <see>
+		/// ClearTimeout
+		/// CheckTimeout
+		/// </see>
+		public static void SetTimeout(Context context, int milliseconds) {
+			unsafe {
+				Wg_SetTimeout(context, milliseconds);
+			}
+		}
+
+		[DllImport("wings", CallingConvention = CallingConvention.Cdecl)]
+		private static extern unsafe void Wg_SetTimeout(Context context, int milliseconds);
+
+		/// <summary>
+		/// Pop the previous timeout.
+		/// </summary>
+		/// <param name="context">
+		/// The associated context.
+		/// </param>
+		/// <see>
+		/// SetTimeout
+		/// CheckTimeout
+		/// </see>
+		public static void ClearTimeout(Context context) {
+			unsafe {
+				Wg_ClearTimeout(context);
+			}
+		}
+
+		[DllImport("wings", CallingConvention = CallingConvention.Cdecl)]
+		private static extern unsafe void Wg_ClearTimeout(Context context);
+
+		/// <summary>
+		/// Check if any timeout has occurred.
+		/// </summary>
+		/// <param name="context">
+		/// The associated context.
+		/// </param>
+		/// <returns>
+		/// True if any timeout has occurred, otherwise false.
+		/// </returns>
+		/// <see>
+		/// SetTimeout
+		/// ClearTimeout
+		/// </see>
+		public static bool CheckTimeout(Context context) {
+			unsafe {
+				bool r;
+				r = Wg_CheckTimeout(context) != 0;
+				return r;
+			}
+		}
+
+		[DllImport("wings", CallingConvention = CallingConvention.Cdecl)]
+		private static extern unsafe byte Wg_CheckTimeout(Context context);
 
 		/// <summary>
 		/// Create and raise an exception.

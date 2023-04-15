@@ -460,6 +460,10 @@ typedef enum Wg_Exc {
 	*/
 	WG_EXC_BASEEXCEPTION,
 	/**
+	* @brief WingsTimeoutError
+	*/
+	WG_EXC_WINGSTIMEOUTERROR,
+	/**
 	* @brief SystemExit
 	*/
 	WG_EXC_SYSTEMEXIT,
@@ -670,6 +674,42 @@ const char* Wg_GetErrorMessage(Wg_Context* context);
 */
 WG_DLL_EXPORT
 Wg_Obj* Wg_GetException(Wg_Context* context);
+
+
+/**
+* @brief Set a timeout before a WingTimeoutError is raised.
+*
+* Call Wg_ClearTimeout() after the timeout is no longer needed.
+* This function may be called multiple times and will stack.
+* 
+* @param context The associated context.
+* @param milliseconds The timeout in milliseconds.
+* 
+* @see Wg_ClearTimeout, Wg_CheckTimeout
+*/
+WG_DLL_EXPORT
+void Wg_SetTimeout(Wg_Context* context, int milliseconds);
+
+/**
+* @brief Pop the previous timeout.
+*
+* @param context The associated context.
+* 
+* @see Wg_SetTimeout, Wg_CheckTimeout
+*/
+WG_DLL_EXPORT
+void Wg_ClearTimeout(Wg_Context* context);
+
+/**
+* @brief Check if any timeout has occurred.
+*
+* @param context The associated context.
+* @return True if any timeout has occurred, otherwise false.
+* 
+* @see Wg_SetTimeout, Wg_ClearTimeout
+*/
+WG_DLL_EXPORT
+bool Wg_CheckTimeout(Wg_Context* context);
 
 /**
 * @brief Create and raise an exception.

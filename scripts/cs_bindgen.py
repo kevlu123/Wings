@@ -167,7 +167,9 @@ class CSBindGen:
 
     def gen(self):
         defs = bindgen.parse()
+        self.write("using System;")
         self.write("using System.Text;")
+        self.write("using System.Linq;")
         self.write("using System.Runtime.InteropServices;\n")
         self.write("namespace Wings {")
         self.write("public static class Wg {")
